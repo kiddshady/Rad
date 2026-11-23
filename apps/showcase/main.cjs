@@ -10,7 +10,6 @@ const rad = require('@rad/core/main');
 const SKINS = {
   classic: require('@rad/skin-classic'),
   glass: require('@rad/skin-glass'),
-  cyberpunk: require('@rad/skin-cyberpunk'),
 };
 const DEFAULT_SKIN = 'classic';
 

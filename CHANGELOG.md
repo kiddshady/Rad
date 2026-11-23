@@ -1,5 +1,14 @@
 # Changelog
 
+## Rad Vitrina 0.7.1 (2026-11-23)
+
+- **Se retira la piel cyberpunk.** Fran la probó y el estilo cyberpunk puro no
+  le cerró para la interfaz de una app. Quedan classic y glass. El código de
+  la piel está en el historial (`ceefd16`), y lo que dejó sigue valiendo: una
+  piel puede traer sus propias entradas, y el humo no le exige respiro de
+  scrollbar a una piel sin esquinas redondeadas.
+- Si la vitrina tenía guardada una piel que ya no existe, abre con classic.
+
 ## @rad/skin-cyberpunk 0.1.0 · Rad Vitrina 0.7.0 (2026-11-23)
 
 - **Cyberpunk, la tercera piel.** Neón sobre negro y todo a filo: cian para lo
