@@ -254,6 +254,10 @@ else {
   if (document.activeElement !== btns.at(-1)) fail('el Shift+Tab no dio la vuelta dentro del modal');
   await sleep(350);
   keyOn(document.activeElement, 'Escape');
+  // Ya entró del todo: sale con su salida propia (se achica), no con el
+  // atajo de "venía entrando".
+  await frame();
+  if (modal.dataset.state !== 'closing') fail(`el modal no salió con su salida propia (estado ${modal.dataset.state}${modal.hasAttribute('data-rad-leaving') ? ', atajo de entrada' : ''})`);
   await sleep(400);
   if (document.querySelector('.rad-modal-layer')) fail('el modal quedó en el DOM después de cerrar');
   if (root.inert) fail('la app quedó inert después de cerrar el modal');
@@ -328,6 +332,23 @@ if (tipEl()?.textContent !== 'BuscarCtrl+F') fail('el segundo tooltip no salió 
 tips[1].dispatchEvent(new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body }));
 await sleep(300);
 if (document.querySelector('.rad-tooltip')) fail('el tooltip quedó en el DOM');
+
+// 11b. Recorrer rápido (Fran con Tab, nov 2026): cada tooltip se cierra
+// cuando todavía está entrando. Ninguno puede quedar pegado.
+const tipsNow = () => [...document.querySelectorAll('.rad-tooltip')];
+tips[0].dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+await sleep(650); // el primero, con su espera
+for (const gap of [0, 16, 40, 80, 120, 200]) {
+  for (const t of [tips[1], tips[2], tips[0]]) {
+    t.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })); // sale enseguida (tibio)
+    if (gap) await sleep(gap); else await frame();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })); // la tecla lo cierra
+  }
+}
+await sleep(900);
+const stuck = tipsNow();
+if (stuck.length) fail(`quedaron ${stuck.length} tooltips pegados: ${stuck.map((t) => `"${t.textContent}" (${t.dataset.state}${t.classList.contains('is-settled') ? ', asentado' : ''}${t.hasAttribute('data-rad-leaving') ? ', saliendo' : ''}, opacidad ${r2(op(t))})`).join('; ')}`);
+stuck.forEach((t) => t.remove());
 if ([...overlays().children].some((c) => c.matches('.rad-menu, .rad-modal-layer, .rad-tooltip'))) fail('quedaron capas abiertas al terminar');
 
 // ---------- Datos ----------

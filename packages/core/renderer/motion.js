@@ -86,7 +86,9 @@ export function present(el, { settle = true } = {}) {
   if (!settle) return;
   const done = () => {
     el.removeEventListener('animationend', onEnd);
-    if (el.dataset.state === 'open') el.classList.add('is-settled');
+    // Lo que ya se está yendo no se asienta: apagarle la animación lo
+    // devolvería entero a la vista.
+    if (el.dataset.state === 'open' && !el.hasAttribute('data-rad-leaving')) el.classList.add('is-settled');
   };
   const onEnd = (e) => { if (e.target === el) done(); };
   el.addEventListener('animationend', onEnd);
@@ -95,14 +97,23 @@ export function present(el, { settle = true } = {}) {
 
 /**
  * dismiss(el): sale y, cuando termina de irse, sale del DOM. Devuelve una
- * promesa que se cumple cuando ya no está. Si todavía venía entrando, no
- * arranca la salida desde entero (saltaría): da vuelta la entrada desde donde
- * iba.
+ * promesa que se cumple cuando ya no está.
+ *
+ * Si todavía venía entrando, no arranca la salida de CSS (empieza desde
+ * entero: saltaría). Pone encima una animación propia desde la opacidad que
+ * tiene ahora hasta 0. No da vuelta la entrada de CSS: el CSS es dueño de esa
+ * animación y la puede cancelar (al asentarse), y entonces la salida se
+ * cancelaba con ella y el elemento quedaba entero y pegado para siempre
+ * (los tooltips al recorrer con Tab, nov 2026). Pase lo que pase con las
+ * animaciones, sale del DOM al terminar o al vencer su plazo.
  */
 export function dismiss(el, { remove = true } = {}) {
   if (el._radDismiss) return el._radDismiss;
   el._radDismiss = new Promise((resolve) => {
+    let finished = false;
     const finish = () => {
+      if (finished) return;
+      finished = true;
       if (remove) el.remove();
       resolve();
     };
@@ -113,14 +124,16 @@ export function dismiss(el, { remove = true } = {}) {
       finish();
       return;
     }
-    const entering = notSettled
-      ? el.getAnimations().find((a) => a.playState === 'running' && a.effect?.target === el)
-      : null;
+    // "Venía entrando" = su entrada todavía corre. Lo que no se asienta nunca
+    // (el modal) y ya terminó de entrar sale con su salida de CSS.
+    const entering = notSettled && el.getAnimations().some((a) => a.playState === 'running' && a.effect?.target === el);
     if (entering) {
       el.setAttribute('data-rad-leaving', '');
-      const left = Number(entering.currentTime) || 0;
-      entering.reverse();
-      whenDone(entering, left + SAFETY_MS, finish);
+      const from = opacityNow(el);
+      const dur = ms('dur-fast') * from;
+      const out = el.animate([{ opacity: from }, { opacity: 0 }], { duration: dur, easing: token('ease-in-out'), fill: 'forwards' });
+      out.finished.then(finish, finish);
+      setTimeout(finish, dur + SAFETY_MS);
       return;
     }
     el.classList.remove('is-settled');

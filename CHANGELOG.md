@@ -1,5 +1,19 @@
 # Changelog
 
+## @rad/core 0.5.2 (2026-11-23)
+
+- Los tooltips ya no quedan pegados al recorrer rápido con Tab. Cerrar algo
+  que todavía venía entrando daba vuelta su animación de CSS; al rato el
+  temporizador de la entrada lo asentaba (apagaba la animación), eso
+  cancelaba la vuelta y el elemento quedaba entero, abierto y fuera de toda
+  salida. Ahora la salida a mitad de la entrada es una animación propia
+  encima, desde la opacidad que tiene, y sale del DOM al terminar o al
+  vencer su plazo, pase lo que pase. Nada se asienta mientras se va.
+- Lo que ya terminó de entrar (el modal, que nunca se asienta) sigue
+  saliendo con su salida propia.
+- El humo recorre los tooltips cerrándolos a mitad de la entrada con
+  distintas esperas, y comprueba la salida del modal.
+
 ## @rad/core 0.5.1 (2026-11-23)
 
 - El relevo de un texto (la statusbar, el subtítulo, el valor de un select)
