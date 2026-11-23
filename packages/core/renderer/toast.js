@@ -92,11 +92,16 @@ export function toast({ text, kind = 'info', duration = 4500, action } = {}) {
     closed = true;
     clearTimeout(timer);
     // Sale del flujo en su lugar: así los demás se acomodan mientras se va.
+    // Se ancla por ABAJO, no por arriba: la pila está pegada al borde de
+    // abajo y crece hacia arriba, así que al sacar uno se achica y su borde
+    // de arriba baja. Anclado por arriba, el que se va bajaba de golpe con
+    // ella (y el último, que la deja vacía, se cortaba contra la ventana).
     flip(host, () => {
-      const { offsetLeft, offsetTop, offsetWidth } = el;
+      const { offsetLeft, offsetTop, offsetWidth, offsetHeight } = el;
+      const fromBottom = host.clientHeight - offsetTop - offsetHeight;
       el.style.position = 'absolute';
       el.style.left = `${offsetLeft}px`;
-      el.style.top = `${offsetTop}px`;
+      el.style.bottom = `${fromBottom}px`;
       el.style.width = `${offsetWidth}px`;
       el.setAttribute('data-rad-leaving', '');
     }, { skip: (k) => k === el || leaving(k) });

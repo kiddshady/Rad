@@ -64,8 +64,15 @@ function createWindow({ skin, window: opts = {}, entry = 'index.html' }) {
   let placed = false;
   win.rad = { isPlaced: () => placed };
 
+  // En el humo la ventana no toma el foco ni recibe el mouse real: el que
+  // esté usando la PC no le mete eventos al guion (un blur cierra menús y
+  // tooltips, y el mouse encima dispara los suyos).
+  const smoke = Boolean(process.env.RAD_SMOKE);
+  if (smoke) win.setIgnoreMouseEvents(true);
+
   win.once('ready-to-show', () => {
-    win.show();
+    if (smoke) win.showInactive();
+    else win.show();
     setTimeout(() => {
       if (win.isDestroyed()) return;
       win.setPosition(target.x, target.y);

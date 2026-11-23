@@ -106,7 +106,14 @@ export function dismiss(el, { remove = true } = {}) {
       if (remove) el.remove();
       resolve();
     };
-    const entering = !el.classList.contains('is-settled') && el.dataset.state === 'open'
+    const notSettled = !el.classList.contains('is-settled') && el.dataset.state === 'open';
+    // Todavía no se llegó a ver (la entrada no pintó ni un cuadro): se va
+    // directo. Arrancarle la salida la mostraría entera para desvanecerla.
+    if (notSettled && opacityNow(el) < 0.02) {
+      finish();
+      return;
+    }
+    const entering = notSettled
       ? el.getAnimations().find((a) => a.playState === 'running' && a.effect?.target === el)
       : null;
     if (entering) {

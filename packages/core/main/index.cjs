@@ -22,6 +22,15 @@ const pkg = require('../package.json');
 
 const CORE_RENDERER = path.join(__dirname, '..', 'renderer');
 
+// En el humo la ventana tiene que seguir pintando aunque otra la tape: si
+// Windows la da por ocluida, Chromium deja de dar cuadros y las animaciones
+// se quedan quietas (el guion mediría una app congelada).
+if (process.env.RAD_SMOKE) {
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+  app.commandLine.appendSwitch('disable-renderer-backgrounding');
+  app.commandLine.appendSwitch('disable-background-timer-throttling');
+}
+
 let registered = false;
 function ensureScheme(extra) {
   if (registered) return;

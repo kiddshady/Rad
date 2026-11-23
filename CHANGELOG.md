@@ -1,5 +1,16 @@
 # Changelog
 
+## @rad/core 0.3.1 (2026-11-23)
+
+- El toast que se va ya no baja de golpe antes de deslizarse. La pila está
+  anclada abajo y, al sacarlo del flujo, se achicaba y se lo llevaba (52 px
+  con tres toasts); el último, que la dejaba vacía, se cortaba contra el
+  borde de la ventana. Ahora sale anclado por abajo y se queda en su lugar.
+- Lo que se cierra antes de pintar su primer cuadro de entrada se va directo,
+  en vez de aparecer entero para desvanecerse.
+- El humo ya no depende de quien esté usando la PC: su ventana no toma el
+  foco, no recibe el mouse real y sigue pintando aunque esté tapada.
+
 ## @rad/core 0.3.0 · @rad/skin-classic 0.3.0 (2026-11-23)
 
 La etapa 3: lo que flota.

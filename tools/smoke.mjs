@@ -17,7 +17,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const electron = require('electron'); // en node pelado devuelve la ruta del ejecutable
 const OUT = path.join(ROOT, '.smoke', 'showcase.json');
 const SHOT = path.join(ROOT, '.smoke', 'showcase.png');
-const TIMEOUT_MS = 30000;
+const TIMEOUT_MS = 60000;
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.rmSync(OUT, { force: true });

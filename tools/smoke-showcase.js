@@ -5,7 +5,8 @@ const failures = [];
 const data = {};
 const fail = (msg) => failures.push(msg);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const frame = () => new Promise((r) => requestAnimationFrame(r));
+// Un cuadro, con tope: si la ventana deja de pintar, el guion no se cuelga.
+const frame = () => new Promise((r) => { requestAnimationFrame(r); setTimeout(r, 50); });
 const view = (id) => document.querySelector(`.rad-view[data-view="${id}"]`);
 const item = (id) => document.querySelector(`.rad-rail-item[data-view="${id}"]`);
 const op = (el) => parseFloat(getComputedStyle(el).opacity);
@@ -189,8 +190,16 @@ const three = alive();
 if (three.length !== 3) fail(`había ${three.length} toasts, se esperaban 3`);
 else {
   const top0 = three[0].getBoundingClientRect().top;
+  const goneBefore = three[1].getBoundingClientRect().top;
   three[1].querySelector('.rad-toast-close').click();
+  // Mismo cuadro y el siguiente: el que se va no puede moverse en vertical
+  // (sale de costado). Si salta, la pila se achicó y se lo llevó.
+  const goneNow = three[1].getBoundingClientRect().top;
   await frame();
+  const goneNext = three[1].getBoundingClientRect().top;
+  if (Math.abs(goneNow - goneBefore) > 1 || Math.abs(goneNext - goneBefore) > 1) {
+    fail(`el toast que se va saltó en vertical: ${Math.round(goneBefore)} → ${Math.round(goneNow)} → ${Math.round(goneNext)}`);
+  }
   if (getComputedStyle(three[1]).position !== 'absolute') fail('el toast que se va no salió del flujo');
   await sleep(450);
   if (three[1].isConnected) fail('el toast cerrado quedó en el DOM');
@@ -198,6 +207,19 @@ else {
   if (!(top1 > top0)) fail('el toast de arriba no bajó a ocupar el lugar');
   data.toasts = `el de arriba bajó ${Math.round(top1 - top0)} px`;
 }
+// El último que queda: al irse, la pila queda vacía y no se lo puede llevar.
+alive().forEach((t) => t._radClose?.());
+await sleep(450);
+capas.querySelector('[data-demo="toast"][data-kind="info"]').click();
+await sleep(450);
+const solo = alive()[0];
+const soloBefore = solo.getBoundingClientRect().top;
+solo._radClose();
+await frame();
+const soloNext = solo.getBoundingClientRect().top;
+if (Math.abs(soloNext - soloBefore) > 1) fail(`el último toast saltó en vertical al irse: ${Math.round(soloBefore)} → ${Math.round(soloNext)}`);
+await sleep(450);
+
 capas.querySelector('[data-demo="burst"]').click();
 await sleep(1400);
 if (alive().length > 4) fail(`quedaron ${alive().length} toasts, el tope es 4`);
