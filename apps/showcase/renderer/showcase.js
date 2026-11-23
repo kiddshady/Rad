@@ -10,6 +10,7 @@ import { toast } from '/@core/toast.js';
 import { openDoc } from '/@core/store.js';
 import { hold } from '/@core/ready.js';
 import { createSelect, setFieldError } from '/@core/controls.js';
+import { wireUpdates } from '/@core/updates.js';
 
 // La interfaz se arma después de leer los datos: el arranque espera.
 const release = hold();
@@ -212,4 +213,5 @@ const shell = createShell({
 shell.status.set('left', views.find((v) => v.id === shell.router.current).label);
 shell.status.set('right', MESSAGES[0]);
 shell.router.on('change', ({ label }) => shell.status.set('left', label));
+wireUpdates({ name: 'Rad Vitrina' });
 release();

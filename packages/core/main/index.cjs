@@ -21,6 +21,7 @@ const protocol = require('./protocol.cjs');
 const { createWindow, wireWindowIpc } = require('./window.cjs');
 const { Store } = require('./store.cjs');
 const smoke = require('./smoke.cjs');
+const updater = require('./updater.cjs');
 const contract = require('../contract/tokens.cjs');
 const pkg = require('../package.json');
 
@@ -167,6 +168,9 @@ function start(options) {
     protocol.handle({ app: renderer, core: CORE_RENDERER, skin: skin.root, fonts: fontsRoot() });
     wireWindowIpc();
     wireStoreIpc();
+    // Actualizaciones: solo empaquetada y con bloque "publish" en el build.
+    // rad.start({ updates: false }) las apaga.
+    updater.setup({ enabled: options.updates !== false });
     const appInfo = { name: options.window?.title ?? app.getName(), version: app.getVersion() };
     const win = createWindow({ ...options, store: getStore(), appInfo, fonts });
     app.on('second-instance', () => {

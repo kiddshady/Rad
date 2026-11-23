@@ -24,6 +24,12 @@
     "directories": {
       "output": "dist"
     },
+    "publish": {
+      "provider": "github",
+      "owner": "kiddshady",
+      "repo": "rad-releases",
+      "releaseType": "release"
+    },
     "files": [
       "main.cjs",
       "renderer/**/*",
@@ -40,7 +46,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "Rad-Vitrina-Setup-${version}.${ext}"
     }
   }
 }

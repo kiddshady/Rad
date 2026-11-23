@@ -1,6 +1,6 @@
 {
   "name": "@rad/core",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "private": true,
   "description": "El núcleo de Rad: ventana, puente, protocolo y los huesos del renderer. No sabe nada de estilo.",
   "author": "Kidd Shady · Umbrovex Systems",
@@ -11,7 +11,8 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@rad/fonts": "*"
+    "@rad/fonts": "*",
+    "electron-updater": "^6.8.11"
   },
   "peerDependencies": {
     "electron": ">=44"

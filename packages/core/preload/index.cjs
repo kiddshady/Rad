@@ -34,6 +34,18 @@ contextBridge.exposeInMainWorld('rad', {
   },
   openExternal: (url) => ipcRenderer.invoke('rad:open-external', url),
 
+  updates: {
+    state: () => ipcRenderer.invoke('rad:update:state'),
+    check: () => ipcRenderer.invoke('rad:update:check'),
+    download: () => ipcRenderer.invoke('rad:update:download'),
+    install: () => ipcRenderer.invoke('rad:update:install'),
+    on: (fn) => {
+      const listener = (_event, payload) => fn(payload);
+      ipcRenderer.on('rad:update', listener);
+      return () => ipcRenderer.removeListener('rad:update', listener);
+    },
+  },
+
   store: {
     read: (name) => ipcRenderer.invoke('rad:store:read', name),
     write: (name, value) => ipcRenderer.send('rad:store:write', name, value),
