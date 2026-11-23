@@ -1,5 +1,20 @@
 # Changelog
 
+## Rad Vitrina 0.5.0, la primera empaquetada (2026-11-23)
+
+- electron-builder 26 en el monorepo. La vitrina se empaqueta con su bloque
+  `build`, y los paquetes `@rad/*` entran al asar como dependencias normales:
+  el asar quedó con el núcleo, la piel, las fuentes y la app, nada más (384 KB).
+- Instalador NSIS (`Rad Vitrina-Setup-0.5.0.exe`) con los campos del
+  ejecutable de Kidd Shady · Umbrovex Systems.
+- Ícono horneado desde el código con la baldosa estándar: un núcleo y su
+  anillo, en los colores de classic. `tools/icon-kit.mjs` dibuja cada tamaño a
+  su tamaño y arma el .ico (PNG de 128 para arriba, DIB abajo);
+  `tools/icon-sheet.py` lo compara con los íconos de las otras apps.
+- La ventana usa el `.ico` en Windows, igual que el ejecutable.
+- `npm run smoke:pack` corre las dos pasadas del humo contra la app
+  empaquetada: pasaron enteras, con el protocolo leyendo desde el asar.
+
 ## @rad/core 0.5.2 (2026-11-23)
 
 - Los tooltips ya no quedan pegados al recorrer rápido con Tab. Cerrar algo

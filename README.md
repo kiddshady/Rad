@@ -225,6 +225,24 @@ npm run check      verify + test + smoke
 El humo no puede ver el flash del compositor al arrancar: no sale en ninguna
 captura. Ese se juzga a ojo, en vivo y en frío.
 
+## Empaquetar una app
+
+Las apps hechas con Rad viven en `apps/<Nombre>`, cada una con su
+`package.json`, su versión y su bloque `build` de electron-builder. El
+empaquetado se lleva bien con el monorepo: los paquetes `@rad/*` entran al
+asar como dependencias normales.
+
+```
+npm run pack         la vitrina sin instalador (dist/win-unpacked), para probar
+npm run smoke:pack   el humo entero contra la vitrina empaquetada
+npm run build        el instalador (dist/Rad Vitrina-Setup-<versión>.exe)
+```
+
+El ícono se hornea desde el código con la baldosa estándar
+(`tools/icon-kit.mjs`; el de la vitrina en `apps/showcase/scripts/icon.mjs`), y
+`tools/icon-sheet.py` arma la hoja de control contra los íconos de las otras
+apps. En Windows la ventana usa el mismo `.ico` que el ejecutable.
+
 ---
 
 Kidd Shady · Umbrovex Systems

@@ -1,15 +1,46 @@
 {
   "name": "rad-showcase",
+  "productName": "Rad Vitrina",
   "version": "0.5.0",
   "private": true,
   "description": "La vitrina de Rad: todos los tokens y componentes con la piel activa, para probar.",
   "author": "Kidd Shady · Umbrovex Systems",
   "main": "main.cjs",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "icon": "node scripts/icon.mjs",
+    "pack": "electron-builder --win dir --publish never",
+    "build": "electron-builder --win --publish never"
   },
   "dependencies": {
     "@rad/core": "*",
     "@rad/skin-classic": "*"
+  },
+  "build": {
+    "appId": "com.umbrovex.rad.showcase",
+    "productName": "Rad Vitrina",
+    "copyright": "Copyright © 2026 Kidd Shady · Umbrovex Systems",
+    "electronVersion": "44.10.1",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "renderer/**/*",
+      "build/icon.ico",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    }
   }
 }

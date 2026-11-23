@@ -12,9 +12,13 @@
     "verify": "node tools/verify-core.mjs && node tools/verify-skins.mjs",
     "test": "node tools/test-store.mjs",
     "smoke": "node tools/smoke.mjs",
-    "check": "npm run verify && npm run test && npm run smoke"
+    "check": "npm run verify && npm run test && npm run smoke",
+    "pack": "npm run pack -w rad-showcase",
+    "smoke:pack": "node tools/smoke.mjs --exe \"apps/showcase/dist/win-unpacked/Rad Vitrina.exe\"",
+    "build": "npm run build -w rad-showcase"
   },
   "devDependencies": {
-    "electron": "44.10.1"
+    "electron": "44.10.1",
+    "electron-builder": "^26.18.0"
   }
 }

@@ -26,17 +26,30 @@ const SCRIPT = path.join(ROOT, 'tools', 'smoke-showcase.js');
 const TIMEOUT_MS = 60000;
 const MOVE = { x: 140, y: 110, width: 1000, height: 700 };
 
+// --exe <ruta>: corre el humo contra la app EMPAQUETADA (dist/win-unpacked)
+// en vez de contra el repo. Es lo que agarra lo que anda en dev y se rompe
+// instalado: archivos que no entraron al asar, rutas que no lo atraviesan.
+const exeArg = process.argv.indexOf('--exe');
+const EXE = exeArg > 0 ? path.resolve(process.argv[exeArg + 1]) : null;
+if (EXE && !fs.existsSync(EXE)) {
+  console.error(`smoke: no existe ${EXE} (¿falta npm run pack -w rad-showcase?)`);
+  process.exit(1);
+}
+const TAG = EXE ? 'empaquetada-' : '';
+const command = EXE ? [EXE, []] : [electron, [path.join(ROOT, 'apps', 'showcase')]];
+if (EXE) console.log(`smoke: contra la app empaquetada ${path.relative(ROOT, EXE)}`);
+
 fs.mkdirSync(SMOKE, { recursive: true });
 const data = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-smoke-'));
 
 function run(pass, extraEnv = {}) {
-  const out = path.join(SMOKE, `showcase-${pass}.json`);
-  const shot = path.join(SMOKE, pass === 1 ? 'showcase.png' : `showcase-${pass}.png`);
+  const out = path.join(SMOKE, `showcase-${TAG}${pass}.json`);
+  const shot = path.join(SMOKE, pass === 1 ? `showcase${TAG ? '-' + TAG.slice(0, -1) : ''}.png` : `showcase-${TAG}${pass}.png`);
   fs.rmSync(out, { force: true });
   const env = { ...process.env, RAD_SMOKE: out, RAD_SMOKE_SHOT: shot, RAD_SMOKE_SCRIPT: SCRIPT, RAD_DATA: data, ...extraEnv };
   delete env.ELECTRON_RUN_AS_NODE;
   return new Promise((resolve) => {
-    const child = spawn(electron, [path.join(ROOT, 'apps', 'showcase')], { env, stdio: 'inherit' });
+    const child = spawn(command[0], command[1], { env, stdio: 'inherit' });
     const killer = setTimeout(() => { console.error(`smoke: pasada ${pass}: tiempo agotado, mato el proceso`); child.kill(); }, TIMEOUT_MS);
     child.on('exit', (code) => {
       clearTimeout(killer);
