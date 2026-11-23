@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const { Store } = require(path.join(ROOT, 'packages', 'core', 'main', 'store.cjs'));
+const { Store, adopt } = require(path.join(ROOT, 'packages', 'core', 'main', 'store.cjs'));
 
 const failures = [];
 const check = (ok, msg) => { if (!ok) failures.push(msg); };
@@ -111,9 +111,34 @@ const onDisk = (dir, name) => {
   }
 }
 
+// 8. Adoptar los datos de la carpeta vieja (una app que cambió de nombre):
+//    se copia entera si la nueva no existe, sin temporales; no pisa una que
+//    ya existe, no borra la vieja y sin vieja no inventa nada.
+{
+  const base = fresh();
+  const old = path.join(base, 'Vieja', 'data');
+  const now = path.join(base, 'Nueva', 'data');
+  const s = new Store(old, { debounceMs: 0 });
+  await s.write('ajustes', { piel: 'mono' });
+  await s.flushAll();
+  fs.writeFileSync(path.join(old, 'ajustes.json.7.tmp'), 'a medias');
+  check(adopt(old, now) === true, 'adoptar: no adoptó una carpeta que existía');
+  check(onDisk(now, 'ajustes').piel === 'mono', 'adoptar: el documento no llegó a la carpeta nueva');
+  check(leftovers(now).length === 0, 'adoptar: se trajo un temporal');
+  check(fs.readdirSync(path.dirname(now)).join() === 'data', `adoptar: quedó algo más al lado: ${fs.readdirSync(path.dirname(now)).join(', ')}`);
+  check(onDisk(old, 'ajustes').piel === 'mono', 'adoptar: tocó la carpeta vieja');
+  const s2 = new Store(now, { debounceMs: 0 });
+  await s2.write('ajustes', { piel: 'glass' });
+  await s2.flushAll();
+  check(adopt(old, now) === false, 'adoptar: volvió a adoptar sobre una carpeta que ya existía');
+  check(onDisk(now, 'ajustes').piel === 'glass', 'adoptar: pisó los datos nuevos con los viejos');
+  const nada = path.join(base, 'Otra', 'data');
+  check(adopt(path.join(base, 'NoExiste', 'data'), nada) === false && !fs.existsSync(nada), 'adoptar: sin carpeta vieja creó algo');
+}
+
 if (failures.length) {
   console.error(`test-store: ${failures.length} falla(s)`);
   for (const f of failures) console.error('  ' + f);
   process.exit(1);
 }
-console.log('test-store: ok (ráfaga, recuperación, .bak, reintentos, nombres)');
+console.log('test-store: ok (ráfaga, recuperación, .bak, reintentos, nombres, adoptar)');

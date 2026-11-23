@@ -1,5 +1,22 @@
 # Changelog
 
+## @rad/core 0.11.0 · Rad 0.11.0 (2026-11-23)
+
+- **La vitrina pasa a llamarse Rad a secas.** Fran no quería el «Vitrina» en
+  el nombre de la app instalada. Cambian el `productName`, el `.exe`
+  (`Rad.exe`), el título de la ventana y el instalador
+  (`Rad-Setup-<versión>.exe`). El `appId` y el repo de releases son los
+  mismos, así que la instalada se actualiza sola. Adentro del repo sigue
+  siendo «la vitrina» (`apps/showcase`): es su papel, no su nombre.
+- **`rad.adoptData('Nombre viejo')`** (núcleo). La carpeta de datos sale del
+  `productName`: una app que cambia de nombre arrancaría de cero. Esto copia
+  los datos de la carpeta vieja si la nueva todavía no existe, a un temporal
+  que se renombra al final (o queda entera o no queda). No pisa nada, no
+  borra la vieja y se puede dejar para siempre. Va antes del primer uso del
+  store. Con su prueba en `test-store` (y la prueba falla con el código roto).
+- `test-update` acepta `--after "<.exe>"` para cuando la versión nueva le
+  cambia el nombre al ejecutable.
+
 ## Rad Vitrina 0.10.1 (2026-11-23)
 
 - Sale con @rad/skin-mono 0.1.2: los colores de estado a pleno, el rojo

@@ -151,4 +151,24 @@ class Store {
   }
 }
 
-module.exports = { Store, NAME };
+// Adoptar los datos de otra carpeta: una app que cambió de nombre estrena
+// carpeta, y sin esto arrancaría de cero. Si la nueva todavía no existe y la
+// vieja sí, se copia entera. Va a un temporal y se renombra al final: o
+// queda completa o no queda (una copia a medias no se tomaría nunca más por
+// buena ni se reintentaría). No pisa nada y no borra la vieja.
+function adopt(oldDir, newDir) {
+  if (fs.existsSync(newDir) || !fs.existsSync(oldDir)) return false;
+  const tmp = `${newDir}.adopt-${process.pid}`;
+  fs.rmSync(tmp, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(newDir), { recursive: true });
+  try {
+    fs.cpSync(oldDir, tmp, { recursive: true, filter: (src) => !src.endsWith('.tmp') });
+    fs.renameSync(tmp, newDir);
+  } catch (err) {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    throw err;
+  }
+  return true;
+}
+
+module.exports = { Store, NAME, adopt };

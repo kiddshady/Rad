@@ -11,6 +11,7 @@
 //   });
 //   rad.send('notas:cambiaron', datos);               // avisarle al renderer
 //   rad.store.read('ajustes');                        // el mismo store del renderer
+//   rad.adoptData('Nombre viejo');                    // si la app cambió de nombre
 //
 // Hay que requerirlo antes de app.whenReady(): registra el esquema rad:// en
 // el momento de cargarse, y Electron solo lo acepta antes de ready.
@@ -19,7 +20,7 @@ const path = require('node:path');
 const { app, ipcMain, BrowserWindow } = require('electron');
 const protocol = require('./protocol.cjs');
 const { createWindow, wireWindowIpc } = require('./window.cjs');
-const { Store } = require('./store.cjs');
+const { Store, adopt } = require('./store.cjs');
 const smoke = require('./smoke.cjs');
 const updater = require('./updater.cjs');
 const contract = require('../contract/tokens.cjs');
@@ -88,6 +89,24 @@ function getStore() {
     store = new Store(dir, { log: (m) => console.warn(`[rad:store] ${m}`) });
   }
   return store;
+}
+
+// Una app que cambió de nombre: sus datos viven en una carpeta con el nombre
+// viejo (userData sale del productName). Se llama antes de tocar el store y
+// se puede dejar para siempre: solo copia si la carpeta nueva no existe.
+// Devuelve si adoptó. Con RAD_DATA no hace nada (los tests no tocan lo real).
+function adoptData(formerName) {
+  if (typeof formerName !== 'string' || !formerName.trim() || /[\/:*?"<>|]/.test(formerName)) {
+    throw new Error(`[rad] adoptData: nombre de app inválido: ${JSON.stringify(formerName)}`);
+  }
+  if (store) throw new Error('[rad] adoptData va antes del primer uso del store');
+  if (process.env.RAD_DATA) return false;
+  try {
+    return adopt(path.join(app.getPath('appData'), formerName, 'data'), path.join(app.getPath('userData'), 'data'));
+  } catch (err) {
+    console.warn(`[rad:store] no se pudieron adoptar los datos de "${formerName}": ${err.message}`);
+    return false;
+  }
 }
 
 function checkSkin(skin) {
@@ -193,6 +212,7 @@ module.exports = {
   start,
   handle,
   send,
+  adoptData,
   get store() { return getStore(); },
   version: pkg.version,
   contract,

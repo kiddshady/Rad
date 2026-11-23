@@ -192,6 +192,7 @@ rad.on('notas:cambiaron', (datos) => { … });
 rad.handle('sistema:info', () => ({ … }));
 rad.send('notas:cambiaron', datos);
 rad.store.read('ajustes');
+rad.adoptData('Nombre viejo');               // antes de tocar el store
 ```
 
 - Cada documento es un JSON en `<userData>/data`. Se escribe a un temporal
@@ -204,6 +205,10 @@ rad.store.read('ajustes');
 - Una sola instancia: la segunda le pasa el foco a la primera.
 - Los links a la web (`http`, `https`, `mailto`) se abren en el navegador.
 - El renderer solo ve canales `app:*`; los documentos con `_` son del núcleo.
+- Una app que cambia de nombre estrena carpeta de datos (sale del
+  `productName`). `rad.adoptData('Nombre viejo')`, antes del primer uso del
+  store, copia los datos de la carpeta vieja si la nueva todavía no existe.
+  Se puede dejar para siempre: no pisa nada y no borra la vieja.
 - `RAD_DATA=<carpeta>` manda los datos y el perfil a otro lado (los tests lo
   usan para no tocar la app real).
 
@@ -337,7 +342,7 @@ asar como dependencias normales.
 ```
 npm run pack         la vitrina sin instalador (dist/win-unpacked), para probar
 npm run smoke:pack   el humo entero contra la vitrina empaquetada
-npm run build        el instalador (dist/Rad Vitrina-Setup-<versión>.exe)
+npm run build        el instalador (dist/Rad-Setup-<versión>.exe)
 ```
 
 ### Publicar y actualizar

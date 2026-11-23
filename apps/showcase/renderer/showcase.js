@@ -168,11 +168,11 @@ const views = [
       area.addEventListener('input', () => nota.patch({ texto: area.value }));
       const n = visitas.get().veces;
       el.querySelector('[data-demo="visitas"]').textContent = n === 1
-        ? 'Es la primera vez que abrís la vitrina.'
-        : `Abriste la vitrina ${n} veces.`;
+        ? 'Es la primera vez que abrís Rad.'
+        : `Abriste Rad ${n} veces.`;
       const facts = el.querySelector('[data-demo="info"]');
       window.rad?.invoke('sistema:info').then((info) => {
-        const rows = [['Vitrina', info.vitrina], ['Electron', info.electron], ['Chromium', info.chromium], ['Node', info.node], ['Datos', info.datos]];
+        const rows = [['Rad', info.vitrina], ['Electron', info.electron], ['Chromium', info.chromium], ['Node', info.node], ['Datos', info.datos]];
         for (const [k, v] of rows) {
           const dt = document.createElement('dt');
           dt.textContent = k;
@@ -283,7 +283,7 @@ function skinCard(s) {
     use.addEventListener('click', async () => {
       const yes = await confirm({
         title: `¿Cambiar a ${s.name}?`,
-        text: 'La vitrina se cierra y vuelve a abrir con esa piel.',
+        text: 'Rad se cierra y vuelve a abrir con esa piel.',
         confirmLabel: 'Cambiar',
       });
       if (!yes) return;
@@ -312,5 +312,5 @@ const shell = createShell({
 shell.status.set('left', views.find((v) => v.id === shell.router.current).label);
 shell.status.set('right', MESSAGES[0]);
 shell.router.on('change', ({ label }) => shell.status.set('left', label));
-wireUpdates({ name: 'Rad Vitrina' });
+wireUpdates({ name: 'Rad' });
 release();

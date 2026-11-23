@@ -15,7 +15,7 @@
     "shots": "node tools/shots.mjs",
     "check": "npm run verify && npm run test && npm run smoke",
     "pack": "npm run pack -w rad-showcase",
-    "smoke:pack": "node tools/smoke.mjs --exe \"apps/showcase/dist/win-unpacked/Rad Vitrina.exe\"",
+    "smoke:pack": "node tools/smoke.mjs --exe \"apps/showcase/dist/win-unpacked/Rad.exe\"",
     "build": "npm run build -w rad-showcase"
   },
   "devDependencies": {

@@ -1,6 +1,9 @@
 // Prueba la actualización de punta a punta sobre la vitrina INSTALADA:
 //
-//   node tools/test-update.mjs --exe "<ruta al Rad Vitrina.exe instalado>" --expect 0.5.1
+//   node tools/test-update.mjs --exe "<ruta al .exe instalado>" --expect 0.5.1
+//
+// --after "<ruta>" si la versión nueva cambia el nombre del .exe (la app se
+// renombró): la versión se lee de ahí después de instalar.
 //
 // 1. Abre la versión instalada (vieja) con datos descartables.
 // 2. El guion (smoke-update.js) espera el aviso, toca "Descargar", espera
@@ -18,13 +21,14 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = (n) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? process.argv[i + 1] : null; };
 const EXE = arg('exe');
 const EXPECT = arg('expect');
+const AFTER = arg('after') || EXE;
 if (!EXE || !EXPECT || !fs.existsSync(EXE)) {
-  console.error('uso: node tools/test-update.mjs --exe "<Rad Vitrina.exe instalado>" --expect <versión>');
+  console.error('uso: node tools/test-update.mjs --exe "<.exe instalado>" --expect <versión> [--after "<.exe después de actualizar>"]');
   process.exit(1);
 }
 
 // Windows informa cuatro números (0.5.1.0): se comparan los tres de semver.
-const version = () => execFileSync('powershell', ['-NoProfile', '-Command', `(Get-Item -LiteralPath '${EXE}').VersionInfo.ProductVersion`], { encoding: 'utf8' })
+const version = (exe = EXE) => execFileSync('powershell', ['-NoProfile', '-Command', `(Get-Item -LiteralPath '${exe}').VersionInfo.ProductVersion`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
   .trim().split('.').slice(0, 3).join('.');
 const before = version();
 console.log(`instalada: ${before}; se espera llegar a ${EXPECT}`);
@@ -53,7 +57,7 @@ if (!report.ok) {
 let now = before;
 for (let i = 0; i < 90 && now !== EXPECT; i++) {
   await new Promise((r) => setTimeout(r, 2000));
-  try { now = version(); } catch { /* el instalador tiene el archivo tomado */ }
+  try { now = version(AFTER); } catch { /* el instalador tiene el archivo tomado, o todavía no lo puso */ }
 }
 fs.rmSync(data, { recursive: true, force: true });
 if (now !== EXPECT) { console.error(`test-update: FALLA, el .exe quedó en ${now}`); process.exit(1); }

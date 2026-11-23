@@ -14,6 +14,10 @@ const SKINS = {
 };
 const DEFAULT_SKIN = 'classic';
 
+// Hasta la 0.10.1 la app se llamaba «Rad Vitrina» y sus datos quedaron en una
+// carpeta con ese nombre: se adoptan la primera vez, antes de leer nada.
+rad.adoptData('Rad Vitrina');
+
 // RAD_SKIN manda (el humo y las capturas lo usan para no depender de lo
 // guardado); si no, la última que se eligió.
 const wanted = process.env.RAD_SKIN || rad.store.read('vitrina')?.piel;
@@ -61,7 +65,7 @@ rad.start({
   window: {
     width: 1100,
     height: 760,
-    title: 'Rad · vitrina',
+    title: 'Rad',
     icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
   },
   // La vitrina usa la mono de la piel. RAD_SHOWCASE_MONO=roboto-mono la
