@@ -23,7 +23,9 @@ if (!EXE || !EXPECT || !fs.existsSync(EXE)) {
   process.exit(1);
 }
 
-const version = () => execFileSync('powershell', ['-NoProfile', '-Command', `(Get-Item -LiteralPath '${EXE}').VersionInfo.ProductVersion`], { encoding: 'utf8' }).trim();
+// Windows informa cuatro números (0.5.1.0): se comparan los tres de semver.
+const version = () => execFileSync('powershell', ['-NoProfile', '-Command', `(Get-Item -LiteralPath '${EXE}').VersionInfo.ProductVersion`], { encoding: 'utf8' })
+  .trim().split('.').slice(0, 3).join('.');
 const before = version();
 console.log(`instalada: ${before}; se espera llegar a ${EXPECT}`);
 
