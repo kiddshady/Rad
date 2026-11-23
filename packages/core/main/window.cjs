@@ -53,7 +53,7 @@ function initialBounds(saved, width, height, minWidth, minHeight) {
 
 const isExternal = (url) => /^(https?:|mailto:)/i.test(url);
 
-function createWindow({ skin, window: opts = {}, entry = 'index.html', store, appInfo }) {
+function createWindow({ skin, window: opts = {}, entry = 'index.html', store, appInfo, fonts = {} }) {
   const minWidth = opts.minWidth ?? 720;
   const minHeight = opts.minHeight ?? 480;
   const remember = opts.remember !== false && store;
@@ -81,6 +81,7 @@ function createWindow({ skin, window: opts = {}, entry = 'index.html', store, ap
         `--rad-skin=${encodeURIComponent(JSON.stringify({ id: skin.id, name: skin.name }))}`,
         `--rad-core=${encodeURIComponent(JSON.stringify({ version: require('../package.json').version }))}`,
         `--rad-app=${encodeURIComponent(JSON.stringify(appInfo ?? {}))}`,
+        `--rad-fonts=${encodeURIComponent(JSON.stringify(fonts))}`,
       ],
       contextIsolation: true,
       nodeIntegration: false,

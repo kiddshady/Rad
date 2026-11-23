@@ -4,7 +4,6 @@
   suaves y esquinas de redondeo sutil. Pensada como punto de partida: que no
   tenga carácter fuerte es justamente lo que la hace servir para cualquier app.
 */
-@import url('/@fonts/roboto-mono.css');
 @import url('tokens.css') layer(rad.skin);
 @import url('shell.css') layer(rad.skin);
 @import url('controls.css') layer(rad.skin);

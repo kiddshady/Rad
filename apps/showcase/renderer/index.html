@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="@core/core.css">
   <link rel="stylesheet" href="@skin/index.css">
   <link rel="stylesheet" href="showcase.css">
+  <!-- Solo para mostrar las dos mono lado a lado; una app normal la elige con rad.start({ fonts }). -->
+  <link rel="stylesheet" href="/@fonts/roboto-mono.css">
   <script type="module" src="@core/boot.js"></script>
   <script type="module" src="showcase.js"></script>
 </head>
@@ -68,7 +70,7 @@
       </section>
       <section class="sc-sec">
         <h2>La fuente de los datos</h2>
-        <p class="sc-t2">Las dos opciones para el mono, lado a lado. La piel elige una con <code>--rad-font-mono</code>.</p>
+        <p class="sc-t2">Las dos opciones para el mono, lado a lado. La piel trae una; cada app puede elegir otra con <code>rad.start({ fonts: { mono: 'roboto-mono' } })</code>.</p>
         <div class="sc-monos">
           <figure class="sc-card sc-mono-card">
             <figcaption class="sc-t3 sc-fs-s">Cascadia Mono · viene con Windows</figcaption>

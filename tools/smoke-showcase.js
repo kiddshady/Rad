@@ -34,6 +34,14 @@ if (marker?.pass === 1) {
   // debounce: solo llega si el cierre normal bajó lo pendiente.
   const last = await window.rad.store.read('ultimo');
   if (last?.ok !== true) fail('lo que se guardó justo antes de cerrar se perdió (before-quit no bajó lo pendiente)');
+  // Esta pasada corre con fonts: { mono: 'roboto-mono' }: la elegida va
+  // adelante y la de la piel queda de reserva.
+  const mono2 = getComputedStyle(document.documentElement).getPropertyValue('--rad-font-mono').trim();
+  if (!mono2.startsWith("'Roboto Mono', 'Cascadia Mono'")) fail(`con la mono elegida, --rad-font-mono es: ${mono2}`);
+  const code2 = document.querySelector('.rad-titlebar-sub');
+  if (!getComputedStyle(code2).fontFamily.startsWith('"Roboto Mono"')) fail(`la titlebar no usa la mono elegida: ${getComputedStyle(code2).fontFamily}`);
+  if (![...document.fonts].some((f) => f.family.replace(/["']/g, '') === 'Roboto Mono' && f.status === 'loaded')) fail('la mono elegida no estaba cargada al entrar');
+  data.monoElegida = mono2;
   window.rad.store.write('smoke', { pass: 2 });
   // Para la captura de esta pasada: las dos fuentes mono, lado a lado.
   item('texto').click();
@@ -43,6 +51,10 @@ if (marker?.pass === 1) {
   data.persistencia = `visitas ${visitas?.veces}, nota "${nota?.texto}", último guardado ${last?.ok ? 'llegó' : 'perdido'}`;
   return { failures, data };
 }
+
+// Sin elección de la app, la mono es la de la piel (classic: Cascadia).
+const mono1 = getComputedStyle(document.documentElement).getPropertyValue('--rad-font-mono').trim();
+if (!mono1.startsWith("'Cascadia Mono'")) fail(`sin elección, --rad-font-mono es: ${mono1}`);
 
 // 0. Arranque: la raíz entró y se apagó su animación; una sola vista visible.
 if (!root.classList.contains('is-settled')) fail('la raíz no quedó asentada (falta is-settled)');

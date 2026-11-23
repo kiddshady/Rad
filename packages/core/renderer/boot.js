@@ -13,6 +13,37 @@ import './tooltip.js';
 
 const FALLBACK_MS = 2000;
 const FONTS_MAX_MS = 1500;
+const capped = (promise) => Promise.race([promise, new Promise((r) => setTimeout(r, FONTS_MAX_MS))]);
+
+// Las fuentes que eligió la app (rad.start({ fonts })). Cada una va adelante
+// de la pila de la piel, que queda de reserva. Se aplica antes de entrar,
+// con la raíz todavía invisible: el cambio no se ve.
+function loadCss(href) {
+  return new Promise((resolve) => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    link.onload = resolve;
+    link.onerror = () => { console.error(`[rad] no se pudo cargar ${href}`); resolve(); };
+    document.head.append(link);
+  });
+}
+
+async function applyFonts() {
+  const chosen = Object.entries(window.rad?.fonts ?? {});
+  if (!chosen.length) return;
+  await Promise.all(chosen.filter(([, f]) => f.css).map(([, f]) => loadCss(`/@fonts/${f.css}`)));
+  const root = document.documentElement;
+  for (const [role, font] of chosen) {
+    const name = `--rad-font-${role}`;
+    const skinStack = getComputedStyle(root).getPropertyValue(name).trim();
+    root.style.setProperty(name, skinStack ? `'${font.family}', ${skinStack}` : `'${font.family}'`);
+  }
+  // La carga explícita: document.fonts.ready no espera a una fuente que
+  // todavía nadie pidió.
+  await capped(Promise.all(chosen.map(([, f]) => document.fonts.load(`1em '${f.family}'`).catch(() => {}))));
+}
+const fontsApplied = applyFonts();
 
 let revealed = false;
 let revealing = false;
@@ -23,7 +54,8 @@ async function reveal() {
   await whenReleased();
   // Las fuentes propias (font-display: block) tienen que estar antes de
   // entrar: si llegaran después, el texto cambiaría de forma ya a la vista.
-  await Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, FONTS_MAX_MS))]);
+  await fontsApplied;
+  await capped(document.fonts.ready);
   if (revealed) return;
   revealed = true;
   document.documentElement.setAttribute('data-rad-ready', '');

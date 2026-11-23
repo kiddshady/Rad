@@ -1,0 +1,14 @@
+{
+  "roboto-mono": {
+    "family": "Roboto Mono",
+    "css": "roboto-mono.css",
+    "roles": ["mono"],
+    "note": "Viaja con Rad (OFL)."
+  },
+  "cascadia-mono": {
+    "family": "Cascadia Mono",
+    "roles": ["mono"],
+    "system": true,
+    "note": "Viene con Windows 11 y con Windows Terminal."
+  }
+}

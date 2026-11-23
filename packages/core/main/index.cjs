@@ -34,6 +34,32 @@ function fontsRoot() {
     return null;
   }
 }
+
+// La elección de fuentes de la app: rad.start({ fonts: { mono: 'roboto-mono' } }).
+// Cada id sale del catálogo de @rad/fonts; un id que no existe o que no sirve
+// para ese rol frena el arranque con la lista de los que hay, en vez de caer
+// callado a la fuente de la piel.
+const FONT_ROLES = ['ui', 'display', 'mono'];
+function resolveFonts(choice = {}) {
+  const picked = {};
+  const entries = Object.entries(choice).filter(([, id]) => id);
+  if (!entries.length) return picked;
+  let catalog;
+  try {
+    catalog = require('@rad/fonts/catalog.json');
+  } catch {
+    throw new Error('[rad] se pidieron fuentes pero no está @rad/fonts');
+  }
+  for (const [role, id] of entries) {
+    if (!FONT_ROLES.includes(role)) throw new Error(`[rad] rol de fuente desconocido: ${role} (hay: ${FONT_ROLES.join(', ')})`);
+    const font = catalog[id];
+    const valid = Object.entries(catalog).filter(([, f]) => f.roles.includes(role)).map(([k]) => k);
+    if (!font || !font.roles.includes(role)) throw new Error(`[rad] la fuente "${id}" no sirve para ${role} (hay: ${valid.join(', ')})`);
+    picked[role] = { family: font.family, css: font.css ?? null };
+  }
+  return picked;
+}
+
 const CHANNEL = /^[a-z0-9][\w.:-]{0,63}$/i;
 
 // RAD_DATA cambia dónde viven los datos (y el perfil de Chromium): los tests
@@ -122,6 +148,7 @@ function wireQuit() {
 function start(options) {
   const { skin, renderer } = options;
   checkSkin(skin);
+  const fonts = resolveFonts(options.fonts);
   if (!renderer) throw new Error('[rad] falta renderer: la carpeta del renderer de la app');
 
   // Una sola instancia: dos procesos escribiendo los mismos documentos se
@@ -141,7 +168,7 @@ function start(options) {
     wireWindowIpc();
     wireStoreIpc();
     const appInfo = { name: options.window?.title ?? app.getName(), version: app.getVersion() };
-    const win = createWindow({ ...options, store: getStore(), appInfo });
+    const win = createWindow({ ...options, store: getStore(), appInfo, fonts });
     app.on('second-instance', () => {
       if (win.isDestroyed()) return;
       if (win.isMinimized()) win.restore();

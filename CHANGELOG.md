@@ -1,5 +1,18 @@
 # Changelog
 
+## @rad/fonts 0.2.0 · @rad/core 0.4.2 · @rad/skin-classic 0.4.2 (2026-11-23)
+
+- Cada app elige sus fuentes al arrancar: `rad.start({ fonts: { mono:
+  'roboto-mono' } })`. La elegida va adelante y la de la piel queda de
+  reserva. Sin elección, manda la piel.
+- `@rad/fonts/catalog.json` lista las fuentes y para qué rol sirve cada una
+  (`roboto-mono`, `cascadia-mono`). Un id que no existe frena el arranque con
+  la lista de los que hay.
+- El núcleo carga el CSS de la fuente elegida, la pide explícitamente y
+  espera a que esté antes de entrar.
+- Classic ya no carga Roboto Mono: su mono sigue siendo Cascadia.
+- El humo corre la segunda pasada con Roboto Mono elegida.
+
 ## @rad/fonts 0.1.0 · @rad/core 0.4.1 · @rad/skin-classic 0.4.1 (2026-11-23)
 
 - Nuevo paquete `@rad/fonts`, con Roboto Mono variable (pesos 100 a 700,

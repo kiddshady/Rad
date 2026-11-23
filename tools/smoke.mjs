@@ -65,7 +65,8 @@ const first = await run(1, { RAD_SMOKE_MOVE: JSON.stringify(MOVE), RAD_SMOKE_QUI
 show(1, first);
 if (!first.ok) process.exit(1);
 
-const second = await run(2);
+// La segunda, además, con la mono elegida por la app en vez de la de la piel.
+const second = await run(2, { RAD_SHOWCASE_MONO: 'roboto-mono' });
 const b = second.bounds || {};
 if (second.ok && (b.x !== MOVE.x || b.y !== MOVE.y || b.width !== MOVE.width || b.height !== MOVE.height)) {
   second.ok = false;

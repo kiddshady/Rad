@@ -168,15 +168,21 @@ Rad es solo oscuro: el verificador rechaza una superficie clara.
 ## Fuentes compartidas
 
 `packages/fonts` (`@rad/fonts`) trae fuentes que viajan con Rad y se sirven en
-`rad://app/@fonts/`. Por ahora, Roboto Mono:
+`rad://app/@fonts/`. La piel define sus fuentes, y cada app puede elegir otra
+al arrancar:
 
-```css
-@import url('/@fonts/roboto-mono.css');
-:root { --rad-font-mono: 'Roboto Mono', 'Cascadia Mono', Consolas, monospace; }
+```js
+rad.start({
+  skin: require('@rad/skin-classic'),
+  renderer: path.join(__dirname, 'renderer'),
+  fonts: { mono: 'roboto-mono' },   // ui, display o mono
+});
 ```
 
-Van con `font-display: block` y el arranque espera a que estén cargadas, así
-el texto nunca cambia de forma ya a la vista.
+Los ids salen de `packages/fonts/catalog.json` (hoy: `roboto-mono` y
+`cascadia-mono`). La elegida va adelante y la de la piel queda de reserva. Van
+con `font-display: block` y el arranque espera a que estén cargadas, así el
+texto nunca cambia de forma ya a la vista.
 
 ## Comandos
 
