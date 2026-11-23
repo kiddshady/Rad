@@ -76,7 +76,10 @@ shell.status.set('left', 'Listo');
 shell.setSubtitle('borrador');
 ```
 
-- **Titlebar** propia con los controles de ventana. Se arrastra entera.
+- **Titlebar** propia con los controles de ventana. Se arrastra entera. Cada
+  botón de ventana ocupa todo el alto y llega al canto (la esquina sigue
+  cerrando con la ventana maximizada), pero lo que se ve es una pastilla más
+  chica adentro: la piel pinta `.rad-winbtn::before`, no el botón.
 - **Rail** con un item por vista. El indicador viaja al activo, y las flechas
   lo recorren con el teclado. Se apaga con `rail: false`.
 - **Escenario**: cada vista se monta la primera vez que se visita y queda

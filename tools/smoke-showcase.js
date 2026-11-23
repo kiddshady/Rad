@@ -75,6 +75,25 @@ const viewBg = getComputedStyle(view('planos')).backgroundColor;
 const viewAlpha = viewBg.startsWith('rgba') ? parseFloat(viewBg.split(',')[3]) : viewBg === 'transparent' ? 0 : 1;
 if (viewAlpha < 1) fail(`la vista no tapa (fondo ${viewBg}): el fundido entre vistas dejaría ver dos contenidos a la vez`);
 
+// 0b. Los botones de ventana: el botón entero llega al canto (la esquina de
+// arriba a la derecha sigue siendo cerrar) y lo que se pinta es una pastilla
+// más chica adentro, separada de los bordes.
+{
+  const close = document.querySelector('.rad-winbtn-close');
+  const box = close.getBoundingClientRect();
+  const plate = getComputedStyle(close, '::before');
+  const plateH = parseFloat(plate.height);
+  const air = parseFloat(plate.right);
+  const top = parseFloat(plate.top);
+  if (Math.abs(window.innerWidth - box.right) > 0.5 || box.top > 0.5) fail(`el botón de cerrar no llega a la esquina: termina en ${r2(box.right)} de ${window.innerWidth}, arriba ${r2(box.top)}`);
+  if (document.elementFromPoint(window.innerWidth - 1, 1)?.closest('.rad-winbtn') !== close) fail('la esquina de arriba a la derecha no es el botón de cerrar');
+  if (!(plateH > 12 && plateH < box.height - 4)) fail(`la pastilla del botón de ventana mide ${plateH} de alto y el botón ${box.height}: tiene que ser más chica`);
+  if (!(air >= 3 && top >= 3)) fail(`la pastilla del botón de ventana no tiene aire: ${air} al costado, ${top} arriba`);
+  if (Math.abs(top * 2 + plateH - box.height) > 1) fail(`la pastilla del botón de ventana no está centrada: ${top} arriba, alto ${plateH}, botón ${box.height}`);
+  if (parseFloat(plate.borderTopLeftRadius) > 0 && getComputedStyle(close).backgroundColor !== 'rgba(0, 0, 0, 0)') fail('el botón de ventana entero tiene fondo: lo que se pinta es la pastilla');
+  data.botonesDeVentana = `botón ${Math.round(box.width)}x${Math.round(box.height)}, pastilla ${Math.round(parseFloat(plate.width))}x${Math.round(plateH)} con ${air} px de aire`;
+}
+
 // 1. Fundido planos -> texto, muestreado cuadro por cuadro.
 item('texto').click();
 const fade = [];

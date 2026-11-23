@@ -1,5 +1,18 @@
 # Changelog
 
+## @rad/core 0.10.0 · Rad Vitrina 0.10.0 (2026-11-23)
+
+- **Botones de ventana en pastilla.** Fran los pidió como los de sus apps de
+  Opal: rectángulos redondeados más chicos, separados del canto, en vez del
+  bloque que llegaba hasta el borde. El botón sigue ocupando todo el alto y
+  llegando a la esquina (con la ventana maximizada, tirar el mouse a la
+  esquina sigue cerrando); lo que se pinta es una pastilla adentro.
+- Cambio de anatomía para las pieles: el fondo del hover y el rojo de cerrar
+  van en `.rad-winbtn::before`, no en el botón. El anillo del teclado también
+  va en la pastilla, así no se corta contra el canto de la ventana. Perillas:
+  `--rad-a-winbtn-plate` (el alto) y `--rad-a-winbtn-air` (el aire a los lados).
+- Classic y glass ya la visten; mono la hereda de glass sin tocar nada.
+
 ## @rad/core 0.9.0 · @rad/skin-mono 0.1.0 · Rad Vitrina 0.9.0 (2026-11-23)
 
 - **Mono, una piel nueva.** Glass sin color: vidrio oscuro acromático donde

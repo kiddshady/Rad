@@ -153,11 +153,35 @@
     align-self: stretch;
     -webkit-app-region: no-drag;
   }
+  /* Los botones de ventana. El botón entero (del alto de la titlebar y pegado
+     al borde) es lo que recibe el click: con la ventana maximizada, tirar el
+     mouse a la esquina sigue cerrando. Lo que se ve es una pastilla más
+     chica adentro (::before), que es lo que la piel pinta: el fondo al pasar
+     el mouse, el rojo de cerrar. Así el color no llega hasta el canto de la
+     ventana, y el anillo del teclado, que va en la pastilla, no se corta
+     contra él. Las perillas: el alto de la pastilla y su aire a los lados. */
   .rad-winbtn {
+    --rad-a-winbtn-plate: calc(var(--rad-control-height) - var(--rad-space-1));
+    --rad-a-winbtn-air: calc(var(--rad-space-1) + var(--rad-line-width));
+    position: relative;
+    z-index: 0;
     width: calc(var(--rad-titlebar-height) * 1.2);
     display: grid;
     place-items: center;
   }
+  .rad-winbtn::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset-inline: var(--rad-a-winbtn-air);
+    top: calc((100% - var(--rad-a-winbtn-plate)) / 2);
+    height: var(--rad-a-winbtn-plate);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), outline-color var(--rad-dur-fast) var(--rad-ease-out);
+    outline: calc(var(--rad-line-width) * 2) solid transparent;
+    outline-offset: var(--rad-line-width);
+  }
+  .rad-winbtn:focus-visible { outline: none; }
+  .rad-winbtn:focus-visible::before { outline-color: var(--rad-focus); }
   .rad-winbtn svg {
     width: calc(var(--rad-icon-size) * 0.625);
     height: calc(var(--rad-icon-size) * 0.625);

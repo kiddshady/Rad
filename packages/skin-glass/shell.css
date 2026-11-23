@@ -18,14 +18,18 @@
   font-size: var(--rad-text-xs);
   color: var(--rad-text-3);
 }
+/* Los botones de ventana: lo que se pinta es la pastilla (::before), no el
+   botón entero, que llega hasta el canto de la ventana. */
 .rad-winbtn {
   color: var(--rad-text-2);
-  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+  transition: color var(--rad-dur-fast) var(--rad-ease-out);
 }
-.rad-winbtn:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
-.rad-winbtn:active { background-color: var(--rad-tint-press); }
-.rad-winbtn-close:hover { background-color: color-mix(in srgb, var(--rad-danger) 82%, transparent); color: var(--rad-text-1); }
-.rad-winbtn:focus-visible { outline-offset: calc(var(--rad-line-width) * -3); }
+.rad-winbtn::before { border-radius: calc(var(--rad-radius-m) - 2px); }
+.rad-winbtn:hover { color: var(--rad-text-1); }
+.rad-winbtn:hover::before { background-color: var(--rad-tint-hover); }
+.rad-winbtn:active::before { background-color: var(--rad-tint-press); }
+.rad-winbtn-close:hover::before { background-color: color-mix(in srgb, var(--rad-danger) 82%, transparent); }
+.rad-winbtn-close:active::before { background-color: color-mix(in srgb, var(--rad-danger) 64%, transparent); }
 
 /* Rail */
 .rad-rail {
