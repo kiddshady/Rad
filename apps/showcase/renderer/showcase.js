@@ -7,6 +7,16 @@ import { createShell } from '/@core/shell.js';
 import { menuButton } from '/@core/menu.js';
 import { openModal, confirm } from '/@core/modal.js';
 import { toast } from '/@core/toast.js';
+import { openDoc } from '/@core/store.js';
+import { hold } from '/@core/ready.js';
+
+// La interfaz se arma después de leer los datos: el arranque espera.
+const release = hold();
+
+// Cada arranque suma una visita: muestra que el documento sobrevive al cierre.
+const visitas = await openDoc('visitas', { veces: 0 });
+visitas.update((v) => ({ veces: v.veces + 1 }));
+const nota = await openDoc('nota', { texto: '' });
 
 const icon = (paths) => `<svg viewBox="0 0 16 16" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 
@@ -88,6 +98,33 @@ const views = [
     },
   },
   {
+    id: 'datos',
+    label: 'Datos',
+    icon: icon('<ellipse cx="8" cy="4" rx="5" ry="1.75"/><path d="M3 4v8c0 1 2.2 1.75 5 1.75S13 13 13 12V4M3 8c0 1 2.2 1.75 5 1.75S13 9 13 8"/>'),
+    mount(el) {
+      fromTemplate('view-datos')(el);
+      const area = el.querySelector('#sc-nota');
+      area.value = nota.get().texto;
+      area.addEventListener('input', () => nota.patch({ texto: area.value }));
+      const n = visitas.get().veces;
+      el.querySelector('[data-demo="visitas"]').textContent = n === 1
+        ? 'Es la primera vez que abrís la vitrina.'
+        : `Abriste la vitrina ${n} veces.`;
+      const facts = el.querySelector('[data-demo="info"]');
+      window.rad?.invoke('sistema:info').then((info) => {
+        const rows = [['Electron', info.electron], ['Chromium', info.chromium], ['Node', info.node], ['Datos', info.datos]];
+        for (const [k, v] of rows) {
+          const dt = document.createElement('dt');
+          dt.textContent = k;
+          const dd = document.createElement('dd');
+          dd.className = 'rad-mono';
+          dd.textContent = v;
+          facts.append(dt, dd);
+        }
+      });
+    },
+  },
+  {
     id: 'movimiento',
     label: 'Movimiento',
     icon: icon('<path d="M2.5 8h8M7.5 4.5 11 8l-3.5 3.5M13.5 4v8"/>'),
@@ -118,3 +155,4 @@ const shell = createShell({
 shell.status.set('left', views.find((v) => v.id === shell.router.current).label);
 shell.status.set('right', MESSAGES[0]);
 shell.router.on('change', ({ label }) => shell.status.set('left', label));
+release();

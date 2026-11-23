@@ -118,6 +118,43 @@ Todo vive en una capa fija hermana de `.rad-root`, entra y sale animado
 de más arriba. El botón del núcleo es `.rad-button`, con
 `data-variant="primary" | "danger" | "quiet"`.
 
+## Guardado y puente
+
+```js
+// renderer
+import { openDoc } from '/@core/store.js';
+import { hold } from '/@core/ready.js';
+
+const release = hold();                      // el arranque espera a la interfaz
+const ajustes = await openDoc('ajustes', { densidad: 'normal' });
+ajustes.patch({ densidad: 'compacta' });     // se guarda solo
+armarInterfaz();
+release();
+
+const info = await rad.invoke('sistema:info');
+rad.on('notas:cambiaron', (datos) => { … });
+```
+
+```js
+// main
+rad.handle('sistema:info', () => ({ … }));
+rad.send('notas:cambiaron', datos);
+rad.store.read('ajustes');
+```
+
+- Cada documento es un JSON en `<userData>/data`. Se escribe a un temporal
+  único y se renombra encima, con `.bak` del anterior y reintentos si Windows
+  tiene el archivo tomado. Un documento roto no se pisa: se aparta y se
+  recupera del `.bak`.
+- Al cerrar la app, lo pendiente baja al disco antes de salir.
+- La ventana se acuerda de su lugar, su tamaño y si estaba maximizada; si el
+  monitor ya no está, vuelve al centro.
+- Una sola instancia: la segunda le pasa el foco a la primera.
+- Los links a la web (`http`, `https`, `mailto`) se abren en el navegador.
+- El renderer solo ve canales `app:*`; los documentos con `_` son del núcleo.
+- `RAD_DATA=<carpeta>` manda los datos y el perfil a otro lado (los tests lo
+  usan para no tocar la app real).
+
 ## Una piel
 
 Una piel es una carpeta `packages/skin-<id>` con:
@@ -134,8 +171,9 @@ Rad es solo oscuro: el verificador rechaza una superficie clara.
 npm install
 npm run showcase   abre la vitrina
 npm run verify     el núcleo sin estilo y cada piel contra el contrato
-npm run smoke      abre la vitrina, mide lo que se ve y sale
-npm run check      verify + smoke
+npm run test       el guardado, con node pelado
+npm run smoke      abre la vitrina dos veces, mide lo que se ve y lo que sobrevive
+npm run check      verify + test + smoke
 ```
 
 El humo no puede ver el flash del compositor al arrancar: no sale en ninguna

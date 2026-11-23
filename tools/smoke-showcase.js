@@ -14,8 +14,32 @@ const z = (el) => parseInt(getComputedStyle(el).zIndex, 10) || 0;
 const visible = () => [...document.querySelectorAll('.rad-view')].filter((v) => v.dataset.state !== 'hidden').map((v) => v.dataset.view);
 const r2 = (n) => Math.round(n * 100) / 100;
 
-// 0. Arranque: la raíz entró y se apagó su animación; una sola vista visible.
 const root = document.querySelector('.rad-root');
+const NOTA = 'Escrita en la pasada 1 del humo.';
+
+// Segunda pasada (tools/smoke.mjs abre la vitrina otra vez sobre los mismos
+// datos): lo de la primera tiene que seguir ahí.
+const marker = await window.rad.store.read('smoke');
+if (marker?.pass === 1) {
+  const visitas = await window.rad.store.read('visitas');
+  if (visitas?.veces !== 2) fail(`las visitas dicen ${visitas?.veces}, se esperaba 2`);
+  const nota = await window.rad.store.read('nota');
+  if (nota?.texto !== NOTA) fail(`la nota guardada dice "${nota?.texto}"`);
+  item('datos').click();
+  await sleep(400);
+  const area = view('datos').querySelector('#sc-nota');
+  if (area.value !== NOTA) fail(`el campo de la nota muestra "${area.value}"`);
+  if (!/2 veces/.test(view('datos').querySelector('[data-demo="visitas"]').textContent)) fail('la vista no muestra las 2 visitas');
+  // Lo último de la pasada 1 se escribió justo antes de cerrar, dentro del
+  // debounce: solo llega si el cierre normal bajó lo pendiente.
+  const last = await window.rad.store.read('ultimo');
+  if (last?.ok !== true) fail('lo que se guardó justo antes de cerrar se perdió (before-quit no bajó lo pendiente)');
+  window.rad.store.write('smoke', { pass: 2 });
+  data.persistencia = `visitas ${visitas?.veces}, nota "${nota?.texto}", último guardado ${last?.ok ? 'llegó' : 'perdido'}`;
+  return { failures, data };
+}
+
+// 0. Arranque: la raíz entró y se apagó su animación; una sola vista visible.
 if (!root.classList.contains('is-settled')) fail('la raíz no quedó asentada (falta is-settled)');
 if (getComputedStyle(root).animationName !== 'none') fail(`la raíz sigue con animación: ${getComputedStyle(root).animationName}`);
 if (visible().join() !== 'planos') fail(`al arrancar se ven: ${visible().join()}`);
@@ -246,9 +270,34 @@ await sleep(300);
 if (document.querySelector('.rad-tooltip')) fail('el tooltip quedó en el DOM');
 if ([...overlays().children].some((c) => c.matches('.rad-menu, .rad-modal-layer, .rad-tooltip'))) fail('quedaron capas abiertas al terminar');
 
+// ---------- Datos ----------
+// 12. El puente contesta, la nota se guarda y los nombres del núcleo están
+// cerrados para el renderer.
+item('datos').click();
+await sleep(400);
+const datos = view('datos');
+const facts = datos.querySelectorAll('[data-demo="info"] dd');
+if (facts.length !== 4) fail(`el puente no contestó: ${facts.length} datos`);
+else data.puente = [...facts].slice(0, 3).map((d) => d.textContent).join(' · ');
+const area = datos.querySelector('#sc-nota');
+area.value = NOTA;
+area.dispatchEvent(new Event('input', { bubbles: true }));
+let reserved = false;
+try { await window.rad.store.read('_window'); } catch { reserved = true; }
+if (!reserved) fail('el renderer pudo leer un documento reservado del núcleo');
+let badChannel = false;
+try { await window.rad.invoke('../rad:window', 'close'); } catch { badChannel = true; }
+if (!badChannel) fail('el puente aceptó un canal inválido');
+window.rad.store.write('smoke', { pass: 1 });
+item('capas').click();
+await sleep(400);
+
 // Para la captura: un menú abierto y un toast.
 capas.querySelector('[data-demo="toast"][data-kind="success"]').click();
 menuBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
 await sleep(500);
+
+// Lo último: un guardado que todavía está en el debounce cuando la app cierra.
+window.rad.store.write('ultimo', { ok: true });
 
 return { failures, data };

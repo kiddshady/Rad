@@ -21,7 +21,7 @@ function hexToRgb(hex) {
   return [0, 2, 4].map(i => parseInt(full.slice(i, i + 2), 16));
 }
 
-function attach(win, { skin, settleMs = 900, timeoutMs = 15000 }) {
+function attach(win, { skin, store, settleMs = 900, timeoutMs = 15000 }) {
   const out = process.env.RAD_SMOKE;
   if (!out) return false;
 
@@ -31,13 +31,27 @@ function attach(win, { skin, settleMs = 900, timeoutMs = 15000 }) {
   });
   win.webContents.on('did-fail-load', (_e, code, desc, url) => errors.push(`did-fail-load ${code} ${desc} ${url}`));
 
-  const finish = (report) => {
+  // Con RAD_SMOKE_QUIT=close sale por el camino normal (app.quit, que pasa
+  // por before-quit y baja lo pendiente del store): así se prueba ese camino.
+  // Si no, app.exit, que no pasa por before-quit: lo pendiente se baja acá.
+  const finish = async (report) => {
+    const normal = process.env.RAD_SMOKE_QUIT === 'close' && report.ok;
+    if (!normal) {
+      try { await store?.flushAll(); } catch (err) { report.ok = false; (report.failures ||= []).push(`store: ${err.message}`); }
+    }
     fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
     fs.writeFileSync(out, JSON.stringify(report, null, 2));
-    app.exit(report.ok ? 0 : 1);
+    if (normal) app.quit();
+    else app.exit(report.ok ? 0 : 1);
   };
 
   const timer = setTimeout(() => finish({ ok: false, failures: ['timeout: la ventana nunca quedó en su lugar'] }), timeoutMs);
+
+  // RAD_SMOKE_MOVE={x,y,width,height}: mueve la ventana apenas queda en su
+  // lugar, para que la pasada siguiente compruebe que se acordó.
+  if (process.env.RAD_SMOKE_MOVE) {
+    win.once('rad:placed', () => { if (!win.isDestroyed()) win.setBounds(JSON.parse(process.env.RAD_SMOKE_MOVE)); });
+  }
 
   win.once('rad:placed', () => setTimeout(async () => {
     clearTimeout(timer);

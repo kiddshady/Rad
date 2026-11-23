@@ -7,13 +7,19 @@
 
 import { wireAll } from './scroll.js';
 import { ms, SAFETY_MS } from './motion.js';
+import { whenReleased } from './ready.js';
 // Los tooltips se activan solos: cualquier elemento con data-rad-tip los tiene.
 import './tooltip.js';
 
 const FALLBACK_MS = 2000;
 
 let revealed = false;
-function reveal() {
+let revealing = false;
+// Entra cuando la ventana está en su lugar Y la app soltó sus hold().
+async function reveal() {
+  if (revealing) return;
+  revealing = true;
+  await whenReleased();
   if (revealed) return;
   revealed = true;
   document.documentElement.setAttribute('data-rad-ready', '');

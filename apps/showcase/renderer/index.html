@@ -170,6 +170,37 @@
     </div>
   </template>
 
+  <template id="view-datos">
+    <div class="sc-col">
+      <header class="sc-head">
+        <h1>Datos</h1>
+        <p>Lo que se guarda en disco y el puente con el proceso principal.</p>
+      </header>
+      <section class="sc-sec">
+        <h2>Un documento guardado</h2>
+        <div class="sc-card sc-stack">
+          <label class="sc-t2 sc-fs-s" for="sc-nota">Escribí algo, cerrá la vitrina y volvé a abrirla.</label>
+          <textarea id="sc-nota" class="sc-textarea" rows="4" spellcheck="false" placeholder="Una nota que sobrevive al cierre"></textarea>
+          <p class="sc-t3 sc-fs-s"><span data-demo="visitas"></span></p>
+        </div>
+      </section>
+      <section class="sc-sec">
+        <h2>La ventana</h2>
+        <div class="sc-card sc-stack">
+          <p class="sc-t2">Moverla, cambiarle el tamaño o maximizarla también se guarda. Si el monitor donde estaba ya no está, vuelve al centro del principal.</p>
+        </div>
+      </section>
+      <section class="sc-sec">
+        <h2>El puente</h2>
+        <div class="sc-card sc-stack">
+          <p class="sc-t2">Esto lo contesta el proceso principal, con <code>rad.invoke('sistema:info')</code>:</p>
+          <dl class="sc-facts" data-demo="info"></dl>
+          <p class="sc-t2">Un link a la web se abre en tu navegador, nunca adentro de la app: <a class="sc-link" href="https://github.com/kiddshady/Rad" target="_blank">el repo de Rad en GitHub</a>.</p>
+        </div>
+      </section>
+    </div>
+  </template>
+
   <template id="view-movimiento">
     <div class="sc-col">
       <header class="sc-head">

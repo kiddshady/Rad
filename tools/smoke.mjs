@@ -1,12 +1,18 @@
-// Humo: arranca la vitrina de verdad, espera a que la ventana esté en su
-// lugar con el contenido entrado, mide lo que se ve y sale.
-// Deja el informe y una captura en .smoke/.
+// Humo: arranca la vitrina de verdad, mide lo que se ve y sale. Dos pasadas
+// sobre la misma carpeta de datos descartable (RAD_DATA), para probar lo que
+// sobrevive al cierre:
+//   1. el guion completo (fundidos, capas, etc.), escribe una nota y la
+//      ventana se mueve a un lugar conocido;
+//   2. la vitrina vuelve a abrir: la nota, las visitas y el lugar de la
+//      ventana tienen que estar como se dejaron.
+// Deja los informes y las capturas en .smoke/.
 // Uso: node tools/smoke.mjs
 //
 // Lo que NO puede medir: el flash del compositor al arrancar. No sale en
 // ninguna captura; se juzga a ojo, en vivo y en frío.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -15,33 +21,57 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const electron = require('electron'); // en node pelado devuelve la ruta del ejecutable
-const OUT = path.join(ROOT, '.smoke', 'showcase.json');
-const SHOT = path.join(ROOT, '.smoke', 'showcase.png');
-const TIMEOUT_MS = 60000;
-
-fs.mkdirSync(path.dirname(OUT), { recursive: true });
-fs.rmSync(OUT, { force: true });
-
+const SMOKE = path.join(ROOT, '.smoke');
 const SCRIPT = path.join(ROOT, 'tools', 'smoke-showcase.js');
-const env = { ...process.env, RAD_SMOKE: OUT, RAD_SMOKE_SHOT: SHOT, RAD_SMOKE_SCRIPT: SCRIPT };
-delete env.ELECTRON_RUN_AS_NODE;
+const TIMEOUT_MS = 60000;
+const MOVE = { x: 140, y: 110, width: 1000, height: 700 };
 
-const child = spawn(electron, [path.join(ROOT, 'apps', 'showcase')], { env, stdio: 'inherit' });
-const killer = setTimeout(() => { console.error('smoke: tiempo agotado, mato el proceso'); child.kill(); }, TIMEOUT_MS);
+fs.mkdirSync(SMOKE, { recursive: true });
+const data = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-smoke-'));
 
-child.on('exit', (code) => {
-  clearTimeout(killer);
-  if (!fs.existsSync(OUT)) {
-    console.error(`smoke: FALLA, la app salió (código ${code}) sin dejar informe`);
-    process.exit(1);
-  }
-  const report = JSON.parse(fs.readFileSync(OUT, 'utf8'));
-  if (report.ok && code === 0) {
-    console.log(`smoke: ok  ventana ${report.size.width}x${report.size.height} en (${report.bounds.x}, ${report.bounds.y}), captura en ${path.relative(ROOT, SHOT)}`);
+function run(pass, extraEnv = {}) {
+  const out = path.join(SMOKE, `showcase-${pass}.json`);
+  const shot = path.join(SMOKE, pass === 1 ? 'showcase.png' : `showcase-${pass}.png`);
+  fs.rmSync(out, { force: true });
+  const env = { ...process.env, RAD_SMOKE: out, RAD_SMOKE_SHOT: shot, RAD_SMOKE_SCRIPT: SCRIPT, RAD_DATA: data, ...extraEnv };
+  delete env.ELECTRON_RUN_AS_NODE;
+  return new Promise((resolve) => {
+    const child = spawn(electron, [path.join(ROOT, 'apps', 'showcase')], { env, stdio: 'inherit' });
+    const killer = setTimeout(() => { console.error(`smoke: pasada ${pass}: tiempo agotado, mato el proceso`); child.kill(); }, TIMEOUT_MS);
+    child.on('exit', (code) => {
+      clearTimeout(killer);
+      if (!fs.existsSync(out)) return resolve({ ok: false, failures: [`la app salió (código ${code}) sin dejar informe`] });
+      const report = JSON.parse(fs.readFileSync(out, 'utf8'));
+      report.ok = report.ok && code === 0;
+      report.shot = path.relative(ROOT, shot);
+      resolve(report);
+    });
+  });
+}
+
+const show = (pass, report) => {
+  if (report.ok) {
+    console.log(`smoke: pasada ${pass} ok  ventana ${report.size.width}x${report.size.height} en (${report.bounds.x}, ${report.bounds.y}), captura en ${report.shot}`);
     if (report.script) for (const [k, v] of Object.entries(report.script)) console.log(`  ${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`);
-    process.exit(0);
+  } else {
+    console.error(`smoke: pasada ${pass} FALLA`);
+    for (const f of report.failures || []) console.error('  ' + f);
   }
-  console.error(`smoke: FALLA (código ${code})`);
-  for (const f of report.failures || []) console.error('  ' + f);
-  process.exit(1);
-});
+};
+
+// La primera sale por el cierre normal: lo último que guardó tiene que bajar
+// al disco en before-quit.
+const first = await run(1, { RAD_SMOKE_MOVE: JSON.stringify(MOVE), RAD_SMOKE_QUIT: 'close' });
+show(1, first);
+if (!first.ok) process.exit(1);
+
+const second = await run(2);
+const b = second.bounds || {};
+if (second.ok && (b.x !== MOVE.x || b.y !== MOVE.y || b.width !== MOVE.width || b.height !== MOVE.height)) {
+  second.ok = false;
+  second.failures = [`la ventana no volvió a su lugar: ${JSON.stringify(b)}, se había dejado en ${JSON.stringify(MOVE)}`];
+}
+show(2, second);
+
+fs.rmSync(data, { recursive: true, force: true });
+process.exit(second.ok ? 0 : 1);

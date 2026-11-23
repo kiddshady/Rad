@@ -1,5 +1,27 @@
 # Changelog
 
+## @rad/core 0.4.0 · @rad/skin-classic 0.4.0 (2026-11-23)
+
+La etapa 4: el guardado y el puente.
+
+- Store de documentos JSON: temporal único, cola por documento, `.bak` del
+  anterior, reintentos ante EPERM/EBUSY/EACCES, y un documento roto se
+  aparta y se recupera del `.bak` en vez de pisarse. Lo pendiente baja al
+  disco antes de salir.
+- `openDoc()` en el renderer: `get`, `set`, `patch`, `update`, `on`, con los
+  valores por defecto mezclados si el archivo es viejo.
+- La ventana se acuerda de su lugar, su tamaño y si estaba maximizada, y
+  vuelve al centro si su monitor ya no está.
+- Instancia única.
+- Puente de la app: `rad.handle` / `rad.send` en el main, `rad.invoke` /
+  `rad.on` en el renderer, solo por canales `app:*`.
+- Los links a la web se abren en el navegador del sistema.
+- `hold()`: el arranque espera a que la app arme su interfaz, para que no
+  aparezca de golpe después del fundido de entrada.
+- `RAD_DATA` para correr con datos descartables.
+- `npm test` prueba el store con node pelado; el humo abre la vitrina dos
+  veces sobre los mismos datos y la primera sale por el cierre normal.
+
 ## @rad/core 0.3.1 (2026-11-23)
 
 - El toast que se va ya no baja de golpe antes de deslizarse. La pila está

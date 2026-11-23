@@ -11,10 +11,33 @@ function arg(name) {
   try { return JSON.parse(decodeURIComponent(hit.slice(name.length + 7))); } catch { return null; }
 }
 
+const CHANNEL = /^[a-z0-9][\w.:-]{0,63}$/i;
+const checked = (channel) => {
+  if (typeof channel !== 'string' || !CHANNEL.test(channel)) throw new Error(`[rad] canal inválido: ${JSON.stringify(channel)}`);
+  return `app:${channel}`;
+};
+
 contextBridge.exposeInMainWorld('rad', {
   platform: process.platform,
   skin: arg('skin'),
   core: arg('core'),
+  app: arg('app'),
+
+  // El puente de la app: solo canales app:*, nunca los internos rad:*.
+  invoke: (channel, ...args) => ipcRenderer.invoke(checked(channel), ...args),
+  on: (channel, fn) => {
+    const name = checked(channel);
+    const listener = (_event, payload) => fn(payload);
+    ipcRenderer.on(name, listener);
+    return () => ipcRenderer.removeListener(name, listener);
+  },
+  openExternal: (url) => ipcRenderer.invoke('rad:open-external', url),
+
+  store: {
+    read: (name) => ipcRenderer.invoke('rad:store:read', name),
+    write: (name, value) => ipcRenderer.send('rad:store:write', name, value),
+  },
+
   window: {
     minimize: () => ipcRenderer.send('rad:window', 'minimize'),
     toggleMaximize: () => ipcRenderer.send('rad:window', 'toggle-maximize'),

@@ -10,8 +10,9 @@
   "scripts": {
     "showcase": "npm start -w rad-showcase",
     "verify": "node tools/verify-core.mjs && node tools/verify-skins.mjs",
+    "test": "node tools/test-store.mjs",
     "smoke": "node tools/smoke.mjs",
-    "check": "npm run verify && npm run smoke"
+    "check": "npm run verify && npm run test && npm run smoke"
   },
   "devDependencies": {
     "electron": "44.10.1"
