@@ -1,5 +1,15 @@
 # Changelog
 
+## @rad/core 0.6.1 · Rad Vitrina 0.5.2 (2026-11-23)
+
+- Actualizaciones desde GitHub (`updater.cjs` + `wireUpdates()`), probadas de
+  punta a punta: la 0.5.1 instalada encontró la 0.5.2, avisó, la bajó con el
+  botón, se instaló en silencio y el humo pasó entero sobre la versión nueva.
+- `tools/release.mjs` publica verificando contra lo que quedó en GitHub;
+  `tools/test-update.mjs` prueba una actualización real.
+- La vitrina publica en `kiddshady/rad-releases` (0.5.0, 0.5.1 y 0.5.2) y
+  muestra su versión en Datos.
+
 ## Rad Vitrina 0.5.0, la primera empaquetada (2026-11-23)
 
 - electron-builder 26 en el monorepo. La vitrina se empaqueta con su bloque

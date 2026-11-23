@@ -238,6 +238,27 @@ npm run smoke:pack   el humo entero contra la vitrina empaquetada
 npm run build        el instalador (dist/Rad Vitrina-Setup-<versión>.exe)
 ```
 
+### Publicar y actualizar
+
+Cada app publica en su propio repo de releases (la vitrina, en
+`kiddshady/rad-releases`): electron-updater toma la versión del tag, así que dos
+apps no pueden compartir uno. El repo va en `build.publish` del `package.json`
+de la app, y el instalador se llama sin espacios.
+
+```
+# subir la versión en apps/<app>/package.json, commitear y pushear, y después:
+GH_TOKEN=$(gh auth token) node tools/release.mjs apps/showcase --title "lo nuevo" --notes notas.md
+```
+
+`release.mjs` compila local, verifica el trío (`latest.yml`, `.exe`,
+`.blockmap`), crea el release con `gh` y lo vuelve a verificar bajándolo de
+GitHub. En la app, `wireUpdates()` (de `/@core/updates.js`) pone el aviso: no
+baja nada solo, no dice "estás al día", e instala en silencio al tocar
+Reiniciar (o sola al cerrar).
+
+`node tools/test-update.mjs --exe "<la app instalada>" --expect <versión>`
+prueba la actualización de punta a punta sobre una versión instalada vieja.
+
 El ícono se hornea desde el código con la baldosa estándar
 (`tools/icon-kit.mjs`; el de la vitrina en `apps/showcase/scripts/icon.mjs`), y
 `tools/icon-sheet.py` arma la hoja de control contra los íconos de las otras
