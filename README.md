@@ -165,6 +165,19 @@ Una piel es una carpeta `packages/skin-<id>` con:
 
 Rad es solo oscuro: el verificador rechaza una superficie clara.
 
+## Fuentes compartidas
+
+`packages/fonts` (`@rad/fonts`) trae fuentes que viajan con Rad y se sirven en
+`rad://app/@fonts/`. Por ahora, Roboto Mono:
+
+```css
+@import url('/@fonts/roboto-mono.css');
+:root { --rad-font-mono: 'Roboto Mono', 'Cascadia Mono', Consolas, monospace; }
+```
+
+Van con `font-display: block` y el arranque espera a que estén cargadas, así
+el texto nunca cambia de forma ya a la vista.
+
 ## Comandos
 
 ```

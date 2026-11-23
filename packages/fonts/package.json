@@ -1,0 +1,11 @@
+{
+  "name": "@rad/fonts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fuentes que viajan con Rad, para que cualquier piel o app las use. Se sirven en rad://app/@fonts/.",
+  "author": "Kidd Shady · Umbrovex Systems",
+  "license": "OFL-1.1",
+  "exports": {
+    "./package.json": "./package.json"
+  }
+}

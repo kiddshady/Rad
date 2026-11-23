@@ -35,6 +35,11 @@ if (marker?.pass === 1) {
   const last = await window.rad.store.read('ultimo');
   if (last?.ok !== true) fail('lo que se guardó justo antes de cerrar se perdió (before-quit no bajó lo pendiente)');
   window.rad.store.write('smoke', { pass: 2 });
+  // Para la captura de esta pasada: las dos fuentes mono, lado a lado.
+  item('texto').click();
+  await sleep(350);
+  view('texto').querySelector('.sc-monos').scrollIntoView({ block: 'center' });
+  await sleep(400);
   data.persistencia = `visitas ${visitas?.veces}, nota "${nota?.texto}", último guardado ${last?.ok ? 'llegó' : 'perdido'}`;
   return { failures, data };
 }
@@ -117,6 +122,16 @@ item('texto').click();
 await sleep(300);
 if (kept > 0 && view('texto').scrollTop !== kept) fail(`el scroll de texto volvió en ${view('texto').scrollTop}, se había dejado en ${kept}`);
 data.scroll = `dejado en ${kept}, vuelto en ${view('texto').scrollTop}`;
+
+// Roboto Mono viaja con Rad: tiene que estar cargada de verdad, no caer a
+// la fuente de reserva.
+await document.fonts.ready;
+const roboto = [...document.fonts].filter((f) => f.family.replace(/["']/g, '') === 'Roboto Mono');
+if (!roboto.some((f) => f.status === 'loaded')) fail(`Roboto Mono no cargó: ${roboto.map((f) => f.status).join(', ') || 'no está declarada'}`);
+const sample = view('texto').querySelector('.sc-mono-roboto');
+const w = (family) => { const c = document.createElement('canvas').getContext('2d'); c.font = `13px ${family}`; return c.measureText('0O1lI{}=>').width; };
+if (Math.abs(w("'Roboto Mono'") - w('monospace')) < 0.5) fail('Roboto Mono mide igual que la mono de reserva: no se está usando');
+data.robotoMono = `${roboto.filter((f) => f.status === 'loaded').length} caras cargadas, muestra en ${getComputedStyle(sample).fontFamily}`;
 
 // ---------- Capas ----------
 item('capas').click();

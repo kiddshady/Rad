@@ -33,12 +33,25 @@ const SHAPES = {
   shadow: /\S/,
 };
 
+// Las mismas direcciones absolutas que sirve el protocolo rad://.
+const ABSOLUTE = {
+  '/@fonts/': path.join(ROOT, 'packages', 'fonts'),
+  '/@core/': path.join(ROOT, 'packages', 'core', 'renderer'),
+};
+
+function resolveImport(from, href) {
+  for (const [prefix, dir] of Object.entries(ABSOLUTE)) {
+    if (href.startsWith(prefix)) return path.join(dir, href.slice(prefix.length));
+  }
+  return path.resolve(path.dirname(from), href);
+}
+
 function readCss(file, seen = new Set()) {
   if (seen.has(file)) return '';
   seen.add(file);
   const text = fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const imports = [...text.matchAll(/@import\s+(?:url\()?\s*['"]?([^'")\s]+)['"]?\s*\)?/g)];
-  return imports.map((m) => readCss(path.resolve(path.dirname(file), m[1]), seen)).join('\n') + '\n' + text;
+  return imports.map((m) => readCss(resolveImport(file, m[1]), seen)).join('\n') + '\n' + text;
 }
 
 function checkSkin(dir) {

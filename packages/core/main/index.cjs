@@ -25,6 +25,15 @@ const contract = require('../contract/tokens.cjs');
 const pkg = require('../package.json');
 
 const CORE_RENDERER = path.join(__dirname, '..', 'renderer');
+
+// Las fuentes compartidas: cualquier piel o app las pide en /@fonts/.
+function fontsRoot() {
+  try {
+    return path.dirname(require.resolve('@rad/fonts/package.json'));
+  } catch {
+    return null;
+  }
+}
 const CHANNEL = /^[a-z0-9][\w.:-]{0,63}$/i;
 
 // RAD_DATA cambia dónde viven los datos (y el perfil de Chromium): los tests
@@ -128,7 +137,7 @@ function start(options) {
   wireQuit();
 
   return app.whenReady().then(() => {
-    protocol.handle({ app: renderer, core: CORE_RENDERER, skin: skin.root });
+    protocol.handle({ app: renderer, core: CORE_RENDERER, skin: skin.root, fonts: fontsRoot() });
     wireWindowIpc();
     wireStoreIpc();
     const appInfo = { name: options.window?.title ?? app.getName(), version: app.getVersion() };

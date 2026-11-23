@@ -12,6 +12,7 @@ import { whenReleased } from './ready.js';
 import './tooltip.js';
 
 const FALLBACK_MS = 2000;
+const FONTS_MAX_MS = 1500;
 
 let revealed = false;
 let revealing = false;
@@ -20,6 +21,9 @@ async function reveal() {
   if (revealing) return;
   revealing = true;
   await whenReleased();
+  // Las fuentes propias (font-display: block) tienen que estar antes de
+  // entrar: si llegaran después, el texto cambiaría de forma ya a la vista.
+  await Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, FONTS_MAX_MS))]);
   if (revealed) return;
   revealed = true;
   document.documentElement.setAttribute('data-rad-ready', '');

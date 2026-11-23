@@ -1,5 +1,17 @@
 # Changelog
 
+## @rad/fonts 0.1.0 · @rad/core 0.4.1 · @rad/skin-classic 0.4.1 (2026-11-23)
+
+- Nuevo paquete `@rad/fonts`, con Roboto Mono variable (pesos 100 a 700,
+  normal e itálica, latin y latin-ext; licencia OFL). Se sirve en
+  `rad://app/@fonts/` y cualquier piel o app la carga con
+  `@import url('/@fonts/roboto-mono.css')`.
+- Va con `font-display: block`, y el arranque espera a `document.fonts.ready`
+  antes de entrar: el texto nunca cambia de forma ya a la vista.
+- Classic la carga y la vitrina muestra Cascadia Mono y Roboto Mono lado a
+  lado. El mono de classic sigue siendo Cascadia hasta decidirlo.
+- El verificador de pieles sigue los `@import` absolutos (`/@fonts/`, `/@core/`).
+
 ## @rad/core 0.4.0 · @rad/skin-classic 0.4.0 (2026-11-23)
 
 La etapa 4: el guardado y el puente.

@@ -4,6 +4,7 @@
 //
 //   rad://app/@core/...   los archivos del núcleo (packages/core/renderer)
 //   rad://app/@skin/...   los archivos de la piel activa
+//   rad://app/@fonts/...  las fuentes compartidas (@rad/fonts)
 //   rad://app/...         el renderer de la app
 //
 // Así la app nunca sabe dónde vive el núcleo en el disco (node_modules, el
@@ -64,7 +65,11 @@ function resolve(roots, pathname) {
   } else if (rel === '@skin' || rel.startsWith('@skin/')) {
     root = roots.skin;
     rel = rel.slice('@skin'.length);
+  } else if (rel === '@fonts' || rel.startsWith('@fonts/')) {
+    root = roots.fonts;
+    rel = rel.slice('@fonts'.length);
   }
+  if (!root) return null;
   rel = rel.replace(/^\/+/, '') || 'index.html';
   const target = path.resolve(root, rel);
   return inside(root, target) ? target : null;
