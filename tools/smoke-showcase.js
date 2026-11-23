@@ -170,6 +170,81 @@ for (let round = 1; round <= 2; round++) {
   await sleep(200);
 }
 
+// 4c. El anillo de carga: entra fundiéndose, la luz avanza a la velocidad de
+// su vuelta, todos los trazos comparten la cabeza, dos anillos van en fase,
+// uno que vuelve a prenderse releva al que se iba sin salto, y al apagarse
+// no queda nada.
+{
+  const { setBusy, isBusy } = await import('/@core/busy.js');
+  const mov = view('movimiento');
+  const card = mov.querySelector('[data-demo="busy-card"]');
+  const bar = mov.querySelector('[data-demo="ask"]');
+  const rings = (el) => [...el.querySelectorAll(':scope > .rad-busy')];
+  const alive = (el) => rings(el).find((r) => !r.hasAttribute('data-rad-leaving') && r.dataset.state !== 'closing');
+  const lineRects = (ring) => [...ring.querySelectorAll('.rad-busy-line rect')];
+  const mod1 = (n) => ((n % 1) + 1) % 1;
+  // Dónde va la cabeza de un trazo, en vueltas (0..1): su largo menos su corrimiento.
+  const posOf = (rect) => {
+    const cs = getComputedStyle(rect);
+    return mod1(parseFloat(cs.getPropertyValue('--rad-a-len')) - parseFloat(cs.strokeDashoffset.replace('calc(', '')));
+  };
+  const pos = (ring) => posOf(lineRects(ring).at(-1));
+  const near = (a, b, tol) => Math.min(mod1(a - b), mod1(b - a)) <= tol;
+
+  setBusy(card, true);
+  await frame();
+  const ring = alive(card);
+  if (!ring) fail('el anillo de carga no apareció');
+  else {
+    if (card.getAttribute('aria-busy') !== 'true' || !isBusy(card)) fail('lo que carga no quedó marcado (aria-busy / isBusy)');
+    if (op(ring) > 0.9) fail(`el anillo apareció de golpe (opacidad ${r2(op(ring))} en el primer cuadro)`);
+    const lap = parseFloat(getComputedStyle(lineRects(ring)[0]).animationDuration) * 1000;
+    const heads = lineRects(ring).map(posOf);
+    if (heads.some((h) => !near(h, heads[0], 0.004))) fail(`los trazos del anillo no comparten la cabeza: ${heads.map(r2).join(', ')}`);
+    const t0 = performance.now();
+    const p0 = pos(ring);
+    await sleep(240);
+    const moved = mod1(pos(ring) - p0);
+    const expected = (performance.now() - t0) / lap;
+    if (!(moved > 0.01)) fail(`la luz del anillo no avanza (se movió ${r2(moved)} de vuelta en 240 ms)`);
+    else if (Math.abs(moved - expected) > 0.02) fail(`la luz avanzó ${r2(moved)} de vuelta, por su vuelta de ${Math.round(lap)} ms tocaba ${r2(expected)}`);
+
+    // Otro elemento que empieza a cargar más tarde gira con el primero.
+    setBusy(bar, true);
+    await frame();
+    const second = alive(bar);
+    if (!second) fail('el segundo anillo no apareció');
+    else {
+      if (!near(pos(second), pos(ring), 0.012)) fail(`dos anillos no van en fase: ${r2(pos(ring))} y ${r2(pos(second))}`);
+      // Una píldora no puede salir elipse: el redondeo tiene tope en medio alto.
+      const rx = parseFloat(getComputedStyle(lineRects(second)[0]).rx);
+      if (!(rx > 4 && rx <= bar.offsetHeight / 2 + 0.5)) fail(`el contorno de la barra redondeada tiene rx ${rx}, y la barra mide ${bar.offsetHeight} de alto`);
+    }
+
+    await sleep(dur('slow') + 80);
+    if (!ring.classList.contains('is-settled') || op(ring) !== 1) fail('el anillo no terminó de entrar');
+
+    // Se apaga y, antes de que termine de irse, vuelve a prenderse.
+    setBusy(card, false);
+    await frame();
+    if (!ring.isConnected) fail('el anillo se fue de golpe (salió del DOM sin fundirse)');
+    if (card.hasAttribute('aria-busy')) fail('quedó aria-busy después de apagar');
+    setBusy(card, true);
+    await frame();
+    const again = alive(card);
+    if (!again || again === ring) fail('volver a prender no trajo un anillo nuevo');
+    else if (ring.isConnected && !near(pos(again), pos(ring), 0.012)) fail(`el anillo que releva no va en fase con el que se va: ${r2(pos(ring))} y ${r2(pos(again))}`);
+    await sleep(dur('slow') + 200);
+    if (rings(card).length !== 1) fail(`después del relevo quedaron ${rings(card).length} anillos`);
+    data.anillo = `vuelta ${Math.round(lap)} ms, avanzó ${r2(moved)} (tocaba ${r2(expected)}), cabeza en ${r2(heads[0])}`;
+  }
+  setBusy(card, false);
+  setBusy(bar, false);
+  await sleep(dur('slow') + 200);
+  if (mov.querySelector('.rad-busy')) fail('quedó un anillo de carga en el DOM después de apagar');
+  if (card.classList.contains('rad-busy-host') || bar.classList.contains('rad-busy-host')) fail('quedó la clase rad-busy-host después de apagar');
+}
+
 // 5. Cada vista conserva su scroll.
 item('texto').click();
 await sleep(300);

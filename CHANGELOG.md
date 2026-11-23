@@ -1,5 +1,25 @@
 # Changelog
 
+## @rad/core 0.8.0 · Rad Vitrina 0.8.0 (2026-11-23)
+
+- **El anillo de carga**, una pieza nueva del núcleo: `setBusy(el, true)` hace
+  que una luz con resplandor recorra el reborde de lo que está trabajando.
+  Fran la vio en una barra de otra app y quiso tenerla.
+- Va a la misma velocidad en todo el recorrido: es un contorno en SVG con
+  trazos que avanzan, no un degradado cónico girando (que en algo ancho se
+  arrastra por el medio y pega un latigazo en las puntas).
+- Todos los anillos van en fase con la hora del documento: dos cosas que
+  cargan a la vez giran juntas, y volver a prender uno que se estaba yendo lo
+  releva sin salto. Entra y sale fundiéndose, sigue el redondeo de su dueño
+  (también en una píldora) y marca `aria-busy`.
+- Colores, grosor, resplandor y vuelta son perillas `--rad-a-busy-*`. Glass
+  le pone cola violeta y cabeza de hielo.
+- En la vitrina: Movimiento → Cargando. En el humo: la luz avanza lo que
+  marca su vuelta, los trazos comparten la cabeza, dos anillos van en fase y
+  al apagar no queda nada. Esa prueba encontró el primer bug: con un número
+  en una punta de la animación y un `calc` en la otra no hay interpolación, y
+  la luz quedaba quieta sin dar ningún error.
+
 ## Rad Vitrina 0.7.1 (2026-11-23)
 
 - **Se retira la piel cyberpunk.** Fran la probó y el estilo cyberpunk puro no

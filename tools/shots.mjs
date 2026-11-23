@@ -55,6 +55,11 @@ const SCENES = {
     await sleep(600);`,
   movimiento: `await go('movimiento'); view('movimiento').querySelector('[data-demo="toggle"]').click(); await sleep(600);`,
   pieles: `await go('pieles'); await sleep(300);`,
+  cargando: `await go('movimiento');
+    const m = view('movimiento');
+    m.querySelector('[data-demo="busy-hold"]').closest('label').click();
+    m.querySelector('[data-demo="ask"]').scrollIntoView({ block: 'center' });
+    await sleep(900);`,
 };
 
 const [skin, ...picked] = process.argv.slice(2);

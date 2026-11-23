@@ -573,6 +573,67 @@
   }
   .rad-status-right { --rad-a-swap-align: end; }
 
+  /* ---------- Anillo de carga (busy.js) ----------
+     Una luz que recorre el reborde de su dueño, con resplandor. Es un SVG
+     con el contorno del elemento; la luz son trazos de rayas que avanzan
+     todos juntos (ver busy.js para el porqué). Las perillas: */
+  .rad-busy-host { position: relative; }
+  .rad-busy {
+    --rad-a-busy-from: var(--rad-accent);         /* el color de la cola */
+    --rad-a-busy-to: var(--rad-accent-strong);    /* el de la cabeza */
+    --rad-a-busy-width: calc(var(--rad-line-width) * 2);
+    --rad-a-busy-glow: var(--rad-space-2);        /* cuánto se derrama el resplandor */
+    --rad-a-busy-lap: calc(var(--rad-dur-slow) * 7);
+    --rad-a-in: rad-fade-in var(--rad-dur-slow) var(--rad-ease-out) both;
+    --rad-a-out: rad-fade-out var(--rad-dur-slow) var(--rad-ease-in-out) both;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    pointer-events: none;
+    /* Para medir contra el lado más corto (cqmin) el redondeo del contorno. */
+    container-type: size;
+  }
+  .rad-busy-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  /* El trazo va centrado en su camino: el rect se mete medio grosor para que
+     la línea quede justo adentro del borde del dueño. */
+  .rad-busy-svg rect {
+    x: calc(var(--rad-a-busy-width) / 2);
+    y: calc(var(--rad-a-busy-width) / 2);
+    width: calc(100% - var(--rad-a-busy-width));
+    height: calc(100% - var(--rad-a-busy-width));
+    /* El redondeo del dueño, con tope en medio lado corto: una píldora
+       (radio 999px) sin tope se vuelve una elipse, porque el SVG recorta rx
+       contra el ancho y ry contra el alto por separado. */
+    rx: max(0px, calc(min(var(--rad-a-busy-r, 0px), 50cqmin) - var(--rad-a-busy-width) / 2));
+    fill: none;
+    stroke: color-mix(in oklab, var(--rad-a-busy-to) var(--rad-a-mix), var(--rad-a-busy-from));
+    stroke-width: var(--rad-a-busy-width);
+    stroke-linecap: round;
+    stroke-dasharray: var(--rad-a-len) calc(1 - var(--rad-a-len));
+    opacity: var(--rad-a-alpha);
+    animation: rad-busy-run var(--rad-a-busy-lap) linear infinite;
+    animation-delay: var(--rad-a-busy-phase, 0s);
+  }
+  .rad-busy-halo { filter: blur(var(--rad-a-busy-glow)); }
+  .rad-busy-halo rect { stroke-width: calc(var(--rad-a-busy-width) * 3); }
+  /* Cada trazo corre desde su propio largo: así las cabezas de todos
+     coinciden y la cola queda atrás. Las dos puntas van como medida (px, que
+     con pathLength=1 es una vuelta): con un número pelado en una y un calc
+     en la otra no hay cómo interpolar, la animación salta de punta a punta
+     a mitad de camino y, como las dos puntas son el mismo lugar, la luz se
+     queda quieta sin dar ningún error. */
+  @keyframes rad-busy-run {
+    from { stroke-dashoffset: calc(var(--rad-a-len) * 1px); }
+    to { stroke-dashoffset: calc((var(--rad-a-len) - 1) * 1px); }
+  }
+
   /* Scroll con esfumado por lado. Cada lado lleva fade solo si de ese lado hay
      contenido recortado (scroll.js pone at-top / at-bottom) y si no hay una
      línea que ya marque el límite (data-rad-line="top|bottom|both").

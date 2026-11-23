@@ -113,4 +113,6 @@
   /* El canto de una hoja y el resplandor del acento. */
   --skin-rim: inset 0 1px 0 #ffffff26, inset 0 0 0 1px #ffffff0f;
   --skin-glow: 0 6px 22px #7fd4f547, 0 1px 4px #7fd4f52e;
+  /* La cola del anillo de carga. */
+  --skin-busy-tail: #7b5cf0;
 }

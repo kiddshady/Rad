@@ -12,6 +12,7 @@ import { hold } from '/@core/ready.js';
 import { createSelect, setFieldError } from '/@core/controls.js';
 import { wireUpdates } from '/@core/updates.js';
 import { ms, token } from '/@core/motion.js';
+import { setBusy } from '/@core/busy.js';
 
 // La interfaz se arma después de leer los datos: el arranque espera.
 const release = hold();
@@ -195,6 +196,38 @@ const views = [
       el.querySelector('[data-demo="status"]').addEventListener('click', () => {
         i = (i + 1) % MESSAGES.length;
         shell.status.set('right', MESSAGES[i]);
+      });
+
+      // Cargando: cada cosa trabaja unos segundos y avisa. El switch deja
+      // todo prendido, para mirarlo tranquilo.
+      const bar = el.querySelector('[data-demo="ask"]');
+      const input = el.querySelector('[data-demo="ask-input"]');
+      const busyCard = el.querySelector('[data-demo="busy-card"]');
+      const self = el.querySelector('[data-demo="busy-self"]');
+      const hold = el.querySelector('[data-demo="busy-hold"]');
+      const timers = new Map();
+      const work = (target, done) => {
+        setBusy(target, true);
+        clearTimeout(timers.get(target));
+        timers.set(target, setTimeout(() => {
+          if (hold.checked) return;
+          setBusy(target, false);
+          done?.();
+        }, 4000));
+      };
+      const ask = () => {
+        if (!input.value.trim()) { input.focus(); return; }
+        work(bar, () => toast({ text: 'Respondido', kind: 'success' }));
+      };
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') ask(); });
+      el.querySelector('[data-demo="ask-send"]').addEventListener('click', ask);
+      el.querySelector('[data-demo="busy-card-go"]').addEventListener('click', () => work(busyCard));
+      self.addEventListener('click', () => work(self, () => toast({ text: 'Guardado', kind: 'success' })));
+      hold.addEventListener('change', () => {
+        for (const target of [bar, busyCard, self]) {
+          clearTimeout(timers.get(target));
+          setBusy(target, hold.checked);
+        }
       });
     },
   },

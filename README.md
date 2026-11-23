@@ -119,6 +119,26 @@ Todo vive en una capa fija hermana de `.rad-root`, entra y sale animado
 de más arriba. El botón del núcleo es `.rad-button`, con
 `data-variant="primary" | "danger" | "quiet"`.
 
+### Cargando
+
+```js
+import { setBusy } from '/@core/busy.js';
+
+setBusy(tarjeta, true);    // una luz empieza a recorrer su reborde
+await guardar();
+setBusy(tarjeta, false);   // se apaga fundiéndose
+```
+
+Una luz con resplandor recorre el contorno de lo que está trabajando, a la
+misma velocidad en todo el recorrido. Todo lo que carga a la vez gira en
+fase. Marca además `aria-busy`. Los colores (cola y cabeza), el grosor, el
+resplandor y cuánto tarda la vuelta son perillas `--rad-a-busy-*` que la piel
+puede pisar en `.rad-busy`.
+
+El anillo es un hijo del elemento: no sirve en un `<input>` (se pone en lo
+que lo envuelve) ni en algo que scrollea. Si el elemento recorta
+(`overflow: hidden`), se ve la línea pero no el resplandor de afuera.
+
 ## Controles
 
 Casi todos son HTML con clases, sin JS:
