@@ -1,19 +1,58 @@
 'use strict';
 
 const path = require('node:path');
+const { app } = require('electron');
 const rad = require('@rad/core/main');
+
+// Las pieles que la vitrina sabe mostrar. Una piel fija el color con que
+// nace la ventana, así que no se cambia en caliente: se elige, se guarda y la
+// vitrina vuelve a abrir con ella.
+const SKINS = {
+  classic: require('@rad/skin-classic'),
+  glass: require('@rad/skin-glass'),
+};
+const DEFAULT_SKIN = 'classic';
+
+// RAD_SKIN manda (el humo y las capturas lo usan para no depender de lo
+// guardado); si no, la última que se eligió.
+const wanted = process.env.RAD_SKIN || rad.store.read('vitrina')?.piel;
+const skin = SKINS[wanted] ?? SKINS[DEFAULT_SKIN];
+if (process.env.RAD_SKIN && !SKINS[process.env.RAD_SKIN]) {
+  throw new Error(`[vitrina] no hay ninguna piel "${process.env.RAD_SKIN}" (hay: ${Object.keys(SKINS).join(', ')})`);
+}
 
 // Un ejemplo del puente: el renderer lo pide con rad.invoke('sistema:info').
 rad.handle('sistema:info', () => ({
-  vitrina: require('electron').app.getVersion(),
+  vitrina: app.getVersion(),
   electron: process.versions.electron,
   chromium: process.versions.chrome,
   node: process.versions.node,
   datos: rad.store.dir,
 }));
 
+rad.handle('pieles:listar', () => Object.values(SKINS).map((s) => ({
+  id: s.id,
+  name: s.name,
+  description: s.description ?? '',
+  preview: s.preview ?? [s.base],
+  active: s === skin,
+})));
+
+// Guarda la piel elegida y reabre la vitrina con ella. En el humo solo
+// guarda: la pasada siguiente comprueba que se acordó.
+rad.handle('pieles:usar', async (id) => {
+  if (!SKINS[id]) throw new Error(`[vitrina] no hay ninguna piel "${id}"`);
+  await rad.store.write('vitrina', { piel: id });
+  if (process.env.RAD_SMOKE) return { reabre: false };
+  // El guardado baja en before-quit; relaunch arranca la nueva cuando esta
+  // termina de salir, así que no chocan por la instancia única.
+  app.relaunch();
+  app.quit();
+  return { reabre: true };
+});
+
 rad.start({
-  skin: require('@rad/skin-classic'),
+  skin,
   renderer: path.join(__dirname, 'renderer'),
   appId: 'com.umbrovex.rad.showcase',
   // En Windows la ventana lleva el mismo .ico que el ejecutable: con el PNG,

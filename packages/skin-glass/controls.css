@@ -1,0 +1,45 @@
+/* Rad · glass · controles.
+   El botón común es una lámina fina: un velo con el canto encendido. El
+   primario es el único vidrio con luz propia: el acento, y su resplandor. */
+
+.rad-button {
+  border-radius: var(--rad-radius-m);
+  background-color: var(--rad-tint-hover);
+  box-shadow: inset 0 1px 0 #ffffff1c, inset 0 0 0 1px #ffffff0d;
+  color: var(--rad-text-1);
+  font-size: var(--rad-text-m);
+  transition:
+    background-color var(--rad-dur-fast) var(--rad-ease-out),
+    box-shadow var(--rad-dur-fast) var(--rad-ease-out),
+    color var(--rad-dur-fast) var(--rad-ease-out),
+    transform var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-button:hover { background-color: var(--rad-tint-press); }
+.rad-button:active { transform: scale(0.98); }
+.rad-button:disabled { color: var(--rad-text-3); background-color: transparent; }
+
+.rad-button[data-variant='primary'] {
+  background-color: var(--rad-accent);
+  box-shadow: inset 0 1px 0 #ffffff66, var(--skin-glow);
+  color: var(--rad-on-accent);
+  font-weight: var(--rad-weight-strong);
+}
+.rad-button[data-variant='primary']:hover {
+  background-color: var(--rad-accent-strong);
+  box-shadow: inset 0 1px 0 #ffffff80, 0 8px 28px #7fd4f561, 0 1px 4px #7fd4f538;
+}
+
+.rad-button[data-variant='danger'] {
+  background-color: var(--rad-danger);
+  box-shadow: inset 0 1px 0 #ffffff59, 0 6px 22px color-mix(in srgb, var(--rad-danger) 28%, transparent);
+  color: var(--rad-on-accent);
+  font-weight: var(--rad-weight-strong);
+}
+.rad-button[data-variant='danger']:hover { background-color: color-mix(in srgb, var(--rad-danger), var(--rad-text-1) 16%); }
+
+.rad-button[data-variant='quiet'] {
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--rad-text-2);
+}
+.rad-button[data-variant='quiet']:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }

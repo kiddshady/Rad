@@ -11,6 +11,7 @@ import { openDoc } from '/@core/store.js';
 import { hold } from '/@core/ready.js';
 import { createSelect, setFieldError } from '/@core/controls.js';
 import { wireUpdates } from '/@core/updates.js';
+import { ms, token } from '/@core/motion.js';
 
 // La interfaz se arma después de leer los datos: el arranque espera.
 const release = hold();
@@ -197,7 +198,72 @@ const views = [
       });
     },
   },
+  {
+    id: 'pieles',
+    label: 'Pieles',
+    icon: icon('<path d="M8 2.5c2.6 3 4 4.9 4 6.9a4 4 0 0 1-8 0c0-2 1.4-3.9 4-6.9z"/>'),
+    mount(el) {
+      fromTemplate('view-pieles')(el);
+      const list = el.querySelector('[data-demo="pieles"]');
+      window.rad?.invoke('pieles:listar').then((skins) => {
+        for (const s of skins) list.append(skinCard(s));
+      });
+    },
+  },
 ];
+
+// Una tarjeta por piel: sus colores, su nombre y cómo usarla.
+function skinCard(s) {
+  const card = document.createElement('article');
+  card.className = 'sc-card sc-skin';
+  card.dataset.skin = s.id;
+  card.toggleAttribute('data-active', s.active);
+
+  const swatches = document.createElement('div');
+  swatches.className = 'sc-skin-swatches';
+  swatches.setAttribute('aria-hidden', 'true');
+  for (const color of s.preview) {
+    const i = document.createElement('i');
+    i.style.backgroundColor = color; // por CSSOM: la CSP no deja estilos en atributos
+    swatches.append(i);
+  }
+
+  const text = document.createElement('div');
+  text.className = 'sc-skin-text';
+  const name = document.createElement('h2');
+  name.textContent = s.name;
+  const desc = document.createElement('p');
+  desc.textContent = s.description;
+  text.append(name, desc);
+  card.append(swatches, text);
+
+  if (s.active) {
+    const chip = document.createElement('span');
+    chip.className = 'sc-chip';
+    chip.textContent = 'En uso';
+    card.append(chip);
+  } else {
+    const use = document.createElement('button');
+    use.type = 'button';
+    use.className = 'rad-button';
+    use.textContent = 'Usar esta piel';
+    use.addEventListener('click', async () => {
+      const yes = await confirm({
+        title: `¿Cambiar a ${s.name}?`,
+        text: 'La vitrina se cierra y vuelve a abrir con esa piel.',
+        confirmLabel: 'Cambiar',
+      });
+      if (!yes) return;
+      // La app se va antes de cerrar la ventana: nada desaparece de golpe.
+      const dur = ms('dur-base');
+      document.querySelector('.rad-root').animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur, easing: token('ease-in-out'), fill: 'forwards' });
+      await new Promise((r) => setTimeout(r, dur + 60));
+      window.rad.invoke('pieles:usar', s.id);
+    });
+    card.append(use);
+  }
+  return card;
+}
 
 const skin = window.rad?.skin?.name ?? 'sin piel';
 const core = window.rad?.core?.version ?? '';

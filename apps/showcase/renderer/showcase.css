@@ -173,4 +173,24 @@
   .sc-demo > span { display: block; padding: var(--rad-space-4); }
   .sc-motion.is-open .sc-demo-slot { grid-template-rows: 1fr; transition-timing-function: var(--rad-ease-out); }
   .sc-motion.is-open .sc-demo { opacity: 1; transform: none; transition-timing-function: var(--rad-ease-out); }
+
+  /* Pieles: una tarjeta por piel, con sus colores. */
+  .sc-skins { display: grid; gap: var(--rad-space-3); }
+  .sc-skin {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--rad-space-4);
+  }
+  .sc-skin-swatches {
+    display: flex;
+    overflow: hidden;
+    border-radius: var(--rad-radius-m);
+    box-shadow: 0 0 0 var(--rad-line-width) var(--rad-line-strong);
+  }
+  .sc-skin-swatches i { width: 22px; height: 44px; }
+  .sc-skin-text { display: grid; gap: var(--rad-space-1); }
+  .sc-skin-text h2 { font-family: var(--rad-font-display); font-size: var(--rad-text-l); font-weight: var(--rad-weight-strong); }
+  .sc-skin-text p { color: var(--rad-text-2); }
+  .sc-skin[data-active] { box-shadow: var(--rad-shadow-1), inset 0 0 0 var(--rad-line-width) var(--rad-accent-soft); }
 }

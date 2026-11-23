@@ -5,7 +5,8 @@
 //     de una piel va con --skin-);
 //   - el base es igual a --rad-surface-0, que es lo que pinta Electron antes
 //     del primer frame;
-//   - es oscura: ninguna superficie pasa de la claridad tope;
+//   - es oscura: ninguna superficie pasa de la claridad tope (surface-0 es
+//     opaca; las otras pueden ser velos y se miden compuestas sobre ella);
 //   - el texto se lee: contraste mínimo de cada nivel sobre las superficies;
 //   - cada valor tiene la forma de su tipo.
 // Uso: node tools/verify-skins.mjs
@@ -95,16 +96,19 @@ function checkSkin(dir) {
     errors.push(`el base del manifiesto (${skin.base}) no es igual a --rad-surface-0 (${s0raw})`);
   }
 
-  const surfaces = contract.tokens.filter((t) => t.surface).map((t) => [t.name, parseColor(value(t.name) || '')]);
-  for (const [name, c] of surfaces) {
-    if (!c) continue;
-    if (c.a < 1) errors.push(`${name} tiene que ser opaca`);
-    const L = oklabL(c);
-    if (L > SURFACE_MAX_L) errors.push(`${name} es demasiado clara (L ${L.toFixed(3)} > ${SURFACE_MAX_L}): Rad es solo oscuro`);
+  // surface-0 es opaca siempre. De la 1 a la 3 pueden ser velos (una piel de
+  // vidrio): se miden como se ven, compuestas sobre surface-0.
+  const s0 = parseColor(value('--rad-surface-0') || '');
+  const seen = (c) => (c && c.a < 1 && s0 ? over(c, s0) : c);
+  for (const t of contract.tokens.filter((x) => x.surface)) {
+    const raw = parseColor(value(t.name) || '');
+    if (!raw) continue;
+    if (t.opaque && raw.a < 1) errors.push(`${t.name} tiene que ser opaca`);
+    const L = oklabL(seen(raw));
+    if (L > SURFACE_MAX_L) errors.push(`${t.name} es demasiado clara (L ${L.toFixed(3)} > ${SURFACE_MAX_L}): Rad es solo oscuro`);
   }
 
-  const s0 = parseColor(value('--rad-surface-0') || '');
-  const s3 = parseColor(value('--rad-surface-3') || '');
+  const s3 = seen(parseColor(value('--rad-surface-3') || ''));
   for (const t of contract.tokens.filter((x) => x.contrastMin)) {
     const fg = parseColor(value(t.name) || '');
     if (!fg || !s0 || !s3) continue;

@@ -1,0 +1,107 @@
+/* Rad · glass · shell.
+   El chrome (titlebar, rail, statusbar) no es una hoja: son letras y botones
+   directo sobre el telón. El escenario es la hoja grande, flotando. */
+
+/* Titlebar */
+.rad-titlebar {
+  padding-left: var(--rad-space-4);
+}
+.rad-titlebar-title {
+  font-family: var(--rad-font-display);
+  font-weight: var(--rad-weight-strong);
+  font-size: var(--rad-text-m);
+  color: var(--rad-text-1);
+}
+.rad-titlebar-sub {
+  margin-left: var(--rad-space-2);
+  font-family: var(--rad-font-mono);
+  font-size: var(--rad-text-xs);
+  color: var(--rad-text-3);
+}
+.rad-winbtn {
+  color: var(--rad-text-2);
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-winbtn:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
+.rad-winbtn:active { background-color: var(--rad-tint-press); }
+.rad-winbtn-close:hover { background-color: color-mix(in srgb, var(--rad-danger) 82%, transparent); color: var(--rad-text-1); }
+.rad-winbtn:focus-visible { outline-offset: calc(var(--rad-line-width) * -3); }
+
+/* Rail */
+.rad-rail {
+  padding: var(--rad-space-1) var(--rad-space-3) var(--rad-space-3);
+  gap: 2px;
+}
+/* El indicador es una gota de vidrio que viaja por debajo de los items. */
+.rad-rail-indicator {
+  left: var(--rad-space-3);
+  right: var(--rad-space-3);
+  border-radius: var(--rad-radius-m);
+  background-color: var(--rad-surface-3);
+  box-shadow: var(--skin-rim), 0 4px 14px #00000038;
+}
+.rad-rail-item {
+  gap: var(--rad-space-3);
+  padding-inline: var(--rad-space-3);
+  border-radius: var(--rad-radius-m);
+  color: var(--rad-text-2);
+  transition: color var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-rail-item:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
+.rad-rail-item:active { background-color: var(--rad-tint-press); }
+.rad-rail-item[aria-current='page'] { color: var(--rad-text-1); }
+.rad-rail-item[aria-current='page']:hover { background-color: transparent; }
+.rad-rail-item .rad-icon { transition: color var(--rad-dur-fast) var(--rad-ease-out); }
+.rad-rail-item[aria-current='page'] .rad-icon { color: var(--rad-accent); }
+
+/* Escenario: la hoja grande.
+   Se pinta OPACA: el velo (surface-1) encima del mismo telón del body,
+   corrido para que calce con él. Así cada vista, que hereda este fondo, tapa
+   de verdad, y el fundido entre vistas no deja ver dos contenidos a la vez.
+   No hay backdrop-filter: el telón ya es liso, esmerilarlo no cambia nada. */
+.rad-stage {
+  --skin-ox: 0px;
+  --skin-oy: calc(var(--rad-titlebar-height) * -1);
+  margin-right: var(--rad-space-2);
+  border-radius: var(--rad-radius-l);
+  /* Contexto de apilado propio: el canto (::after) y las vistas que se van
+     llevan z-index altos, y sin esto se pintarían por encima de un modal. */
+  isolation: isolate;
+  background-color: var(--rad-surface-0);
+  background-image:
+    var(--skin-sheen),
+    linear-gradient(var(--rad-surface-1), var(--rad-surface-1)),
+    var(--skin-field-a), var(--skin-field-b), var(--skin-field-c);
+  background-size: auto, auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;
+  background-position: 0 0, 0 0, var(--skin-ox) var(--skin-oy), var(--skin-ox) var(--skin-oy), var(--skin-ox) var(--skin-oy);
+  background-repeat: no-repeat;
+  box-shadow: 0 18px 50px #00000052, 0 2px 8px #0000003d;
+}
+.rad-shell[data-rail] .rad-stage {
+  --skin-ox: calc(var(--rad-rail-width) * -1);
+}
+.rad-shell:not([data-statusbar]) .rad-stage {
+  margin-bottom: var(--rad-space-2);
+}
+.rad-shell:not([data-rail]) .rad-stage {
+  margin-left: var(--rad-space-2);
+  --skin-ox: calc(var(--rad-space-2) * -1);
+}
+/* El canto de la hoja va en una capa propia, por encima de las vistas: una
+   sombra inset del escenario quedaría tapada por ellas, que son opacas. */
+.rad-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2000;
+  border-radius: inherit;
+  box-shadow: var(--skin-rim);
+  pointer-events: none;
+}
+
+/* Statusbar */
+.rad-statusbar {
+  padding-inline: var(--rad-space-4);
+  font-size: var(--rad-text-xs);
+  color: var(--rad-text-3);
+}

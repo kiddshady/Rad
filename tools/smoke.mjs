@@ -5,8 +5,11 @@
 //      ventana se mueve a un lugar conocido;
 //   2. la vitrina vuelve a abrir: la nota, las visitas y el lugar de la
 //      ventana tienen que estar como se dejaron.
+// Lo corre una vez por cada piel de packages/skin-*: una piel nueva pasa el
+// mismo guion que las demás, y la pasada 2 comprueba además que la vitrina
+// se acordó de la piel elegida.
 // Deja los informes y las capturas en .smoke/.
-// Uso: node tools/smoke.mjs
+// Uso: node tools/smoke.mjs [--skin <id>] [--exe <ruta>]
 //
 // Lo que NO puede medir: el flash del compositor al arrancar. No sale en
 // ninguna captura; se juzga a ojo, en vivo y en frío.
@@ -40,17 +43,23 @@ const command = EXE ? [EXE, []] : [electron, [path.join(ROOT, 'apps', 'showcase'
 if (EXE) console.log(`smoke: contra la app empaquetada ${path.relative(ROOT, EXE)}`);
 
 fs.mkdirSync(SMOKE, { recursive: true });
-const data = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-smoke-'));
 
-function run(pass, extraEnv = {}) {
-  const out = path.join(SMOKE, `showcase-${TAG}${pass}.json`);
-  const shot = path.join(SMOKE, pass === 1 ? `showcase${TAG ? '-' + TAG.slice(0, -1) : ''}.png` : `showcase-${TAG}${pass}.png`);
+// Cada piel de packages/skin-* pasa el humo entero. --skin <id> corre una sola.
+const skinArg = process.argv.indexOf('--skin');
+const SKINS = skinArg > 0
+  ? [process.argv[skinArg + 1]]
+  : fs.readdirSync(path.join(ROOT, 'packages')).filter((d) => d.startsWith('skin-')).map((d) => require(path.join(ROOT, 'packages', d, 'skin.cjs')).id);
+
+function run(skin, pass, data, extraEnv = {}) {
+  const out = path.join(SMOKE, `showcase-${TAG}${skin}-${pass}.json`);
+  const shot = path.join(SMOKE, `showcase-${TAG}${skin}-${pass}.png`);
   fs.rmSync(out, { force: true });
   const env = { ...process.env, RAD_SMOKE: out, RAD_SMOKE_SHOT: shot, RAD_SMOKE_SCRIPT: SCRIPT, RAD_DATA: data, ...extraEnv };
   delete env.ELECTRON_RUN_AS_NODE;
+  if (!('RAD_SKIN' in extraEnv)) delete env.RAD_SKIN;
   return new Promise((resolve) => {
     const child = spawn(command[0], command[1], { env, stdio: 'inherit' });
-    const killer = setTimeout(() => { console.error(`smoke: pasada ${pass}: tiempo agotado, mato el proceso`); child.kill(); }, TIMEOUT_MS);
+    const killer = setTimeout(() => { console.error(`smoke: ${skin}, pasada ${pass}: tiempo agotado, mato el proceso`); child.kill(); }, TIMEOUT_MS);
     child.on('exit', (code) => {
       clearTimeout(killer);
       if (!fs.existsSync(out)) return resolve({ ok: false, failures: [`la app salió (código ${code}) sin dejar informe`] });
@@ -62,31 +71,47 @@ function run(pass, extraEnv = {}) {
   });
 }
 
-const show = (pass, report) => {
+const show = (skin, pass, report) => {
   if (report.ok) {
-    console.log(`smoke: pasada ${pass} ok  ventana ${report.size.width}x${report.size.height} en (${report.bounds.x}, ${report.bounds.y}), captura en ${report.shot}`);
+    console.log(`smoke: ${skin}, pasada ${pass} ok  ventana ${report.size.width}x${report.size.height} en (${report.bounds.x}, ${report.bounds.y}), captura en ${report.shot}`);
     if (report.script) for (const [k, v] of Object.entries(report.script)) console.log(`  ${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`);
   } else {
-    console.error(`smoke: pasada ${pass} FALLA`);
+    console.error(`smoke: ${skin}, pasada ${pass} FALLA`);
     for (const f of report.failures || []) console.error('  ' + f);
     if (report.script) for (const [k, v] of Object.entries(report.script)) console.error(`  (dato) ${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`);
   }
 };
 
-// La primera sale por el cierre normal: lo último que guardó tiene que bajar
-// al disco en before-quit.
-const first = await run(1, { RAD_SMOKE_MOVE: JSON.stringify(MOVE), RAD_SMOKE_QUIT: 'close' });
-show(1, first);
-if (!first.ok) process.exit(1);
+async function smokeSkin(skin) {
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-smoke-'));
+  try {
+    // La primera elige la piel con RAD_SKIN y sale por el cierre normal: lo
+    // último que guardó tiene que bajar al disco en before-quit.
+    const first = await run(skin, 1, data, { RAD_SKIN: skin, RAD_SMOKE_MOVE: JSON.stringify(MOVE), RAD_SMOKE_QUIT: 'close' });
+    show(skin, 1, first);
+    if (!first.ok) return false;
 
-// La segunda, además, con la mono elegida por la app en vez de la de la piel.
-const second = await run(2, { RAD_SHOWCASE_MONO: 'roboto-mono' });
-const b = second.bounds || {};
-if (second.ok && (b.x !== MOVE.x || b.y !== MOVE.y || b.width !== MOVE.width || b.height !== MOVE.height)) {
-  second.ok = false;
-  second.failures = [`la ventana no volvió a su lugar: ${JSON.stringify(b)}, se había dejado en ${JSON.stringify(MOVE)}`];
+    // La segunda, con la mono elegida por la app en vez de la de la piel, y
+    // SIN RAD_SKIN: la vitrina tiene que abrir con la piel que se guardó.
+    const second = await run(skin, 2, data, { RAD_SHOWCASE_MONO: 'roboto-mono' });
+    const b = second.bounds || {};
+    if (second.ok && (b.x !== MOVE.x || b.y !== MOVE.y || b.width !== MOVE.width || b.height !== MOVE.height)) {
+      second.ok = false;
+      second.failures = [`la ventana no volvió a su lugar: ${JSON.stringify(b)}, se había dejado en ${JSON.stringify(MOVE)}`];
+    }
+    if (second.ok && second.script?.piel !== skin) {
+      second.ok = false;
+      second.failures = [`la vitrina no se acordó de la piel: abrió con "${second.script?.piel}", se había elegido "${skin}"`];
+    }
+    show(skin, 2, second);
+    return second.ok;
+  } finally {
+    fs.rmSync(data, { recursive: true, force: true });
+  }
 }
-show(2, second);
 
-fs.rmSync(data, { recursive: true, force: true });
-process.exit(second.ok ? 0 : 1);
+let allOk = true;
+for (const skin of SKINS) {
+  if (!(await smokeSkin(skin))) { allOk = false; break; }
+}
+process.exit(allOk ? 0 : 1);

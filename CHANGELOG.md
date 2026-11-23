@@ -1,5 +1,29 @@
 # Changelog
 
+## @rad/core 0.7.0 · @rad/skin-glass 0.1.0 · Rad Vitrina 0.6.0 (2026-11-23)
+
+- **Glass, la segunda piel.** Vidrio ahumado sobre una luz lejana: el fondo de
+  la ventana es un telón casi negro con tres campos de color apagados, el
+  chrome vive directo sobre él y el escenario es una hoja que lo deja pasar.
+  Los campos son pozos tallados, el primario es el único vidrio con luz propia,
+  y lo que flota (menús, toasts, tooltips, el velo del modal) esmerila de
+  verdad lo que tiene atrás.
+- **Contrato v4: las superficies 1 a 3 pueden ser translúcidas.** `surface-0`
+  sigue opaca. El verificador mide las otras compuestas sobre ella. No hay
+  tokens nuevos: classic no cambió.
+- Lo que el vidrio pidió y cómo se resolvió sin tocar el núcleo: el escenario
+  se pinta opaco (el velo sobre el mismo telón, alineado) para que el fundido
+  entre vistas siga tapando; el canto de la hoja va en un `::after` por encima
+  de las vistas; el escenario aísla su apilado para no pintarse sobre un
+  modal; y lo que esmerila entra y sale solo por opacidad.
+- La vitrina tiene un **selector de piel** (la vista Pieles): se cierra y
+  vuelve a abrir con la elegida, y se acuerda. `RAD_SKIN=<id>` la fuerza.
+- El **humo corre una vez por piel**, y la segunda pasada comprueba que la
+  vitrina se acordó de la piel. Las esperas del guion salen de las duraciones
+  de la piel, y se suma una comprobación: una vista tiene que tapar.
+- `npm run shots -- <piel>`: capturas de la vitrina escena por escena, para
+  diseñar una piel mirándola.
+
 ## @rad/core 0.6.1 · Rad Vitrina 0.5.2 (2026-11-23)
 
 - Actualizaciones desde GitHub (`updater.cjs` + `wireUpdates()`), probadas de

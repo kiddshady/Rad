@@ -1,0 +1,102 @@
+/* Rad · glass · campos y controles de elección.
+   Un campo es un pozo tallado en la hoja: más oscuro que ella, con la sombra
+   adentro arriba y un hilo de luz en el labio de abajo. Al enfocarlo, el
+   borde pasa al acento y resplandece. */
+
+.rad-field-label {
+  font-size: var(--rad-text-s);
+  font-weight: var(--rad-weight-strong);
+  color: var(--rad-text-2);
+}
+.rad-field-hint {
+  font-size: var(--rad-text-s);
+  color: var(--rad-text-3);
+}
+.rad-field-error-text {
+  font-size: var(--rad-text-s);
+  color: var(--rad-danger);
+}
+
+.rad-input, .rad-select {
+  padding: var(--rad-space-1) var(--rad-space-3);
+  border-radius: var(--rad-radius-m);
+  background-color: var(--skin-well);
+  box-shadow: var(--skin-well-shadow);
+  color: var(--rad-text-1);
+  font-size: var(--rad-text-m);
+  caret-color: var(--rad-accent);
+  transition: box-shadow var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out);
+}
+textarea.rad-input { padding-block: var(--rad-space-2); line-height: 1.5; }
+.rad-input::placeholder { color: var(--rad-text-3); }
+.rad-input:hover, .rad-select:hover {
+  box-shadow: inset 0 1px 3px #0000005c, inset 0 0 0 1px #ffffff24, 0 1px 0 #ffffff0d;
+}
+.rad-input:focus, .rad-select[aria-expanded='true'] {
+  box-shadow: inset 0 1px 3px #0000005c, inset 0 0 0 1.5px var(--rad-accent), 0 0 0 3px var(--rad-accent-soft);
+}
+.rad-input:disabled { color: var(--rad-text-3); background-color: transparent; }
+.rad-field[data-invalid] .rad-input {
+  box-shadow: inset 0 1px 3px #0000005c, inset 0 0 0 1px var(--rad-danger), 0 1px 0 #ffffff0d;
+}
+.rad-field[data-invalid] .rad-input:focus {
+  box-shadow: inset 0 1px 3px #0000005c, inset 0 0 0 1.5px var(--rad-danger), 0 0 0 3px color-mix(in srgb, var(--rad-danger) 16%, transparent);
+}
+
+.rad-select[data-empty] .rad-select-value { color: var(--rad-text-3); }
+.rad-select-chevron { color: var(--rad-text-3); }
+
+/* Check y radio */
+.rad-check, .rad-radio, .rad-switch {
+  color: var(--rad-text-1);
+  font-size: var(--rad-text-m);
+}
+.rad-check-box, .rad-radio-dot {
+  background-color: var(--skin-well);
+  box-shadow: var(--skin-well-shadow);
+  color: var(--rad-on-accent);
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-check-box { border-radius: var(--rad-radius-s); }
+.rad-radio-dot { border-radius: var(--rad-radius-pill); }
+.rad-check:hover .rad-check-box, .rad-radio:hover .rad-radio-dot {
+  box-shadow: inset 0 1px 3px #0000005c, inset 0 0 0 1px #ffffff2e, 0 1px 0 #ffffff0d;
+}
+.rad-check > input:checked + .rad-check-box,
+.rad-radio > input:checked + .rad-radio-dot {
+  background-color: var(--rad-accent);
+  box-shadow: inset 0 1px 0 #ffffff66, 0 2px 10px #7fd4f547;
+}
+.rad-check:has(> input:disabled), .rad-radio:has(> input:disabled), .rad-switch:has(> input:disabled) { color: var(--rad-text-3); }
+
+/* Switch: la pista es un pozo; prendida, se llena de acento y resplandece.
+   El pulgar es una gota clara que se oscurece al cruzar. */
+.rad-switch-track {
+  border-radius: var(--rad-radius-pill);
+  background-color: var(--skin-well);
+  box-shadow: var(--skin-well-shadow);
+  transition: background-color var(--rad-dur-base) var(--rad-ease-in-out), box-shadow var(--rad-dur-base) var(--rad-ease-in-out);
+}
+.rad-switch-track::after {
+  background-color: var(--rad-text-2);
+  box-shadow: inset 0 1px 0 #ffffff59, 0 1px 3px #00000066;
+}
+.rad-switch > input:checked + .rad-switch-track {
+  background-color: var(--rad-accent);
+  box-shadow: inset 0 1px 0 #ffffff59, 0 2px 12px #7fd4f547;
+}
+.rad-switch > input:checked + .rad-switch-track::after { background-color: var(--rad-on-accent); }
+
+/* Botón de ícono */
+.rad-iconbutton {
+  border-radius: var(--rad-radius-m);
+  color: var(--rad-text-2);
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out), transform var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-iconbutton:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
+.rad-iconbutton:active { background-color: var(--rad-tint-press); transform: scale(0.96); }
+.rad-iconbutton[aria-pressed='true'] {
+  color: var(--rad-accent-strong);
+  background-color: var(--rad-accent-soft);
+  box-shadow: inset 0 0 0 1px #7fd4f538;
+}

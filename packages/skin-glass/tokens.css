@@ -1,0 +1,116 @@
+/* Rad · glass · tokens. Uno por cada nombre del contrato; lo propio va con --skin-. */
+:root {
+  /* Superficies: la 0 es el telón, opaca. De la 1 a la 3 son velos de luz
+     que se suman sobre lo que tengan abajo. */
+  --rad-surface-0: #090b11;
+  --rad-surface-1: #ffffff0a;
+  --rad-surface-2: #ffffff0f;
+  --rad-surface-3: #ffffff17;
+  --rad-tint-hover: #ffffff0f;
+  --rad-tint-press: #ffffff1c;
+  --rad-scrim: #05070c52;
+
+  /* Texto */
+  --rad-text-1: #eef2f8;
+  --rad-text-2: #b6bfce;
+  --rad-text-3: #838da0;
+
+  /* Acento: celeste hielo, la luz que el vidrio devuelve. */
+  --rad-accent: #7fd4f5;
+  --rad-accent-strong: #a8e3fb;
+  --rad-accent-soft: #7fd4f524;
+  --rad-on-accent: #04202c;
+  --rad-focus: #7fd4f5;
+  --rad-selection: #7fd4f54d;
+
+  /* Estado */
+  --rad-danger: #f0838c;
+  --rad-success: #76d6a6;
+  --rad-warning: #ecc16c;
+
+  /* Líneas */
+  --rad-line: #ffffff14;
+  --rad-line-strong: #ffffff2b;
+  --rad-line-width: 1px;
+
+  /* Scroll */
+  --rad-scroll-thumb: #ffffff24;
+  --rad-scroll-thumb-hover: #ffffff47;
+  --rad-scroll-size: 10px;
+
+  /* Forma: más redonda que classic, el vidrio no tiene aristas. */
+  --rad-radius-s: 6px;
+  --rad-radius-m: 10px;
+  --rad-radius-l: 16px;
+  --rad-radius-pill: 999px;
+
+  /* Espacio */
+  --rad-space-1: 4px;
+  --rad-space-2: 8px;
+  --rad-space-3: 12px;
+  --rad-space-4: 16px;
+  --rad-space-5: 24px;
+  --rad-space-6: 32px;
+
+  /* Tipografía: las de Windows 11. */
+  --rad-font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --rad-font-display: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  --rad-font-mono: 'Cascadia Mono', Consolas, monospace;
+  --rad-text-xs: 11px;
+  --rad-text-s: 12px;
+  --rad-text-m: 13px;
+  --rad-text-l: 15px;
+  --rad-text-xl: 21px;
+  --rad-weight-regular: 400;
+  --rad-weight-strong: 600;
+
+  /* Elevación: cada sombra trae su canto de luz (inset), así cualquier
+     tarjeta de una app sale de vidrio sin saber nada de esta piel. */
+  --rad-shadow-1: inset 0 1px 0 #ffffff14, inset 0 0 0 1px #ffffff08, 0 2px 6px #0000002e;
+  --rad-shadow-2: inset 0 1px 0 #ffffff24, inset 0 0 0 1px #ffffff0f, 0 14px 36px #00000075, 0 3px 10px #00000047;
+  --rad-shadow-3: inset 0 1px 0 #ffffff29, inset 0 0 0 1px #ffffff12, 0 30px 80px #000000ad, 0 8px 24px #00000066;
+
+  /* Shell: un poco más de aire. */
+  --rad-titlebar-height: 40px;
+  --rad-rail-width: 212px;
+  --rad-statusbar-height: 28px;
+  --rad-control-height: 34px;
+  --rad-icon-size: 16px;
+  --rad-menu-min-width: 212px;
+  --rad-modal-width: 448px;
+  --rad-toast-width: 344px;
+  --rad-tooltip-max-width: 260px;
+
+  /* Movimiento: un pelo más lento y más blando que classic. */
+  --rad-dur-fast: 140ms;
+  --rad-dur-base: 230ms;
+  --rad-dur-slow: 360ms;
+  --rad-ease-out: cubic-bezier(0.16, 0.84, 0.24, 1);
+  --rad-ease-in: cubic-bezier(0.4, 0, 0.9, 0.6);
+  --rad-ease-in-out: cubic-bezier(0.5, 0, 0.2, 1);
+
+  /* ---------- Lo propio de glass ---------- */
+
+  /* El telón: tres campos de color lejanos. Ninguno llega a la esquina de
+     abajo a la izquierda, que queda en el base (el humo la mide). */
+  --skin-field-a: radial-gradient(ellipse 90% 110% at 0% -10%, #14728f99 0%, #115f7c85 22%, #0e4a6470 42%, #0b344a4d 60%, #09223226 74%, transparent 88%);
+  --skin-field-b: radial-gradient(ellipse 86% 104% at 108% 112%, #5d42b899 0%, #4c369c80 24%, #3a2a7a61 44%, #281d573d 62%, #1a14391f 76%, transparent 90%);
+  --skin-field-c: radial-gradient(ellipse 60% 64% at 76% -16%, #2a4fae66 0%, #1e3a8540 40%, #13255a1f 62%, transparent 82%);
+
+  /* El reflejo de la hoja grande: la luz le entra por arriba a la izquierda. */
+  --skin-sheen: linear-gradient(140deg, #ffffff0f 0%, #ffffff05 24%, transparent 50%);
+
+  /* El vidrio que flota: tinte ahumado + esmerilado. */
+  --skin-float: #161b279e;
+  --skin-float-solid: #1a2030b3;
+  --skin-frost: blur(26px) saturate(1.7);
+  --skin-frost-soft: blur(14px) saturate(1.3);
+
+  /* El pozo: lo tallado en el vidrio (campos, pistas). */
+  --skin-well: #00000047;
+  --skin-well-shadow: inset 0 1px 3px #0000005c, inset 0 0 0 1px #ffffff12, 0 1px 0 #ffffff0d;
+
+  /* El canto de una hoja y el resplandor del acento. */
+  --skin-rim: inset 0 1px 0 #ffffff26, inset 0 0 0 1px #ffffff0f;
+  --skin-glow: 0 6px 22px #7fd4f547, 0 1px 4px #7fd4f52e;
+}

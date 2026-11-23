@@ -1,0 +1,9 @@
+/* Rad · glass · el telón.
+   Vive en el body, quieto, desde el primer cuadro: el color de fondo sigue
+   siendo surface-0 (el base con que nace la ventana) y los campos van encima
+   como imagen. Nada lo anima: lo que tenga vidrio encima no puede moverse. */
+body {
+  background-image: var(--skin-field-a), var(--skin-field-b), var(--skin-field-c);
+  background-size: 100vw 100vh;
+  background-repeat: no-repeat;
+}

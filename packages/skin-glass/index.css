@@ -1,0 +1,23 @@
+/*
+  Rad · piel glass
+  Vidrio ahumado sobre una luz lejana. El fondo de la ventana es un telón casi
+  negro con campos de color muy apagados; el chrome vive directo sobre él y
+  todo lo demás son hojas de vidrio que lo dejan pasar. La jerarquía no la da
+  el color de cada hoja sino cuánta luz suma (un velo más denso = más arriba)
+  y el canto: toda hoja tiene el borde de arriba encendido.
+
+  Dos vidrios distintos, por física:
+    - el que está fijo sobre el telón (el escenario, las tarjetas) no necesita
+      esmerilar nada: el telón ya es liso. Es un velo, y el escenario lo pinta
+      opaco (velo + el mismo telón, alineado) para que el fundido entre
+      vistas siga tapando;
+    - el que flota sobre el contenido (menús, toasts, tooltips, el velo del
+      modal) sí esmerila, con backdrop-filter. Por eso no viaja: entra y sale
+      solo por opacidad.
+*/
+@import url('tokens.css') layer(rad.skin);
+@import url('backdrop.css') layer(rad.skin);
+@import url('shell.css') layer(rad.skin);
+@import url('controls.css') layer(rad.skin);
+@import url('fields.css') layer(rad.skin);
+@import url('overlays.css') layer(rad.skin);

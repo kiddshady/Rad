@@ -16,6 +16,10 @@
 //
 // type:
 //   color     un color (hex, rgb(), oklch()...). Los "surface" deben ser oscuros.
+//             surface-0 es opaca siempre (es el fondo de la ventana). De la 1
+//             a la 3 pueden ser translúcidas: en una piel de vidrio son velos
+//             que se suman sobre lo que tengan abajo. El verificador las mide
+//             compuestas sobre surface-0.
 //   length    una medida (px, rem...).
 //   font      una lista de familias.
 //   weight    un peso tipográfico numérico.
@@ -33,8 +37,8 @@ const group = (name, role, tokens) => tokens.map(([id, type, desc, extra]) => ({
 }));
 
 const TOKENS = [
-  ...group('surface', 'Superficies, de la más baja a la más alta. La jerarquía de planos se arma con estas y con la elevación, no con bordes.', [
-    ['surface-0', 'color', 'El fondo de la ventana. Tiene que ser IGUAL al "base" del manifiesto de la piel: es lo que pinta Electron antes del primer frame.', { surface: true }],
+  ...group('surface', 'Superficies, de la más baja a la más alta. La jerarquía de planos se arma con estas y con la elevación, no con bordes. Una app no puede contar con que tapen: de la 1 a la 3 pueden ser velos translúcidos.', [
+    ['surface-0', 'color', 'El fondo de la ventana, siempre opaco. Tiene que ser IGUAL al "base" del manifiesto de la piel: es lo que pinta Electron antes del primer frame.', { surface: true, opaque: true }],
     ['surface-1', 'color', 'Paneles fijos: rail, barras laterales, titlebar.', { surface: true }],
     ['surface-2', 'color', 'Tarjetas y controles en reposo dentro de un panel.', { surface: true }],
     ['surface-3', 'color', 'Lo que flota: menús, modales, toasts, tooltips.', { surface: true }],
@@ -123,7 +127,7 @@ const TOKENS = [
 ];
 
 module.exports = {
-  version: 3,
+  version: 4,
   tokens: TOKENS,
   names: TOKENS.map(t => t.name),
 };

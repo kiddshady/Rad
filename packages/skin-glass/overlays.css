@@ -1,0 +1,127 @@
+/* Rad · glass · capas.
+   Lo que flota sobre el contenido es el vidrio de verdad: un tinte ahumado
+   que esmerila lo que tiene atrás. Por eso no viaja: el núcleo trae entradas
+   con transform y acá se cambian por fundidos (un backdrop-filter que se
+   mueve recalcula el blur en cada cuadro y le sale un canto sucio). */
+
+.rad-tooltip, .rad-menu, .rad-toast {
+  --rad-a-in: rad-fade-in var(--rad-dur-base) var(--rad-ease-out) both;
+  --rad-a-out: rad-fade-out var(--rad-dur-fast) var(--rad-ease-in) both;
+  background-color: var(--skin-float);
+  backdrop-filter: var(--skin-frost);
+}
+
+/* Tooltip */
+.rad-tooltip {
+  padding: var(--rad-space-1) var(--rad-space-2);
+  border-radius: var(--rad-radius-s);
+  backdrop-filter: var(--skin-frost-soft);
+  box-shadow: inset 0 1px 0 #ffffff1f, inset 0 0 0 1px #ffffff0f, 0 8px 22px #0000006b;
+  color: var(--rad-text-1);
+  font-size: var(--rad-text-s);
+  line-height: 1.35;
+}
+.rad-tooltip-key {
+  font-family: var(--rad-font-mono);
+  font-size: var(--rad-text-xs);
+  color: var(--rad-text-3);
+}
+
+/* Menú */
+.rad-menu {
+  padding: var(--rad-space-1);
+  border-radius: var(--rad-radius-l);
+  box-shadow: var(--rad-shadow-2);
+  font-size: var(--rad-text-m);
+}
+.rad-menu-item {
+  gap: var(--rad-space-3);
+  padding-inline: var(--rad-space-2) var(--rad-space-3);
+  border-radius: calc(var(--rad-radius-l) - var(--rad-space-1));
+  color: var(--rad-text-1);
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-menu-item .rad-icon { color: var(--rad-text-2); }
+.rad-menu-item.is-active { background-color: var(--rad-tint-press); }
+.rad-menu-item[aria-checked='true'] .rad-icon { color: var(--rad-accent); }
+.rad-menu-item[data-variant='danger'] { color: var(--rad-danger); }
+.rad-menu-item[data-variant='danger'] .rad-icon { color: var(--rad-danger); }
+.rad-menu-item[data-variant='danger'].is-active { background-color: color-mix(in srgb, var(--rad-danger) 18%, transparent); }
+.rad-menu-item[aria-disabled='true'] { color: var(--rad-text-3); }
+.rad-menu-item[aria-disabled='true'] .rad-icon { color: var(--rad-text-3); }
+.rad-menu-key {
+  margin-left: var(--rad-space-4);
+  font-family: var(--rad-font-mono);
+  font-size: var(--rad-text-xs);
+  color: var(--rad-text-3);
+}
+.rad-menu-sep {
+  height: var(--rad-line-width);
+  margin: var(--rad-space-1) var(--rad-space-2);
+  background-color: var(--rad-line);
+}
+
+/* Modal: el que esmerila es el velo, que cubre toda la app y solo aparece.
+   El panel va encima de ese vidrio y no esmerila nada por su cuenta, así
+   que puede subir al entrar. */
+.rad-scrim {
+  background-color: var(--rad-scrim);
+  backdrop-filter: var(--skin-frost-soft);
+}
+.rad-modal {
+  padding: var(--rad-space-5);
+  border-radius: var(--rad-radius-l);
+  background-color: var(--skin-float-solid);
+  box-shadow: var(--rad-shadow-3);
+  gap: var(--rad-space-3);
+}
+.rad-modal-title {
+  font-family: var(--rad-font-display);
+  font-size: var(--rad-text-l);
+  font-weight: var(--rad-weight-strong);
+  color: var(--rad-text-1);
+}
+.rad-modal-body { color: var(--rad-text-2); line-height: 1.5; }
+.rad-modal-actions { gap: var(--rad-space-2); margin-top: var(--rad-space-3); }
+
+/* Toast */
+/* Entra en in-out, no en ease-out: aparece en su lugar (no sube desde abajo)
+   mientras los de arriba todavía le están haciendo sitio, y arrancando
+   despacio casi no se encima con ellos. */
+.rad-toast {
+  --rad-a-in: rad-fade-in var(--rad-dur-slow) var(--rad-ease-in-out) both;
+  --rad-a-out: rad-fade-out var(--rad-dur-base) var(--rad-ease-in) both;
+  gap: var(--rad-space-3);
+  padding: var(--rad-space-2) var(--rad-space-2) var(--rad-space-2) var(--rad-space-4);
+  min-height: calc(var(--rad-control-height) + var(--rad-space-3));
+  border-radius: var(--rad-radius-l);
+  box-shadow: var(--rad-shadow-2);
+  color: var(--rad-text-1);
+}
+.rad-toast-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--rad-radius-pill);
+  background-color: var(--rad-accent);
+  box-shadow: 0 0 10px var(--rad-accent);
+}
+.rad-toast[data-kind='success'] .rad-toast-dot { background-color: var(--rad-success); box-shadow: 0 0 10px var(--rad-success); }
+.rad-toast[data-kind='warning'] .rad-toast-dot { background-color: var(--rad-warning); box-shadow: 0 0 10px var(--rad-warning); }
+.rad-toast[data-kind='danger'] .rad-toast-dot { background-color: var(--rad-danger); box-shadow: 0 0 10px var(--rad-danger); }
+.rad-toast-action {
+  height: calc(var(--rad-control-height) - var(--rad-space-1));
+  padding-inline: var(--rad-space-2);
+  border-radius: var(--rad-radius-s);
+  color: var(--rad-accent-strong);
+  font-weight: var(--rad-weight-strong);
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-toast-action:hover { background-color: var(--rad-tint-hover); }
+.rad-toast-close {
+  width: calc(var(--rad-control-height) - var(--rad-space-1));
+  height: calc(var(--rad-control-height) - var(--rad-space-1));
+  border-radius: var(--rad-radius-s);
+  color: var(--rad-text-3);
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-toast-close:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }

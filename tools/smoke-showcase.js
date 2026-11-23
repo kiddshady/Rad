@@ -13,6 +13,12 @@ const op = (el) => parseFloat(getComputedStyle(el).opacity);
 const z = (el) => parseInt(getComputedStyle(el).zIndex, 10) || 0;
 const visible = () => [...document.querySelectorAll('.rad-view')].filter((v) => v.dataset.state !== 'hidden').map((v) => v.dataset.view);
 const r2 = (n) => Math.round(n * 100) / 100;
+// Las duraciones son de la piel: lo que tenga que esperar a que algo termine
+// espera lo que diga ella, no un número pensado para classic.
+const dur = (name) => {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(`--rad-dur-${name}`).trim();
+  return v.endsWith('ms') ? parseFloat(v) : parseFloat(v) * 1000;
+};
 
 const root = document.querySelector('.rad-root');
 const NOTA = 'Escrita en la pasada 1 del humo.';
@@ -42,6 +48,8 @@ if (marker?.pass === 1) {
   if (!getComputedStyle(code2).fontFamily.startsWith('"Roboto Mono"')) fail(`la titlebar no usa la mono elegida: ${getComputedStyle(code2).fontFamily}`);
   if (![...document.fonts].some((f) => f.family.replace(/["']/g, '') === 'Roboto Mono' && f.status === 'loaded')) fail('la mono elegida no estaba cargada al entrar');
   data.monoElegida = mono2;
+  // Esta pasada arranca sin RAD_SKIN: la piel es la que se eligió en la 1.
+  data.piel = window.rad.skin.id;
   window.rad.store.write('smoke', { pass: 2 });
   // Para la captura de esta pasada: las dos fuentes mono, lado a lado.
   item('texto').click();
@@ -60,6 +68,12 @@ if (!mono1.startsWith("'Cascadia Mono'")) fail(`sin elección, --rad-font-mono e
 if (!root.classList.contains('is-settled')) fail('la raíz no quedó asentada (falta is-settled)');
 if (getComputedStyle(root).animationName !== 'none') fail(`la raíz sigue con animación: ${getComputedStyle(root).animationName}`);
 if (visible().join() !== 'planos') fail(`al arrancar se ven: ${visible().join()}`);
+// Una vista tiene que tapar: el fundido deja a la que se va encima de la
+// nueva, y si su fondo es translúcido (una piel de vidrio que pintó el
+// escenario con un velo suelto) se ven los dos contenidos encimados.
+const viewBg = getComputedStyle(view('planos')).backgroundColor;
+const viewAlpha = viewBg.startsWith('rgba') ? parseFloat(viewBg.split(',')[3]) : viewBg === 'transparent' ? 0 : 1;
+if (viewAlpha < 1) fail(`la vista no tapa (fondo ${viewBg}): el fundido entre vistas dejaría ver dos contenidos a la vez`);
 
 // 1. Fundido planos -> texto, muestreado cuadro por cuadro.
 item('texto').click();
@@ -252,7 +266,7 @@ else {
   if (document.activeElement !== btns[0]) fail('el Tab no dio la vuelta dentro del modal');
   keyOn(document.activeElement, 'Tab', { shiftKey: true });
   if (document.activeElement !== btns.at(-1)) fail('el Shift+Tab no dio la vuelta dentro del modal');
-  await sleep(350);
+  await sleep(dur('slow') + 90);
   keyOn(document.activeElement, 'Escape');
   // Ya entró del todo: sale con su salida propia (se achica), no con el
   // atajo de "venía entrando".
@@ -370,6 +384,26 @@ let badChannel = false;
 try { await window.rad.invoke('../rad:window', 'close'); } catch { badChannel = true; }
 if (!badChannel) fail('el puente aceptó un canal inválido');
 window.rad.store.write('smoke', { pass: 1 });
+
+// ---------- Pieles ----------
+// 12b. El selector lista las pieles, marca una sola como activa (la que
+// dice el puente) y guarda la elegida. En el humo no reabre: la pasada 2
+// arranca sin RAD_SKIN y tiene que salir con esta misma.
+item('pieles').click();
+await sleep(500);
+const cards = [...view('pieles').querySelectorAll('.sc-skin')];
+const activeCards = cards.filter((c) => c.hasAttribute('data-active'));
+if (cards.length < 2) fail(`el selector muestra ${cards.length} pieles, se esperaban al menos 2`);
+if (activeCards.length !== 1 || activeCards[0].dataset.skin !== window.rad.skin.id) fail(`la piel activa del selector es "${activeCards.map((c) => c.dataset.skin).join()}", el puente dice "${window.rad.skin.id}"`);
+if (activeCards[0]?.querySelector('.rad-button')) fail('la piel en uso ofrece el botón de usarla');
+if (cards.some((c) => !c.hasAttribute('data-active') && !c.querySelector('.rad-button'))) fail('una piel que no está en uso no tiene su botón');
+if (document.querySelector('.rad-titlebar-sub > :not(.rad-swap-out)')?.textContent !== window.rad.skin.name.toLowerCase()) fail('la titlebar no dice el nombre de la piel');
+const elegida = await window.rad.invoke('pieles:usar', window.rad.skin.id);
+if (elegida?.reabre !== false) fail('en el humo, elegir una piel no tiene que reabrir la vitrina');
+let badSkin = false;
+try { await window.rad.invoke('pieles:usar', 'no-existe'); } catch { badSkin = true; }
+if (!badSkin) fail('el selector aceptó una piel que no existe');
+data.pieles = `${cards.map((c) => c.dataset.skin).join(', ')}; en uso: ${window.rad.skin.id}`;
 item('capas').click();
 await sleep(400);
 
@@ -432,7 +466,7 @@ else {
   if (path.join(' > ') !== 'Mañana > Tarde > Noche > Mañana') fail(`el recorrido del select fue: ${path.join(' > ')}`);
   keyOn(selMenu, 'ArrowDown');
   keyOn(selMenu, 'Enter');
-  await sleep(400);
+  await sleep(dur('fast') + dur('base') + 150);
   if (sel.value !== 'tarde') fail(`el select quedó en ${sel.value}, no en tarde`);
   const shown = sel.el.querySelector('.rad-select-value > :not(.rad-swap-out)')?.textContent;
   if (shown !== 'Tarde') fail(`el botón del select muestra "${shown}"`);

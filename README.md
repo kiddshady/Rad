@@ -16,9 +16,10 @@ packages/core           @rad/core: los huesos
   main/                 proceso principal: ventana, protocolo rad://, humo
   preload/              el puente window.rad
   renderer/             core.css, boot.js, scroll.js
-packages/skin-classic   @rad/skin-classic: la primera piel
+packages/skin-classic   @rad/skin-classic: la piel neutral
+packages/skin-glass     @rad/skin-glass: la piel de vidrio
 apps/showcase           la vitrina: todos los tokens con la piel activa
-tools/                  verificadores y humo
+tools/                  verificadores, humo y capturas
 ```
 
 ## El contrato
@@ -188,9 +189,48 @@ Una piel es una carpeta `packages/skin-<id>` con:
 
 - `skin.cjs`: `{ id, name, base, root }`. `base` es el color con que Electron
   pinta la ventana antes del primer frame: `#rrggbb` e igual a `--rad-surface-0`.
+  Opcionales, para quien liste las pieles: `description` y `preview` (cuatro o
+  cinco colores que la resumen).
 - `index.css`: la entrada, que importa sus partes en `layer(rad.skin)`.
 
 Rad es solo oscuro: el verificador rechaza una superficie clara.
+
+Hoy hay dos:
+
+- **classic**: neutral y sobria. Grafito, un acento azul acero, sombras suaves.
+- **glass**: vidrio ahumado sobre una luz lejana. El fondo es un telón casi
+  negro con campos de color apagados, y todo lo demás son hojas que lo dejan
+  pasar.
+
+### Superficies translúcidas
+
+`--rad-surface-0` es opaca siempre (es el fondo de la ventana). De la 1 a la 3
+pueden ser velos translúcidos, que se suman sobre lo que tengan abajo: así una
+tarjeta de una app (`background: var(--rad-surface-2)`) sale de vidrio sin
+saber nada de la piel. Una app no puede contar con que una superficie tape.
+
+Lo único que sí tiene que tapar es una vista: el fundido entre vistas deja a
+la que se va encima de la nueva. Por eso una piel de vidrio no pinta el
+escenario con el velo suelto: lo compone opaco (el velo encima del mismo
+fondo de la ventana, corrido para que calce), y la vista lo hereda. El humo
+lo comprueba.
+
+Y el vidrio que esmerila (`backdrop-filter`) es solo para lo que flota sobre
+el contenido. No viaja: una piel cambia las entradas con transform del núcleo
+por fundidos, pisando `--rad-a-in` y `--rad-a-out` en ese componente.
+
+### Diseñar una piel
+
+La vitrina tiene un selector (la vista Pieles): elegís una, se cierra y
+vuelve a abrir con ella, y se acuerda. `RAD_SKIN=<id>` la fuerza sin tocar lo
+guardado. Para mirar una piel escena por escena sin abrir nada a mano:
+
+```
+npm run shots -- glass              todas las escenas
+npm run shots -- glass menu modal   solo esas
+```
+
+Deja las capturas en `.smoke/shots/`.
 
 ## Fuentes compartidas
 
@@ -218,8 +258,9 @@ npm install
 npm run showcase   abre la vitrina
 npm run verify     el núcleo sin estilo y cada piel contra el contrato
 npm run test       el guardado, con node pelado
-npm run smoke      abre la vitrina dos veces, mide lo que se ve y lo que sobrevive
+npm run smoke      abre la vitrina dos veces por piel, mide lo que se ve y lo que sobrevive
 npm run check      verify + test + smoke
+npm run shots      capturas de la vitrina con una piel, para diseñarla
 ```
 
 El humo no puede ver el flash del compositor al arrancar: no sale en ninguna
