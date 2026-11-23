@@ -10,6 +10,7 @@ const rad = require('@rad/core/main');
 const SKINS = {
   classic: require('@rad/skin-classic'),
   glass: require('@rad/skin-glass'),
+  mono: require('@rad/skin-mono'),
 };
 const DEFAULT_SKIN = 'classic';
 

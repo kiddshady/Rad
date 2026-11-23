@@ -95,6 +95,12 @@ function checkSkin(skin) {
   const missing = need.filter((k) => !skin || !skin[k]);
   if (missing.length) throw new Error(`[rad] la piel no trae: ${missing.join(', ')}`);
   if (!/^#[0-9a-f]{6}$/i.test(skin.base)) throw new Error(`[rad] el base de la piel tiene que ser #rrggbb: ${skin.base}`);
+  // Una piel puede heredar de otra (extends): sus archivos se sirven en
+  // /@base/. Un solo nivel: la base no puede heredar a su vez.
+  if (skin.extends) {
+    if (!skin.extends.root) throw new Error(`[rad] la piel "${skin.id}" hereda de una piel sin root`);
+    if (skin.extends.extends) throw new Error(`[rad] la piel "${skin.id}" hereda de "${skin.extends.id}", que a su vez hereda: se admite un solo nivel`);
+  }
 }
 
 function checkChannel(channel) {
@@ -165,7 +171,7 @@ function start(options) {
   wireQuit();
 
   return app.whenReady().then(() => {
-    protocol.handle({ app: renderer, core: CORE_RENDERER, skin: skin.root, fonts: fontsRoot() });
+    protocol.handle({ app: renderer, core: CORE_RENDERER, skin: skin.root, base: skin.extends?.root ?? null, fonts: fontsRoot() });
     wireWindowIpc();
     wireStoreIpc();
     // Actualizaciones: solo empaquetada y con bloque "publish" en el build.

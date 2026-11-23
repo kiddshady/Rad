@@ -1,0 +1,46 @@
+/* Rad · mono · tokens. Solo los que cambian respecto de glass: forma,
+   espacio, tipografía, elevación, medidas y movimiento son los de la base. */
+:root {
+  /* Superficies: negro neutro. Los velos (1 a 3) son los de glass. */
+  --rad-surface-0: #0a0a0a;
+  --rad-scrim: #05050557;
+
+  /* Texto: grises sin temperatura. */
+  --rad-text-1: #f0f0f0;
+  --rad-text-2: #b9b9b9;
+  --rad-text-3: #878787;
+
+  /* Acento: luz blanca. */
+  --rad-accent: #e9e9e9;
+  --rad-accent-strong: #ffffff;
+  --rad-accent-soft: #ffffff1f;
+  --rad-on-accent: #0c0c0c;
+  --rad-focus: #ffffff;
+  --rad-selection: #ffffff3d;
+
+  /* Estado: lo único con color, apagado. */
+  --rad-danger: #e58e93;
+  --rad-success: #8fcfab;
+  --rad-warning: #dfc085;
+
+  /* ---------- Lo propio ---------- */
+
+  /* El telón: los mismos tres campos de glass, de luz en vez de color. */
+  --skin-field-a: radial-gradient(ellipse 90% 110% at 0% -10%, #ffffff26 0%, #ffffff1f 22%, #ffffff17 42%, #ffffff0f 60%, #ffffff08 74%, transparent 88%);
+  --skin-field-b: radial-gradient(ellipse 86% 104% at 108% 112%, #ffffff21 0%, #ffffff1a 24%, #ffffff12 44%, #ffffff0a 62%, #ffffff05 76%, transparent 90%);
+  --skin-field-c: radial-gradient(ellipse 60% 64% at 76% -16%, #ffffff14 0%, #ffffff0a 40%, #ffffff05 62%, transparent 82%);
+
+  /* El vidrio que flota, sin tinte. */
+  --skin-float: #1a1a1a9e;
+  --skin-float-solid: #1c1c1cb3;
+  --skin-frost: blur(26px);
+  --skin-frost-soft: blur(14px);
+
+  /* La luz. */
+  --skin-glow: 0 0 22px #ffffff38, 0 0 5px #ffffff2e;
+  --skin-busy-tail: #7d7d7d;
+  /* Vidrio encendido: lo prendido y la acción primaria. */
+  --skin-lit: #ffffff30;
+  --skin-lit-strong: #ffffff47;
+  --skin-lit-rim: inset 0 1px 0 #ffffff99, inset 0 0 0 1px #ffffff47;
+}

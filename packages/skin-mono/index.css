@@ -1,0 +1,24 @@
+/*
+  Rad · piel mono
+  Glass sin color. Es la misma física (el telón, las hojas que lo dejan
+  pasar, el vidrio que esmerila lo que flota) y por eso hereda de glass en
+  vez de copiarla: acá solo está lo que cambia.
+
+  Lo que cambia:
+    - ningún color. El telón ya no deja pasar color sino luz: campos de
+      claridad sobre negro, como una lámpara lejana en la niebla. Sin eso las
+      hojas serían gris plano y no se leerían como vidrio;
+    - toda la luz es blanca: el canto, el foco, el resplandor, el anillo de
+      carga;
+    - el blanco va en líneas y halos, no en superficies (a Fran lo muy blanco
+      le molesta a la vista). Por eso lo prendido no es un bloque blanco sino
+      vidrio encendido: translúcido, con el canto y el halo blancos;
+    - los colores de estado se quedan, más apagados: en gris, un error y un
+      aviso serían iguales.
+
+  La base se importa entera en una subcapa de rad.skin; lo de este archivo
+  queda directo en rad.skin y por eso le gana sin pelear especificidad.
+*/
+@import url('/@base/index.css') layer(rad.skin);
+@import url('tokens.css') layer(rad.skin);
+@import url('mono.css') layer(rad.skin);

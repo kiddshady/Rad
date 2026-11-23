@@ -1,5 +1,20 @@
 # Changelog
 
+## @rad/core 0.9.0 · @rad/skin-mono 0.1.0 · Rad Vitrina 0.9.0 (2026-11-23)
+
+- **Mono, una piel nueva.** Glass sin color: vidrio oscuro acromático donde
+  toda la luz es blanca (el canto, el foco, el resplandor, el anillo de
+  carga). El telón ya no deja pasar color sino claridad. El blanco va en
+  líneas y halos, no en superficies: lo prendido (el primario, el switch) es
+  vidrio encendido y no un bloque blanco. Los colores de estado se quedan,
+  más apagados.
+- **Una piel puede heredar de otra** (`extends` en el manifiesto): el núcleo
+  sirve la base en `/@base/` y la que hereda la importa entera y pone solo lo
+  que cambia. Mono son dos archivos chicos sobre glass, y un arreglo en glass
+  le llega sola. El verificador sigue la herencia.
+- Glass ya no tiene el color del acento escrito a mano en sus resplandores:
+  salen del token, que es lo que deja que otra piel la herede.
+
 ## @rad/core 0.8.0 · Rad Vitrina 0.8.0 (2026-11-23)
 
 - **El anillo de carga**, una pieza nueva del núcleo: `setBusy(el, true)` hace

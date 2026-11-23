@@ -40,19 +40,20 @@ const ABSOLUTE = {
   '/@core/': path.join(ROOT, 'packages', 'core', 'renderer'),
 };
 
-function resolveImport(from, href) {
-  for (const [prefix, dir] of Object.entries(ABSOLUTE)) {
+// extra: lo que cambia por piel ('/@base/' -> la piel de la que hereda).
+function resolveImport(from, href, extra) {
+  for (const [prefix, dir] of Object.entries({ ...ABSOLUTE, ...extra })) {
     if (href.startsWith(prefix)) return path.join(dir, href.slice(prefix.length));
   }
   return path.resolve(path.dirname(from), href);
 }
 
-function readCss(file, seen = new Set()) {
+function readCss(file, extra = {}, seen = new Set()) {
   if (seen.has(file)) return '';
   seen.add(file);
   const text = fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const imports = [...text.matchAll(/@import\s+(?:url\()?\s*['"]?([^'")\s]+)['"]?\s*\)?/g)];
-  return imports.map((m) => readCss(resolveImport(file, m[1]), seen)).join('\n') + '\n' + text;
+  return imports.map((m) => readCss(resolveImport(file, m[1], extra), extra, seen)).join('\n') + '\n' + text;
 }
 
 function checkSkin(dir) {
@@ -69,7 +70,11 @@ function checkSkin(dir) {
   const entry = path.join(dir, 'index.css');
   if (!fs.existsSync(entry)) return { label, errors: [...errors, 'falta index.css'], warnings };
 
-  const css = readCss(entry);
+  // Una piel que hereda (extends) importa los archivos de su base desde
+  // /@base/. Lo que la base define cuenta como definido; lo propio, que va
+  // después, gana. Un solo nivel: la base no puede heredar a su vez.
+  if (skin.extends && (!skin.extends.root || skin.extends.extends)) errors.push('extends tiene que ser una piel con root que no herede a su vez');
+  const css = readCss(entry, skin.extends?.root ? { '/@base/': skin.extends.root } : {});
   const defined = new Map();
   for (const m of css.matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)) defined.set(m[1], m[2].trim());
 

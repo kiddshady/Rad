@@ -4,6 +4,7 @@
 //
 //   rad://app/@core/...   los archivos del núcleo (packages/core/renderer)
 //   rad://app/@skin/...   los archivos de la piel activa
+//   rad://app/@base/...   los de la piel de la que hereda, si hereda de una
 //   rad://app/@fonts/...  las fuentes compartidas (@rad/fonts)
 //   rad://app/...         el renderer de la app
 //
@@ -65,6 +66,9 @@ function resolve(roots, pathname) {
   } else if (rel === '@skin' || rel.startsWith('@skin/')) {
     root = roots.skin;
     rel = rel.slice('@skin'.length);
+  } else if (rel === '@base' || rel.startsWith('@base/')) {
+    root = roots.base;
+    rel = rel.slice('@base'.length);
   } else if (rel === '@fonts' || rel.startsWith('@fonts/')) {
     root = roots.fonts;
     rel = rel.slice('@fonts'.length);

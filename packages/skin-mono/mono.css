@@ -1,0 +1,52 @@
+/* Rad · mono · lo que se viste distinto que en glass.
+   En glass, lo prendido se llena de acento. Acá el acento es blanco, y un
+   bloque blanco encandila: lo prendido es vidrio encendido. */
+
+/* El primario: una lámina con luz adentro, no un bloque. */
+.rad-button[data-variant='primary'] {
+  background-color: var(--skin-lit);
+  box-shadow: var(--skin-lit-rim), var(--skin-glow);
+  color: var(--rad-text-1);
+}
+.rad-button[data-variant='primary']:hover {
+  background-color: var(--skin-lit-strong);
+  box-shadow: var(--skin-lit-rim), 0 0 30px #ffffff52, 0 0 6px #ffffff3d;
+}
+
+/* El switch prendido: la pista se enciende y el pulgar es la luz. */
+.rad-switch > input:checked + .rad-switch-track {
+  background-color: var(--skin-lit-strong);
+  box-shadow: var(--skin-lit-rim), 0 0 14px #ffffff3d;
+}
+.rad-switch > input:checked + .rad-switch-track::after {
+  background-color: var(--rad-accent-strong);
+  box-shadow: 0 0 8px #ffffff8c;
+}
+
+/* El check y el radio sí se llenan: son chicos, y vacíos no se leerían. */
+.rad-check > input:checked + .rad-check-box,
+.rad-radio > input:checked + .rad-radio-dot {
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 12px #ffffff4d;
+}
+
+/* Lo activo del rail y de los botones de ícono, sin teñir. */
+.rad-rail-item[aria-current='page'] .rad-icon { color: var(--rad-accent-strong); }
+.rad-iconbutton[aria-pressed='true'] {
+  color: var(--rad-accent-strong);
+  background-color: var(--skin-lit);
+  box-shadow: inset 0 0 0 1px #ffffff47;
+}
+
+/* El foco de un campo: un hilo blanco y su halo. */
+.rad-input:focus, .rad-select[aria-expanded='true'] {
+  box-shadow: inset 0 1px 3px #0000005c, inset 0 0 0 1.5px #ffffffd9, 0 0 0 3px #ffffff1f, 0 0 16px #ffffff24;
+}
+
+/* El punto de un toast sin tipo es luz blanca. */
+.rad-toast-dot { box-shadow: 0 0 10px var(--rad-accent-strong); }
+
+/* El anillo de carga: cola gris, cabeza blanca. */
+.rad-busy {
+  --rad-a-busy-from: var(--skin-busy-tail);
+  --rad-a-busy-to: var(--rad-accent-strong);
+}

@@ -18,6 +18,7 @@ packages/core           @rad/core: los huesos
   renderer/             core.css, boot.js, scroll.js
 packages/skin-classic   @rad/skin-classic: la piel neutral
 packages/skin-glass     @rad/skin-glass: la piel de vidrio
+packages/skin-mono      @rad/skin-mono: glass sin color (hereda de glass)
 apps/showcase           la vitrina: todos los tokens con la piel activa
 tools/                  verificadores, humo y capturas
 ```
@@ -215,12 +216,39 @@ Una piel es una carpeta `packages/skin-<id>` con:
 
 Rad es solo oscuro: el verificador rechaza una superficie clara.
 
-Hoy hay dos:
+Hoy hay tres:
 
 - **classic**: neutral y sobria. Grafito, un acento azul acero, sombras suaves.
 - **glass**: vidrio ahumado sobre una luz lejana. El fondo es un telón casi
   negro con campos de color apagados, y todo lo demás son hojas que lo dejan
   pasar.
+- **mono**: glass sin color. Vidrio oscuro acromático donde toda la luz es
+  blanca; lo prendido no es un bloque blanco sino vidrio encendido. Hereda de
+  glass.
+
+### Una piel que hereda de otra
+
+Si una piel es una variante de otra, no la copia: la hereda.
+
+```js
+// packages/skin-mono/skin.cjs
+module.exports = { id: 'mono', name: 'Mono', base: '#0a0a0a', root: __dirname,
+  extends: require('@rad/skin-glass') };
+```
+
+```css
+/* packages/skin-mono/index.css */
+@import url('/@base/index.css') layer(rad.skin);   /* la base, entera */
+@import url('tokens.css') layer(rad.skin);         /* lo que cambia */
+@import url('mono.css') layer(rad.skin);
+```
+
+El núcleo sirve los archivos de la base en `/@base/`. La base queda en una
+subcapa de `rad.skin` y lo propio, directo en `rad.skin`, así que le gana sin
+pelear especificidad. Un arreglo en la base le llega sola a la que hereda. Se
+admite un solo nivel. Para que funcione, la base no puede tener colores del
+acento escritos a mano en su anatomía: salen de los tokens (o de un
+`color-mix` sobre ellos).
 
 ### Superficies translúcidas
 

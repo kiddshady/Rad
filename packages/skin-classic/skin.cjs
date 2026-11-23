@@ -9,6 +9,8 @@
 // Opcionales, para quien liste las pieles (el selector de la vitrina):
 //   description   una línea que la cuenta.
 //   preview       cuatro o cinco colores que la resumen, del fondo al acento.
+//   extends       otra piel (su manifiesto) de la que esta hereda: el núcleo
+//                 sirve sus archivos en /@base/ y el index.css los importa.
 
 module.exports = {
   id: 'classic',
