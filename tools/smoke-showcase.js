@@ -414,6 +414,20 @@ const ctl = view('controles');
 const after = (el) => getComputedStyle(el, '::after');
 const labelOf = (sel) => ctl.querySelector(sel).closest('label');
 
+// 12c. El respiro de la scrollbar: la pista de un scroll redondeado se separa
+// de las puntas lo que diga su --rad-a-scroll-inset, y eso no se hereda a lo
+// de adentro (la vista de glass lo tiene, sus tarjetas no).
+const notas = ctl.querySelector('textarea.rad-input');
+const inset = (el) => getComputedStyle(el).getPropertyValue('--rad-a-scroll-inset').trim();
+const track = (el) => getComputedStyle(el, '::-webkit-scrollbar-track');
+if (parseFloat(inset(notas)) <= 0) fail(`el textarea no declara respiro para su scrollbar (${inset(notas)})`);
+for (const el of [notas, ctl]) {
+  const t = track(el);
+  if (t.marginTop !== inset(el) || t.marginBottom !== inset(el)) fail(`la pista de ${el === ctl ? 'la vista' : 'el textarea'} tiene margen ${t.marginTop}/${t.marginBottom}, su respiro dice ${inset(el)}`);
+}
+if (inset(notas.closest('.rad-field')) !== '0px' || inset(ctl.firstElementChild) !== '0px') fail('el respiro de la scrollbar se heredó a un elemento que no lo declara');
+data.scrollbar = `respiro: vista ${inset(ctl)}, textarea ${inset(notas)}`;
+
 // 13. Check: el click en la etiqueta lo marca y el tilde se dibuja entero.
 const vencidos = ctl.querySelector('[data-demo="vencidos"]');
 labelOf('[data-demo="vencidos"]').click();

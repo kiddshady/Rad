@@ -21,6 +21,7 @@
 /* Menú: el borde vive en el mismo elemento que scrollea, así que no lleva
    esfumado (se comería su propio canto). */
 .rad-menu {
+  --rad-a-scroll-inset: var(--rad-space-2);
   padding: var(--rad-space-1);
   border-radius: var(--rad-radius-l);
   background-color: var(--rad-surface-3);
@@ -56,6 +57,7 @@
 /* Modal */
 .rad-scrim { background-color: var(--rad-scrim); }
 .rad-modal {
+  --rad-a-scroll-inset: var(--rad-space-2);
   padding: var(--rad-space-5);
   border-radius: var(--rad-radius-l);
   background-color: var(--rad-surface-3);

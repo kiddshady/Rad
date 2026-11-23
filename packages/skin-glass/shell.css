@@ -87,6 +87,11 @@
   margin-left: var(--rad-space-2);
   --skin-ox: calc(var(--rad-space-2) * -1);
 }
+/* La hoja es redonda de los cuatro lados y la scrollbar de la vista corre
+   pegada a su borde: con respiro, el pulgar no llega a la curva. */
+.rad-stage > .rad-view {
+  --rad-a-scroll-inset: var(--rad-space-3);
+}
 /* El canto de la hoja va en una capa propia, por encima de las vistas: una
    sombra inset del escenario quedaría tapada por ellas, que son opacas. */
 .rad-stage::after {

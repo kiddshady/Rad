@@ -29,6 +29,7 @@
 
 /* Menú */
 .rad-menu {
+  --rad-a-scroll-inset: var(--rad-space-2);
   padding: var(--rad-space-1);
   border-radius: var(--rad-radius-l);
   box-shadow: var(--rad-shadow-2);
@@ -69,6 +70,7 @@
   backdrop-filter: var(--skin-frost-soft);
 }
 .rad-modal {
+  --rad-a-scroll-inset: var(--rad-space-3);
   padding: var(--rad-space-5);
   border-radius: var(--rad-radius-l);
   background-color: var(--skin-float-solid);

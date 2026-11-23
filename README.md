@@ -215,6 +215,11 @@ escenario con el velo suelto: lo compone opaco (el velo encima del mismo
 fondo de la ventana, corrido para que calce), y la vista lo hereda. El humo
 lo comprueba.
 
+Si algo scrollea y tiene las esquinas redondeadas, su scrollbar lleva respiro
+para que la curva no corte el pulgar: `--rad-a-scroll-inset` en ese elemento
+(vale también para lo propio de una app: `.mi-panel { --rad-a-scroll-inset:
+var(--rad-space-2); }`). No se hereda a los scrolls de adentro.
+
 Y el vidrio que esmerila (`backdrop-filter`) es solo para lo que flota sobre
 el contenido. No viaja: una piel cambia las entradas con transform del núcleo
 por fundidos, pisando `--rad-a-in` y `--rad-a-out` en ese componente.

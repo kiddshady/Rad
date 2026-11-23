@@ -1,5 +1,16 @@
 # Changelog
 
+## @rad/core 0.7.1 · Rad Vitrina 0.6.1 (2026-11-23)
+
+- **El respiro de la scrollbar.** En algo que scrollea y tiene las esquinas
+  redondeadas, el pulgar llegaba hasta la punta y la curva lo cortaba (Fran lo
+  vio en la hoja de glass). El núcleo suma la perilla `--rad-a-scroll-inset`:
+  cuánto se separa la pista de las dos puntas. La declara quien redondea y
+  vale solo para ese elemento, no para los scrolls de adentro.
+- Glass la usa en la vista (la hoja es redonda de los cuatro lados), el menú,
+  el modal y el textarea; classic, en el menú, el modal y el textarea.
+- El humo comprueba que la pista tome el respiro de su dueño y que no se herede.
+
 ## @rad/core 0.7.0 · @rad/skin-glass 0.1.0 · Rad Vitrina 0.6.0 (2026-11-23)
 
 - **Glass, la segunda piel.** Vidrio ahumado sobre una luz lejana: el fondo de

@@ -68,6 +68,16 @@
   /* Scrollbar propia: fina, sin flechas, el pulgar flota separado del borde. */
   ::-webkit-scrollbar { width: var(--rad-scroll-size); height: var(--rad-scroll-size); }
   ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  /* El respiro de la scrollbar: cuánto se separa la pista de las dos puntas.
+     Es para lo que scrollea y tiene las esquinas redondeadas: sin respiro, el
+     pulgar llega hasta la punta y la curva lo corta. Lo pone quien redondea
+     (una piel en la anatomía, una app en lo suyo):
+       .mi-panel { --rad-a-scroll-inset: var(--rad-space-2); }
+     El `*` lo vuelve a cero en cada elemento, así vale solo para el que lo
+     declara y no lo heredan los scrolls de adentro; la pista, que es un
+     pseudo-elemento, sí lo toma de su dueño. */
+  * { --rad-a-scroll-inset: 0px; }
+  ::-webkit-scrollbar-track { margin: var(--rad-a-scroll-inset); }
   ::-webkit-scrollbar-thumb {
     background: var(--rad-scroll-thumb);
     background-clip: content-box;
