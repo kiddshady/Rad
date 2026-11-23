@@ -250,6 +250,159 @@
   }
   .rad-button:disabled { pointer-events: none; }
 
+  .rad-iconbutton {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: var(--rad-control-height);
+    height: var(--rad-control-height);
+  }
+
+  /* ---------- Campos ---------- */
+
+  .rad-field {
+    display: grid;
+    gap: var(--rad-space-1);
+    min-width: 0;
+  }
+  .rad-input {
+    width: 100%;
+    min-width: 0;
+    min-height: var(--rad-control-height);
+    border: 0;
+    user-select: text;
+  }
+  textarea.rad-input { resize: none; display: block; }
+  .rad-input::-webkit-inner-spin-button,
+  .rad-input::-webkit-outer-spin-button,
+  .rad-input::-webkit-search-cancel-button { -webkit-appearance: none; margin: 0; }
+  /* En un campo de texto, Chromium prende :focus-visible también con el
+     mouse: el anillo de teclado no sirve ahí. El campo tiene su propio
+     estado de foco, que dibuja la piel con :focus. */
+  .rad-input:focus-visible { outline: none; }
+
+  /* El renglón del error se despliega (0fr -> 1fr) en vez de aparecer. */
+  .rad-field-error {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .rad-field-error > * {
+    min-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out);
+  }
+  .rad-field[data-invalid] > .rad-field-error { grid-template-rows: 1fr; }
+  .rad-field[data-invalid] > .rad-field-error > * {
+    opacity: 1;
+    transition-delay: calc(var(--rad-dur-fast) / 2);
+  }
+
+  /* ---------- Check, radio y switch ----------
+     El input nativo queda adentro, invisible pero vivo (foco, teclado,
+     formularios); lo que se ve es el dibujo de al lado. */
+  .rad-check, .rad-radio, .rad-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    cursor: pointer;
+    user-select: none;
+  }
+  .rad-check > input, .rad-radio > input, .rad-switch > input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .rad-check:has(> input:disabled), .rad-radio:has(> input:disabled), .rad-switch:has(> input:disabled) { cursor: default; }
+  .rad-check > input:focus-visible + *,
+  .rad-radio > input:focus-visible + *,
+  .rad-switch > input:focus-visible + * {
+    outline: calc(var(--rad-line-width) * 2) solid var(--rad-focus);
+    outline-offset: calc(var(--rad-line-width) * 2);
+  }
+
+  .rad-check-box, .rad-radio-dot {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: var(--rad-icon-size);
+    height: var(--rad-icon-size);
+  }
+  /* El tilde se dibuja: el trazo corre de 0 a entero. */
+  .rad-check-box svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset var(--rad-dur-fast) var(--rad-ease-in);
+  }
+  .rad-check > input:checked + .rad-check-box svg {
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset var(--rad-dur-base) var(--rad-ease-out);
+  }
+  .rad-radio-dot::after {
+    content: '';
+    width: 45%;
+    height: 45%;
+    border-radius: var(--rad-radius-pill);
+    background: currentColor;
+    transform: scale(0);
+    transition: transform var(--rad-dur-fast) var(--rad-ease-in);
+  }
+  .rad-radio > input:checked + .rad-radio-dot::after {
+    transform: scale(1);
+    transition: transform var(--rad-dur-base) var(--rad-ease-out);
+  }
+
+  .rad-switch-track {
+    --rad-a-h: calc(var(--rad-icon-size) * 1.25);
+    --rad-a-w: calc(var(--rad-a-h) * 1.8);
+    --rad-a-pad: calc(var(--rad-line-width) * 3);
+    position: relative;
+    flex: none;
+    width: var(--rad-a-w);
+    height: var(--rad-a-h);
+  }
+  .rad-switch-track::after {
+    content: '';
+    position: absolute;
+    top: var(--rad-a-pad);
+    left: var(--rad-a-pad);
+    width: calc(var(--rad-a-h) - var(--rad-a-pad) * 2);
+    height: calc(var(--rad-a-h) - var(--rad-a-pad) * 2);
+    border-radius: var(--rad-radius-pill);
+    transition: transform var(--rad-dur-base) var(--rad-ease-in-out), background-color var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .rad-switch > input:checked + .rad-switch-track::after {
+    transform: translateX(calc(var(--rad-a-w) - var(--rad-a-h)));
+  }
+
+  /* ---------- Select ---------- */
+
+  .rad-select {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--rad-space-2);
+    min-height: var(--rad-control-height);
+    min-width: 0;
+    text-align: start;
+  }
+  .rad-select-value { min-width: 0; white-space: nowrap; }
+  .rad-select-value > * { overflow: hidden; text-overflow: ellipsis; }
+  .rad-select-chevron { transition: transform var(--rad-dur-base) var(--rad-ease-in-out); }
+  .rad-select[aria-expanded='true'] .rad-select-chevron { transform: rotate(180deg); }
+
   /* ---------- Overlays ---------- */
 
   .rad-overlays {

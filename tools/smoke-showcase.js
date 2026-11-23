@@ -279,7 +279,7 @@ await sleep(450);
 if (document.querySelector('.rad-toast')) fail('quedaron toasts en el DOM');
 
 // 11. Tooltip: espera la primera vez, sale enseguida la siguiente.
-const tips = capas.querySelectorAll('.sc-iconbtn');
+const tips = capas.querySelectorAll('.rad-iconbutton');
 const tipEl = () => [...document.querySelectorAll('.rad-tooltip')].find((t) => t.dataset.state === 'open' && !t.hasAttribute('data-rad-leaving'));
 tips[0].dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
 await sleep(200);
@@ -319,9 +319,109 @@ window.rad.store.write('smoke', { pass: 1 });
 item('capas').click();
 await sleep(400);
 
-// Para la captura: un menú abierto y un toast.
-capas.querySelector('[data-demo="toast"][data-kind="success"]').click();
-menuBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+// ---------- Controles ----------
+item('controles').click();
+await sleep(400);
+const ctl = view('controles');
+const after = (el) => getComputedStyle(el, '::after');
+const labelOf = (sel) => ctl.querySelector(sel).closest('label');
+
+// 13. Check: el click en la etiqueta lo marca y el tilde se dibuja entero.
+const vencidos = ctl.querySelector('[data-demo="vencidos"]');
+labelOf('[data-demo="vencidos"]').click();
+await sleep(320);
+if (!vencidos.checked) fail('el check no se marcó con el click en su etiqueta');
+const tick = vencidos.nextElementSibling.querySelector('svg');
+if (!tick) fail('el check no tiene su tilde dibujado');
+else if (parseFloat(getComputedStyle(tick).strokeDashoffset) > 0.01) fail(`el tilde quedó a medio dibujar: ${getComputedStyle(tick).strokeDashoffset}`);
+const nativeBox = getComputedStyle(vencidos);
+if (nativeBox.opacity !== '0' || parseFloat(nativeBox.width) > 1) fail('el checkbox nativo se ve');
+
+// 14. Switch: el pulgar viaja.
+const sonido = ctl.querySelector('[data-demo="sonido"]');
+const thumbX = () => new DOMMatrix(after(sonido.nextElementSibling).transform === 'none' ? undefined : after(sonido.nextElementSibling).transform).m41;
+const x0 = thumbX();
+labelOf('[data-demo="sonido"]').click();
+await frame();
+const xMid = thumbX();
+await sleep(320);
+const x1 = thumbX();
+if (!sonido.checked) fail('el switch no se prendió');
+if (!(x1 > x0 + 4)) fail(`el pulgar del switch no viajó: ${x0} → ${x1}`);
+data.switch = `pulgar ${Math.round(x0)} → ${Math.round(xMid)} → ${Math.round(x1)} px`;
+
+// 15. Radio: uno solo por grupo, y el punto crece.
+labelOf('[data-demo="orden-nombre"]').click();
+await sleep(320);
+if (!ctl.querySelector('[data-demo="orden-nombre"]').checked || ctl.querySelector('[data-demo="orden-fecha"]').checked) fail('el grupo de radios no quedó con uno solo');
+const dot = new DOMMatrix(after(ctl.querySelector('[data-demo="orden-nombre"]').nextElementSibling).transform);
+if (Math.abs(dot.a - 1) > 0.01) fail(`el punto del radio no creció entero: escala ${dot.a}`);
+
+// 16. Deshabilitado: no cambia.
+const disabledCheck = [...ctl.querySelectorAll('.rad-check input')].find((i) => i.disabled);
+disabledCheck.closest('label').click();
+if (disabledCheck.checked) fail('un check deshabilitado se marcó');
+
+// 17. Select con el teclado: abre con el elegido activo, calza con el
+// botón, saltea el deshabilitado, Enter elige y el foco vuelve.
+const sel = ctl._radSelect;
+sel.el.focus();
+keyOn(sel.el, 'ArrowDown');
+await frame();
+let selMenu = openMenus()[0];
+if (!selMenu) fail('el select no abrió con la flecha');
+else {
+  if (activeLabel(selMenu) !== 'Mañana') fail(`el select abrió con "${activeLabel(selMenu)}" activo, no el elegido`);
+  if (selMenu.offsetWidth < sel.el.offsetWidth) fail(`el menú del select (${selMenu.offsetWidth}) es más angosto que el botón (${sel.el.offsetWidth})`);
+  const path = [activeLabel(selMenu)];
+  for (let i = 0; i < 3; i++) { keyOn(selMenu, 'ArrowDown'); path.push(activeLabel(selMenu)); }
+  if (path.join(' > ') !== 'Mañana > Tarde > Noche > Mañana') fail(`el recorrido del select fue: ${path.join(' > ')}`);
+  keyOn(selMenu, 'ArrowDown');
+  keyOn(selMenu, 'Enter');
+  await sleep(400);
+  if (sel.value !== 'tarde') fail(`el select quedó en ${sel.value}, no en tarde`);
+  const shown = sel.el.querySelector('.rad-select-value > :not(.rad-swap-out)')?.textContent;
+  if (shown !== 'Tarde') fail(`el botón del select muestra "${shown}"`);
+  if (sel.el.querySelectorAll('.rad-select-value > *').length !== 1) fail('quedaron restos del relevo en el botón del select');
+  if (document.activeElement !== sel.el) fail('el foco no volvió al select');
+  if (sel.el.getAttribute('aria-expanded') !== 'false') fail('el select quedó con aria-expanded=true');
+  data.select = path.join(' > ') + ' → Tarde';
+}
+// La trampa del ancla también en el select.
+sel.el.click();
+await sleep(250);
+sel.el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+sel.el.click();
+await sleep(300);
+if (openMenus().length) fail('el click sobre el select volvió a abrir su menú');
+
+// 18. Error de campo: se despliega, y se pliega al corregir.
+const nombreIn = ctl.querySelector('[data-demo="nombre"]');
+const nombreField = nombreIn.closest('.rad-field');
+const errSlot = () => nombreField.querySelector('.rad-field-error');
+const h0 = errSlot().getBoundingClientRect().height;
+ctl.querySelector('[data-demo="form"]').requestSubmit();
+await frame();
+const hMid = errSlot().getBoundingClientRect().height;
+await sleep(350);
+const h1 = errSlot().getBoundingClientRect().height;
+if (!nombreField.hasAttribute('data-invalid') || nombreIn.getAttribute('aria-invalid') !== 'true') fail('el campo vacío no quedó marcado con error');
+if (!(h0 < 1 && h1 > 10)) fail(`el renglón del error no se desplegó: ${h0} → ${h1}`);
+if (hMid >= h1) fail('el renglón del error apareció entero de golpe');
+const errText = errSlot().querySelector('.rad-field-error-text > :not(.rad-swap-out)')?.textContent;
+if (errText !== 'Falta el nombre.') fail(`el error dice "${errText}"`);
+nombreIn.value = 'Fran';
+nombreIn.dispatchEvent(new Event('input', { bubbles: true }));
+await sleep(350);
+if (nombreField.hasAttribute('data-invalid') || errSlot().getBoundingClientRect().height > 1) fail('el error no se plegó al corregir el campo');
+data.error = `renglón ${Math.round(h0)} → ${Math.round(hMid)} → ${Math.round(h1)} px, y de vuelta a 0`;
+
+// Para la captura: el formulario con un error y el select abierto.
+await sleep(300);
+nombreIn.value = '';
+ctl.querySelector('[data-demo="form"]').requestSubmit();
+await sleep(400);
+sel.el.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
 await sleep(500);
 
 // Lo último: un guardado que todavía está en el debounce cuando la app cierra.

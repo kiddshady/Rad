@@ -118,6 +118,33 @@ Todo vive en una capa fija hermana de `.rad-root`, entra y sale animado
 de más arriba. El botón del núcleo es `.rad-button`, con
 `data-variant="primary" | "danger" | "quiet"`.
 
+## Controles
+
+Casi todos son HTML con clases, sin JS:
+
+```html
+<label class="rad-field">
+  <span class="rad-field-label">Nombre</span>
+  <input class="rad-input" type="text">
+  <span class="rad-field-hint">Como aparece en las recetas.</span>
+</label>
+
+<label class="rad-check"><input type="checkbox"><span class="rad-check-box"></span>Recordarme</label>
+<label class="rad-radio"><input type="radio" name="orden"><span class="rad-radio-dot"></span>Fecha</label>
+<label class="rad-switch"><input type="checkbox" role="switch"><span class="rad-switch-track"></span>Sonido</label>
+<button class="rad-iconbutton" aria-label="Fijar" data-rad-tip="Fijar">…</button>
+```
+
+Son inputs nativos de verdad, escondidos, con el dibujo propio encima. Los
+que necesitan JS:
+
+```js
+import { createSelect, setFieldError } from '/@core/controls.js';
+
+const turno = createSelect({ options: [{ value: 'm', label: 'Mañana' }, …], value: 'm', onChange(v) { … } });
+setFieldError(campo, 'Falta el nombre.');   // null lo limpia
+```
+
 ## Guardado y puente
 
 ```js

@@ -8,6 +8,7 @@
 import { wireAll } from './scroll.js';
 import { ms, SAFETY_MS } from './motion.js';
 import { whenReleased } from './ready.js';
+import { wireControls } from './controls.js';
 // Los tooltips se activan solos: cualquier elemento con data-rad-tip los tiene.
 import './tooltip.js';
 
@@ -70,6 +71,7 @@ async function reveal() {
 
 async function boot() {
   wireAll(document);
+  wireControls(document);
   const bridge = window.rad?.window;
   if (!bridge) return reveal();
   // Primero se escucha y después se pregunta: si el aviso llega entre las dos

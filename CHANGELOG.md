@@ -1,5 +1,30 @@
 # Changelog
 
+## @rad/core 0.5.0 · @rad/skin-classic 0.5.0 (2026-11-23)
+
+La etapa 5: classic completa.
+
+- Campos (`.rad-field`, `.rad-input`, etiqueta y pista) con su propio estado
+  de foco: en un campo de texto Chromium prende `:focus-visible` también con
+  el mouse, así que ahí no va el anillo de teclado. Sin flechitas en los de
+  número ni manija para estirar en los de texto largo.
+- `setFieldError()`: el renglón del error se despliega y se pliega, y el
+  mensaje se releva si cambia.
+- Check, radio y switch dibujados: el input nativo queda adentro, invisible
+  pero vivo (teclado, formularios, lectores de pantalla). El tilde se dibuja,
+  el punto crece y el pulgar viaja.
+- `createSelect()`: un select propio que despliega un menú del ancho del
+  botón, abre con el elegido activo, saltea los deshabilitados y resuelve la
+  trampa del ancla. El menú suma items con tilde (`checked`).
+- `.rad-iconbutton`, con estado apretado (`aria-pressed`).
+- Classic los viste: los campos son un pozo un escalón más abajo que la
+  hoja, y el contorno pasa al acento al enfocarlos.
+- La vitrina suma la vista Controles con un formulario de verdad, y lo
+  provisorio (el campo de la nota, los botones de ícono) pasa a ser del núcleo.
+- El humo prueba cada control: el tilde entero, el pulgar que viaja, un solo
+  radio por grupo, el deshabilitado, el select con teclado y el error que se
+  despliega y se pliega.
+
 ## @rad/fonts 0.2.0 · @rad/core 0.4.2 · @rad/skin-classic 0.4.2 (2026-11-23)
 
 - Cada app elige sus fuentes al arrancar: `rad.start({ fonts: { mono:

@@ -25,7 +25,12 @@ export function closeMenus() {
   openMenuHandle?.close({ restoreFocus: false });
 }
 
-export function openMenu({ anchor, items, side = 'bottom', align = 'start', activate = null, onClose } = {}) {
+const CHECK_ICON = '<svg viewBox="0 0 16 16" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg>';
+
+// activate: 'first' | 'last' | un índice (entre los items, sin contar
+// separadores). matchAnchorWidth: el menú es por lo menos tan ancho como su
+// ancla, para un desplegable que calza con su botón; un contextual no lo usa.
+export function openMenu({ anchor, items, side = 'bottom', align = 'start', activate = null, matchAnchorWidth = false, onClose } = {}) {
   closeMenus();
 
   const el = document.createElement('div');
@@ -46,12 +51,14 @@ export function openMenu({ anchor, items, side = 'bottom', align = 'start', acti
     const row = document.createElement('div');
     row.className = 'rad-menu-item';
     row.id = nextId('rad-menu-item');
-    row.setAttribute('role', 'menuitem');
+    row.setAttribute('role', item.checked !== undefined ? 'menuitemradio' : 'menuitem');
+    if (item.checked !== undefined) row.setAttribute('aria-checked', String(Boolean(item.checked)));
     if (item.danger) row.dataset.variant = 'danger';
     if (item.disabled) row.setAttribute('aria-disabled', 'true');
     const icon = document.createElement('span');
     icon.className = 'rad-icon';
-    if (item.icon) icon.innerHTML = item.icon;
+    if (item.checked) icon.innerHTML = CHECK_ICON;
+    else if (item.icon) icon.innerHTML = item.icon;
     const label = document.createElement('span');
     label.className = 'rad-menu-label';
     label.textContent = item.label;
@@ -67,6 +74,7 @@ export function openMenu({ anchor, items, side = 'bottom', align = 'start', acti
   }
 
   layer().append(el);
+  if (matchAnchorWidth && anchor instanceof Element) el.style.minWidth = `${anchor.offsetWidth}px`;
   place(el, anchor, { side, align });
   present(el);
   anchor?.setAttribute('aria-expanded', 'true');
@@ -159,6 +167,7 @@ export function openMenu({ anchor, items, side = 'bottom', align = 'start', acti
   el.focus({ preventScroll: true });
   if (activate === 'first') edge(false);
   else if (activate === 'last') edge(true);
+  else if (Number.isInteger(activate) && enabled(activate)) setActive(activate);
 
   const handle = { el, anchor, close };
   openMenuHandle = handle;

@@ -9,6 +9,7 @@ import { openModal, confirm } from '/@core/modal.js';
 import { toast } from '/@core/toast.js';
 import { openDoc } from '/@core/store.js';
 import { hold } from '/@core/ready.js';
+import { createSelect, setFieldError } from '/@core/controls.js';
 
 // La interfaz se arma después de leer los datos: el arranque espera.
 const release = hold();
@@ -94,6 +95,62 @@ const views = [
       el.querySelector('[data-demo="burst"]').addEventListener('click', () => {
         const kinds = ['info', 'success', 'warning', 'danger', 'info'];
         kinds.forEach((k, i) => setTimeout(() => toast({ text: `Toast número ${i + 1}`, kind: k }), i * 180));
+      });
+    },
+  },
+  {
+    id: 'controles',
+    label: 'Controles',
+    icon: icon('<path d="M2.5 5h6M11.5 5h2M2.5 11h2M7.5 11h6"/><circle cx="10" cy="5" r="1.5"/><circle cx="6" cy="11" r="1.5"/>'),
+    mount(el) {
+      fromTemplate('view-controles')(el);
+      const form = el.querySelector('[data-demo="form"]');
+      // El texto del botón no se lee con textContent: durante el relevo tiene
+      // las dos opciones adentro. Se busca la etiqueta por valor.
+      const TURNOS = { manana: 'Mañana', tarde: 'Tarde', noche: 'Noche', guardia: 'Guardia de 24 h' };
+      const turno = createSelect({
+        label: 'Turno',
+        options: [
+          { value: 'manana', label: 'Mañana' },
+          { value: 'tarde', label: 'Tarde' },
+          { value: 'noche', label: 'Noche' },
+          { value: 'guardia', label: 'Guardia de 24 h', disabled: true },
+        ],
+        value: 'manana',
+        onChange: (v) => toast({ text: `Turno: ${TURNOS[v]}` }),
+      });
+      turno.el.setAttribute('aria-labelledby', 'sc-turno-label');
+      el.querySelector('[data-demo="turno"]').replaceWith(turno.el);
+      el._radSelect = turno; // para el humo
+
+      const nombre = el.querySelector('[data-demo="nombre"]');
+      const correo = el.querySelector('[data-demo="correo"]');
+      const check = () => {
+        const errs = [];
+        if (!nombre.value.trim()) { setFieldError(nombre.closest('.rad-field'), 'Falta el nombre.'); errs.push('nombre'); }
+        else setFieldError(nombre.closest('.rad-field'), null);
+        if (correo.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.value)) { setFieldError(correo.closest('.rad-field'), 'Ese correo no parece válido.'); errs.push('correo'); }
+        else setFieldError(correo.closest('.rad-field'), null);
+        return errs;
+      };
+      nombre.addEventListener('input', () => { if (nombre.closest('[data-invalid]')) check(); });
+      correo.addEventListener('input', () => { if (correo.closest('[data-invalid]')) check(); });
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const errs = check();
+        if (errs.length) toast({ text: 'Revisá los campos marcados', kind: 'warning' });
+        else toast({ text: `Guardado: ${nombre.value.trim()}, turno ${TURNOS[turno.value]}`, kind: 'success' });
+      });
+      form.addEventListener('reset', () => {
+        setFieldError(nombre.closest('.rad-field'), null);
+        setFieldError(correo.closest('.rad-field'), null);
+        turno.set('manana');
+      });
+      const pin = el.querySelector('[data-demo="pin"]');
+      pin.addEventListener('click', () => {
+        const on = pin.getAttribute('aria-pressed') !== 'true';
+        pin.setAttribute('aria-pressed', String(on));
+        pin.setAttribute('data-rad-tip', on ? 'Desfijar' : 'Fijar');
       });
     },
   },

@@ -174,20 +174,83 @@ S:\tools\Rad\packages\core   0.4.0</pre>
       <section class="sc-sec">
         <h2>Tooltips</h2>
         <div class="sc-card sc-row">
-          <button class="sc-iconbtn" type="button" aria-label="Guardar" data-rad-tip="Guardar" data-rad-tip-key="Ctrl+S">
+          <button class="rad-iconbutton" type="button" aria-label="Guardar" data-rad-tip="Guardar" data-rad-tip-key="Ctrl+S">
             <span class="rad-icon"><svg viewBox="0 0 16 16" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h8l2.5 2.5v8.5h-11z"/><path d="M5.5 2.5v3h5v-3M5 13.5v-4h6v4"/></svg></span>
           </button>
-          <button class="sc-iconbtn" type="button" aria-label="Buscar" data-rad-tip="Buscar" data-rad-tip-key="Ctrl+F">
+          <button class="rad-iconbutton" type="button" aria-label="Buscar" data-rad-tip="Buscar" data-rad-tip-key="Ctrl+F">
             <span class="rad-icon"><svg viewBox="0 0 16 16" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg></span>
           </button>
-          <button class="sc-iconbtn" type="button" aria-label="Compartir" data-rad-tip="Compartir">
+          <button class="rad-iconbutton" type="button" aria-label="Compartir" data-rad-tip="Compartir">
             <span class="rad-icon"><svg viewBox="0 0 16 16" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10V2.5M5 5.5l3-3 3 3"/><path d="M3 9v4.5h10V9"/></svg></span>
           </button>
-          <button class="sc-iconbtn" type="button" aria-label="Ajustes" data-rad-tip="Ajustes" data-rad-tip-side="bottom">
+          <button class="rad-iconbutton" type="button" aria-label="Ajustes" data-rad-tip="Ajustes" data-rad-tip-side="bottom">
             <span class="rad-icon"><svg viewBox="0 0 16 16" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.5"/><circle cx="6" cy="11.5" r="1.5"/></svg></span>
           </button>
           <span class="sc-t3">Pasá el mouse: el primero espera un poco, los siguientes salen enseguida.</span>
         </div>
+      </section>
+    </div>
+  </template>
+
+  <template id="view-controles">
+    <div class="sc-col">
+      <header class="sc-head">
+        <h1>Controles</h1>
+        <p>Nada del control nativo de Chromium se ve: son inputs de verdad, escondidos, con el dibujo propio encima.</p>
+      </header>
+      <section class="sc-sec">
+        <h2>Un formulario</h2>
+        <form class="sc-card sc-form" data-demo="form" novalidate>
+          <label class="rad-field">
+            <span class="rad-field-label">Nombre</span>
+            <input class="rad-input" type="text" name="nombre" placeholder="Cómo te llamás" autocomplete="off" data-demo="nombre">
+            <span class="rad-field-hint">Obligatorio.</span>
+          </label>
+          <div class="rad-field">
+            <span class="rad-field-label" id="sc-turno-label">Turno</span>
+            <div data-demo="turno"></div>
+            <span class="rad-field-hint">Un select propio: el menú calza con el botón.</span>
+          </div>
+          <label class="rad-field">
+            <span class="rad-field-label">Dosis (mg)</span>
+            <input class="rad-input" type="number" name="dosis" min="0" step="5" value="20" data-demo="dosis">
+          </label>
+          <label class="rad-field">
+            <span class="rad-field-label">Correo</span>
+            <input class="rad-input" type="email" name="correo" placeholder="nombre@ejemplo.com" autocomplete="off" data-demo="correo">
+          </label>
+          <label class="rad-field sc-wide">
+            <span class="rad-field-label">Notas</span>
+            <textarea class="rad-input" name="notas" rows="3" placeholder="Algo que quieras dejar anotado"></textarea>
+          </label>
+          <div class="sc-choices sc-wide">
+            <span class="rad-field-label">Avisos</span>
+            <div class="sc-choices-row">
+              <label class="rad-switch"><input type="checkbox" role="switch" name="sonido" data-demo="sonido"><span class="rad-switch-track"></span>Sonido</label>
+              <label class="rad-switch"><input type="checkbox" role="switch" name="badge" checked><span class="rad-switch-track"></span>Contador en el ícono</label>
+              <label class="rad-switch"><input type="checkbox" role="switch" disabled><span class="rad-switch-track"></span>Deshabilitado</label>
+            </div>
+          </div>
+          <div class="sc-choices">
+            <span class="rad-field-label">Mostrar</span>
+            <label class="rad-check"><input type="checkbox" name="vencidos" data-demo="vencidos"><span class="rad-check-box"></span>Los vencidos</label>
+            <label class="rad-check"><input type="checkbox" name="archivados" checked><span class="rad-check-box"></span>Los archivados</label>
+            <label class="rad-check"><input type="checkbox" disabled><span class="rad-check-box"></span>Deshabilitado</label>
+          </div>
+          <div class="sc-choices" role="radiogroup" aria-label="Orden">
+            <span class="rad-field-label">Ordenar por</span>
+            <label class="rad-radio"><input type="radio" name="orden" value="fecha" checked data-demo="orden-fecha"><span class="rad-radio-dot"></span>Fecha</label>
+            <label class="rad-radio"><input type="radio" name="orden" value="nombre" data-demo="orden-nombre"><span class="rad-radio-dot"></span>Nombre</label>
+            <label class="rad-radio"><input type="radio" name="orden" value="dosis"><span class="rad-radio-dot"></span>Dosis</label>
+          </div>
+          <div class="sc-form-actions sc-wide">
+            <button class="rad-iconbutton" type="button" aria-label="Fijar" aria-pressed="false" data-rad-tip="Fijar" data-demo="pin">
+              <span class="rad-icon"><svg viewBox="0 0 16 16" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h4M7 2.5v4L4.5 9h7L9 6.5v-4M8 9v4.5"/></svg></span>
+            </button>
+            <button class="rad-button" type="reset" data-variant="quiet">Limpiar</button>
+            <button class="rad-button" type="submit" data-variant="primary">Guardar</button>
+          </div>
+        </form>
       </section>
     </div>
   </template>
@@ -201,9 +264,11 @@ S:\tools\Rad\packages\core   0.4.0</pre>
       <section class="sc-sec">
         <h2>Un documento guardado</h2>
         <div class="sc-card sc-stack">
-          <label class="sc-t2 sc-fs-s" for="sc-nota">Escribí algo, cerrá la vitrina y volvé a abrirla.</label>
-          <textarea id="sc-nota" class="sc-textarea" rows="4" spellcheck="false" placeholder="Una nota que sobrevive al cierre"></textarea>
-          <p class="sc-t3 sc-fs-s"><span data-demo="visitas"></span></p>
+          <label class="rad-field">
+            <span class="rad-field-label">Escribí algo, cerrá la vitrina y volvé a abrirla.</span>
+            <textarea id="sc-nota" class="rad-input" rows="4" spellcheck="false" placeholder="Una nota que sobrevive al cierre"></textarea>
+            <span class="rad-field-hint" data-demo="visitas"></span>
+          </label>
         </div>
       </section>
       <section class="sc-sec">

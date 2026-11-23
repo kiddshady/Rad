@@ -16,6 +16,7 @@
 
 import { ms, token, whenDone, opacityNow, SAFETY_MS } from './motion.js';
 import { wireScroll } from './scroll.js';
+import { wireControls } from './controls.js';
 
 const Z_ACTIVE = '1';
 const Z_LEAVING_TOP = 1000;
@@ -60,6 +61,7 @@ export function createRouter({ stage, views, initial }) {
       entry.mounted = true;
       entry.def.mount?.(entry.el, api);
       if (entry.el.classList.contains('rad-scroll')) wireScroll(entry.el);
+      wireControls(entry.el);
     }
   };
 

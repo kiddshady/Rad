@@ -95,24 +95,12 @@
   .sc-mono-cascadia { font-family: 'Cascadia Mono', Consolas, monospace; }
   .sc-mono-roboto { font-family: 'Roboto Mono', monospace; }
 
-  /* Campo de texto provisorio (en la etapa 5 pasa al núcleo). */
-  .sc-textarea {
-    width: 100%;
-    resize: none;
-    padding: var(--rad-space-2) var(--rad-space-3);
-    border: 0;
-    border-radius: var(--rad-radius-m);
-    background-color: var(--rad-surface-1);
-    box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line);
-    color: var(--rad-text-1);
-    line-height: 1.5;
-    outline: calc(var(--rad-line-width) * 2) solid transparent;
-    outline-offset: 0;
-    transition: box-shadow var(--rad-dur-fast) var(--rad-ease-out), outline-color var(--rad-dur-fast) var(--rad-ease-out);
-  }
-  .sc-textarea::placeholder { color: var(--rad-text-3); }
-  .sc-textarea:hover { box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line-strong); }
-  .sc-textarea:focus { outline-color: var(--rad-focus); }
+  /* Controles */
+  .sc-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rad-space-4); align-items: start; }
+  .sc-form .sc-wide { grid-column: 1 / -1; }
+  .sc-choices { display: grid; gap: var(--rad-space-3); }
+  .sc-choices-row { display: flex; flex-wrap: wrap; gap: var(--rad-space-5); }
+  .sc-form-actions { display: flex; justify-content: flex-end; gap: var(--rad-space-2); }
 
   .sc-facts {
     display: grid;
@@ -132,18 +120,6 @@
   }
   .sc-link:hover { text-decoration-color: var(--rad-accent-strong); }
   code { font-size: 0.92em; color: var(--rad-text-1); }
-
-  /* Botón de ícono suelto (en la etapa 5 pasa al núcleo). */
-  .sc-iconbtn {
-    width: var(--rad-control-height);
-    height: var(--rad-control-height);
-    display: grid;
-    place-items: center;
-    border-radius: var(--rad-radius-m);
-    color: var(--rad-text-2);
-    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
-  }
-  .sc-iconbtn:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
 
   .sc-chip {
     padding: var(--rad-space-1) var(--rad-space-3);
