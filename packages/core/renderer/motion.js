@@ -152,9 +152,16 @@ export function flip(container, mutate, { skip = () => false } = {}) {
 }
 
 /**
- * Relevo chico: cambia el texto de una celda .rad-swap. Lo viejo se esfuma en
- * su lugar (ease-in-out) y lo nuevo asoma cuando lo viejo va por un tercio.
+ * Relevo chico: cambia el texto de una celda .rad-swap. Lo viejo sube apenas
+ * y se esfuma; recién cuando ya no se ve, lo nuevo entra subiendo desde abajo.
+ * Nunca están las dos frases a la vista: en el mismo lugar, dos textos
+ * encimados se leen como letras rotas (Fran lo vio en la statusbar, nov 2026:
+ * el nuevo asomaba con el viejo todavía al 9 %).
  * El primer llenado no es un cambio: aparece sin relevo.
+ *
+ * Los ítems se alinean al lado de la celda (--rad-a-swap-align en el CSS):
+ * si no, en una celda alineada a la derecha la frase nueva nacía a la
+ * izquierda del ancho de la vieja y saltaba cuando la vieja salía del DOM.
  */
 export function swapText(cell, text) {
   const live = cell.querySelector(':scope > :not(.rad-swap-out)');
@@ -168,20 +175,27 @@ export function swapText(cell, text) {
     return;
   }
 
-  const dur = ms('dur-base');
-  const easeBoth = token('ease-in-out');
+  const outDur = ms('dur-fast');
+  const inDur = ms('dur-base');
+  const lift = (parseFloat(token('space-1')) || 4) / 2;
 
-  // Lo viejo sale desde la opacidad que tiene ahora (puede venir entrando).
+  // Lo viejo sale desde donde está ahora (puede venir entrando).
   const from = opacityNow(live);
   cancelAll(live);
   live.classList.add('rad-swap-out');
   live.setAttribute('aria-hidden', 'true');
-  const out = live.animate([{ opacity: from }, { opacity: 0 }], { duration: dur * 0.8, easing: easeBoth, fill: 'forwards' });
-  whenDone(out, dur * 0.8 + SAFETY_MS, () => live.remove());
+  const outTime = outDur * from;
+  const out = live.animate(
+    [{ opacity: from, transform: 'translateY(0px)' }, { opacity: 0, transform: `translateY(${-lift}px)` }],
+    { duration: outTime, easing: token('ease-in-out'), fill: 'forwards' },
+  );
+  whenDone(out, outTime + SAFETY_MS, () => live.remove());
 
-  // Lo nuevo espera su turno, salvo que lo viejo ya casi no se viera.
+  // Lo nuevo espera a que lo viejo se haya ido del todo.
   cell.append(next);
-  const delay = from > 0.3 ? dur * 0.45 : 0;
-  const enter = next.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur, delay, easing: token('ease-out'), fill: 'backwards' });
-  whenDone(enter, delay + dur + SAFETY_MS, () => enter.finish());
+  const enter = next.animate(
+    [{ opacity: 0, transform: `translateY(${lift}px)` }, { opacity: 1, transform: 'translateY(0px)' }],
+    { duration: inDur, delay: outTime, easing: token('ease-out'), fill: 'backwards' },
+  );
+  whenDone(enter, outTime + inDur + SAFETY_MS, () => enter.finish());
 }

@@ -1,5 +1,18 @@
 # Changelog
 
+## @rad/core 0.5.1 (2026-11-23)
+
+- El relevo de un texto (la statusbar, el subtítulo, el valor de un select)
+  ya no encima las dos frases: lo viejo sube apenas y se va del todo, y
+  recién ahí entra lo nuevo subiendo desde abajo. Antes el nuevo asomaba con
+  el viejo todavía al 9 %.
+- La frase nueva ya no salta de costado en el lado derecho de la
+  statusbar: los ítems del relevo se alinean al lado de su celda. Antes nacía
+  contra la izquierda del ancho de la vieja y saltaba 50 px al irse esta.
+- El humo mide el relevo cuadro por cuadro (las dos opacidades y el borde
+  del texto con un Range, no de la caja) y muestra sus datos también cuando
+  falla.
+
 ## @rad/core 0.5.0 · @rad/skin-classic 0.5.0 (2026-11-23)
 
 La etapa 5: classic completa.

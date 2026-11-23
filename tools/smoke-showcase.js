@@ -123,6 +123,39 @@ const ind = document.querySelector('.rad-rail-indicator');
 const ty = new DOMMatrix(getComputedStyle(ind).transform).m42;
 if (Math.abs(ty - item('movimiento').offsetTop) > 0.5) fail(`el indicador quedó en ${ty}, el item está en ${item('movimiento').offsetTop}`);
 
+// 4b. El relevo del mensaje de la statusbar (lado derecho), cuadro por
+// cuadro: lo viejo termina de irse antes de que asome lo nuevo (nunca las dos
+// frases encimadas), y lo nuevo no salta de costado cuando lo viejo sale del
+// DOM (el lado derecho está alineado a la derecha).
+const right = document.querySelector('.rad-status-right');
+const statusBtn = view('movimiento').querySelector('[data-demo="status"]');
+const relay = async () => {
+  statusBtn.click();
+  const frames = [];
+  for (const t0 = performance.now(); performance.now() - t0 < 520;) {
+    await frame();
+    const kids = [...right.children];
+    const out = kids.find((k) => k.classList.contains('rad-swap-out'));
+    const live = kids.find((k) => !k.classList.contains('rad-swap-out'));
+    // El borde del TEXTO (un Range), no de la caja: la caja del ítem se
+    // estira al ancho de la celda y no muestra dónde quedó pintada la frase.
+    let edge = 0;
+    if (live) { const r = document.createRange(); r.selectNodeContents(live); edge = r.getBoundingClientRect().right; }
+    frames.push({ out: out ? op(out) : 0, live: live ? op(live) : 0, edge });
+  }
+  return frames;
+};
+for (let round = 1; round <= 2; round++) {
+  const frames = await relay();
+  const both = Math.max(...frames.map((f) => Math.min(f.out, f.live)));
+  if (both > 0.08) fail(`relevo ${round} de la statusbar: lo viejo y lo nuevo se ven a la vez (los dos por encima de ${r2(both)})`);
+  const shown = frames.filter((f) => f.live > 0.02);
+  const jump = Math.max(0, ...shown.slice(1).map((f, i) => Math.abs(f.edge - shown[i].edge)));
+  if (jump > 0.5) fail(`relevo ${round} de la statusbar: el texto nuevo saltó ${r2(jump)} px de costado`);
+  if (round === 1) data.statusbar = frames.filter((_, i) => i % 2 === 0).map((f) => `${r2(f.out)}/${r2(f.live)}@${Math.round(f.edge)}`).join(' ');
+  await sleep(200);
+}
+
 // 5. Cada vista conserva su scroll.
 item('texto').click();
 await sleep(300);

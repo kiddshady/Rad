@@ -555,9 +555,13 @@
   .rad-swap.rad-swap { display: inline-grid; }
   .rad-swap > * {
     grid-area: 1 / 1;
-    will-change: opacity;
+    will-change: opacity, transform;
     min-width: 0;
+    /* Del lado de la celda: si no, la frase nueva nace contra el borde
+       equivocado y salta cuando la vieja (más ancha) sale del DOM. */
+    justify-self: var(--rad-a-swap-align, start);
   }
+  .rad-status-right { --rad-a-swap-align: end; }
 
   /* Scroll con esfumado por lado. Cada lado lleva fade solo si de ese lado hay
      contenido recortado (scroll.js pone at-top / at-bottom) y si no hay una

@@ -56,6 +56,7 @@ const show = (pass, report) => {
   } else {
     console.error(`smoke: pasada ${pass} FALLA`);
     for (const f of report.failures || []) console.error('  ' + f);
+    if (report.script) for (const [k, v] of Object.entries(report.script)) console.error(`  (dato) ${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`);
   }
 };
 
