@@ -1,0 +1,78 @@
+/* Rad · classic · tokens. Uno por cada nombre del contrato, ni uno más. */
+:root {
+  /* Superficies: grafito con un pelo de azul, subiendo de a poco. */
+  --rad-surface-0: #111215;
+  --rad-surface-1: #16171b;
+  --rad-surface-2: #1c1e23;
+  --rad-surface-3: #23262c;
+  --rad-tint-hover: #ffffff0d;
+  --rad-tint-press: #ffffff17;
+  --rad-scrim: #05060899;
+
+  /* Texto */
+  --rad-text-1: #e7e9ee;
+  --rad-text-2: #a6abb6;
+  --rad-text-3: #757b87;
+
+  /* Acento: azul acero, calmo. */
+  --rad-accent: #7c9fe0;
+  --rad-accent-strong: #98b4ea;
+  --rad-accent-soft: #7c9fe024;
+  --rad-on-accent: #0c111d;
+  --rad-focus: #7c9fe0;
+  --rad-selection: #7c9fe04d;
+
+  /* Estado */
+  --rad-danger: #e5747b;
+  --rad-success: #6fc29a;
+  --rad-warning: #e2b660;
+
+  /* Líneas */
+  --rad-line: #ffffff12;
+  --rad-line-strong: #ffffff26;
+  --rad-line-width: 1px;
+
+  /* Scroll */
+  --rad-scroll-thumb: #ffffff1f;
+  --rad-scroll-thumb-hover: #ffffff3d;
+  --rad-scroll-size: 10px;
+
+  /* Forma */
+  --rad-radius-s: 5px;
+  --rad-radius-m: 8px;
+  --rad-radius-l: 12px;
+  --rad-radius-pill: 999px;
+
+  /* Espacio */
+  --rad-space-1: 4px;
+  --rad-space-2: 8px;
+  --rad-space-3: 12px;
+  --rad-space-4: 16px;
+  --rad-space-5: 24px;
+  --rad-space-6: 32px;
+
+  /* Tipografía: las de Windows 11, para no cargar nada. */
+  --rad-font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --rad-font-display: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  --rad-font-mono: 'Cascadia Mono', Consolas, monospace;
+  --rad-text-xs: 11px;
+  --rad-text-s: 12px;
+  --rad-text-m: 13px;
+  --rad-text-l: 15px;
+  --rad-text-xl: 20px;
+  --rad-weight-regular: 400;
+  --rad-weight-strong: 600;
+
+  /* Elevación: sombras anchas y suaves, dos capas cada una. */
+  --rad-shadow-1: 0 1px 2px #00000059, 0 1px 1px #00000040;
+  --rad-shadow-2: 0 8px 22px #00000073, 0 2px 6px #0000004d;
+  --rad-shadow-3: 0 20px 52px #0000009e, 0 6px 16px #00000066;
+
+  /* Movimiento */
+  --rad-dur-fast: 120ms;
+  --rad-dur-base: 200ms;
+  --rad-dur-slow: 320ms;
+  --rad-ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --rad-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --rad-ease-in-out: cubic-bezier(0.45, 0, 0.25, 1);
+}

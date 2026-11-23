@@ -1,0 +1,15 @@
+{
+  "name": "rad-showcase",
+  "version": "0.1.0",
+  "private": true,
+  "description": "La vitrina de Rad: todos los tokens y componentes con la piel activa, para probar.",
+  "author": "Kidd Shady · Umbrovex Systems",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "@rad/core": "*",
+    "@rad/skin-classic": "*"
+  }
+}

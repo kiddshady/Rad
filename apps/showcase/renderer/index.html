@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'">
+  <title>Rad · vitrina</title>
+  <link rel="stylesheet" href="@core/core.css">
+  <link rel="stylesheet" href="@skin/index.css">
+  <link rel="stylesheet" href="showcase.css">
+  <script type="module" src="@core/boot.js"></script>
+  <script type="module" src="showcase.js"></script>
+</head>
+<body>
+  <div class="rad-root sc">
+
+    <!-- Titlebar provisoria: en la etapa 2 la reemplaza el shell del núcleo. -->
+    <header class="sc-bar" data-rad-chrome>
+      <div class="sc-brand">
+        <span class="sc-brand-name">Rad</span>
+        <span class="sc-brand-skin rad-mono" id="skin-name">classic</span>
+      </div>
+      <div class="sc-winbtns">
+        <button class="sc-winbtn" data-win="minimize" aria-label="Minimizar">
+          <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 5.5h8"/></svg>
+        </button>
+        <button class="sc-winbtn" data-win="toggle-maximize" aria-label="Maximizar">
+          <svg viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="7" rx="1"/></svg>
+        </button>
+        <button class="sc-winbtn sc-winbtn-close" data-win="close" aria-label="Cerrar">
+          <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="sc-main rad-scroll">
+      <div class="sc-col">
+
+        <section class="sc-intro">
+          <h1>La vitrina</h1>
+          <p>Cada token del contrato, pintado con la piel activa. Si algo se ve raro acá, se ve raro en todas las apps.</p>
+        </section>
+
+        <section class="sc-sec">
+          <h2>Superficies</h2>
+          <p class="sc-lead">De la más baja a la más alta. Los planos se separan por elevación, no por bordes.</p>
+          <div class="sc-surfaces">
+            <div class="sc-surface sc-s0"><span class="rad-mono">surface-0</span><small>fondo de la ventana</small></div>
+            <div class="sc-surface sc-s1"><span class="rad-mono">surface-1</span><small>paneles fijos</small></div>
+            <div class="sc-surface sc-s2"><span class="rad-mono">surface-2</span><small>tarjetas y controles</small></div>
+            <div class="sc-surface sc-s3"><span class="rad-mono">surface-3</span><small>lo que flota</small></div>
+          </div>
+        </section>
+
+        <section class="sc-sec">
+          <h2>Texto</h2>
+          <div class="sc-card sc-texts">
+            <p class="sc-t1">Texto primario: lo que hay que leer.</p>
+            <p class="sc-t2">Texto secundario: lo que acompaña.</p>
+            <p class="sc-t3">Texto apagado: pistas, metadatos, lo deshabilitado.</p>
+          </div>
+        </section>
+
+        <section class="sc-sec">
+          <h2>Acento y estado</h2>
+          <p class="sc-lead">El acento marca la acción primaria, lo activo y el foco. Probá navegar con Tab.</p>
+          <div class="sc-card sc-row">
+            <button class="sc-btn sc-btn-primary">Acción primaria</button>
+            <button class="sc-btn">Secundaria</button>
+            <span class="sc-chip">Activo</span>
+            <span class="sc-state"><i class="sc-dot-success"></i>Listo</span>
+            <span class="sc-state"><i class="sc-dot-warning"></i>Atención</span>
+            <span class="sc-state"><i class="sc-dot-danger"></i>Error</span>
+          </div>
+        </section>
+
+        <section class="sc-sec">
+          <h2>Forma</h2>
+          <div class="sc-card sc-row">
+            <div class="sc-shape sc-r-s"><span class="rad-mono">radius-s</span></div>
+            <div class="sc-shape sc-r-m"><span class="rad-mono">radius-m</span></div>
+            <div class="sc-shape sc-r-l"><span class="rad-mono">radius-l</span></div>
+            <div class="sc-shape sc-r-pill"><span class="rad-mono">radius-pill</span></div>
+          </div>
+        </section>
+
+        <section class="sc-sec">
+          <h2>Elevación</h2>
+          <div class="sc-elev">
+            <div class="sc-lift sc-sh1"><span class="rad-mono">shadow-1</span><small>una tarjeta</small></div>
+            <div class="sc-lift sc-sh2"><span class="rad-mono">shadow-2</span><small>menú, toast</small></div>
+            <div class="sc-lift sc-sh3"><span class="rad-mono">shadow-3</span><small>un modal</small></div>
+          </div>
+        </section>
+
+        <section class="sc-sec">
+          <h2>Movimiento</h2>
+          <p class="sc-lead">Lo que entra usa ease-out; lo que sale, ease-in. Nada aparece ni se va de golpe.</p>
+          <div class="sc-card sc-motion">
+            <button class="sc-btn" id="motion-toggle">Probar la entrada y la salida</button>
+            <div class="sc-demo-slot">
+              <div class="sc-demo" id="motion-demo">
+                <span class="rad-mono">dur-base · ease-out / ease-in</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sc-sec">
+          <h2>Tipografía</h2>
+          <div class="sc-card sc-type">
+            <p class="sc-fs-xl">Un título de vista</p>
+            <p class="sc-fs-l">Un subtítulo o un texto destacado</p>
+            <p class="sc-fs-m">El tamaño base de la interfaz, el que más se lee.</p>
+            <p class="sc-fs-s sc-t2">Un texto chico, para etiquetas y ayudas.</p>
+            <p class="sc-fs-xs sc-t3">El más chico de todos.</p>
+            <pre class="sc-code">S:\tools\Rad\packages\core\renderer\core.css   0.1.0   200 ms</pre>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+</body>
+</html>

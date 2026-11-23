@@ -1,0 +1,185 @@
+/* La vitrina. Capa app: le gana al núcleo y a la piel. Usa solo tokens, para
+   que cambiar de piel cambie todo esto sin tocar una línea. */
+@layer app {
+  .sc {
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+
+  /* Titlebar provisoria */
+  .sc-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 40px;
+    padding-left: var(--rad-space-4);
+    -webkit-app-region: drag;
+  }
+  .sc-brand { display: flex; align-items: baseline; gap: var(--rad-space-2); }
+  .sc-brand-name { font-family: var(--rad-font-display); font-weight: var(--rad-weight-strong); font-size: var(--rad-text-l); }
+  .sc-brand-skin { color: var(--rad-text-3); font-size: var(--rad-text-xs); }
+  .sc-winbtns { display: flex; height: 100%; -webkit-app-region: no-drag; }
+  .sc-winbtn {
+    width: 46px;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    color: var(--rad-text-2);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .sc-winbtn svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1; }
+  .sc-winbtn:hover { background: var(--rad-tint-hover); color: var(--rad-text-1); }
+  .sc-winbtn:active { background: var(--rad-tint-press); }
+  .sc-winbtn-close:hover { background: var(--rad-danger); color: var(--rad-on-accent); }
+  .sc-winbtn:focus-visible { outline-offset: calc(var(--rad-line-width) * -3); }
+
+  /* Columna */
+  .sc-main { min-height: 0; }
+  .sc-col {
+    max-width: 880px;
+    margin: 0 auto;
+    padding-inline: var(--rad-space-6);
+    display: grid;
+    gap: var(--rad-space-6);
+  }
+  .sc-intro h1 { font-family: var(--rad-font-display); font-size: var(--rad-text-xl); font-weight: var(--rad-weight-strong); }
+  .sc-intro p { color: var(--rad-text-2); margin-top: var(--rad-space-1); }
+  .sc-sec { display: grid; gap: var(--rad-space-3); }
+  .sc-sec h2 { font-size: var(--rad-text-l); font-weight: var(--rad-weight-strong); }
+  .sc-lead { color: var(--rad-text-2); margin-top: calc(var(--rad-space-2) * -1); }
+
+  .sc-card {
+    background: var(--rad-surface-1);
+    border-radius: var(--rad-radius-l);
+    padding: var(--rad-space-4);
+    box-shadow: var(--rad-shadow-1);
+  }
+  .sc-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rad-space-3); }
+
+  /* Superficies */
+  .sc-surfaces { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--rad-space-3); }
+  .sc-surface {
+    background: var(--s);
+    border-radius: var(--rad-radius-m);
+    padding: var(--rad-space-4);
+    min-height: 92px;
+    display: grid;
+    align-content: end;
+    gap: var(--rad-space-1);
+    box-shadow: var(--rad-shadow-1);
+  }
+  .sc-surface small { color: var(--rad-text-3); font-size: var(--rad-text-s); }
+  /* surface-0 es el mismo fondo de la ventana: sin contorno no se vería. */
+  .sc-s0 { --s: var(--rad-surface-0); box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line-strong); }
+  .sc-s1 { --s: var(--rad-surface-1); }
+  .sc-s2 { --s: var(--rad-surface-2); }
+  .sc-s3 { --s: var(--rad-surface-3); box-shadow: var(--rad-shadow-2); }
+
+  /* Texto */
+  .sc-texts { display: grid; gap: var(--rad-space-2); }
+  .sc-t1 { color: var(--rad-text-1); }
+  .sc-t2 { color: var(--rad-text-2); }
+  .sc-t3 { color: var(--rad-text-3); }
+
+  /* Botones */
+  .sc-btn {
+    height: 32px;
+    padding-inline: var(--rad-space-4);
+    border-radius: var(--rad-radius-m);
+    background: var(--rad-surface-2);
+    color: var(--rad-text-1);
+    box-shadow: var(--rad-shadow-1);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), transform var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .sc-btn:hover { background: var(--rad-surface-3); }
+  .sc-btn:active { transform: scale(0.98); }
+  .sc-btn-primary { background: var(--rad-accent); color: var(--rad-on-accent); font-weight: var(--rad-weight-strong); }
+  .sc-btn-primary:hover { background: var(--rad-accent-strong); }
+
+  .sc-chip {
+    padding: var(--rad-space-1) var(--rad-space-3);
+    border-radius: var(--rad-radius-pill);
+    background: var(--rad-accent-soft);
+    color: var(--rad-accent-strong);
+    font-size: var(--rad-text-s);
+  }
+  .sc-state { display: inline-flex; align-items: center; gap: var(--rad-space-2); color: var(--rad-text-2); font-size: var(--rad-text-s); }
+  .sc-state i { width: 8px; height: 8px; border-radius: var(--rad-radius-pill); background: var(--c); }
+  .sc-dot-success { --c: var(--rad-success); }
+  .sc-dot-warning { --c: var(--rad-warning); }
+  .sc-dot-danger { --c: var(--rad-danger); }
+
+  /* Forma */
+  .sc-shape {
+    width: 112px;
+    height: 72px;
+    display: grid;
+    place-items: center;
+    background: var(--rad-surface-2);
+    border-radius: var(--r);
+    color: var(--rad-text-2);
+    font-size: var(--rad-text-xs);
+  }
+  .sc-r-s { --r: var(--rad-radius-s); }
+  .sc-r-m { --r: var(--rad-radius-m); }
+  .sc-r-l { --r: var(--rad-radius-l); }
+  .sc-r-pill { --r: var(--rad-radius-pill); width: 144px; height: 40px; }
+
+  /* Elevación */
+  .sc-elev { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--rad-space-5); padding-block: var(--rad-space-2); }
+  .sc-lift {
+    background: var(--rad-surface-2);
+    border-radius: var(--rad-radius-l);
+    padding: var(--rad-space-4);
+    min-height: 88px;
+    display: grid;
+    align-content: end;
+    gap: var(--rad-space-1);
+    box-shadow: var(--sh);
+  }
+  .sc-lift small { color: var(--rad-text-3); font-size: var(--rad-text-s); }
+  .sc-sh1 { --sh: var(--rad-shadow-1); }
+  .sc-sh2 { --sh: var(--rad-shadow-2); background: var(--rad-surface-3); }
+  .sc-sh3 { --sh: var(--rad-shadow-3); background: var(--rad-surface-3); }
+
+  /* Movimiento: la caja entra con ease-out y sale con ease-in. Se revela el
+     alto con grid-template-rows 0fr -> 1fr, nunca animando height. */
+  .sc-motion { display: grid; gap: var(--rad-space-3); justify-items: start; }
+  .sc-demo-slot {
+    display: grid;
+    grid-template-rows: 0fr;
+    width: 100%;
+    transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in);
+  }
+  .sc-demo-slot > * { min-height: 0; }
+  .sc-demo {
+    overflow: hidden;
+    border-radius: var(--rad-radius-m);
+    background: var(--rad-surface-3);
+    color: var(--rad-text-2);
+    font-size: var(--rad-text-s);
+    opacity: 0;
+    transform: translateY(calc(var(--rad-space-2) * -1));
+    transition: opacity var(--rad-dur-base) var(--rad-ease-in), transform var(--rad-dur-base) var(--rad-ease-in);
+  }
+  .sc-demo > span { display: block; padding: var(--rad-space-4); }
+  .sc-motion.is-open .sc-demo-slot { grid-template-rows: 1fr; transition-timing-function: var(--rad-ease-out); }
+  .sc-motion.is-open .sc-demo { opacity: 1; transform: none; transition-timing-function: var(--rad-ease-out); }
+
+  /* Tipografía */
+  .sc-type { display: grid; gap: var(--rad-space-2); }
+  .sc-fs-xl { font-size: var(--rad-text-xl); font-family: var(--rad-font-display); }
+  .sc-fs-l { font-size: var(--rad-text-l); }
+  .sc-fs-m { font-size: var(--rad-text-m); }
+  .sc-fs-s { font-size: var(--rad-text-s); }
+  .sc-fs-xs { font-size: var(--rad-text-xs); }
+  .sc-code {
+    margin: var(--rad-space-2) 0 0;
+    padding: var(--rad-space-3);
+    border-radius: var(--rad-radius-m);
+    background: var(--rad-surface-0);
+    color: var(--rad-text-2);
+    font-size: var(--rad-text-s);
+    overflow-x: auto;
+  }
+}

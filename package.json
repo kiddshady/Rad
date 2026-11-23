@@ -1,0 +1,19 @@
+{
+  "name": "rad",
+  "private": true,
+  "description": "Rad: un núcleo de app de escritorio y las pieles que nacen de él.",
+  "author": "Kidd Shady · Umbrovex Systems",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "showcase": "npm start -w rad-showcase",
+    "verify": "node tools/verify-core.mjs && node tools/verify-skins.mjs",
+    "smoke": "node tools/smoke.mjs",
+    "check": "npm run verify && npm run smoke"
+  },
+  "devDependencies": {
+    "electron": "44.10.1"
+  }
+}

@@ -1,0 +1,115 @@
+/*
+  Rad · núcleo
+  Estructura y comportamiento. Ni un color, ni una sombra, ni una fuente, ni una
+  duración escritos a mano: todo sale de los tokens del contrato, que pone la
+  piel. tools/verify-core.mjs lo hace cumplir.
+
+  El orden de las capas va primero que todo: la piel siempre le gana al núcleo
+  y la app a los dos, sin pelear con la especificidad.
+*/
+@layer rad.reset, rad.core, rad.skin, app;
+
+/* Las longitudes del esfumado del scroll se registran para que interpolen: una
+   custom property sin registrar no anima y el fade entraría de golpe. */
+@property --rad-fade-top { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --rad-fade-bottom { syntax: '<length>'; inherits: false; initial-value: 0px; }
+
+@layer rad.reset {
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  h1, h2, h3, h4, h5, h6, p, figure, blockquote, dl, dd { margin: 0; }
+  ul[role='list'], ol[role='list'] { margin: 0; padding: 0; list-style: none; }
+  img, svg, video, canvas { display: block; max-width: 100%; }
+  button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+  button { margin: 0; padding: 0; border: 0; background: none; cursor: pointer; }
+  /* El foco nativo se apaga en todos lados; el propio está en rad.core. */
+  :focus { outline: none; }
+}
+
+@layer rad.core {
+  html {
+    background: var(--rad-surface-0);
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--rad-surface-0);
+    color: var(--rad-text-1);
+    font-family: var(--rad-font-ui);
+    font-size: var(--rad-text-m);
+    font-weight: var(--rad-weight-regular);
+    line-height: 1.45;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  code, kbd, samp, pre, .rad-mono {
+    font-family: var(--rad-font-mono);
+  }
+
+  /* El contenido se puede marcar y copiar. El chrome (botones, barras) no:
+     se siente nativo. Ante la duda, seleccionable. */
+  body { user-select: text; }
+  button, [role='button'], [data-rad-chrome] { user-select: none; }
+
+  ::selection {
+    background: var(--rad-selection);
+    color: var(--rad-text-1);
+  }
+
+  /* Anillo de foco propio, solo con teclado. Va con outline y no con
+     box-shadow: así una piel que le pone sombra a un botón no le borra el foco.
+     Chromium ya dibuja el outline siguiendo el border-radius. */
+  :focus-visible {
+    outline: calc(var(--rad-line-width) * 2) solid var(--rad-focus);
+    outline-offset: calc(var(--rad-line-width) * 2);
+  }
+
+  /* Scrollbar propia: fina, sin flechas, el pulgar flota separado del borde. */
+  ::-webkit-scrollbar { width: var(--rad-scroll-size); height: var(--rad-scroll-size); }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--rad-scroll-thumb);
+    background-clip: content-box;
+    border: calc(var(--rad-scroll-size) / 4) solid transparent;
+    border-radius: var(--rad-radius-pill);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--rad-scroll-thumb-hover);
+    background-clip: content-box;
+  }
+
+  /* La raíz de la app entra cuando la ventana ya está en su lugar (boot.js).
+     Antes de eso se ve solo el fondo, que es el mismo color que pintó Electron. */
+  .rad-root {
+    height: 100%;
+  }
+  html:not([data-rad-ready]) .rad-root {
+    opacity: 0;
+  }
+  html[data-rad-ready] .rad-root {
+    animation: rad-enter var(--rad-dur-slow) var(--rad-ease-out) both;
+  }
+  @keyframes rad-enter {
+    from { opacity: 0; transform: translateY(var(--rad-space-1)); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* Scroll con esfumado por lado. Cada lado lleva fade solo si de ese lado hay
+     contenido recortado (scroll.js pone at-top / at-bottom) y si no hay una
+     línea que ya marque el límite (data-rad-line="top|bottom|both").
+     El padding del eje es igual al fade: en reposo nada queda adentro de la
+     banda esfumada. */
+  .rad-scroll {
+    --rad-fade: var(--rad-space-5);
+    overflow-y: auto;
+    padding-block: var(--rad-fade);
+    --rad-fade-top: var(--rad-fade);
+    --rad-fade-bottom: var(--rad-fade);
+    transition: --rad-fade-top var(--rad-dur-base) var(--rad-ease-out), --rad-fade-bottom var(--rad-dur-base) var(--rad-ease-out);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--rad-fade-top), #000 calc(100% - var(--rad-fade-bottom)), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 var(--rad-fade-top), #000 calc(100% - var(--rad-fade-bottom)), transparent 100%);
+  }
+  .rad-scroll.at-top, .rad-scroll[data-rad-line='top'], .rad-scroll[data-rad-line='both'] { --rad-fade-top: 0px; }
+  .rad-scroll.at-bottom, .rad-scroll[data-rad-line='bottom'], .rad-scroll[data-rad-line='both'] { --rad-fade-bottom: 0px; }
+}
