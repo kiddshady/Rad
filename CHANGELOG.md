@@ -1,5 +1,16 @@
 # Changelog
 
+## @rad/skin-mono 0.1.1 (2026-11-23)
+
+- **Los colores de estado, a pleno.** Listo, atención y error eran pasteles
+  (`#8fcfab`, `#dfc085`, `#e58e93`) y sobre negro y gris se leían casi blancos:
+  Fran los pidió más notorios. Ahora son color de verdad (`#2fc27a`, `#eca21f`,
+  `#ef4f58`): en una piel sin color, lo único que lo lleva tiene que verse.
+- El rojo que rellena (el botón destructivo y la pastilla de cerrar) es uno
+  más hondo, `--skin-danger-fill` (`#c92a35`), con letra clara encima en vez
+  de la oscura de glass. El de texto y puntos queda más claro para leerse
+  sobre el vidrio (5,6:1 sobre el fondo).
+
 ## @rad/core 0.10.0 · Rad Vitrina 0.10.0 (2026-11-23)
 
 - **Botones de ventana en pastilla.** Fran los pidió como los de sus apps de

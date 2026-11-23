@@ -18,10 +18,15 @@
   --rad-focus: #ffffff;
   --rad-selection: #ffffff3d;
 
-  /* Estado: lo único con color, apagado. */
-  --rad-danger: #e58e93;
-  --rad-success: #8fcfab;
-  --rad-warning: #dfc085;
+  /* Estado: lo único con color, y por eso a pleno. Sobre negro y gris, un
+     pastel se lee casi blanco: tienen que ser color de verdad. */
+  --rad-danger: #ef4f58;
+  --rad-success: #2fc27a;
+  --rad-warning: #eca21f;
+  /* El rojo cuando RELLENA (el botón destructivo, la pastilla de cerrar): más
+     hondo que el de texto y puntos, para llevar letra clara encima. */
+  --skin-danger-fill: #c92a35;
+  --skin-danger-fill-hover: #d5343f;
 
   /* ---------- Lo propio ---------- */
 
