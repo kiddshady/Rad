@@ -50,7 +50,41 @@ El renderer se sirve desde un solo origen:
 - `rad://app/…` es el renderer de la app.
 
 En el `index.html` van `@core/core.css`, `@skin/index.css` y
-`@core/boot.js`, y todo el contenido adentro de un `.rad-root`.
+`@core/boot.js`, y todo el contenido adentro de un `.rad-root`. Desde JS, el
+núcleo se importa con la ruta absoluta (`/@core/shell.js`): un nombre suelto
+necesitaría un import map, que es un script inline y la CSP no lo deja pasar.
+
+## El shell y las vistas
+
+```js
+import { createShell } from '/@core/shell.js';
+
+const shell = createShell({
+  root: document.querySelector('.rad-root'),
+  title: 'Mi app',
+  views: [
+    { id: 'inicio', label: 'Inicio', icon: '<svg…>', mount(el, router) { … } },
+    { id: 'ajustes', label: 'Ajustes', icon: '<svg…>', mount(el) { … } },
+  ],
+});
+
+shell.router.go('ajustes');
+shell.router.on('change', ({ id, from, label }) => { … });
+shell.status.set('left', 'Listo');
+shell.setSubtitle('borrador');
+```
+
+- **Titlebar** propia con los controles de ventana. Se arrastra entera.
+- **Rail** con un item por vista. El indicador viaja al activo, y las flechas
+  lo recorren con el teclado. Se apaga con `rail: false`.
+- **Escenario**: cada vista se monta la primera vez que se visita y queda
+  viva, con su scroll y su estado. El cambio entre vistas es un fundido: la
+  nueva está entera debajo y la vieja se esfuma encima.
+- **Statusbar** con dos lados; cada texto cambia con un relevo. Se apaga con
+  `statusbar: false`.
+
+La anatomía (`.rad-titlebar`, `.rad-rail-item`, `.rad-stage`, `.rad-view`,
+`.rad-statusbar`…) es parte de la API: la piel se engancha ahí.
 
 ## Una piel
 

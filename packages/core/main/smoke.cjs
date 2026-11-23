@@ -54,6 +54,16 @@ function attach(win, { skin, settleMs = 900, timeoutMs = 15000 }) {
         };
       })()`);
 
+      // Un guion propio de la app (RAD_SMOKE_SCRIPT): corre en la página, con
+      // await, y devuelve { failures: [], data: {} }. Mide desde adentro, sin
+      // la latencia del IPC entre muestra y muestra.
+      let script = null;
+      if (process.env.RAD_SMOKE_SCRIPT) {
+        const code = fs.readFileSync(process.env.RAD_SMOKE_SCRIPT, 'utf8');
+        script = await win.webContents.executeJavaScript(`(async () => {\n${code}\n})()`);
+        for (const f of script?.failures ?? []) failures.push(`guion: ${f}`);
+      }
+
       if (probe.missing.length) failures.push(`tokens sin resolver: ${probe.missing.join(', ')}`);
       if (!probe.ready) failures.push('el contenido nunca entró (falta data-rad-ready)');
 
@@ -78,7 +88,7 @@ function attach(win, { skin, settleMs = 900, timeoutMs = 15000 }) {
       const shot = process.env.RAD_SMOKE_SHOT;
       if (shot) fs.writeFileSync(shot, img.toPNG());
 
-      finish({ ok: failures.length === 0, failures, probe, size, bounds: win.getBounds() });
+      finish({ ok: failures.length === 0, failures, probe, script: script?.data ?? null, size, bounds: win.getBounds() });
     } catch (err) {
       finish({ ok: false, failures: [`excepción: ${err && err.stack || err}`] });
     }

@@ -45,6 +45,12 @@ function createWindow({ skin, window: opts = {}, entry = 'index.html' }) {
     backgroundColor: skin.base,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'index.cjs'),
+      // El preload corre en sandbox y no puede leer archivos: lo que tiene
+      // que saber de la piel y del núcleo le llega por argumentos.
+      additionalArguments: [
+        `--rad-skin=${encodeURIComponent(JSON.stringify({ id: skin.id, name: skin.name }))}`,
+        `--rad-core=${encodeURIComponent(JSON.stringify({ version: require('../package.json').version }))}`,
+      ],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -69,6 +75,13 @@ function createWindow({ skin, window: opts = {}, entry = 'index.html' }) {
     }, MOVE_DELAY_MS);
   });
 
+  // La titlebar cambia el ícono de maximizar por el de restaurar.
+  const sendMaximized = () => {
+    if (!win.isDestroyed()) win.webContents.send('rad:window:maximized', win.isMaximized());
+  };
+  win.on('maximize', sendMaximized);
+  win.on('unmaximize', sendMaximized);
+
   // Nada sale de rad://app: ni navegaciones ni ventanas nuevas.
   win.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith(ORIGIN + '/')) event.preventDefault();
@@ -83,6 +96,7 @@ function createWindow({ skin, window: opts = {}, entry = 'index.html' }) {
 function wireWindowIpc() {
   const from = (event) => BrowserWindow.fromWebContents(event.sender);
   ipcMain.handle('rad:window:is-placed', (event) => from(event)?.rad?.isPlaced() ?? false);
+  ipcMain.handle('rad:window:is-maximized', (event) => from(event)?.isMaximized() ?? false);
   ipcMain.on('rad:window', (event, action) => {
     const win = from(event);
     if (!win) return;

@@ -97,18 +97,25 @@ const TOKENS = [
     ['shadow-2', 'shadow', 'Flotante: menú, toast, tooltip.'],
     ['shadow-3', 'shadow', 'Lo más alto: un modal.'],
   ]),
+  ...group('layout', 'Las medidas del shell. Junto con el espaciado, definen la densidad de la piel.', [
+    ['titlebar-height', 'length', 'El alto de la titlebar. Los botones de ventana son un poco más anchos que altos.'],
+    ['rail-width', 'length', 'El ancho del rail. Si alcanza, los items muestran ícono y nombre.'],
+    ['statusbar-height', 'length', 'El alto de la statusbar.'],
+    ['control-height', 'length', 'El alto de un control: botón, campo, item del rail.'],
+    ['icon-size', 'length', 'El lado de un ícono de interfaz.'],
+  ]),
   ...group('motion', 'Movimiento. Todo cambio de estado se anima con estas duraciones y curvas.', [
     ['dur-fast', 'duration', 'Hover, press, cambios chicos.'],
-    ['dur-base', 'duration', 'Aparecer y desaparecer.'],
-    ['dur-slow', 'duration', 'Cambios de vista, entradas grandes.'],
+    ['dur-base', 'duration', 'Aparecer y desaparecer, el fundido entre vistas.'],
+    ['dur-slow', 'duration', 'Entradas grandes.'],
     ['ease-out', 'easing', 'Para lo que entra.'],
-    ['ease-in', 'easing', 'Para lo que sale.'],
-    ['ease-in-out', 'easing', 'Para lo que se mueve de un lugar a otro.'],
+    ['ease-in', 'easing', 'Para lo que sale sin que nadie lo espere.'],
+    ['ease-in-out', 'easing', 'Para lo que se mueve de un lugar a otro, y para la salida que otro espera (un relevo, un fundido).'],
   ]),
 ];
 
 module.exports = {
-  version: 1,
+  version: 2,
   tokens: TOKENS,
   names: TOKENS.map(t => t.name),
 };

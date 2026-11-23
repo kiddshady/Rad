@@ -68,6 +68,13 @@
   --rad-shadow-2: 0 8px 22px #00000073, 0 2px 6px #0000004d;
   --rad-shadow-3: 0 20px 52px #0000009e, 0 6px 16px #00000066;
 
+  /* Shell */
+  --rad-titlebar-height: 38px;
+  --rad-rail-width: 208px;
+  --rad-statusbar-height: 26px;
+  --rad-control-height: 32px;
+  --rad-icon-size: 16px;
+
   /* Movimiento */
   --rad-dur-fast: 120ms;
   --rad-dur-base: 200ms;

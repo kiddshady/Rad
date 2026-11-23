@@ -22,7 +22,8 @@ const TIMEOUT_MS = 30000;
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.rmSync(OUT, { force: true });
 
-const env = { ...process.env, RAD_SMOKE: OUT, RAD_SMOKE_SHOT: SHOT };
+const SCRIPT = path.join(ROOT, 'tools', 'smoke-showcase.js');
+const env = { ...process.env, RAD_SMOKE: OUT, RAD_SMOKE_SHOT: SHOT, RAD_SMOKE_SCRIPT: SCRIPT };
 delete env.ELECTRON_RUN_AS_NODE;
 
 const child = spawn(electron, [path.join(ROOT, 'apps', 'showcase')], { env, stdio: 'inherit' });
@@ -37,6 +38,7 @@ child.on('exit', (code) => {
   const report = JSON.parse(fs.readFileSync(OUT, 'utf8'));
   if (report.ok && code === 0) {
     console.log(`smoke: ok  ventana ${report.size.width}x${report.size.height} en (${report.bounds.x}, ${report.bounds.y}), captura en ${path.relative(ROOT, SHOT)}`);
+    if (report.script) for (const [k, v] of Object.entries(report.script)) console.log(`  ${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`);
     process.exit(0);
   }
   console.error(`smoke: FALLA (código ${code})`);

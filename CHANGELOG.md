@@ -1,5 +1,27 @@
 # Changelog
 
+## @rad/core 0.2.0 · @rad/skin-classic 0.2.0 (2026-11-23)
+
+La etapa 2: el shell y el router.
+
+- `createShell()`: titlebar propia con minimizar, maximizar/restaurar (los
+  íconos se relevan) y cerrar; rail con indicador que viaja y navegación con
+  flechas; escenario; statusbar de dos lados.
+- `createRouter()`: vistas que se montan al primer uso y quedan vivas con su
+  scroll. El cambio es un fundido con la nueva quieta debajo; dos cambios
+  seguidos apilan bien, y una vista que vuelve sube desde donde iba.
+- `motion.js`: duraciones y curvas leídas de los tokens, plazo de red en toda
+  salida y `swapText()`, el relevo chico de un texto.
+- La raíz apaga su animación de entrada al terminar, para no retener opacidad
+  ni transform.
+- Contrato v2: cinco tokens de medidas del shell (`titlebar-height`,
+  `rail-width`, `statusbar-height`, `control-height`, `icon-size`).
+- El puente expone la piel y la versión del núcleo, y avisa al maximizar.
+- Classic viste el shell: chrome sobre el fondo y el escenario como una hoja
+  un escalón más arriba.
+- El humo corre un guion adentro de la vitrina: mide el fundido cuadro por
+  cuadro, la ida y vuelta, el apilado, la statusbar, el indicador y el scroll.
+
 ## @rad/core 0.1.0 · @rad/skin-classic 0.1.0 (2026-11-23)
 
 La etapa 1: el esqueleto.

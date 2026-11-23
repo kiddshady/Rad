@@ -5,3 +5,4 @@
   tenga carácter fuerte es justamente lo que la hace servir para cualquier app.
 */
 @import url('tokens.css') layer(rad.skin);
+@import url('shell.css') layer(rad.skin);

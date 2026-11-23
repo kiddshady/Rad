@@ -94,6 +94,159 @@
     from { opacity: 0; transform: translateY(var(--rad-space-1)); }
     to { opacity: 1; transform: none; }
   }
+  /* Al terminar la entrada se apaga, con una clase y no con style.animation:
+     una opacidad retenida (aunque valga 1) corta el backdrop-filter de
+     cualquier vidrio de adentro, y un transform retenido se vuelve el bloque
+     contenedor de los position: fixed. */
+  html[data-rad-ready] .rad-root.is-settled {
+    animation: none;
+  }
+
+  /* ---------- Shell ---------- */
+
+  .rad-shell {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--rad-titlebar-height) minmax(0, 1fr);
+    grid-template-areas: 'title' 'stage';
+  }
+  .rad-shell[data-statusbar] {
+    grid-template-rows: var(--rad-titlebar-height) minmax(0, 1fr) var(--rad-statusbar-height);
+    grid-template-areas: 'title' 'stage' 'status';
+  }
+  .rad-shell[data-rail] {
+    grid-template-columns: var(--rad-rail-width) minmax(0, 1fr);
+    grid-template-areas: 'title title' 'rail stage';
+  }
+  .rad-shell[data-rail][data-statusbar] {
+    grid-template-areas: 'title title' 'rail stage' 'status status';
+  }
+
+  /* Titlebar: se arrastra entera, menos los botones. */
+  .rad-titlebar {
+    grid-area: title;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    -webkit-app-region: drag;
+  }
+  .rad-titlebar-head {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
+  }
+  .rad-titlebar-title, .rad-titlebar-sub { white-space: nowrap; }
+  .rad-winbtns {
+    display: flex;
+    align-self: stretch;
+    -webkit-app-region: no-drag;
+  }
+  .rad-winbtn {
+    width: calc(var(--rad-titlebar-height) * 1.2);
+    display: grid;
+    place-items: center;
+  }
+  .rad-winbtn svg {
+    width: calc(var(--rad-icon-size) * 0.625);
+    height: calc(var(--rad-icon-size) * 0.625);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1;
+  }
+  .rad-winbtn-swap { display: grid; }
+  .rad-winbtn-swap > svg {
+    grid-area: 1 / 1;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out);
+  }
+  .rad-ic-restore { opacity: 0; }
+  .rad-titlebar[data-maximized] .rad-ic-max { opacity: 0; }
+  .rad-titlebar[data-maximized] .rad-ic-restore { opacity: 1; }
+
+  /* Rail */
+  .rad-rail {
+    grid-area: rail;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .rad-rail-indicator {
+    position: absolute;
+    top: 0;
+    pointer-events: none;
+    transition: transform var(--rad-dur-base) var(--rad-ease-in-out), height var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .rad-rail-indicator.is-instant { transition: none; }
+  .rad-rail-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: var(--rad-control-height);
+    min-width: 0;
+    text-align: start;
+  }
+  .rad-rail-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rad-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: var(--rad-icon-size);
+    height: var(--rad-icon-size);
+  }
+  .rad-icon svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+  }
+
+  /* Escenario: todas las vistas en la misma celda. La que se va queda encima,
+     opaca, mientras se funde; por eso cada vista hereda el fondo del escenario. */
+  .rad-stage {
+    grid-area: stage;
+    position: relative;
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .rad-view {
+    grid-area: 1 / 1;
+    min-width: 0;
+    min-height: 0;
+    background: inherit;
+  }
+  .rad-view[data-state='hidden'] { visibility: hidden; }
+
+  /* Statusbar */
+  .rad-statusbar {
+    grid-area: status;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  /* Celda de relevo: lo viejo y lo nuevo en el mismo lugar. Doble clase para
+     ganarle al display propio de quien la use. La capa fija (will-change)
+     hace que se pinte igual animándose y quieto: si no, una posición con
+     decimales se redondea distinto y el texto salta un píxel al terminar. */
+  .rad-swap.rad-swap { display: inline-grid; }
+  .rad-swap > * {
+    grid-area: 1 / 1;
+    will-change: opacity;
+    min-width: 0;
+  }
 
   /* Scroll con esfumado por lado. Cada lado lleva fade solo si de ese lado hay
      contenido recortado (scroll.js pone at-top / at-bottom) y si no hay una

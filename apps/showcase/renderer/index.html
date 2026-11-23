@@ -11,114 +11,134 @@
   <script type="module" src="showcase.js"></script>
 </head>
 <body>
-  <div class="rad-root sc">
+  <div class="rad-root"></div>
 
-    <!-- Titlebar provisoria: en la etapa 2 la reemplaza el shell del núcleo. -->
-    <header class="sc-bar" data-rad-chrome>
-      <div class="sc-brand">
-        <span class="sc-brand-name">Rad</span>
-        <span class="sc-brand-skin rad-mono" id="skin-name">classic</span>
-      </div>
-      <div class="sc-winbtns">
-        <button class="sc-winbtn" data-win="minimize" aria-label="Minimizar">
-          <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 5.5h8"/></svg>
-        </button>
-        <button class="sc-winbtn" data-win="toggle-maximize" aria-label="Maximizar">
-          <svg viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="7" rx="1"/></svg>
-        </button>
-        <button class="sc-winbtn sc-winbtn-close" data-win="close" aria-label="Cerrar">
-          <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg>
-        </button>
-      </div>
-    </header>
+  <!-- Cada vista es un template: la vitrina lo clona la primera vez que se visita. -->
 
-    <main class="sc-main rad-scroll">
-      <div class="sc-col">
+  <template id="view-planos">
+    <div class="sc-col">
+      <header class="sc-head">
+        <h1>Planos</h1>
+        <p>Los planos se separan por elevación, no por bordes. Esta hoja ya es surface-1.</p>
+      </header>
+      <section class="sc-sec">
+        <h2>Superficies</h2>
+        <div class="sc-surfaces">
+          <div class="sc-surface sc-s0"><span class="rad-mono">surface-0</span><small>fondo de la ventana</small></div>
+          <div class="sc-surface sc-s1"><span class="rad-mono">surface-1</span><small>paneles fijos</small></div>
+          <div class="sc-surface sc-s2"><span class="rad-mono">surface-2</span><small>tarjetas y controles</small></div>
+          <div class="sc-surface sc-s3"><span class="rad-mono">surface-3</span><small>lo que flota</small></div>
+        </div>
+      </section>
+      <section class="sc-sec">
+        <h2>Elevación</h2>
+        <div class="sc-elev">
+          <div class="sc-lift sc-sh1"><span class="rad-mono">shadow-1</span><small>una tarjeta</small></div>
+          <div class="sc-lift sc-sh2"><span class="rad-mono">shadow-2</span><small>menú, toast</small></div>
+          <div class="sc-lift sc-sh3"><span class="rad-mono">shadow-3</span><small>un modal</small></div>
+        </div>
+      </section>
+    </div>
+  </template>
 
-        <section class="sc-intro">
-          <h1>La vitrina</h1>
-          <p>Cada token del contrato, pintado con la piel activa. Si algo se ve raro acá, se ve raro en todas las apps.</p>
-        </section>
+  <template id="view-texto">
+    <div class="sc-col">
+      <header class="sc-head">
+        <h1>Texto</h1>
+        <p>Una escalera de énfasis y dos familias: sans para la interfaz, mono solo para datos.</p>
+      </header>
+      <section class="sc-sec">
+        <h2>Énfasis</h2>
+        <div class="sc-card sc-stack">
+          <p class="sc-t1">Texto primario: lo que hay que leer.</p>
+          <p class="sc-t2">Texto secundario: lo que acompaña.</p>
+          <p class="sc-t3">Texto apagado: pistas, metadatos, lo deshabilitado.</p>
+        </div>
+      </section>
+      <section class="sc-sec">
+        <h2>Tamaños</h2>
+        <div class="sc-card sc-stack">
+          <p class="sc-fs-xl">Un título de vista</p>
+          <p class="sc-fs-l">Un subtítulo o un texto destacado</p>
+          <p class="sc-fs-m">El tamaño base de la interfaz, el que más se lee.</p>
+          <p class="sc-fs-s sc-t2">Un texto chico, para etiquetas y ayudas.</p>
+          <p class="sc-fs-xs sc-t3">El más chico de todos.</p>
+          <pre class="sc-code">S:\tools\Rad\packages\core\renderer\core.css   0.2.0   200 ms</pre>
+        </div>
+      </section>
+      <section class="sc-sec">
+        <h2>Un texto largo, para ver el scroll</h2>
+        <div class="sc-card sc-stack sc-prose">
+          <p>El esfumado de arriba y de abajo aparece solo cuando de ese lado hay contenido recortado. Scrolleá esta vista hasta el fondo y fijate que el borde de abajo deja de esfumarse; volvé arriba y pasa lo mismo con el de arriba.</p>
+          <p>Cada vista conserva su scroll: si te vas a otra y volvés, la encontrás donde la dejaste. Las vistas ocultas siguen vivas, solo que no se ven ni reciben el foco.</p>
+          <p>El cambio entre vistas es un fundido: la nueva está entera y quieta debajo, y la vieja se esfuma encima. La pantalla nunca queda destapada en el medio.</p>
+          <p>Probá cambiar de vista muy rápido, o volver a la anterior antes de que termine de irse: la que vuelve sube desde donde iba, sin saltar.</p>
+          <p>El indicador del rail viaja al item activo. La primera vez se coloca en el acto, para no nacer en la punta y viajar en cada arranque.</p>
+          <p>La statusbar cambia de texto con un relevo chico: lo viejo se esfuma en su lugar y lo nuevo asoma cuando lo viejo va por un tercio.</p>
+        </div>
+      </section>
+    </div>
+  </template>
 
-        <section class="sc-sec">
-          <h2>Superficies</h2>
-          <p class="sc-lead">De la más baja a la más alta. Los planos se separan por elevación, no por bordes.</p>
-          <div class="sc-surfaces">
-            <div class="sc-surface sc-s0"><span class="rad-mono">surface-0</span><small>fondo de la ventana</small></div>
-            <div class="sc-surface sc-s1"><span class="rad-mono">surface-1</span><small>paneles fijos</small></div>
-            <div class="sc-surface sc-s2"><span class="rad-mono">surface-2</span><small>tarjetas y controles</small></div>
-            <div class="sc-surface sc-s3"><span class="rad-mono">surface-3</span><small>lo que flota</small></div>
+  <template id="view-acento">
+    <div class="sc-col">
+      <header class="sc-head">
+        <h1>Acento y estado</h1>
+        <p>El acento marca la acción primaria, lo activo y el foco. Probá navegar con Tab y con las flechas en el rail.</p>
+      </header>
+      <section class="sc-sec">
+        <div class="sc-card sc-row">
+          <button class="sc-btn sc-btn-primary" type="button">Acción primaria</button>
+          <button class="sc-btn" type="button">Secundaria</button>
+          <span class="sc-chip">Activo</span>
+          <span class="sc-state"><i class="sc-dot-success"></i>Listo</span>
+          <span class="sc-state"><i class="sc-dot-warning"></i>Atención</span>
+          <span class="sc-state"><i class="sc-dot-danger"></i>Error</span>
+        </div>
+      </section>
+    </div>
+  </template>
+
+  <template id="view-forma">
+    <div class="sc-col">
+      <header class="sc-head">
+        <h1>Forma</h1>
+        <p>Esquinas de redondeo sutil: suavizan sin llamar la atención.</p>
+      </header>
+      <section class="sc-sec">
+        <div class="sc-card sc-row">
+          <div class="sc-shape sc-r-s"><span class="rad-mono">radius-s</span></div>
+          <div class="sc-shape sc-r-m"><span class="rad-mono">radius-m</span></div>
+          <div class="sc-shape sc-r-l"><span class="rad-mono">radius-l</span></div>
+          <div class="sc-shape sc-r-pill"><span class="rad-mono">radius-pill</span></div>
+        </div>
+      </section>
+    </div>
+  </template>
+
+  <template id="view-movimiento">
+    <div class="sc-col">
+      <header class="sc-head">
+        <h1>Movimiento</h1>
+        <p>Lo que entra usa ease-out; lo que sale, ease-in; lo que se releva, ease-in-out. Nada aparece ni se va de golpe.</p>
+      </header>
+      <section class="sc-sec">
+        <h2>Entrada y salida</h2>
+        <div class="sc-card sc-motion">
+          <button class="sc-btn" type="button" data-demo="toggle">Probar la entrada y la salida</button>
+          <div class="sc-demo-slot">
+            <div class="sc-demo"><span class="rad-mono">dur-base · ease-out / ease-in</span></div>
           </div>
-        </section>
-
-        <section class="sc-sec">
-          <h2>Texto</h2>
-          <div class="sc-card sc-texts">
-            <p class="sc-t1">Texto primario: lo que hay que leer.</p>
-            <p class="sc-t2">Texto secundario: lo que acompaña.</p>
-            <p class="sc-t3">Texto apagado: pistas, metadatos, lo deshabilitado.</p>
-          </div>
-        </section>
-
-        <section class="sc-sec">
-          <h2>Acento y estado</h2>
-          <p class="sc-lead">El acento marca la acción primaria, lo activo y el foco. Probá navegar con Tab.</p>
-          <div class="sc-card sc-row">
-            <button class="sc-btn sc-btn-primary">Acción primaria</button>
-            <button class="sc-btn">Secundaria</button>
-            <span class="sc-chip">Activo</span>
-            <span class="sc-state"><i class="sc-dot-success"></i>Listo</span>
-            <span class="sc-state"><i class="sc-dot-warning"></i>Atención</span>
-            <span class="sc-state"><i class="sc-dot-danger"></i>Error</span>
-          </div>
-        </section>
-
-        <section class="sc-sec">
-          <h2>Forma</h2>
-          <div class="sc-card sc-row">
-            <div class="sc-shape sc-r-s"><span class="rad-mono">radius-s</span></div>
-            <div class="sc-shape sc-r-m"><span class="rad-mono">radius-m</span></div>
-            <div class="sc-shape sc-r-l"><span class="rad-mono">radius-l</span></div>
-            <div class="sc-shape sc-r-pill"><span class="rad-mono">radius-pill</span></div>
-          </div>
-        </section>
-
-        <section class="sc-sec">
-          <h2>Elevación</h2>
-          <div class="sc-elev">
-            <div class="sc-lift sc-sh1"><span class="rad-mono">shadow-1</span><small>una tarjeta</small></div>
-            <div class="sc-lift sc-sh2"><span class="rad-mono">shadow-2</span><small>menú, toast</small></div>
-            <div class="sc-lift sc-sh3"><span class="rad-mono">shadow-3</span><small>un modal</small></div>
-          </div>
-        </section>
-
-        <section class="sc-sec">
-          <h2>Movimiento</h2>
-          <p class="sc-lead">Lo que entra usa ease-out; lo que sale, ease-in. Nada aparece ni se va de golpe.</p>
-          <div class="sc-card sc-motion">
-            <button class="sc-btn" id="motion-toggle">Probar la entrada y la salida</button>
-            <div class="sc-demo-slot">
-              <div class="sc-demo" id="motion-demo">
-                <span class="rad-mono">dur-base · ease-out / ease-in</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="sc-sec">
-          <h2>Tipografía</h2>
-          <div class="sc-card sc-type">
-            <p class="sc-fs-xl">Un título de vista</p>
-            <p class="sc-fs-l">Un subtítulo o un texto destacado</p>
-            <p class="sc-fs-m">El tamaño base de la interfaz, el que más se lee.</p>
-            <p class="sc-fs-s sc-t2">Un texto chico, para etiquetas y ayudas.</p>
-            <p class="sc-fs-xs sc-t3">El más chico de todos.</p>
-            <pre class="sc-code">S:\tools\Rad\packages\core\renderer\core.css   0.1.0   200 ms</pre>
-          </div>
-        </section>
-
-      </div>
-    </main>
-  </div>
+        </div>
+      </section>
+      <section class="sc-sec">
+        <h2>Relevo chico</h2>
+        <div class="sc-card sc-row">
+          <button class="sc-btn" type="button" data-demo="status">Cambiar el mensaje de la statusbar</button>
+          <span class="sc-t3">Mirá la esquina de abajo a la derecha.</span>
+        </div>
+      </section>
+    </div>
+  </template>
 </body>
 </html>

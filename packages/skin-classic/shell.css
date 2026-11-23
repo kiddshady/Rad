@@ -1,0 +1,72 @@
+/* Rad · classic · shell.
+   El chrome (titlebar, rail, statusbar) vive sobre el fondo de la ventana; el
+   escenario es una hoja un escalón más arriba, con la esquina redondeada donde
+   se encuentra con el rail. */
+
+/* Titlebar */
+.rad-titlebar {
+  padding-left: var(--rad-space-4);
+}
+.rad-titlebar-title {
+  font-family: var(--rad-font-display);
+  font-weight: var(--rad-weight-strong);
+  font-size: var(--rad-text-m);
+  color: var(--rad-text-1);
+}
+.rad-titlebar-sub {
+  margin-left: var(--rad-space-2);
+  font-family: var(--rad-font-mono);
+  font-size: var(--rad-text-xs);
+  color: var(--rad-text-3);
+}
+.rad-winbtn {
+  color: var(--rad-text-2);
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-winbtn:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
+.rad-winbtn:active { background-color: var(--rad-tint-press); }
+.rad-winbtn-close:hover { background-color: var(--rad-danger); color: var(--rad-text-1); }
+.rad-winbtn:focus-visible { outline-offset: calc(var(--rad-line-width) * -3); }
+
+/* Rail */
+.rad-rail {
+  padding: var(--rad-space-1) var(--rad-space-2) var(--rad-space-3);
+  gap: 2px;
+}
+.rad-rail-indicator {
+  left: var(--rad-space-2);
+  right: var(--rad-space-2);
+  border-radius: var(--rad-radius-m);
+  background-color: var(--rad-accent-soft);
+}
+.rad-rail-item {
+  gap: var(--rad-space-3);
+  padding-inline: var(--rad-space-3);
+  border-radius: var(--rad-radius-m);
+  color: var(--rad-text-2);
+  transition: color var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-rail-item:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
+.rad-rail-item:active { background-color: var(--rad-tint-press); }
+.rad-rail-item[aria-current='page'] { color: var(--rad-text-1); }
+.rad-rail-item .rad-icon { transition: color var(--rad-dur-fast) var(--rad-ease-out); }
+.rad-rail-item[aria-current='page'] .rad-icon { color: var(--rad-accent-strong); }
+
+/* Escenario: la hoja de trabajo. */
+.rad-stage {
+  background-color: var(--rad-surface-1);
+  box-shadow: var(--rad-shadow-1);
+}
+.rad-shell[data-rail] .rad-stage {
+  border-top-left-radius: var(--rad-radius-l);
+}
+.rad-shell[data-rail][data-statusbar] .rad-stage {
+  border-bottom-left-radius: var(--rad-radius-l);
+}
+
+/* Statusbar */
+.rad-statusbar {
+  padding-inline: var(--rad-space-4);
+  font-size: var(--rad-text-xs);
+  color: var(--rad-text-3);
+}
