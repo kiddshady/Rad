@@ -13,8 +13,8 @@
     - el blanco va en líneas y halos, no en superficies (a Fran lo muy blanco
       le molesta a la vista). Por eso lo prendido no es un bloque blanco sino
       vidrio encendido: translúcido, con el canto y el halo blancos;
-    - los colores de estado se quedan, más apagados: en gris, un error y un
-      aviso serían iguales.
+    - los colores de estado se quedan, y a pleno: en gris, un error y un
+      aviso serían iguales, y un pastel sobre negro se lee casi blanco.
 
   La base se importa entera en una subcapa de rad.skin; lo de este archivo
   queda directo en rad.skin y por eso le gana sin pelear especificidad.

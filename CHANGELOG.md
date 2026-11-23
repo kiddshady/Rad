@@ -1,5 +1,12 @@
 # Changelog
 
+## @rad/skin-mono 0.1.2 (2026-11-23)
+
+- **El halo de los puntos de un toast, de su color.** El de «sin tipo» es
+  blanco, y esa regla les ganaba a las de glass por la capa (no por la
+  especificidad): los puntos verde, ámbar y rojo salían con halo blanco, que
+  les lavaba el color. Lo vio Fran. Ahora cada uno brilla de lo suyo.
+
 ## @rad/skin-mono 0.1.1 (2026-11-23)
 
 - **Los colores de estado, a pleno.** Listo, atención y error eran pasteles
