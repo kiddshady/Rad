@@ -74,6 +74,10 @@
   --rad-statusbar-height: 26px;
   --rad-control-height: 32px;
   --rad-icon-size: 16px;
+  --rad-menu-min-width: 208px;
+  --rad-modal-width: 440px;
+  --rad-toast-width: 340px;
+  --rad-tooltip-max-width: 260px;
 
   /* Movimiento */
   --rad-dur-fast: 120ms;

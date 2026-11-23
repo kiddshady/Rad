@@ -7,6 +7,10 @@
 // puede inventar otros con el prefijo --rad- (lo propio de una piel va con
 // --skin-). tools/verify-core.mjs y tools/verify-skins.mjs lo hacen cumplir.
 //
+// Aparte están las perillas de anatomía, --rad-a-*: las define el núcleo en
+// cada componente (por ejemplo --rad-a-in, la animación de entrada de un
+// menú) y una piel puede pisarlas en ese mismo selector. No son tokens.
+//
 // Agregar un token es un cambio de contrato: sube la versión menor del núcleo
 // y obliga a que todas las pieles lo definan antes de pasar el verificador.
 //
@@ -103,6 +107,10 @@ const TOKENS = [
     ['statusbar-height', 'length', 'El alto de la statusbar.'],
     ['control-height', 'length', 'El alto de un control: botón, campo, item del rail.'],
     ['icon-size', 'length', 'El lado de un ícono de interfaz.'],
+    ['menu-min-width', 'length', 'El ancho mínimo de un menú.'],
+    ['modal-width', 'length', 'El ancho de un modal.'],
+    ['toast-width', 'length', 'El ancho de un toast.'],
+    ['tooltip-max-width', 'length', 'El ancho máximo de un tooltip antes de partir el renglón.'],
   ]),
   ...group('motion', 'Movimiento. Todo cambio de estado se anima con estas duraciones y curvas.', [
     ['dur-fast', 'duration', 'Hover, press, cambios chicos.'],
@@ -115,7 +123,7 @@ const TOKENS = [
 ];
 
 module.exports = {
-  version: 2,
+  version: 3,
   tokens: TOKENS,
   names: TOKENS.map(t => t.name),
 };

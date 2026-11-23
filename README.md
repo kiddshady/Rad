@@ -86,6 +86,38 @@ shell.setSubtitle('borrador');
 La anatomía (`.rad-titlebar`, `.rad-rail-item`, `.rad-stage`, `.rad-view`,
 `.rad-statusbar`…) es parte de la API: la piel se engancha ahí.
 
+## Lo que flota
+
+```js
+import { menuButton } from '/@core/menu.js';
+import { openModal, confirm } from '/@core/modal.js';
+import { toast } from '/@core/toast.js';
+
+menuButton(boton, () => [
+  { id: 'dup', label: 'Duplicar', shortcut: 'Ctrl+D', onSelect() { … } },
+  { separator: true },
+  { id: 'del', label: 'Eliminar', danger: true, onSelect() { … } },
+]);
+
+const m = openModal({ title: 'Renombrar', body: nodo, actions: [
+  { id: 'cancel', label: 'Cancelar' },
+  { id: 'ok', label: 'Guardar', variant: 'primary' },
+] });
+await m.closed; // el id de la acción, o 'dismiss'
+
+if (await confirm({ title: '¿Eliminar?', confirmLabel: 'Eliminar', danger: true })) { … }
+
+toast({ text: 'Guardado', kind: 'success' });
+```
+
+Y los tooltips no se importan: cualquier elemento con `data-rad-tip="Guardar"`
+(y opcionalmente `data-rad-tip-key="Ctrl+S"`) ya lo tiene. Nunca `title=`.
+
+Todo vive en una capa fija hermana de `.rad-root`, entra y sale animado
+(`present()` y `dismiss()` de `motion.js`), y el Escape lo atiende siempre el
+de más arriba. El botón del núcleo es `.rad-button`, con
+`data-variant="primary" | "danger" | "quiet"`.
+
 ## Una piel
 
 Una piel es una carpeta `packages/skin-<id>` con:

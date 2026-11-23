@@ -43,7 +43,7 @@ function titlebar({ title, subtitle }) {
 
   const btns = h('div', 'rad-winbtns');
   const btn = (action, label, html, extra = '') => {
-    const b = h('button', `rad-winbtn ${extra}`.trim(), { 'aria-label': label, 'data-action': action, type: 'button' });
+    const b = h('button', `rad-winbtn ${extra}`.trim(), { 'aria-label': label, 'data-action': action, 'data-rad-tip': label, 'data-rad-tip-side': 'bottom', type: 'button' });
     b.innerHTML = html;
     b.addEventListener('click', () => {
       const w = window.rad?.window;
@@ -62,6 +62,7 @@ function titlebar({ title, subtitle }) {
   const setMax = (on) => {
     bar.toggleAttribute('data-maximized', on);
     maxBtn.setAttribute('aria-label', on ? 'Restaurar' : 'Maximizar');
+    maxBtn.setAttribute('data-rad-tip', on ? 'Restaurar' : 'Maximizar');
   };
   window.rad?.window.isMaximized?.().then(setMax);
   window.rad?.window.onMaximizedChange?.(setMax);

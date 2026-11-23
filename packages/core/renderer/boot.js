@@ -7,6 +7,8 @@
 
 import { wireAll } from './scroll.js';
 import { ms, SAFETY_MS } from './motion.js';
+// Los tooltips se activan solos: cualquier elemento con data-rad-tip los tiene.
+import './tooltip.js';
 
 const FALLBACK_MS = 2000;
 

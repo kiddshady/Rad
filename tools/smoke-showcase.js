@@ -93,8 +93,140 @@ await sleep(300);
 if (kept > 0 && view('texto').scrollTop !== kept) fail(`el scroll de texto volvió en ${view('texto').scrollTop}, se había dejado en ${kept}`);
 data.scroll = `dejado en ${kept}, vuelto en ${view('texto').scrollTop}`;
 
-// Para la captura: la primera vista, quieta.
-item('planos').click();
-await sleep(400);
+// ---------- Capas ----------
+item('capas').click();
+await sleep(350);
+const capas = view('capas');
+const overlays = () => document.querySelector('.rad-overlays');
+const openMenus = () => [...document.querySelectorAll('.rad-overlays .rad-menu')].filter((m) => m.dataset.state === 'open' && !m.hasAttribute('data-rad-leaving'));
+const activeLabel = (m) => m.querySelector('.rad-menu-item.is-active .rad-menu-label')?.textContent;
+const keyOn = (el, key, extra = {}) => el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...extra }));
+
+// 6. Menú con el teclado: abre con el primero activo, salta el deshabilitado,
+// da la vuelta, y Escape lo cierra devolviendo el foco.
+const menuBtn = capas.querySelector('[data-demo="menu"]');
+menuBtn.focus();
+menuBtn.click(); // detail 0, como Enter
+await frame();
+let menu = openMenus()[0];
+if (!menu) fail('el menú no abrió');
+else {
+  if (menuBtn.getAttribute('aria-expanded') !== 'true') fail('el botón no dice aria-expanded=true');
+  if (document.activeElement !== menu) fail('el foco no quedó en el menú');
+  const path = [activeLabel(menu)];
+  for (let i = 0; i < 3; i++) { keyOn(menu, 'ArrowDown'); path.push(activeLabel(menu)); }
+  if (path.join(' > ') !== 'Duplicar > Renombrar > Eliminar > Duplicar') fail(`el recorrido del menú fue: ${path.join(' > ')}`);
+  data.menu = path.join(' > ');
+  await sleep(250);
+  keyOn(menu, 'Escape');
+  const out = [];
+  for (const t0 = performance.now(); performance.now() - t0 < 140;) { await frame(); out.push(op(menu)); }
+  for (let i = 1; i < out.length; i++) if (out[i] > out[i - 1] + 0.001) { fail('la salida del menú subió de opacidad'); break; }
+  await sleep(250);
+  if (menu.isConnected) fail('el menú quedó en el DOM después de salir');
+  if (document.activeElement !== menuBtn) fail('el foco no volvió al botón del menú');
+  if (menuBtn.getAttribute('aria-expanded') !== 'false') fail('el botón quedó con aria-expanded=true');
+}
+
+// 7. La trampa del ancla: el pointerdown sobre el botón cierra, y el click
+// que sigue no lo vuelve a abrir.
+menuBtn.click();
+await sleep(250);
+menuBtn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+menuBtn.click();
+await sleep(300);
+if (openMenus().length) fail('el click sobre el ancla volvió a abrir el menú');
+
+// 8. Cerrar a mitad de la entrada: da vuelta la entrada desde donde iba.
+menuBtn.click();
+await frame();
+menu = openMenus()[0];
+await frame();
+const mid = op(menu);
+keyOn(menu, 'Escape');
+const rev = [];
+for (const t0 = performance.now(); performance.now() - t0 < 160;) { await frame(); if (menu.isConnected) rev.push(op(menu)); }
+if (rev.some((o) => o > mid + 0.02)) fail(`al cerrar a mitad de la entrada la opacidad saltó de ${r2(mid)} a ${r2(Math.max(...rev))}`);
+await sleep(250);
+if (menu.isConnected) fail('el menú cerrado a mitad de la entrada quedó en el DOM');
+data.menuReverso = `desde ${r2(mid)}: ${rev.map(r2).join(' → ')}`;
+
+// 9. Modal: inerte atrás, foco adentro, el Tab da la vuelta, Escape cierra y
+// el foco vuelve.
+const modalBtn = capas.querySelector('[data-demo="modal"]');
+modalBtn.focus();
+modalBtn.click();
+await frame();
+const modal = document.querySelector('.rad-overlays .rad-modal');
+if (!modal) fail('el modal no abrió');
+else {
+  if (!root.inert) fail('la app de atrás no quedó inert con el modal abierto');
+  const btns = [...modal.querySelectorAll('.rad-button')];
+  if (document.activeElement !== btns.at(-1)) fail('el foco no fue a la acción primaria del modal');
+  keyOn(document.activeElement, 'Tab');
+  if (document.activeElement !== btns[0]) fail('el Tab no dio la vuelta dentro del modal');
+  keyOn(document.activeElement, 'Tab', { shiftKey: true });
+  if (document.activeElement !== btns.at(-1)) fail('el Shift+Tab no dio la vuelta dentro del modal');
+  await sleep(350);
+  keyOn(document.activeElement, 'Escape');
+  await sleep(400);
+  if (document.querySelector('.rad-modal-layer')) fail('el modal quedó en el DOM después de cerrar');
+  if (root.inert) fail('la app quedó inert después de cerrar el modal');
+  if (document.activeElement !== modalBtn) fail('el foco no volvió al botón que abrió el modal');
+}
+
+// 10. Toasts: se apilan, uno del medio se va y los demás se acomodan; nunca
+// más de cuatro.
+const alive = () => [...document.querySelectorAll('.rad-toast')].filter((t) => !t.hasAttribute('data-rad-leaving') && t.dataset.state !== 'closing');
+alive().forEach((t) => t._radClose?.());
+await sleep(450);
+for (const kind of ['info', 'success', 'warning']) {
+  capas.querySelector(`[data-demo="toast"][data-kind="${kind}"]`).click();
+  await sleep(60);
+}
+await sleep(450);
+const three = alive();
+if (three.length !== 3) fail(`había ${three.length} toasts, se esperaban 3`);
+else {
+  const top0 = three[0].getBoundingClientRect().top;
+  three[1].querySelector('.rad-toast-close').click();
+  await frame();
+  if (getComputedStyle(three[1]).position !== 'absolute') fail('el toast que se va no salió del flujo');
+  await sleep(450);
+  if (three[1].isConnected) fail('el toast cerrado quedó en el DOM');
+  const top1 = three[0].getBoundingClientRect().top;
+  if (!(top1 > top0)) fail('el toast de arriba no bajó a ocupar el lugar');
+  data.toasts = `el de arriba bajó ${Math.round(top1 - top0)} px`;
+}
+capas.querySelector('[data-demo="burst"]').click();
+await sleep(1400);
+if (alive().length > 4) fail(`quedaron ${alive().length} toasts, el tope es 4`);
+alive().forEach((t) => t._radClose?.());
+await sleep(450);
+if (document.querySelector('.rad-toast')) fail('quedaron toasts en el DOM');
+
+// 11. Tooltip: espera la primera vez, sale enseguida la siguiente.
+const tips = capas.querySelectorAll('.sc-iconbtn');
+const tipEl = () => [...document.querySelectorAll('.rad-tooltip')].find((t) => t.dataset.state === 'open' && !t.hasAttribute('data-rad-leaving'));
+tips[0].dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+await sleep(200);
+if (tipEl()) fail('el tooltip apareció sin esperar');
+await sleep(450);
+const tip = tipEl();
+if (!tip) fail('el tooltip no apareció');
+else if (tip.textContent !== 'GuardarCtrl+S') fail(`el tooltip dice "${tip.textContent}"`);
+tips[0].dispatchEvent(new PointerEvent('pointerout', { bubbles: true, relatedTarget: tips[1] }));
+tips[1].dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+await frame();
+if (tipEl()?.textContent !== 'BuscarCtrl+F') fail('el segundo tooltip no salió enseguida');
+tips[1].dispatchEvent(new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body }));
+await sleep(300);
+if (document.querySelector('.rad-tooltip')) fail('el tooltip quedó en el DOM');
+if ([...overlays().children].some((c) => c.matches('.rad-menu, .rad-modal-layer, .rad-tooltip'))) fail('quedaron capas abiertas al terminar');
+
+// Para la captura: un menú abierto y un toast.
+capas.querySelector('[data-demo="toast"][data-kind="success"]').click();
+menuBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+await sleep(500);
 
 return { failures, data };

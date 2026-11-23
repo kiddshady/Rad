@@ -70,6 +70,81 @@ export function cancelAll(el) {
 }
 
 /**
+ * Presencia: la entrada y la salida de algo que aparece y se va (un menú, un
+ * modal, un toast, un tooltip). El CSS del núcleo engancha las animaciones en
+ * [data-rad-presence][data-state=open|closing]; cada componente dice cuáles
+ * con --rad-a-in y --rad-a-out.
+ *
+ * present(el): entra. Al terminar se asienta (is-settled apaga la animación):
+ * una opacidad retenida le cortaría el vidrio a lo de adentro. Con
+ * { settle: false } la entrada queda retenida; es para lo que tiene sombra
+ * grande (el modal), que si se asienta cambia de capa y la sombra salta.
+ */
+export function present(el, { settle = true } = {}) {
+  el.setAttribute('data-rad-presence', '');
+  el.dataset.state = 'open';
+  if (!settle) return;
+  const done = () => {
+    el.removeEventListener('animationend', onEnd);
+    if (el.dataset.state === 'open') el.classList.add('is-settled');
+  };
+  const onEnd = (e) => { if (e.target === el) done(); };
+  el.addEventListener('animationend', onEnd);
+  setTimeout(done, ms('dur-slow') + SAFETY_MS);
+}
+
+/**
+ * dismiss(el): sale y, cuando termina de irse, sale del DOM. Devuelve una
+ * promesa que se cumple cuando ya no está. Si todavía venía entrando, no
+ * arranca la salida desde entero (saltaría): da vuelta la entrada desde donde
+ * iba.
+ */
+export function dismiss(el, { remove = true } = {}) {
+  if (el._radDismiss) return el._radDismiss;
+  el._radDismiss = new Promise((resolve) => {
+    const finish = () => {
+      if (remove) el.remove();
+      resolve();
+    };
+    const entering = !el.classList.contains('is-settled') && el.dataset.state === 'open'
+      ? el.getAnimations().find((a) => a.playState === 'running' && a.effect?.target === el)
+      : null;
+    if (entering) {
+      el.setAttribute('data-rad-leaving', '');
+      const left = Number(entering.currentTime) || 0;
+      entering.reverse();
+      whenDone(entering, left + SAFETY_MS, finish);
+      return;
+    }
+    el.classList.remove('is-settled');
+    el.dataset.state = 'closing';
+    const onEnd = (e) => { if (e.target === el) { el.removeEventListener('animationend', onEnd); clearTimeout(timer); finish(); } };
+    el.addEventListener('animationend', onEnd);
+    const timer = setTimeout(() => { el.removeEventListener('animationend', onEnd); finish(); }, ms('dur-base') + SAFETY_MS);
+  });
+  return el._radDismiss;
+}
+
+/**
+ * FLIP: corre mutate() (que mueve cosas de lugar) y hace viajar a cada hijo
+ * de container desde donde estaba hasta donde quedó, con transform. Se suma
+ * (composite add) a lo que el hijo ya esté animando, como su entrada.
+ */
+export function flip(container, mutate, { skip = () => false } = {}) {
+  const kids = [...container.children].filter((k) => !skip(k));
+  const before = new Map(kids.map((k) => [k, k.getBoundingClientRect().top]));
+  mutate();
+  const dur = ms('dur-base');
+  const easing = token('ease-in-out');
+  for (const [k, top] of before) {
+    if (!k.isConnected || skip(k)) continue;
+    const dy = top - k.getBoundingClientRect().top;
+    if (Math.abs(dy) < 0.5) continue;
+    k.animate([{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0px)' }], { duration: dur, easing, composite: 'add' });
+  }
+}
+
+/**
  * Relevo chico: cambia el texto de una celda .rad-swap. Lo viejo se esfuma en
  * su lugar (ease-in-out) y lo nuevo asoma cuando lo viejo va por un tercio.
  * El primer llenado no es un cambio: aparece sin relevo.

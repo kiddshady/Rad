@@ -61,6 +61,7 @@ function checkSkin(dir) {
 
   const known = new Set(contract.names);
   for (const name of defined.keys()) {
+    if (name.startsWith('--rad-a-')) continue; // perilla de anatomía del núcleo: se puede pisar
     if (name.startsWith('--rad-') && !known.has(name)) errors.push(`${name} no está en el contrato (lo propio de la piel va con --skin-)`);
   }
 

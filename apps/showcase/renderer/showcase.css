@@ -79,20 +79,17 @@
     overflow-x: auto;
   }
 
-  /* Botones */
-  .sc-btn {
+  /* Botón de ícono suelto (en la etapa 5 pasa al núcleo). */
+  .sc-iconbtn {
+    width: var(--rad-control-height);
     height: var(--rad-control-height);
-    padding-inline: var(--rad-space-4);
+    display: grid;
+    place-items: center;
     border-radius: var(--rad-radius-m);
-    background-color: var(--rad-surface-3);
-    color: var(--rad-text-1);
-    box-shadow: var(--rad-shadow-1);
-    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), transform var(--rad-dur-fast) var(--rad-ease-out);
+    color: var(--rad-text-2);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
   }
-  .sc-btn:hover { background-color: color-mix(in srgb, var(--rad-surface-3), var(--rad-text-1) 7%); }
-  .sc-btn:active { transform: scale(0.98); }
-  .sc-btn-primary { background-color: var(--rad-accent); color: var(--rad-on-accent); font-weight: var(--rad-weight-strong); }
-  .sc-btn-primary:hover { background-color: var(--rad-accent-strong); }
+  .sc-iconbtn:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
 
   .sc-chip {
     padding: var(--rad-space-1) var(--rad-space-3);

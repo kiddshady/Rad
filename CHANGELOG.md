@@ -1,5 +1,28 @@
 # Changelog
 
+## @rad/core 0.3.0 · @rad/skin-classic 0.3.0 (2026-11-23)
+
+La etapa 3: lo que flota.
+
+- Capa de overlays hermana de la raíz, con una pila que decide quién atiende
+  el Escape, y `place()` para colocar junto a un ancla dándose vuelta si no
+  entra.
+- `present()` / `dismiss()`: entrada, asentado y salida. Cerrar algo que
+  todavía venía entrando da vuelta la entrada desde donde iba.
+- `flip()`: lo que cambia de lugar viaja con transform.
+- Tooltips con `data-rad-tip` (y atajo opcional), con espera la primera vez y
+  enseguida las siguientes.
+- Menús con teclado completo, items deshabilitados, peligrosos y separadores,
+  y la trampa del ancla resuelta.
+- Modales con la app inert atrás, Tab que da la vuelta y foco que vuelve; y
+  `confirm()`.
+- Toasts que se apilan, viajan al acomodarse, se frenan con el mouse y nunca
+  pasan de cuatro.
+- `.rad-button` en el núcleo, con variantes primaria, peligrosa y callada.
+- Contrato v3: anchos de menú, modal, toast y tooltip. Las perillas de
+  anatomía (`--rad-a-*`) no son tokens y una piel las puede pisar.
+- El humo prueba todo esto desde adentro de la vitrina.
+
 ## @rad/core 0.2.0 · @rad/skin-classic 0.2.0 (2026-11-23)
 
 La etapa 2: el shell y el router.

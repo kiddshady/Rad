@@ -237,6 +237,164 @@
     white-space: nowrap;
   }
 
+  /* ---------- Botón ---------- */
+
+  .rad-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--rad-space-2);
+    height: var(--rad-control-height);
+    padding-inline: var(--rad-space-4);
+    white-space: nowrap;
+  }
+  .rad-button:disabled { pointer-events: none; }
+
+  /* ---------- Overlays ---------- */
+
+  .rad-overlays {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    pointer-events: none;
+  }
+  .rad-overlays > * { pointer-events: auto; }
+
+  /* Presencia (motion.js): cada componente elige su entrada y su salida con
+     --rad-a-in / --rad-a-out. Asentado apaga la entrada; la regla de salida
+     va DESPUÉS y con la misma especificidad, así salir siempre gana. */
+  [data-rad-presence][data-state='open'] { animation: var(--rad-a-in); }
+  [data-rad-presence].is-settled { animation: none; }
+  [data-rad-presence][data-state='closing'] { animation: var(--rad-a-out); }
+  [data-rad-presence][data-state='closing'], [data-rad-leaving] { pointer-events: none; }
+
+  @keyframes rad-pop-in {
+    from { opacity: 0; transform: translateY(var(--rad-a-dy)) scale(0.98); }
+  }
+  @keyframes rad-pop-out {
+    to { opacity: 0; transform: translateY(var(--rad-a-dy)) scale(0.98); }
+  }
+  @keyframes rad-fade-in { from { opacity: 0; } }
+  @keyframes rad-fade-out { to { opacity: 0; } }
+  @keyframes rad-rise-in {
+    from { opacity: 0; transform: translateY(var(--rad-space-2)) scale(0.97); }
+  }
+  @keyframes rad-sink-out {
+    to { opacity: 0; transform: scale(0.98); }
+  }
+  @keyframes rad-slide-in {
+    from { opacity: 0; transform: translateY(var(--rad-space-3)); }
+  }
+  @keyframes rad-slide-out {
+    to { opacity: 0; transform: translateX(var(--rad-space-4)); }
+  }
+
+  /* Tooltip y menú: aparecen desde el lado del ancla. */
+  .rad-tooltip, .rad-menu {
+    position: fixed;
+    --rad-a-dy: calc(var(--rad-space-1) * -1);
+    --rad-a-in: rad-pop-in var(--rad-dur-base) var(--rad-ease-out) both;
+    --rad-a-out: rad-pop-out var(--rad-dur-fast) var(--rad-ease-in) both;
+  }
+  .rad-tooltip[data-side='top'], .rad-menu[data-side='top'] { --rad-a-dy: var(--rad-space-1); }
+
+  .rad-tooltip {
+    display: flex;
+    align-items: baseline;
+    gap: var(--rad-space-2);
+    max-width: var(--rad-tooltip-max-width);
+    pointer-events: none;
+    user-select: none;
+  }
+  .rad-overlays > .rad-tooltip { pointer-events: none; }
+
+  .rad-menu {
+    display: flex;
+    flex-direction: column;
+    min-width: var(--rad-menu-min-width);
+    max-height: 70vh;
+    overflow-y: auto;
+    user-select: none;
+  }
+  /* El menú y el modal reciben el foco como contenedores: el anillo iría
+     alrededor de toda la capa. En el menú lo que marca el foco es el item
+     activo; en el modal, el control que tiene el foco adentro. */
+  .rad-menu:focus-visible, .rad-modal:focus-visible { outline: none; }
+  .rad-menu-item {
+    display: flex;
+    align-items: center;
+    min-height: var(--rad-control-height);
+    cursor: default;
+  }
+  .rad-menu-label { flex: 1; min-width: 0; white-space: nowrap; }
+  .rad-menu-item[aria-disabled='true'] { cursor: default; }
+
+  /* Modal: el velo solo aparece (no viaja: si un día es vidrio, que no se
+     mueva); el panel sube apenas. La capa fija (will-change) es por su
+     sombra grande, para que se pinte igual animándose y quieto. */
+  .rad-modal-layer {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+  .rad-scrim {
+    position: absolute;
+    inset: 0;
+    --rad-a-in: rad-fade-in var(--rad-dur-slow) var(--rad-ease-out) both;
+    --rad-a-out: rad-fade-out var(--rad-dur-base) var(--rad-ease-in) both;
+  }
+  .rad-modal {
+    position: relative;
+    width: min(var(--rad-modal-width), calc(100vw - var(--rad-space-6) * 2));
+    max-height: calc(100vh - var(--rad-space-6) * 2);
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    will-change: transform;
+    --rad-a-in: rad-rise-in var(--rad-dur-slow) var(--rad-ease-out) both;
+    --rad-a-out: rad-sink-out var(--rad-dur-base) var(--rad-ease-in) both;
+  }
+  .rad-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  /* Toasts: abajo a la derecha, por encima de la statusbar. */
+  .rad-toasts {
+    position: fixed;
+    right: var(--rad-space-4);
+    bottom: calc(var(--rad-statusbar-height) + var(--rad-space-3));
+    width: var(--rad-toast-width);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: var(--rad-space-2);
+    pointer-events: none;
+  }
+  .rad-toast {
+    display: flex;
+    align-items: center;
+    pointer-events: auto;
+    --rad-a-in: rad-slide-in var(--rad-dur-slow) var(--rad-ease-out) both;
+    --rad-a-out: rad-slide-out var(--rad-dur-base) var(--rad-ease-in) both;
+  }
+  .rad-toast-text { flex: 1; min-width: 0; }
+  .rad-toast-dot { flex: none; }
+  .rad-toast-close {
+    flex: none;
+    display: grid;
+    place-items: center;
+  }
+  .rad-toast-close svg {
+    width: calc(var(--rad-icon-size) * 0.625);
+    height: calc(var(--rad-icon-size) * 0.625);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.25;
+  }
+
   /* Celda de relevo: lo viejo y lo nuevo en el mismo lugar. Doble clase para
      ganarle al display propio de quien la use. La capa fija (will-change)
      hace que se pinte igual animándose y quieto: si no, una posición con
