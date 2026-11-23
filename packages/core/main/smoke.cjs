@@ -41,6 +41,9 @@ function attach(win, { skin, store, settleMs = 900, timeoutMs = 15000 }) {
     }
     fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
     fs.writeFileSync(out, JSON.stringify(report, null, 2));
+    // Un guion que bajó una actualización pide instalarla: sale por el
+    // camino real (quitAndInstall), que es lo que hay que probar.
+    if (report.ok && report.script?.installAfter && require('./updater.cjs').install()) return;
     if (normal) app.quit();
     else app.exit(report.ok ? 0 : 1);
   };

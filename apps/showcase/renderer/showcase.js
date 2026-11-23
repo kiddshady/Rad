@@ -170,7 +170,7 @@ const views = [
         : `Abriste la vitrina ${n} veces.`;
       const facts = el.querySelector('[data-demo="info"]');
       window.rad?.invoke('sistema:info').then((info) => {
-        const rows = [['Electron', info.electron], ['Chromium', info.chromium], ['Node', info.node], ['Datos', info.datos]];
+        const rows = [['Vitrina', info.vitrina], ['Electron', info.electron], ['Chromium', info.chromium], ['Node', info.node], ['Datos', info.datos]];
         for (const [k, v] of rows) {
           const dt = document.createElement('dt');
           dt.textContent = k;

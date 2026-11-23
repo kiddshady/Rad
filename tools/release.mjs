@@ -43,7 +43,9 @@ const product = pkg.build.productName || pkg.productName || pkg.name;
 const title = arg('title') ? `${product} ${version} — ${arg('title')}` : `${product} ${version}`;
 const notesArg = arg('notes') || '';
 const notes = notesArg && fs.existsSync(notesArg) ? fs.readFileSync(notesArg, 'utf8') : notesArg;
-const sh = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8', shell: process.platform === 'win32', ...opts });
+// Sin shell: gh es un .exe de verdad, y con shell los argumentos con
+// espacios (el título) se parten. npx sí la necesita (es un .cmd).
+const sh = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8', ...opts });
 
 const sha512 = (file) => crypto.createHash('sha512').update(fs.readFileSync(file)).digest('base64');
 function checkTrio(dir, label) {

@@ -45,11 +45,7 @@ function setup({ enabled = true } = {}) {
     await updater.downloadUpdate();
     return true;
   });
-  ipcMain.handle('rad:update:install', () => {
-    if (!updater || last?.state !== 'ready') return false;
-    updater.quitAndInstall(true, !process.env.RAD_SMOKE);
-    return true;
-  });
+  ipcMain.handle('rad:update:install', () => install());
 
   if (!enabled || !app.isPackaged) return null;
   if (process.env.PORTABLE_EXECUTABLE_FILE) {
@@ -92,4 +88,11 @@ async function check() {
   }
 }
 
-module.exports = { setup, check };
+/** Instala lo que ya se bajó. En el humo, sin volver a abrir la app. */
+function install() {
+  if (!updater || last?.state !== 'ready') return false;
+  updater.quitAndInstall(true, !process.env.RAD_SMOKE);
+  return true;
+}
+
+module.exports = { setup, check, install };
