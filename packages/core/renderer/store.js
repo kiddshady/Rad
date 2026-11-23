@@ -14,6 +14,18 @@
 // Si el documento guardado y los valores por defecto son objetos, se mezclan:
 // una clave nueva en los defaults aparece aunque el archivo sea viejo.
 
+//
+//   import { removeDoc } from '/@core/store.js';
+//   await removeDoc('chat-a1b2');               // borra el archivo y su .bak
+//
+// Un documento borrado no avisa a quien lo tenía abierto: el que borra es el
+// que sabe que ya nadie lo usa.
+
+/** Borra un documento guardado. La promesa se cumple cuando ya no está. */
+export function removeDoc(name) {
+  return window.rad?.store?.remove(name) ?? Promise.resolve();
+}
+
 const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const clone = (v) => (v === undefined ? v : structuredClone(v));
 

@@ -190,6 +190,22 @@
   .sc-ask .rad-input:focus { background: none; box-shadow: none; }
   .sc-ask .rad-iconbutton { border-radius: var(--rad-radius-pill); }
 
+  /* Listas: filas que se ponen al día por clave. */
+  .sc-list { display: grid; gap: var(--rad-space-1); }
+  .sc-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--rad-space-3);
+    min-height: var(--rad-control-height);
+    padding-inline: var(--rad-space-3);
+    border-radius: var(--rad-radius-m);
+    background: var(--rad-surface-3);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .sc-list-row:hover { background: var(--rad-tint-press); }
+  .sc-list-row small { color: var(--rad-text-3); font-size: var(--rad-text-s); }
+
   /* Pieles: una tarjeta por piel, con sus colores. */
   .sc-skins { display: grid; gap: var(--rad-space-3); }
   .sc-skin {

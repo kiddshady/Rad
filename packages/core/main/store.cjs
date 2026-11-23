@@ -25,6 +25,8 @@
 //     núcleo frena la salida hasta que flushAll() bajó lo pendiente. No hay
 //     versión sincrónica a propósito: podría renombrar mientras una escritura
 //     de la cola todavía está en vuelo, y la vieja terminaría ganando.
+//   - Borrar un documento (remove) va por la misma cola: nunca le gana una
+//     escritura vieja que lo vuelva a crear.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -118,6 +120,31 @@ class Store {
       () => job.waiters.forEach((w) => w.resolve()),
       (err) => { this.log(`no se pudo guardar ${name}: ${err.message}`); job.waiters.forEach((w) => w.reject(err)); },
     );
+    return run;
+  }
+
+  /**
+   * Borra un documento: el archivo y su .bak. Lo que estaba pendiente de
+   * guardarse ya no se escribe, y el borrado va en la cola del documento:
+   * una escritura que venía en vuelo termina antes, así que no lo resucita.
+   */
+  remove(name) {
+    const file = this.file(name);
+    const job = this.pending.get(name);
+    if (job) {
+      clearTimeout(job.timer);
+      this.pending.delete(name);
+      job.waiters.forEach((w) => w.resolve());
+    }
+    this.cache.set(name, undefined);
+    const run = (this.queues.get(name) ?? Promise.resolve())
+      .catch(() => {})
+      .then(async () => {
+        // El mismo archivo tomado un instante que frena al rename: se reintenta.
+        for (const f of [file, `${file}.bak`]) await fs.promises.rm(f, { force: true, maxRetries: RETRY_DELAYS.length, retryDelay: RETRY_DELAYS[0] });
+      });
+    this.queues.set(name, run);
+    run.catch((err) => this.log(`no se pudo borrar ${name}: ${err.message}`));
     return run;
   }
 

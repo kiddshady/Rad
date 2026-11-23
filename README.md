@@ -94,7 +94,7 @@ La anatomía (`.rad-titlebar`, `.rad-rail-item`, `.rad-stage`, `.rad-view`,
 ## Lo que flota
 
 ```js
-import { menuButton } from '/@core/menu.js';
+import { menuButton, contextMenu } from '/@core/menu.js';
 import { openModal, confirm } from '/@core/modal.js';
 import { toast } from '/@core/toast.js';
 
@@ -103,6 +103,12 @@ menuButton(boton, () => [
   { separator: true },
   { id: 'del', label: 'Eliminar', danger: true, onSelect() { … } },
 ]);
+
+// Contextual: sale en el punto del click derecho (o de la tecla de menú).
+contextMenu(lista, (e) => {
+  const fila = e.target.closest('.fila');
+  return fila && [{ label: 'Renombrar', onSelect() { … } }];   // sin items, no abre
+});
 
 const m = openModal({ title: 'Renombrar', body: nodo, actions: [
   { id: 'cancel', label: 'Cancelar' },
@@ -143,6 +149,27 @@ El anillo es un hijo del elemento: no sirve en un `<input>` (se pone en lo
 que lo envuelve) ni en algo que scrollea. Si el elemento recorta
 (`overflow: hidden`), se ve la línea pero no el resplandor de afuera.
 
+### Listas que cambian
+
+```js
+import { reconcile } from '/@core/list.js';
+
+reconcile(lista, chats, {
+  key: (chat) => chat.id,
+  create: (chat) => fila(chat),        // el nodo de un item nuevo
+  update: (nodo, chat) => { … },       // pone al día el de uno que sigue
+});
+```
+
+Una lista que ya se ve no se rehace: se pone al día por clave. El item que
+sigue es el mismo nodo (conserva su foco y su hover) y, si cambió de lugar,
+viaja hasta él. El que se va se esfuma en su lugar, fuera del flujo, mientras
+los demás se acomodan. El nuevo entra fundiéndose, después de que el que se
+iba casi no se ve. El primer llenado no es un cambio: aparece sin entrada.
+
+La entrada, la salida y el viaje los pone `reconcile`: las filas no llevan
+una animación de entrada propia en el CSS.
+
 ## Controles
 
 Casi todos son HTML con clases, sin JS:
@@ -174,7 +201,7 @@ setFieldError(campo, 'Falta el nombre.');   // null lo limpia
 
 ```js
 // renderer
-import { openDoc } from '/@core/store.js';
+import { openDoc, removeDoc } from '/@core/store.js';
 import { hold } from '/@core/ready.js';
 
 const release = hold();                      // el arranque espera a la interfaz
@@ -182,6 +209,8 @@ const ajustes = await openDoc('ajustes', { densidad: 'normal' });
 ajustes.patch({ densidad: 'compacta' });     // se guarda solo
 armarInterfaz();
 release();
+
+await removeDoc('nota-vieja');               // borra el archivo y su .bak
 
 const info = await rad.invoke('sistema:info');
 rad.on('notas:cambiaron', (datos) => { … });
@@ -192,6 +221,7 @@ rad.on('notas:cambiaron', (datos) => { … });
 rad.handle('sistema:info', () => ({ … }));
 rad.send('notas:cambiaron', datos);
 rad.store.read('ajustes');
+rad.store.remove('nota-vieja');
 rad.adoptData('Nombre viejo');               // antes de tocar el store
 ```
 
@@ -204,7 +234,12 @@ rad.adoptData('Nombre viejo');               // antes de tocar el store
   monitor ya no está, vuelve al centro.
 - Una sola instancia: la segunda le pasa el foco a la primera.
 - Los links a la web (`http`, `https`, `mailto`) se abren en el navegador.
-- El renderer solo ve canales `app:*`; los documentos con `_` son del núcleo.
+- El renderer solo ve canales `app:*`. Los documentos con `_` son del proceso
+  principal: el renderer no puede leerlos, escribirlos ni borrarlos. El núcleo
+  guarda ahí el lugar de la ventana, y una app, lo que el renderer no tiene
+  que ver (una llave cifrada).
+- Borrar un documento va por la misma cola que guardarlo: un guardado que
+  venía en vuelo no lo resucita.
 - Una app que cambia de nombre estrena carpeta de datos (sale del
   `productName`). `rad.adoptData('Nombre viejo')`, antes del primer uso del
   store, copia los datos de la carpeta vieja si la nueva todavía no existe.

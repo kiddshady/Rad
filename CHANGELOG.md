@@ -1,5 +1,34 @@
 # Changelog
 
+## @rad/core 0.12.0 · Rad 0.12.0 (2026-11-23)
+
+Tres piezas que pidió la primera app de verdad. Ninguna cambia una API que
+ya existiera.
+
+- **Listas que se ponen al día por clave** (`reconcile()`, en
+  `/@core/list.js`). Una lista que ya se ve no se rehace: el item que sigue
+  es el mismo nodo y viaja a su lugar, el que se va se esfuma en el suyo
+  (fuera del flujo, mientras los demás se acomodan) y el nuevo entra
+  fundiéndose cuando el que se iba casi no se ve. El primer llenado no entra
+  animado. Un nodo solo se mueve en el DOM si no está donde tiene que estar.
+- **Menú contextual** (`contextMenu()`, en `/@core/menu.js`). El click
+  derecho abre el menú con la esquina en ese punto, con los items de lo que
+  se clickeó (sirve delegado: una vez en la lista). Sin items no abre nada,
+  y nunca deja pasar el de Chromium. Desde el teclado sale junto al elemento,
+  con el primero activo, y al cerrar el foco vuelve a donde estaba.
+  `openMenu()` acepta `at` (un punto o una caja) en vez de `anchor`.
+- **Borrar un documento** (`rad.store.remove()` en el main, `removeDoc()` en
+  el renderer). Se van el archivo y su `.bak`. Va por la misma cola que los
+  guardados: uno que estaba pendiente ya no se escribe, y uno que venía en
+  vuelo termina antes y no lo resucita.
+- Los documentos con `_` quedan dichos como lo que son: del proceso
+  principal. El núcleo guarda ahí el lugar de la ventana y una app puede
+  guardar lo que el renderer no tiene que ver.
+- La vitrina muestra las listas y el menú contextual en Movimiento, y el
+  humo los mide con las tres pieles: el viaje cuadro por cuadro, que la fila
+  que se va no salte, que reordenar mueva los nodos en vez de rehacerlos, y
+  dónde sale el menú. Con el viaje apagado a propósito, el humo falla.
+
 ## @rad/core 0.11.0 · Rad 0.11.0 (2026-11-23)
 
 - **La vitrina pasa a llamarse Rad a secas.** Fran no quería el «Vitrina» en

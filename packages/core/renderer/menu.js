@@ -7,6 +7,14 @@
 //     { id: 'del', label: 'Eliminar', danger: true, onSelect() { … } },
 //   ]);
 //
+// Contextual, en el punto del click derecho (o de la tecla de menú):
+//
+//   import { contextMenu } from '/@core/menu.js';
+//   contextMenu(lista, (e) => {
+//     const fila = e.target.closest('.fila');
+//     return fila && [{ label: 'Renombrar', onSelect() { … } }];
+//   });
+//
 // Uno solo abierto a la vez. Se maneja con el teclado (flechas, Inicio, Fin,
 // Enter, Escape) y el foco queda en el menú, no en los items: el item activo
 // se marca con aria-activedescendant. Mover el foco item por item por código
@@ -30,8 +38,12 @@ const CHECK_ICON = '<svg viewBox="0 0 16 16" stroke-width="1.75" stroke-linecap=
 // activate: 'first' | 'last' | un índice (entre los items, sin contar
 // separadores). matchAnchorWidth: el menú es por lo menos tan ancho como su
 // ancla, para un desplegable que calza con su botón; un contextual no lo usa.
-export function openMenu({ anchor, items, side = 'bottom', align = 'start', activate = null, matchAnchorWidth = false, onClose } = {}) {
+// at: { x, y } en vez de anchor abre el menú con la esquina en ese punto (un
+// contextual), o un DOMRect, junto a esa caja; al cerrar, el foco vuelve a
+// donde estaba.
+export function openMenu({ anchor, at, items, side = 'bottom', align = 'start', activate = null, matchAnchorWidth = false, onClose } = {}) {
   closeMenus();
+  const previous = document.activeElement;
 
   const el = document.createElement('div');
   el.className = 'rad-menu';
@@ -75,7 +87,9 @@ export function openMenu({ anchor, items, side = 'bottom', align = 'start', acti
 
   layer().append(el);
   if (matchAnchorWidth && anchor instanceof Element) el.style.minWidth = `${anchor.offsetWidth}px`;
-  place(el, anchor, { side, align });
+  if (at instanceof DOMRect) place(el, at, { side, align });
+  else if (at) place(el, new DOMRect(at.x, at.y, 0, 0), { side, align, gap: 0 });
+  else place(el, anchor, { side, align });
   present(el);
   anchor?.setAttribute('aria-expanded', 'true');
   anchor?.setAttribute('aria-controls', el.id);
@@ -132,7 +146,10 @@ export function openMenu({ anchor, items, side = 'bottom', align = 'start', acti
     if (openMenuHandle === handle) openMenuHandle = null;
     const hadFocus = el.contains(document.activeElement);
     dismiss(el);
-    if (restoreFocus && hadFocus) anchor?.focus({ preventScroll: true });
+    if (restoreFocus && hadFocus) {
+      const back = anchor ?? (previous instanceof HTMLElement && previous.isConnected ? previous : null);
+      back?.focus({ preventScroll: true });
+    }
     onClose?.();
   }
 
@@ -172,6 +189,32 @@ export function openMenu({ anchor, items, side = 'bottom', align = 'start', acti
   const handle = { el, anchor, close };
   openMenuHandle = handle;
   return handle;
+}
+
+/**
+ * Menú contextual: el click derecho (o la tecla de menú, o Shift+F10) sobre
+ * target abre un menú en ese punto. getItems(evento) se llama en cada
+ * apertura y dice qué items van para lo que se clickeó; si no devuelve
+ * ninguno, no se abre nada. Sirve delegado: se engancha una vez en la lista
+ * y getItems mira en qué fila cayó el click. Devuelve la función que lo saca.
+ */
+export function contextMenu(target, getItems, options = {}) {
+  const onContext = (e) => {
+    e.preventDefault();
+    const items = getItems(e);
+    if (!items?.length) return;
+    // Desde el teclado no hay puntero. Chromium manda el punto del elemento
+    // con foco; un evento sin punto sale junto al elemento, como de un ancla.
+    const pointless = e.clientX === 0 && e.clientY === 0;
+    openMenu({
+      at: pointless ? (e.target instanceof Element ? e.target : target).getBoundingClientRect() : { x: e.clientX, y: e.clientY },
+      items,
+      activate: e.button === 2 ? null : 'first',
+      ...options,
+    });
+  };
+  target.addEventListener('contextmenu', onContext);
+  return () => target.removeEventListener('contextmenu', onContext);
 }
 
 /** Engancha un botón que abre y cierra un menú. getItems() se llama en cada

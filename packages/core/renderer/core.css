@@ -597,6 +597,10 @@
   }
   .rad-status-right { --rad-a-swap-align: end; }
 
+  /* Lista que se pone al día por clave (list.js): el item que se va queda
+     absoluto en su lugar mientras se esfuma, y la lista es su marco. */
+  .rad-list { position: relative; }
+
   /* ---------- Anillo de carga (busy.js) ----------
      Una luz que recorre el reborde de su dueño, con resplandor. Es un SVG
      con el contorno del elemento; la luz son trazos de rayas que avanzan

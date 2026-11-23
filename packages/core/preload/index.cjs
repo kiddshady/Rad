@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld('rad', {
   store: {
     read: (name) => ipcRenderer.invoke('rad:store:read', name),
     write: (name, value) => ipcRenderer.send('rad:store:write', name, value),
+    remove: (name) => ipcRenderer.invoke('rad:store:remove', name),
   },
 
   window: {

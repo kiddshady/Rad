@@ -4,7 +4,8 @@
 // suelto como '@core/shell.js' necesitaría un import map, que es un script
 // inline y la CSP no lo deja pasar.
 import { createShell } from '/@core/shell.js';
-import { menuButton } from '/@core/menu.js';
+import { menuButton, contextMenu } from '/@core/menu.js';
+import { reconcile } from '/@core/list.js';
 import { openModal, confirm } from '/@core/modal.js';
 import { toast } from '/@core/toast.js';
 import { openDoc } from '/@core/store.js';
@@ -228,6 +229,45 @@ const views = [
           clearTimeout(timers.get(target));
           setBusy(target, hold.checked);
         }
+      });
+
+      // Listas: las filas se ponen al día por clave, y el click derecho abre
+      // el menú de esa fila en el punto del click.
+      const list = el.querySelector('[data-demo="list"]');
+      const NAMES = ['Ácido acetilsalicílico', 'Ibuprofeno', 'Paracetamol', 'Diclofenac', 'Naproxeno', 'Ketorolac', 'Meloxicam', 'Piroxicam'];
+      let rows = [1, 2, 3, 4].map((n) => ({ id: n, name: NAMES[n - 1] }));
+      let serial = rows.length;
+      const row = (item) => {
+        const node = document.createElement('div');
+        node.className = 'sc-list-row';
+        node.setAttribute('role', 'listitem');
+        node.tabIndex = 0;
+        const name = document.createElement('span');
+        name.textContent = item.name;
+        const tag = document.createElement('small');
+        tag.className = 'rad-mono';
+        tag.textContent = `#${item.id}`;
+        node.append(name, tag);
+        return node;
+      };
+      const draw = () => reconcile(list, rows, { key: (r) => r.id, create: row });
+      draw();
+      el.querySelector('[data-demo="list-add"]').addEventListener('click', () => {
+        serial++;
+        rows = [{ id: serial, name: NAMES[(serial - 1) % NAMES.length] }, ...rows];
+        draw();
+      });
+      el.querySelector('[data-demo="list-drop"]').addEventListener('click', () => { rows = rows.slice(1); draw(); });
+      el.querySelector('[data-demo="list-shuffle"]').addEventListener('click', () => { rows = [...rows].reverse(); draw(); });
+      contextMenu(list, (e) => {
+        const node = e.target.closest('.sc-list-row');
+        if (!node) return null;
+        const id = Number(node.dataset.radKey);
+        return [
+          { id: 'top', label: 'Subir al principio', disabled: rows[0]?.id === id, onSelect: () => { rows = [rows.find((r) => r.id === id), ...rows.filter((r) => r.id !== id)]; draw(); } },
+          { separator: true },
+          { id: 'drop', label: 'Quitar', danger: true, onSelect: () => { rows = rows.filter((r) => r.id !== id); draw(); } },
+        ];
       });
     },
   },

@@ -264,6 +264,127 @@ for (let round = 1; round <= 2; round++) {
   if (card.classList.contains('rad-busy-host') || bar.classList.contains('rad-busy-host')) fail('quedó la clase rad-busy-host después de apagar');
 }
 
+// 4d. Una lista que se pone al día por clave: el primer llenado no entra
+// animado; la fila que se va se esfuma en su lugar, fuera del flujo, y recién
+// después sale del DOM; la que sigue es el mismo nodo y viaja a su lugar en
+// vez de saltar; la nueva entra fundiéndose; y reordenar mueve los nodos, no
+// los rehace.
+{
+  const mov = view('movimiento');
+  const list = mov.querySelector('[data-demo="list"]');
+  // Con aire abajo: si la vista está scrolleada hasta el fondo, sacar una
+  // fila le corre el scroll y la que sigue no cambia de lugar en pantalla.
+  mov.scrollTop = Math.max(0, mov.scrollHeight - mov.clientHeight - 140);
+  await sleep(120);
+  const rowsOf =() => [...list.children].filter((r) => !r.hasAttribute('data-rad-leaving'));
+  const keys = () => rowsOf().map((r) => r.dataset.radKey).join();
+  // Respecto de la lista: sacar una fila puede correr el scroll de la vista.
+  const y = (el) => el.getBoundingClientRect().top - list.getBoundingClientRect().top;
+  const press = (name) => mov.querySelector(`[data-demo="${name}"]`).click();
+  const settle = () => sleep(dur('base') + dur('fast') + 160);
+
+  if (keys() !== '1,2,3,4') fail(`la lista arrancó con las filas ${keys()}`);
+  if (rowsOf().some((r) => op(r) !== 1 || r.getAnimations().length)) fail('el primer llenado de la lista entró animado');
+  if (getComputedStyle(list).position !== 'relative') fail('la lista no es el marco de las filas que se van');
+
+  const [a, b] = rowsOf();
+  const aY = y(a);
+  const bY = y(b);
+  press('list-drop');
+  if (!a.isConnected) fail('la fila quitada salió del DOM de golpe');
+  if (getComputedStyle(a).position !== 'absolute') fail('la fila que se va no salió del flujo');
+  if (Math.abs(y(a) - aY) > 1) fail(`la fila que se va saltó de ${r2(aY)} a ${r2(y(a))}`);
+  if (rowsOf()[0] !== b) fail('la fila que sigue no es el mismo nodo: la lista se rehízo');
+  const trip = [];
+  const fadeOut = [];
+  for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 140;) {
+    await frame();
+    trip.push(y(b));
+    if (a.isConnected) fadeOut.push(op(a));
+  }
+  if (Math.abs(trip[0] - bY) > (bY - aY) / 2) fail(`la fila que sigue saltó a su lugar nuevo: estaba en ${r2(bY)} y al primer cuadro en ${r2(trip[0])}`);
+  for (let i = 1; i < trip.length; i++) if (trip[i] > trip[i - 1] + 0.5) { fail('la fila que viaja retrocedió'); break; }
+  if (Math.abs(trip.at(-1) - aY) > 0.5) fail(`la fila que sigue terminó en ${r2(trip.at(-1))}, su lugar es ${r2(aY)}`);
+  for (let i = 1; i < fadeOut.length; i++) if (fadeOut[i] > fadeOut[i - 1] + 0.001) { fail('la fila que se va subió de opacidad'); break; }
+  if (fadeOut.length < 2) fail('la fila que se va casi no se vio irse');
+  await sleep(160);
+  if (a.isConnected) fail('la fila quitada quedó en el DOM');
+  data.listaViaje = trip.filter((_, i) => i % 3 === 0).map((n) => Math.round(n)).join(' → ');
+
+  press('list-add');
+  const added = rowsOf()[0];
+  if (added === b) fail('agregar no puso la fila nueva primera');
+  await frame();
+  if (op(added) > 0.9) fail(`la fila nueva apareció de golpe (opacidad ${r2(op(added))} en el primer cuadro)`);
+  if (rowsOf()[1] !== b) fail('agregar rehízo las filas que ya estaban');
+  await settle();
+  if (op(added) !== 1) fail(`la fila nueva quedó en opacidad ${r2(op(added))}`);
+
+  const antes = rowsOf();
+  press('list-shuffle');
+  const despues = rowsOf();
+  if (despues.length !== antes.length || despues.some((n, i) => n !== antes[antes.length - 1 - i])) fail('dar vuelta la lista rehízo las filas en vez de moverlas');
+  await frame();
+  if (y(antes[0]) > y(antes.at(-1))) fail('al dar vuelta, la fila de arriba saltó abajo en vez de viajar');
+  await settle();
+  if (y(antes[0]) < y(antes.at(-1))) fail('al dar vuelta, las filas no terminaron en su lugar');
+  data.lista = `${keys()} (4 filas, mismos nodos)`;
+
+  // 4e. El menú contextual: sale con la esquina en el punto del click, con
+  // los items de ESA fila; fuera de una fila no abre nada (ni deja pasar el
+  // de Chromium); desde el teclado sale de la esquina de la fila con el
+  // primero activo, y Escape devuelve el foco.
+  const menusNow = () => [...document.querySelectorAll('.rad-overlays .rad-menu')].filter((m) => m.dataset.state === 'open' && !m.hasAttribute('data-rad-leaving'));
+  const context = (el, init) => {
+    const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, ...init });
+    el.dispatchEvent(ev);
+    return ev;
+  };
+  list.scrollIntoView({ block: 'center' });
+  await sleep(120);
+  const target = rowsOf()[1];
+  const box = target.getBoundingClientRect();
+  const pt = { x: Math.round(box.left + 40), y: Math.round(box.top + 10) };
+  const ev1 = context(target, { button: 2, clientX: pt.x, clientY: pt.y });
+  await frame();
+  const ctx = menusNow()[0];
+  if (!ev1.defaultPrevented) fail('el click derecho dejó pasar el menú de Chromium');
+  if (!ctx) fail('el menú contextual no abrió');
+  else {
+    if (parseFloat(ctx.style.left) !== pt.x || parseFloat(ctx.style.top) !== pt.y) fail(`el menú contextual salió en (${ctx.style.left}, ${ctx.style.top}), el click fue en (${pt.x}, ${pt.y})`);
+    const labels = [...ctx.querySelectorAll('.rad-menu-label')].map((l) => l.textContent).join(' / ');
+    if (labels !== 'Subir al principio / Quitar') fail(`el menú contextual trae: ${labels}`);
+    if (ctx.querySelector('.rad-menu-item.is-active')) fail('con el mouse, el menú contextual abrió con un item ya activo');
+    ctx.querySelector('.rad-menu-item').click();
+    await settle();
+    if (rowsOf()[0] !== target) fail('elegir «Subir al principio» no subió esa fila (o la rehízo)');
+    if (ctx.isConnected) fail('el menú contextual quedó en el DOM');
+    data.contextual = `en (${pt.x}, ${pt.y}): ${labels}`;
+  }
+  const ev2 = context(list, { button: 2, clientX: 5, clientY: 5 });
+  await frame();
+  if (!ev2.defaultPrevented || menusNow().length) fail('el click derecho fuera de una fila abrió un menú o dejó pasar el de Chromium');
+  const kbRow = rowsOf()[2];
+  kbRow.focus();
+  context(kbRow, { button: 0 });
+  await frame();
+  const km = menusNow()[0];
+  if (!km) fail('el menú contextual no abrió desde el teclado');
+  else {
+    // Junto a la fila, como de un ancla: abajo, o arriba si abajo no entra.
+    const kb = kbRow.getBoundingClientRect();
+    const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--rad-space-1'));
+    const wantTop = km.dataset.side === 'top' ? kb.top - gap - km.offsetHeight : kb.bottom + gap;
+    if (Math.abs(parseFloat(km.style.left) - kb.left) > 1 || Math.abs(parseFloat(km.style.top) - wantTop) > 1) fail(`desde el teclado el menú salió en (${km.style.left}, ${km.style.top}) hacia ${km.dataset.side}; junto a la fila era (${r2(kb.left)}, ${r2(wantTop)})`);
+    if (!km.querySelector('.rad-menu-item.is-active')) fail('desde el teclado el menú contextual abrió sin item activo');
+    await sleep(dur('base') + 80);
+    km.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await sleep(dur('base') + 160);
+    if (km.isConnected) fail('el menú contextual abierto con el teclado quedó en el DOM');
+    if (document.activeElement !== kbRow) fail('al cerrar el menú contextual el foco no volvió a la fila');
+  }
+}
+
 // 5. Cada vista conserva su scroll.
 item('texto').click();
 await sleep(300);

@@ -14,6 +14,7 @@ const { Store, adopt } = require(path.join(ROOT, 'packages', 'core', 'main', 'st
 const failures = [];
 const check = (ok, msg) => { if (!ok) failures.push(msg); };
 const fresh = () => fs.mkdtempSync(path.join(os.tmpdir(), 'rad-store-'));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const leftovers = (dir) => fs.readdirSync(dir).filter((f) => f.endsWith('.tmp'));
 const onDisk = (dir, name) => {
   try { return JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), 'utf8')); } catch { return {}; }
@@ -136,9 +137,40 @@ const onDisk = (dir, name) => {
   check(adopt(path.join(base, 'NoExiste', 'data'), nada) === false && !fs.existsSync(nada), 'adoptar: sin carpeta vieja creó algo');
 }
 
+// 9. Borrar un documento: se van el archivo y su .bak, leerlo da undefined,
+//    un guardado que estaba pendiente no lo resucita, uno que venía en vuelo
+//    tampoco, y después se puede volver a crear.
+{
+  const dir = fresh();
+  const s = new Store(dir, { debounceMs: 20 });
+  await s.write('chat', { v: 1 });
+  await s.write('chat', { v: 2 });
+  const pendiente = s.write('chat', { v: 3 }); // todavía en el debounce
+  await s.remove('chat');
+  await pendiente;
+  await sleep(60);
+  const quedan = () => fs.readdirSync(dir).filter((f) => f.startsWith('chat'));
+  check(quedan().length === 0, `borrar: quedaron archivos: ${quedan().join(', ')}`);
+  check(s.read('chat') === undefined, 'borrar: leerlo después no dio undefined');
+
+  const enVuelo = s.write('chat', { v: 4 });
+  s.flush('chat'); // ya salió a escribirse
+  await s.remove('chat');
+  await enVuelo.catch(() => {});
+  await s.flushAll();
+  check(quedan().length === 0, `borrar con una escritura en vuelo: quedaron archivos: ${quedan().join(', ')}`);
+
+  await s.write('chat', { v: 5 });
+  await s.flushAll();
+  check(onDisk(dir, 'chat').v === 5, 'borrar: no se pudo volver a crear el documento');
+  let threw = false;
+  try { s.remove('../fuera'); } catch { threw = true; }
+  check(threw, 'borrar: aceptó un nombre inválido');
+}
+
 if (failures.length) {
   console.error(`test-store: ${failures.length} falla(s)`);
   for (const f of failures) console.error('  ' + f);
   process.exit(1);
 }
-console.log('test-store: ok (ráfaga, recuperación, .bak, reintentos, nombres, adoptar)');
+console.log('test-store: ok (ráfaga, recuperación, .bak, reintentos, nombres, adoptar, borrar)');

@@ -141,8 +141,9 @@ function send(channel, payload) {
   }
 }
 
-// El store desde el renderer. Los documentos con _ son del núcleo (el lugar
-// de la ventana): el renderer no los toca.
+// El store desde el renderer. Los documentos con _ son del proceso principal:
+// el núcleo guarda ahí el lugar de la ventana (_window) y una app, lo que el
+// renderer no tiene que ver (una llave cifrada). El renderer no los toca.
 function wireStoreIpc() {
   const userName = (name) => {
     if (typeof name !== 'string' || name.startsWith('_')) throw new Error(`[rad] documento reservado o inválido: ${JSON.stringify(name)}`);
@@ -156,6 +157,7 @@ function wireStoreIpc() {
       console.warn(`[rad:store] ${err.message}`);
     }
   });
+  ipcMain.handle('rad:store:remove', (_e, name) => getStore().remove(userName(name)));
 }
 
 // Al salir, lo pendiente baja al disco antes de que el proceso termine.
