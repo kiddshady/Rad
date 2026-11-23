@@ -1,5 +1,11 @@
 # Changelog
 
+## Rad Vitrina 0.10.1 (2026-11-23)
+
+- Sale con @rad/skin-mono 0.1.2: los colores de estado a pleno, el rojo
+  hondo en cerrar y en el botón destructivo, y el halo de color en los
+  puntos de los toasts.
+
 ## @rad/skin-mono 0.1.2 (2026-11-23)
 
 - **El halo de los puntos de un toast, de su color.** El de «sin tipo» es

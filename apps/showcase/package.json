@@ -1,7 +1,7 @@
 {
   "name": "rad-showcase",
   "productName": "Rad Vitrina",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "private": true,
   "description": "La vitrina de Rad: todos los tokens y componentes con la piel activa, para probar.",
   "author": "Kidd Shady · Umbrovex Systems",
