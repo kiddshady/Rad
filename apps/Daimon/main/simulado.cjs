@@ -72,4 +72,18 @@ async function responder(pedido, { signal, onTexto, onPensando }) {
   return { motivo: 'fin', modelo: pedido.modelo, uso: { entrada: 0, salida } };
 }
 
-module.exports = { responder, VENICE };
+// La comprobación de una llave, de mentira: tarda un rato (para que se vea
+// «comprobando») y contesta según lo que diga el texto de la llave, así el
+// humo recorre cada resultado sin tocar la red. Cualquier otra, la acepta.
+const COMPROBAR_MS = 420;
+async function comprobarLlave(key) {
+  await new Promise((r) => setTimeout(r, COMPROBAR_MS));
+  if (key.includes('sin-workspace')) {
+    return { fase: 'rechazada', motivo: 'sin-workspace', detalle: 'This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use. Add the header, or use an API key that is scoped to a workspace.' };
+  }
+  if (key.includes('vencida')) return { fase: 'rechazada', motivo: 'invalida', detalle: 'invalid x-api-key' };
+  if (key.includes('sin-conexion')) return { fase: 'sin-comprobar', motivo: 'conexion' };
+  return { fase: 'aceptada' };
+}
+
+module.exports = { responder, comprobarLlave, VENICE };

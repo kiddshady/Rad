@@ -75,12 +75,32 @@ async function venice(req, res, json) {
   res.end();
 }
 
+// GET /v1/models: el pedido gratis con el que se comprueba una llave.
+const SIN_WORKSPACE = 'This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use. Add the header, or use an API key that is scoped to a workspace.';
+function modelosDeAnthropic(res) {
+  const fallos = {
+    401: ['authentication_error', 'invalid x-api-key'],
+    400: ['invalid_request_error', SIN_WORKSPACE],
+    403: ['permission_error', 'Your API key does not have permission to use the specified resource.'],
+    500: ['api_error', 'Internal server error'],
+  };
+  const fallo = fallos[mode];
+  if (fallo) {
+    res.writeHead(Number(mode), { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ type: 'error', error: { type: fallo[0], message: fallo[1] } }));
+    return;
+  }
+  res.writeHead(200, { 'content-type': 'application/json' });
+  res.end(JSON.stringify({ data: [{ id: 'claude-opus-5-5', type: 'model', display_name: 'Claude Opus 5.5', created_at: '2026-01-01T00:00:00Z' }], has_more: false, first_id: 'claude-opus-5-5', last_id: 'claude-opus-5-5' }));
+}
+
 const server = http.createServer((req, res) => {
   let body = '';
   req.on('data', (c) => { body += c; });
   req.on('end', async () => {
     const json = JSON.parse(body || '{}');
     seen.push({ url: req.url, headers: req.headers, body: json });
+    if (req.url.startsWith('/v1/models')) { modelosDeAnthropic(res); return; }
     if (!req.url.startsWith('/v1/messages')) { venice(req, res, json); return; }
     if (mode === '401') {
       res.writeHead(401, { 'content-type': 'application/json' });
@@ -118,7 +138,7 @@ process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${server.address().port}`;
 process.env.VENICE_BASE_URL = `http://127.0.0.1:${server.address().port}`;
 delete process.env.ANTHROPIC_API_KEY;
 delete process.env.ANTHROPIC_AUTH_TOKEN;
-const { responder, MODELOS, MODELO_INICIAL } = require(path.join(ROOT, 'apps', 'Daimon', 'main', 'anthropic.cjs'));
+const { responder, comprobar, MODELOS, MODELO_INICIAL } = require(path.join(ROOT, 'apps', 'Daimon', 'main', 'anthropic.cjs'));
 const deVenice = require(path.join(ROOT, 'apps', 'Daimon', 'main', 'venice.cjs'));
 const KEY_VENICE = 'venice-prueba-del-proveedor-no-es-una-llave';
 
@@ -216,8 +236,40 @@ const correr = async (p, { abortAfter, con = responder, key = KEY } = {}) => {
   check(![a.err?.message, b.err?.message].some((m) => m?.includes(KEY)), 'errores: el mensaje trae la llave');
 }
 
+// 6b. Comprobar una llave: se le pregunta a la API con un pedido que no gasta
+//     nada (listar un modelo), y lo que decide es lo que la API contesta, no
+//     cómo empieza la llave. Una llave «de usuario» que la API acepta, sirve.
+{
+  mode = 'ok';
+  const antes = seen.length;
+  for (const key of [KEY, 'sk-ant-usr01-prueba-del-proveedor-no-es-una-llave', 'cualquier-cosa-que-la-api-acepte-0000']) {
+    const r = await comprobar(key);
+    check(r.fase === 'aceptada', `comprobar: una llave que la API acepta (${key.slice(0, 10)}…) salió ${JSON.stringify(r)}`);
+  }
+  const pedidos = seen.slice(antes);
+  check(pedidos.every((p) => p.url.startsWith('/v1/models') && p.url.includes('limit=1')), `comprobar: pidió ${pedidos.map((p) => p.url).join(', ')}`);
+  check(!seen.slice(antes).some((p) => p.url.startsWith('/v1/messages')), 'comprobar: mandó un mensaje (eso gasta créditos)');
+
+  mode = '401';
+  const a = await comprobar(KEY);
+  check(a.fase === 'rechazada' && a.motivo === 'invalida', `comprobar 401: ${JSON.stringify(a)}`);
+  mode = '400';
+  const b = await comprobar(KEY);
+  check(b.fase === 'rechazada' && b.motivo === 'sin-workspace' && b.detalle === SIN_WORKSPACE, `comprobar 400: ${JSON.stringify(b)}`);
+  mode = '403';
+  const c = await comprobar(KEY);
+  check(c.fase === 'rechazada' && c.motivo === 'sin-permiso', `comprobar 403: ${JSON.stringify(c)}`);
+  // Que la API ande mal no es un rechazo de la llave, y no se reintenta solo.
+  mode = '500';
+  const veces = seen.length;
+  const d = await comprobar(KEY);
+  check(d.fase === 'sin-comprobar' && d.motivo === 'servicio', `comprobar 500: ${JSON.stringify(d)}`);
+  check(seen.length - veces === 1, `comprobar 500: hizo ${seen.length - veces} pedidos`);
+  check(![a, b, c, d].some((x) => JSON.stringify(x).includes(KEY)), 'comprobar: el resultado trae la llave');
+}
+
 // ---------- Venice ----------
-const aVenice = { con: deVenice.responder, key: KEY_VENICE };
+const aVenice ={ con: deVenice.responder, key: KEY_VENICE };
 
 // 7. Un pedido normal a Venice: el texto llega en orden aunque los eventos
 //    vengan partidos, lo que el modelo piensa no se mezcla con la respuesta,
@@ -295,6 +347,9 @@ const aVenice = { con: deVenice.responder, key: KEY_VENICE };
   check(c.err?.message.startsWith('No se pudo conectar con Anthropic'), `sin red: el error dice «${c.err?.message}»`);
   const v = await correr(pedido('alfa-2'), aVenice);
   check(v.err?.message.startsWith('No se pudo conectar con Venice'), `venice, sin red: el error dice «${v.err?.message}»`);
+  // Sin conexión, de una llave no se sabe nada: no es un rechazo.
+  const k = await comprobar(KEY);
+  check(k.fase === 'sin-comprobar' && k.motivo === 'conexion', `comprobar sin red: ${JSON.stringify(k)}`);
 }
 
 if (failures.length) {
@@ -302,4 +357,4 @@ if (failures.length) {
   for (const f of failures) console.error('  ' + f);
   process.exit(1);
 }
-console.log('test-daimon-provider: ok (Anthropic y Venice: pedido, streaming, modelos, frenar, rechazo, largo, errores)');
+console.log('test-daimon-provider: ok (Anthropic y Venice: pedido, streaming, modelos, frenar, rechazo, largo, errores, comprobar la llave)');

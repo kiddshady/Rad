@@ -24,10 +24,10 @@ const electron = require('electron');
 const SMOKE = path.join(ROOT, '.smoke');
 const SCRIPT = path.join(ROOT, 'tools', 'smoke-daimon.js');
 const TIMEOUT_MS = 90000;
-// Las mismas que escribe el guion en Ajustes, una por proveedor. No son
+// Todas las llaves que escribe el guion en Ajustes llevan esta marca. No son
 // llaves: son textos con su forma, para comprobar que lo que se guarda no
 // queda en claro.
-const LLAVES_DE_PRUEBA = ['sk-ant-api03-humo-de-daimon-no-es-una-llave-0000', 'venice-humo-de-daimon-no-es-una-llave-1111'];
+const MARCA_DE_LLAVE = 'no-es-una-llave';
 
 const exeArg = process.argv.indexOf('--exe');
 const EXE = exeArg > 0 ? path.resolve(process.argv[exeArg + 1]) : null;
@@ -87,7 +87,7 @@ function checkDisk(data, report) {
   const files = fs.readdirSync(dir);
   for (const f of files) {
     const text = fs.readFileSync(path.join(dir, f), 'utf8');
-    if (LLAVES_DE_PRUEBA.some((k) => text.includes(k))) failures.push(`una llave quedó en claro en ${f}`);
+    if (text.includes(MARCA_DE_LLAVE)) failures.push(`una llave quedó en claro en ${f}`);
   }
   for (const doc of ['_llave.json', '_llave_venice.json']) {
     if (!files.includes(doc)) failures.push(`una llave no se guardó (falta ${doc})`);

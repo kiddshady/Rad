@@ -88,6 +88,11 @@ if (marker?.pass === 1) {
   // El agente de Venice volvió con su proveedor y su modelo.
   const oraculo = agentes.find((a) => a.nombre === 'Oráculo');
   if (oraculo?.proveedor !== 'venice' || oraculo?.modelo !== 'kimi-k3') fail(`el agente de Venice volvió como ${JSON.stringify(oraculo)}`);
+  await go('ajustes');
+  const estadoLlave = view('ajustes').querySelector('[data-proveedor="anthropic"] .dm-estado');
+  await until(() => estadoLlave.dataset.comprobacion === 'aceptada', 3000);
+  if (estadoLlave.dataset.comprobacion !== 'aceptada' || estadoLlave.dataset.tono !== 'success') fail(`al reabrir, la llave de Anthropic figura como ${estadoLlave.dataset.comprobacion}`);
+  await go('chat');
   // Lo último de la pasada 1 se escribió justo antes de cerrar.
   if ((await window.rad.store.read('ultimo'))?.ok !== true) fail('lo que se guardó justo antes de cerrar se perdió');
 
@@ -359,31 +364,103 @@ else {
   if (shown(chatView.querySelector('.dm-conv-titulo')) !== 'Dolor de cabeza') fail('el título de la conversación no tomó el nombre nuevo');
 }
 
-// 10. La llave de Anthropic: no acepta cualquier cosa, y la que guarda no
-// queda a la vista ni al alcance del renderer.
+// 10. La llave de Anthropic. Que esté guardada no quiere decir que sirva:
+// Daimon le pregunta a la API (acá a la simulada, que contesta según el texto
+// de la llave) y dice lo que la API contestó, no lo que parece por cómo
+// empieza. Y la que guarda no queda a la vista ni al alcance del renderer.
 await go('ajustes');
 const aj = view('ajustes').querySelector('[data-proveedor="anthropic"]');
 const estado = aj.querySelector('.dm-estado');
 const llaveIn = aj.querySelector('[data-campo="llave"]');
 const guardar = aj.querySelector('[data-accion="guardar-llave"]');
+const dice = () => shown(estado.querySelector('.dm-estado-texto'));
+const anillo = () => [...aj.querySelectorAll(':scope > .rad-busy')].find((r) => !r.hasAttribute('data-rad-leaving') && r.dataset.state !== 'closing');
+const detalle = aj.querySelector('.dm-estado-detalle');
+// Mira un rato si en algún momento se puso a comprobar.
+const seComprobo = async (ms) => {
+  let visto = false;
+  await until(() => { visto ||= estado.dataset.comprobacion === 'comprobando'; return false; }, ms);
+  return visto;
+};
+// Guarda una llave y sigue la comprobación hasta que la API contesta.
+// Devuelve lo que se vio mientras tanto.
+const guardarLlave = async (valor) => {
+  type(llaveIn, valor);
+  guardar.click();
+  const visto = { comprobando: false, anillo: false, verde: false };
+  await until(() => estado.dataset.comprobacion === 'comprobando', 2500);
+  if (estado.dataset.comprobacion === 'comprobando') {
+    visto.comprobando = true;
+    await frame();
+    visto.anillo = Boolean(anillo());
+    visto.verde = estado.dataset.tono === 'success';
+  }
+  await until(() => estado.dataset.comprobacion !== 'comprobando', 4000);
+  await settle();
+  return visto;
+};
+
 if (estado.dataset.llave !== 'falta') fail(`sin llave, Ajustes dice ${estado.dataset.llave}`);
 if (!aj.querySelector('[data-accion="quitar-llave"]').disabled) fail('sin llave, se ofrece quitarla');
 type(llaveIn, 'hola');
 guardar.click();
 await sleep(dur('base') + 200);
 if (!llaveIn.closest('.rad-field').hasAttribute('data-invalid') || estado.dataset.llave !== 'falta') fail('Ajustes aceptó algo que no es una llave');
-type(llaveIn, LLAVE);
-guardar.click();
-await until(() => estado.dataset.llave === 'lista', 3000);
-await settle();
-if (estado.dataset.llave !== 'lista' || estado.dataset.tono !== 'success') fail(`después de guardar, la llave figura como ${estado.dataset.llave}`);
-if (!shown(estado.querySelector('.dm-estado-texto')).endsWith('sk-ant-api…0000')) fail(`el estado de la llave dice «${shown(estado.querySelector('.dm-estado-texto'))}»`);
+
+// Una que la API acepta. Mientras pregunta no la da por buena: lo dice, y la
+// tarjeta trabaja (el anillo de carga).
+const primera = await guardarLlave(LLAVE);
+if (!primera.comprobando || !primera.anillo) fail(`al guardar la llave no se vio que la estuviera comprobando (${JSON.stringify(primera)})`);
+if (primera.verde) fail('dio la llave por buena antes de que la API contestara');
+if (estado.dataset.comprobacion !== 'aceptada' || estado.dataset.tono !== 'success') fail(`una llave que la API acepta figura como ${estado.dataset.comprobacion} (${estado.dataset.tono})`);
+if (!dice().startsWith('Anthropic la acepta') || !dice().endsWith('sk-ant-api…0000')) fail(`el estado de la llave dice «${dice()}»`);
 if (llaveIn.value !== '') fail('el campo de la llave no se vació al guardar');
-if (document.documentElement.outerHTML.includes(LLAVE)) fail('la llave quedó escrita en la página');
+await sleep(dur('slow') + 260);
+if (aj.querySelector(':scope > .rad-busy') || aj.hasAttribute('aria-busy')) fail('el anillo de carga quedó en la tarjeta después de comprobar');
+if (detalle.getBoundingClientRect().height > 1) fail('con la llave aceptada quedó abierto el renglón de lo que dijo la API');
+
+// La que le pasó a Fran: una llave «de usuario» (por cómo empieza) que la API
+// acepta. Sirve, y Daimon no puede decir otra cosa.
+await guardarLlave('sk-ant-usr01-humo-de-daimon-no-es-una-llave-0000');
+if (estado.dataset.comprobacion !== 'aceptada' || estado.dataset.tono !== 'success' || /usuario|rechaza/.test(dice())) fail(`una llave de usuario que la API acepta figura como «${dice()}»`);
+
+// Una que no está atada a un workspace: la API la rechaza, y se ve el motivo
+// de verdad, con lo que dijo la API.
+await guardarLlave('sk-ant-api03-humo-sin-workspace-no-es-una-llave-0000');
+if (estado.dataset.comprobacion !== 'rechazada' || estado.dataset.motivo !== 'sin-workspace' || estado.dataset.tono !== 'danger') fail(`una llave sin workspace figura como ${estado.dataset.comprobacion} / ${estado.dataset.motivo} (${estado.dataset.tono})`);
+if (!dice().includes('no está atada a un workspace')) fail(`de una llave sin workspace dice «${dice()}»`);
+await sleep(dur('base') + 120);
+if (detalle.getBoundingClientRect().height < 10 || !shown(detalle.querySelector('.dm-estado-detalle-texto')).includes('anthropic-workspace-id')) fail('no se ve lo que dijo la API al rechazar la llave');
+data.llaveRechazada = dice();
+
+// Sin conexión no se sabe nada: no es un rechazo. Se puede volver a
+// comprobar con su botón, y al volver a Ajustes se pregunta de nuevo sola.
+await guardarLlave('sk-ant-api03-humo-sin-conexion-no-es-una-llave-0000');
+if (estado.dataset.comprobacion !== 'sin-comprobar' || estado.dataset.tono !== 'warning' || !dice().includes('no se pudo comprobar')) fail(`sin conexión, la llave figura como ${estado.dataset.comprobacion} (${estado.dataset.tono}): «${dice()}»`);
+await sleep(dur('base') + 120);
+if (detalle.getBoundingClientRect().height > 1) fail('el renglón de lo que dijo la API quedó abierto sin nada que mostrar');
+aj.querySelector('[data-accion="comprobar-llave"]').click();
+if (!await seComprobo(700)) fail('«Comprobar de nuevo» no volvió a preguntar');
+await until(() => estado.dataset.comprobacion !== 'comprobando', 3000);
+await go('chat');
+document.querySelector('.rad-rail-item[data-view="ajustes"]').click();
+if (!await seComprobo(700)) fail('al volver a Ajustes no reintentó una comprobación que había quedado sin hacer');
+await until(() => estado.dataset.comprobacion !== 'comprobando', 3000);
+
+// Queda la buena. Lo que la API ya contestó no se vuelve a preguntar cada
+// vez que se abre Ajustes.
+await guardarLlave(LLAVE);
+if (estado.dataset.comprobacion !== 'aceptada') fail(`la última llave figura como ${estado.dataset.comprobacion}`);
+await go('chat');
+document.querySelector('.rad-rail-item[data-view="ajustes"]').click();
+if (await seComprobo(700)) fail('al volver a Ajustes volvió a preguntar por una llave que la API ya había aceptado');
+if (estado.dataset.comprobacion !== 'aceptada') fail('al volver a Ajustes se perdió lo que había contestado la API');
+
+if (/no-es-una-llave/.test(document.documentElement.outerHTML)) fail('una llave quedó escrita en la página');
 let reservado = false;
 try { await window.rad.store.read('_llave'); } catch { reservado = true; }
 if (!reservado) fail('el renderer pudo leer el documento de la llave');
-data.llave = shown(estado.querySelector('.dm-estado-texto'));
+data.llave = dice();
 
 // 11. Venice. Su llave va aparte de la de Anthropic. Un agente con ese
 // proveedor elige entre los modelos de Venice (el select de modelos releva
@@ -398,6 +475,7 @@ await settle();
 if (veEstado.dataset.llave !== 'lista' || !shown(veEstado.querySelector('.dm-estado-texto')).endsWith('…1111')) fail(`la llave de Venice figura como ${veEstado.dataset.llave}: «${shown(veEstado.querySelector('.dm-estado-texto'))}»`);
 if (estado.dataset.llave !== 'lista') fail('guardar la llave de Venice pisó la de Anthropic');
 if (document.documentElement.outerHTML.includes(LLAVE_VENICE)) fail('la llave de Venice quedó escrita en la página');
+if (ve.querySelector('[data-accion="comprobar-llave"]') || veEstado.dataset.comprobacion !== 'sin-pedir') fail('la llave de Venice, que no tiene cómo comprobarse, figura como comprobada');
 
 await go('agentes');
 view('agentes').querySelector('[data-accion="nuevo-agente"]').click();

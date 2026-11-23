@@ -16,7 +16,7 @@ await Promise.all([datos.abrir(), llave.refrescar()]);
 const views = [
   { id: 'chat', label: 'Chat', icon: ICONOS.chat, scroll: false, mount: (el, router) => montarChat(el, { router }) },
   { id: 'agentes', label: 'Agentes', icon: ICONOS.agentes, mount: (el, router) => montarAgentes(el, { router }) },
-  { id: 'ajustes', label: 'Ajustes', icon: ICONOS.ajustes, mount: (el) => montarAjustes(el) },
+  { id: 'ajustes', label: 'Ajustes', icon: ICONOS.ajustes, mount: (el, router) => montarAjustes(el, { router }) },
 ];
 
 const shell = createShell({

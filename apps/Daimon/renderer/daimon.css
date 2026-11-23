@@ -99,8 +99,33 @@
   .dm-estado[data-tono='success'] .dm-estado-punto { background: var(--rad-success); }
   .dm-estado[data-tono='warning'] .dm-estado-punto { background: var(--rad-warning); }
   .dm-estado[data-tono='danger'] .dm-estado-punto { background: var(--rad-danger); }
+  /* Lo que dijo la API de una llave, tal cual: se despliega debajo de la
+     frase cuando hay algo que mostrar. */
+  .dm-estado-detalle {
+    display: grid;
+    grid-template-rows: 0fr;
+    /* Plegado, se come el hueco que le deja la tarjeta. Sin estirarse: un
+       item estirado con margen negativo crece lo que el margen le saca. */
+    align-self: start;
+    margin-top: calc(var(--rad-space-3) * -1);
+    transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out), margin-top var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .dm-estado-detalle[data-abierto] { grid-template-rows: 1fr; margin-top: calc(var(--rad-space-1) * -1); }
+  .dm-estado-detalle-in {
+    min-height: 0;
+    overflow: hidden;
+    padding-inline-start: var(--rad-space-4);
+    font-family: var(--rad-font-mono);
+    font-size: var(--rad-text-xs);
+    color: var(--rad-text-3);
+    opacity: 0;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out);
+  }
+  .dm-estado-detalle[data-abierto] .dm-estado-detalle-in { opacity: 1; transition-delay: calc(var(--rad-dur-fast) / 2); }
   .dm-llave { display: grid; gap: var(--rad-space-3); }
   .dm-llave-acciones { display: flex; justify-content: flex-end; gap: var(--rad-space-2); }
+  /* Un botón callado que no se puede usar se apaga: la piel lo deja igual. */
+  .dm-llave-acciones .rad-button[data-variant='quiet']:disabled { color: var(--rad-text-3); }
   .dm-datos {
     display: grid;
     grid-template-columns: max-content 1fr;

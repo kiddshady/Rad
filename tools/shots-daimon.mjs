@@ -79,7 +79,15 @@ const SCENES = {
     await llave.guardar('anthropic', 'sk-ant-api03-captura-de-daimon-no-es-una-llave-0000');
     await llave.guardar('venice', 'venice-captura-de-daimon-no-es-una-llave-1111');
     await go('ajustes');
-    await sleep(400);`,
+    await sleep(1400);`,
+  'llave-rechazada': `
+    await llave.guardar('anthropic', 'sk-ant-api03-captura-sin-workspace-no-es-una-llave-0000');
+    await go('ajustes');
+    await sleep(1400);`,
+  'llave-comprobando': `
+    await go('ajustes');
+    llave.guardar('anthropic', 'sk-ant-api03-captura-de-daimon-no-es-una-llave-0000');
+    await sleep(330);`,
   'sin-llave': `
     await go('ajustes');
     await sleep(400);`,

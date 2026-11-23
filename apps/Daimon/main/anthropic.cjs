@@ -46,6 +46,41 @@ function explicar(err) {
   return `Algo falló al pedir la respuesta: ${err?.message ?? err}`;
 }
 
+// Cuánto se espera la respuesta al comprobar una llave.
+const COMPROBAR_MS = 10000;
+
+/**
+ * Le pregunta a la API si acepta la llave, con un pedido que no gasta nada
+ * (listar un modelo). El prefijo de una llave no dice si sirve: la Console
+ * crea llaves personales que andan o no según se las haya atado a un
+ * workspace al crearlas, y eso solo lo sabe la API.
+ *
+ * Devuelve { fase, motivo?, detalle? }:
+ *   'aceptada'
+ *   'rechazada'      motivo 'invalida' (401: no existe, se deshabilitó o
+ *                    venció), 'sin-workspace' (400: no está atada a un
+ *                    workspace y el pedido no dice cuál usar) o 'sin-permiso'
+ *                    (403). `detalle` es lo que dijo la API.
+ *   'sin-comprobar'  no se pudo saber (sin conexión, o la API anda mal):
+ *                    NO es un rechazo.
+ * Decide por la clase del error, nunca por su texto.
+ */
+async function comprobar(key) {
+  const client = new Anthropic({ apiKey: key, maxRetries: 0, timeout: COMPROBAR_MS });
+  try {
+    await client.models.list({ limit: 1 });
+    return { fase: 'aceptada' };
+  } catch (err) {
+    const detalle = err?.error?.error?.message ?? '';
+    if (err instanceof Anthropic.AuthenticationError) return { fase: 'rechazada', motivo: 'invalida', detalle };
+    // Un pedido tan simple no puede estar mal armado: un 400 acá es la llave.
+    if (err instanceof Anthropic.BadRequestError) return { fase: 'rechazada', motivo: 'sin-workspace', detalle };
+    if (err instanceof Anthropic.PermissionDeniedError) return { fase: 'rechazada', motivo: 'sin-permiso', detalle };
+    if (err instanceof Anthropic.APIConnectionError) return { fase: 'sin-comprobar', motivo: 'conexion' };
+    return { fase: 'sin-comprobar', motivo: 'servicio', detalle };
+  }
+}
+
 async function responder({ modelo, instrucciones, mensajes }, { key, signal, onTexto, onPensando }) {
   const info = MODELOS.find((m) => m.id === modelo);
   const client = new Anthropic({ apiKey: key });
@@ -78,4 +113,4 @@ async function responder({ modelo, instrucciones, mensajes }, { key, signal, onT
   }
 }
 
-module.exports = { responder, MODELOS, MODELO_INICIAL };
+module.exports = { responder, comprobar, MODELOS, MODELO_INICIAL };

@@ -1,5 +1,34 @@
 # Changelog
 
+## Daimon 0.1.1 (2026-11-23)
+
+- **La llave de Anthropic se comprueba contra la API, no se adivina.** La
+  0.1.0 avisaba «es una llave de usuario: la API la rechaza» mirando cómo
+  empezaba la llave, y era falso: la Console crea llaves personales que
+  sirven si se las ata a un workspace al crearlas. Fran creó una así, la
+  guardó y el aviso seguía. Ahora Daimon le pregunta a la API si la acepta,
+  con un pedido que no gasta nada (listar un modelo), al guardarla y al abrir
+  Ajustes:
+  - mientras pregunta lo dice, la tarjeta muestra el anillo de carga y la
+    llave todavía no figura como buena;
+  - si la API la acepta, lo dice (y recién ahí el punto va en verde);
+  - si la rechaza, dice por qué según lo que contestó la API: no es válida,
+    se deshabilitó o venció (401); no está atada a un workspace (400), con la
+    indicación de elegirlo al crearla; o no tiene permiso (403). Debajo va lo
+    que dijo la API, tal cual;
+  - si no se pudo comprobar (sin conexión, o la API anda mal), lo dice sin
+    darla por mala, y hay un botón para comprobar de nuevo.
+  Lo que la API ya contestó queda en memoria por llave (por su huella, nunca
+  la llave) y no se vuelve a preguntar cada vez que se abre Ajustes.
+- Ya no se rechaza al pegar lo que no empieza con `sk-ant-`: alcanza con que
+  sea un texto largo y sin espacios. Si sirve o no, lo dice la API.
+- La llave de Venice no se comprueba: su lista de modelos no pide llave, así
+  que no hay un pedido gratis que la pruebe. Figura como guardada.
+- El humo recorre cada resultado contra el proveedor simulado (incluida la
+  llave «de usuario» que la API acepta, y falla si vuelve el aviso viejo), y
+  `test-daimon-provider` prueba la comprobación de verdad contra el servidor
+  local: qué pide, qué decide con cada respuesta y que nunca manda un mensaje.
+
 ## Daimon 0.1.0 (2026-11-23)
 
 La primera app permanente hecha con Rad (`apps/Daimon`): un chat con IA
