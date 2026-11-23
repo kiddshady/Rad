@@ -1,0 +1,48 @@
+{
+  "name": "daimon",
+  "productName": "Daimon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Daimon: un chat con IA y varios agentes, cada uno con su proveedor, su modelo, sus instrucciones y sus chats.",
+  "author": "Kidd Shady · Umbrovex Systems",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "icon": "node scripts/icon.mjs",
+    "pack": "electron-builder --win dir --publish never",
+    "build": "electron-builder --win --publish never"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.12.0",
+    "@rad/core": "*",
+    "@rad/skin-mono": "*"
+  },
+  "build": {
+    "appId": "com.umbrovex.daimon",
+    "productName": "Daimon",
+    "copyright": "Copyright © 2026 Kidd Shady · Umbrovex Systems",
+    "electronVersion": "44.10.1",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "main/**/*",
+      "renderer/**/*",
+      "build/icon.ico",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Daimon-Setup-${version}.${ext}"
+    }
+  }
+}

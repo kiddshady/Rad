@@ -9,13 +9,18 @@
   ],
   "scripts": {
     "showcase": "npm start -w rad-showcase",
+    "daimon": "npm start -w daimon",
     "verify": "node tools/verify-core.mjs && node tools/verify-skins.mjs",
-    "test": "node tools/test-store.mjs",
-    "smoke": "node tools/smoke.mjs",
+    "test": "node tools/test-store.mjs && node tools/test-daimon-provider.mjs",
+    "smoke": "node tools/smoke.mjs && node tools/smoke-daimon.mjs",
+    "smoke:daimon": "node tools/smoke-daimon.mjs",
     "shots": "node tools/shots.mjs",
+    "shots:daimon": "node tools/shots-daimon.mjs",
     "check": "npm run verify && npm run test && npm run smoke",
     "pack": "npm run pack -w rad-showcase",
     "smoke:pack": "node tools/smoke.mjs --exe \"apps/showcase/dist/win-unpacked/Rad.exe\"",
+    "pack:daimon": "npm run pack -w daimon",
+    "smoke:pack:daimon": "node tools/smoke-daimon.mjs --exe \"apps/Daimon/dist/win-unpacked/Daimon.exe\"",
     "build": "npm run build -w rad-showcase"
   },
   "devDependencies": {

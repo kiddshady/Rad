@@ -1,5 +1,57 @@
 # Changelog
 
+## Daimon 0.1.0 (2026-11-23)
+
+La primera app permanente hecha con Rad (`apps/Daimon`): un chat con IA
+donde se arman varios agentes. Es un prototipo angosto, para ver si la idea
+convence antes de invertirle más.
+
+- **Agentes.** Cada uno tiene su nombre, su proveedor, su modelo y sus
+  instrucciones, y sus propios chats. Se crean, se editan y se borran (el último no: siempre hay
+  con quién hablar). Arranca con uno, para escribir sin armar nada.
+- **Chats.** Se crean, se renombran y se borran, desde el botón de cada fila
+  o con click derecho. Borrar pide confirmación. El título sale del primer
+  mensaje hasta que se lo renombra.
+- **La conversación.** La respuesta llega de a poco y se puede frenar; lo que
+  había llegado queda. Markdown básico (títulos, negrita, cursiva, listas,
+  citas, tablas, links y bloques de código con su botón de copiar), armado
+  nodo por nodo: lo que escribe el modelo nunca se interpreta como HTML, y
+  mientras llega solo se toca el bloque que cambió. Todo el texto se puede
+  seleccionar. Enter manda, Shift+Enter baja de renglón.
+- **Solo conversa:** sin herramientas. El pedido va en el proceso principal y
+  el texto llega al renderer de a poco, por el puente.
+- **Dos proveedores, y cada agente elige el suyo.**
+  - *Anthropic* (Opus 5.5, Sonnet 5.5, Haiku 5.5 y Fable 5.2), con el SDK
+    oficial. Si el modelo declina, la API reintenta sola con otro
+    (`fallbacks`), menos en Haiku, que no lo tiene.
+  - *Venice*, a pedido de Fran, que tiene tokens ahí. Su API es compatible
+    con la de OpenAI y se habla con `fetch`, sin dependencia nueva. La lista
+    de modelos no está escrita: se le pide a Venice al guardar la llave y se
+    vuelve a pedir cada unas horas (sin llave de Venice, Daimon no llama a
+    nadie). El pedido apaga el system prompt que Venice antepone por su
+    cuenta, así las instrucciones del agente son las únicas.
+  - En el formulario del agente, cada proveedor tiene su select de modelos y
+    los dos se relevan en la misma celda.
+- **Las llaves,** una por proveedor, se pegan en Ajustes y se guardan
+  cifradas con `safeStorage`, en documentos que el renderer no puede leer.
+  Nunca quedan en claro: al renderer le llega una pista para reconocerlas. Si
+  una no se puede descifrar, dice que hay que pegarla de nuevo en vez de
+  darla por buena, y avisa si lo que se pegó es una llave de usuario de
+  Anthropic (`sk-ant-usr`), que la API rechaza. Si al agente abierto le falta
+  la llave de su proveedor, el chat lo dice arriba del campo para escribir.
+- Un documento por chat: abrir la app no lee todas las conversaciones.
+- Piel mono, fija. Sin actualizaciones hasta que tenga su repo de releases.
+  El ícono es provisorio.
+- **Pruebas, sin gastar un token.** El humo (`tools/smoke-daimon.mjs`) corre
+  contra un proveedor simulado y mide: crear y editar un agente, crear un
+  chat, mandar un mensaje, ver llegar la respuesta de a poco, frenarla,
+  cambiar de chat, borrar uno mientras contesta, renombrar, guardar las dos
+  llaves (y que no queden en claro en el disco), un agente de Venice con su
+  modelo, y que todo siga ahí al reabrir. `tools/test-daimon-provider.mjs`
+  prueba los dos proveedores de verdad contra un servidor local que habla el
+  protocolo de cada API: qué mandan, cómo leen el streaming (con los eventos
+  partidos), cómo frenan y qué dicen cuando algo falla.
+
 ## @rad/core 0.12.0 · Rad 0.12.0 (2026-11-23)
 
 Tres piezas que pidió la primera app de verdad. Ninguna cambia una API que

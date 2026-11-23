@@ -20,6 +20,7 @@ packages/skin-classic   @rad/skin-classic: la piel neutral
 packages/skin-glass     @rad/skin-glass: la piel de vidrio
 packages/skin-mono      @rad/skin-mono: glass sin color (hereda de glass)
 apps/showcase           la vitrina: todos los tokens con la piel activa
+apps/Daimon             Daimon: un chat con IA y varios agentes (piel mono)
 tools/                  verificadores, humo y capturas
 ```
 
@@ -357,12 +358,21 @@ texto nunca cambia de forma ya a la vista.
 ```
 npm install
 npm run showcase   abre la vitrina
+npm run daimon     abre Daimon
 npm run verify     el núcleo sin estilo y cada piel contra el contrato
-npm run test       el guardado, con node pelado
-npm run smoke      abre la vitrina dos veces por piel, mide lo que se ve y lo que sobrevive
+npm run test       el guardado y el proveedor de Daimon, con node pelado
+npm run smoke      abre la vitrina dos veces por piel y Daimon dos veces, mide lo que se ve y lo que sobrevive
 npm run check      verify + test + smoke
 npm run shots      capturas de la vitrina con una piel, para diseñarla
+npm run shots:daimon   capturas de Daimon con datos de mentira
 ```
+
+El humo de cada app es su propio guion (`tools/smoke-showcase.js`,
+`tools/smoke-daimon.js`), que corre adentro de la página. El de Daimon usa un
+proveedor simulado (`DAIMON_PROVEEDOR=simulado`): contesta en streaming sin
+tocar la red. Y `test-daimon-provider` prueba los proveedores de verdad
+(Anthropic y Venice) contra un servidor local que habla el protocolo de cada
+API. Ninguno gasta un token.
 
 El humo no puede ver el flash del compositor al arrancar: no sale en ninguna
 captura. Ese se juzga a ojo, en vivo y en frío.
@@ -378,7 +388,27 @@ asar como dependencias normales.
 npm run pack         la vitrina sin instalador (dist/win-unpacked), para probar
 npm run smoke:pack   el humo entero contra la vitrina empaquetada
 npm run build        el instalador (dist/Rad-Setup-<versión>.exe)
+npm run pack:daimon         lo mismo para Daimon
+npm run smoke:pack:daimon   su humo contra la empaquetada
 ```
+
+## Daimon
+
+La primera app hecha con Rad: un chat con IA donde se arman varios agentes,
+cada uno con su nombre, su proveedor y su modelo, sus instrucciones y sus
+propios chats. Por ahora conversa y nada más (sin herramientas), con los
+modelos de Anthropic y los de Venice.
+
+- Las llaves de las APIs (una por proveedor) se pegan en Ajustes y se guardan
+  cifradas con `safeStorage`, en documentos que el renderer no puede leer.
+  Nunca quedan en claro.
+- La llamada al modelo va en el proceso principal (`apps/Daimon/main/`) y el
+  texto llega al renderer de a poco por el puente. Anthropic va con su SDK;
+  Venice, con `fetch` (su API es compatible con la de OpenAI) y con la lista
+  de modelos pedida a Venice, no escrita a mano.
+- Los datos son del store del núcleo: un documento con los agentes, otro con
+  el índice de chats y uno por chat.
+- El ícono es provisorio.
 
 ### Publicar y actualizar
 

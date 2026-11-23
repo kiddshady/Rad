@@ -1,0 +1,508 @@
+/* Daimon. Capa app: le gana al núcleo y a la piel. Solo tokens del contrato:
+   ni un color ni una duración a mano, así una piel distinta lo viste sin
+   tocar una línea. Las vistas viven sobre la hoja del escenario, que puede
+   ser un velo: nada de acá cuenta con que una superficie tape. */
+@layer app {
+  /* ---------- Páginas (Agentes, Ajustes) ---------- */
+
+  .dm-pagina {
+    max-width: 760px;
+    margin: 0 auto;
+    padding-inline: var(--rad-space-6);
+    display: grid;
+    gap: var(--rad-space-5);
+  }
+  .dm-pagina-cabeza {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--rad-space-4);
+  }
+  .dm-pagina-cabeza h1 {
+    font-family: var(--rad-font-display);
+    font-size: var(--rad-text-xl);
+    font-weight: var(--rad-weight-strong);
+  }
+  .dm-pagina-cabeza p { color: var(--rad-text-2); margin-top: var(--rad-space-1); }
+
+  .dm-tarjeta {
+    display: grid;
+    gap: var(--rad-space-3);
+    padding: var(--rad-space-4);
+    border-radius: var(--rad-radius-l);
+    background: var(--rad-surface-2);
+    box-shadow: var(--rad-shadow-1);
+  }
+  .dm-tarjeta-cabeza { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--rad-space-3); }
+  .dm-tarjeta-titulo { display: grid; gap: 2px; min-width: 0; }
+  .dm-tarjeta-nombre {
+    font-family: var(--rad-font-display);
+    font-size: var(--rad-text-l);
+    font-weight: var(--rad-weight-strong);
+  }
+  .dm-tarjeta-modelo {
+    font-family: var(--rad-font-mono);
+    font-size: var(--rad-text-xs);
+    color: var(--rad-text-3);
+  }
+  .dm-tarjeta-acciones { display: flex; gap: var(--rad-space-1); flex: none; }
+  .dm-tarjeta-acciones [aria-disabled='true'] { color: var(--rad-text-3); cursor: default; }
+  .dm-tarjeta-acciones [aria-disabled='true']:hover { background-color: transparent; color: var(--rad-text-3); }
+  .dm-tarjeta-instr {
+    color: var(--rad-text-2);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    white-space: pre-line;
+  }
+  .dm-tarjeta-instr[data-vacio] { color: var(--rad-text-3); }
+  .dm-tarjeta-pie { display: flex; align-items: center; justify-content: space-between; gap: var(--rad-space-3); }
+  .dm-tarjeta-cuenta { font-size: var(--rad-text-s); color: var(--rad-text-3); }
+  .dm-agentes { display: grid; gap: var(--rad-space-3); }
+
+  /* El formulario de un agente, adentro del modal. */
+  .dm-form { display: grid; gap: var(--rad-space-4); }
+  .dm-form .rad-select { width: 100%; }
+  .dm-form-par { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--rad-space-3); align-items: start; }
+  /* Un select de modelos por proveedor, los dos en la misma celda: el del
+     proveedor elegido se ve y el otro espera apagado, sin sacarlo del DOM
+     (así se acuerda de lo que tenía elegido). */
+  .dm-modelos { display: grid; min-width: 0; }
+  .dm-modelos > .rad-select {
+    grid-area: 1 / 1;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--rad-dur-fast) var(--rad-ease-in-out),
+      visibility 0s linear var(--rad-dur-fast),
+      box-shadow var(--rad-dur-fast) var(--rad-ease-out),
+      background-color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-modelos > .rad-select[data-activo] {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: var(--rad-dur-fast), 0s, 0s, 0s;
+  }
+  .dm-modelos > .rad-select:disabled { color: var(--rad-text-3); cursor: default; }
+
+  /* Ajustes */
+  .dm-estado { display: flex; align-items: baseline; gap: var(--rad-space-2); color: var(--rad-text-1); }
+  .dm-estado-punto {
+    flex: none;
+    width: var(--rad-space-2);
+    height: var(--rad-space-2);
+    border-radius: var(--rad-radius-pill);
+    background: var(--rad-text-3);
+    transition: background-color var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .dm-estado[data-tono='success'] .dm-estado-punto { background: var(--rad-success); }
+  .dm-estado[data-tono='warning'] .dm-estado-punto { background: var(--rad-warning); }
+  .dm-estado[data-tono='danger'] .dm-estado-punto { background: var(--rad-danger); }
+  .dm-llave { display: grid; gap: var(--rad-space-3); }
+  .dm-llave-acciones { display: flex; justify-content: flex-end; gap: var(--rad-space-2); }
+  .dm-datos {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--rad-space-1) var(--rad-space-4);
+    margin: 0;
+    font-size: var(--rad-text-s);
+  }
+  .dm-datos dt { color: var(--rad-text-3); }
+  .dm-datos dd { margin: 0; color: var(--rad-text-1); }
+  .dm-link {
+    justify-self: start;
+    color: var(--rad-text-1);
+    text-decoration: underline;
+    text-decoration-color: var(--rad-line-strong);
+    text-underline-offset: 3px;
+    transition: text-decoration-color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-link:hover { text-decoration-color: var(--rad-text-1); }
+
+  /* ---------- Chat ---------- */
+
+  .dm-chat {
+    display: grid;
+    grid-template-columns: 272px minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  /* El lado: el agente y sus chats. Una línea fina lo separa de la charla. */
+  .dm-lado {
+    display: flex;
+    flex-direction: column;
+    gap: var(--rad-space-2);
+    min-height: 0;
+    padding: var(--rad-space-3) var(--rad-space-3) 0;
+    box-shadow: inset calc(var(--rad-line-width) * -1) 0 0 var(--rad-line);
+  }
+  .dm-agente {
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    padding: var(--rad-space-2) var(--rad-space-2) var(--rad-space-2) var(--rad-space-3);
+    border-radius: var(--rad-radius-m);
+    background: var(--rad-surface-2);
+    box-shadow: var(--rad-shadow-1);
+    text-align: start;
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-agente:hover, .dm-agente[aria-expanded='true'] { background: var(--rad-surface-3); }
+  .dm-agente-texto { display: grid; flex: 1; min-width: 0; }
+  .dm-agente-nombre { font-weight: var(--rad-weight-strong); color: var(--rad-text-1); }
+  .dm-agente-modelo { font-family: var(--rad-font-mono); font-size: var(--rad-text-xs); color: var(--rad-text-3); }
+  .dm-agente-chevron { color: var(--rad-text-3); transition: transform var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-agente[aria-expanded='true'] .dm-agente-chevron { transform: rotate(180deg); }
+  .dm-nuevo { justify-content: flex-start; padding-inline: var(--rad-space-3); }
+
+  /* Una celda de relevo que corta su texto con puntos suspensivos. */
+  .dm-agente-nombre.rad-swap, .dm-agente-modelo.rad-swap, .dm-fila-titulo.rad-swap, .dm-conv-titulo.rad-swap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+  }
+  .dm-agente-nombre > *, .dm-agente-modelo > *, .dm-fila-titulo > *, .dm-conv-titulo > * {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* La lista de chats llega hasta el borde de la hoja: abajo corta limpio. */
+  .dm-chats {
+    --rad-fade: var(--rad-space-3);
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-inline: calc(var(--rad-space-3) * -1);
+    padding-inline: var(--rad-space-3);
+  }
+  .dm-chats-vacio { padding: var(--rad-space-2) var(--rad-space-3); color: var(--rad-text-3); font-size: var(--rad-text-s); }
+  .dm-fila {
+    flex: none;
+    display: flex;
+    align-items: center;
+    border-radius: var(--rad-radius-m);
+    color: var(--rad-text-2);
+    transition:
+      background-color var(--rad-dur-fast) var(--rad-ease-out),
+      box-shadow var(--rad-dur-fast) var(--rad-ease-out),
+      color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-fila:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
+  .dm-fila[aria-current='true'] {
+    background-color: var(--rad-surface-3);
+    box-shadow: var(--rad-shadow-1);
+    color: var(--rad-text-1);
+  }
+  .dm-fila-abrir {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    min-height: var(--rad-control-height);
+    padding-inline: var(--rad-space-3) var(--rad-space-1);
+    border-radius: inherit;
+    text-align: start;
+  }
+  .dm-fila-titulo { flex: 1; }
+  /* El punto de un chat que está contestando. El latido corre siempre, en
+     el de adentro; lo que se prende y se apaga es la caja. (Con las dos
+     cosas en el mismo elemento, la opacidad del latido le gana a la de la
+     caja y el punto queda a la vista con el chat quieto.) */
+  .dm-fila-punto {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    opacity: 0;
+    transition: opacity var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .dm-fila-punto i {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--rad-radius-pill);
+    background: var(--rad-accent-strong);
+    animation: dm-latido calc(var(--rad-dur-slow) * 2.5) var(--rad-ease-in-out) infinite alternate;
+  }
+  .dm-fila[data-respondiendo] .dm-fila-punto { opacity: 1; }
+  .dm-fila-mas {
+    opacity: 0;
+    transition:
+      opacity var(--rad-dur-fast) var(--rad-ease-out),
+      background-color var(--rad-dur-fast) var(--rad-ease-out),
+      color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-fila:hover .dm-fila-mas,
+  .dm-fila:focus-within .dm-fila-mas,
+  .dm-fila[aria-current='true'] .dm-fila-mas,
+  .dm-fila-mas[aria-expanded='true'] { opacity: 1; }
+
+  /* La conversación. */
+  .dm-conv {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    min-width: 0;
+    min-height: 0;
+  }
+  .dm-conv-cabeza {
+    display: flex;
+    align-items: baseline;
+    gap: var(--rad-space-3);
+    min-width: 0;
+    padding: var(--rad-space-4) var(--rad-space-6) var(--rad-space-1);
+  }
+  .dm-conv-titulo {
+    font-family: var(--rad-font-display);
+    font-size: var(--rad-text-l);
+    font-weight: var(--rad-weight-strong);
+  }
+  .dm-conv-sub { flex: none; font-size: var(--rad-text-s); color: var(--rad-text-3); white-space: nowrap; }
+
+  /* La celda donde una conversación releva a la otra. */
+  .dm-hilo-celda { display: grid; min-width: 0; min-height: 0; }
+  .dm-hilo-celda > * { grid-area: 1 / 1; min-height: 0; }
+  .dm-hilo {
+    --rad-a-scroll-inset: var(--rad-space-2);
+    padding-inline: var(--rad-space-6);
+  }
+  .dm-col {
+    max-width: 760px;
+    min-height: 100%;
+    margin-inline: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--rad-space-5);
+  }
+  .dm-vacio {
+    margin: auto;
+    display: grid;
+    justify-items: center;
+    gap: var(--rad-space-1);
+    padding-block: var(--rad-space-6);
+    color: var(--rad-text-3);
+    text-align: center;
+  }
+  .dm-vacio strong {
+    font-family: var(--rad-font-display);
+    font-size: var(--rad-text-xl);
+    font-weight: var(--rad-weight-strong);
+    color: var(--rad-text-1);
+  }
+
+  /* Los mensajes. El del usuario va en una burbuja a la derecha; el del
+     agente, suelto sobre la hoja, a todo el ancho de la columna. */
+  .dm-msg { display: grid; min-width: 0; }
+  .dm-msg-cuerpo {
+    min-width: 0;
+    font-size: var(--rad-text-l);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+  .dm-msg[data-rol='user'] { align-self: flex-end; max-width: 82%; }
+  .dm-msg[data-rol='user'] .dm-msg-cuerpo {
+    padding: var(--rad-space-2) var(--rad-space-4);
+    border-radius: var(--rad-radius-l);
+    background: var(--rad-surface-3);
+    box-shadow: var(--rad-shadow-1);
+    white-space: pre-wrap;
+  }
+
+  /* El pie de un mensaje del agente: mientras llega dice qué está haciendo,
+     y si no terminó bien, por qué. Si todo salió bien, se pliega. */
+  .dm-msg-pie {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .dm-msg-pie[data-abierto] { grid-template-rows: 1fr; }
+  .dm-msg-pie-in {
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    font-size: var(--rad-text-s);
+    color: var(--rad-text-3);
+    opacity: 0;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out);
+  }
+  .dm-msg-pie[data-abierto] .dm-msg-pie-in { opacity: 1; transition-delay: calc(var(--rad-dur-fast) / 2); }
+  .dm-msg-nota { padding-block: var(--rad-space-2); }
+  .dm-msg[data-estado='error'] .dm-msg-nota { color: var(--rad-danger); }
+  .dm-msg[data-estado='rechazo'] .dm-msg-cuerpo { color: var(--rad-text-3); }
+  /* El pulso: un punto de luz mientras el agente escribe. Late siempre; al
+     terminar se pliega la caja que lo lleva, no se le saca la animación. */
+  .dm-pulso {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 6px;
+    overflow: hidden;
+    opacity: 1;
+    transition:
+      width var(--rad-dur-base) var(--rad-ease-in-out),
+      margin var(--rad-dur-base) var(--rad-ease-in-out),
+      opacity var(--rad-dur-fast) var(--rad-ease-in-out);
+  }
+  .dm-pulso i {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--rad-radius-pill);
+    background: var(--rad-accent-strong);
+    animation: dm-latido calc(var(--rad-dur-slow) * 2.5) var(--rad-ease-in-out) infinite alternate;
+  }
+  .dm-msg:not([data-estado='escribiendo']) .dm-pulso {
+    width: 0;
+    margin-inline-end: calc(var(--rad-space-2) * -1);
+    opacity: 0;
+  }
+  @keyframes dm-latido {
+    from { transform: scale(0.6); opacity: 0.35; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* ---------- El markdown de una respuesta ---------- */
+
+  .dm-md > * + * { margin-top: var(--rad-space-3); }
+  .dm-md > .dm-titulo + * { margin-top: var(--rad-space-2); }
+  .dm-md .dm-titulo { font-family: var(--rad-font-display); font-weight: var(--rad-weight-strong); line-height: 1.3; }
+  .dm-md > * + .dm-titulo { margin-top: var(--rad-space-5); }
+  .dm-md .dm-titulo[data-nivel='1'], .dm-md .dm-titulo[data-nivel='2'] { font-size: var(--rad-text-xl); }
+  .dm-md .dm-titulo[data-nivel='3'] { font-size: calc((var(--rad-text-xl) + var(--rad-text-l)) / 2); }
+  .dm-md strong { font-weight: var(--rad-weight-strong); }
+  .dm-md del { color: var(--rad-text-3); }
+  .dm-md ul, .dm-md ol { margin: 0; padding-inline-start: var(--rad-space-5); }
+  .dm-md > ul, .dm-md > ol { margin-top: var(--rad-space-3); }
+  .dm-md li + li, .dm-md li > ul, .dm-md li > ol { margin-top: var(--rad-space-1); }
+  .dm-md li::marker { color: var(--rad-text-3); }
+  .dm-md blockquote {
+    margin-inline: 0;
+    padding-inline-start: var(--rad-space-4);
+    box-shadow: inset calc(var(--rad-line-width) * 2) 0 0 var(--rad-line-strong);
+    color: var(--rad-text-2);
+  }
+  .dm-md blockquote > * + * { margin-top: var(--rad-space-2); }
+  .dm-md hr { height: var(--rad-line-width); margin-block: var(--rad-space-4); border: 0; background: var(--rad-line-strong); }
+  .dm-md :not(pre) > code {
+    padding: 1px var(--rad-space-1);
+    border-radius: var(--rad-radius-s);
+    background: var(--rad-tint-press);
+    font-size: 0.88em;
+  }
+  .dm-tabla { overflow-x: auto; }
+  .dm-tabla table { border-collapse: collapse; font-size: var(--rad-text-m); }
+  .dm-tabla th, .dm-tabla td {
+    padding: var(--rad-space-2) var(--rad-space-4) var(--rad-space-2) 0;
+    text-align: start;
+    vertical-align: top;
+    box-shadow: inset 0 calc(var(--rad-line-width) * -1) 0 var(--rad-line);
+  }
+  .dm-tabla th { color: var(--rad-text-2); font-size: var(--rad-text-s); font-weight: var(--rad-weight-strong); }
+
+  /* Un bloque de código es un pozo: más oscuro que la hoja. El contorno va
+     con una sombra hacia adentro; un borde de verdad deja una hilacha en las
+     esquinas de algo redondeado que recorta. */
+  .dm-codigo {
+    margin-inline: 0;
+    border-radius: var(--rad-radius-m);
+    background: color-mix(in srgb, var(--rad-surface-0) 62%, transparent);
+    box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line);
+    overflow: hidden;
+  }
+  .dm-codigo-cabeza {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--rad-space-3);
+    padding: var(--rad-space-1) var(--rad-space-1) 0 var(--rad-space-3);
+  }
+  .dm-codigo-lang { font-family: var(--rad-font-mono); font-size: var(--rad-text-xs); color: var(--rad-text-3); }
+  .dm-codigo-copiar {
+    padding: var(--rad-space-1) var(--rad-space-2);
+    border-radius: var(--rad-radius-s);
+    font-size: var(--rad-text-xs);
+    color: var(--rad-text-3);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-codigo-copiar:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
+  .dm-codigo pre {
+    margin: 0;
+    padding: var(--rad-space-2) var(--rad-space-3) var(--rad-space-3);
+    overflow-x: auto;
+    font-size: var(--rad-text-m);
+    line-height: 1.55;
+    tab-size: 2;
+  }
+
+  /* ---------- El aviso de la llave ---------- */
+
+  .dm-aviso {
+    display: grid;
+    grid-template-rows: 0fr;
+    padding-inline: var(--rad-space-6);
+    transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .dm-aviso[data-abierto] { grid-template-rows: 1fr; }
+  .dm-aviso-in {
+    min-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out);
+  }
+  .dm-aviso[data-abierto] .dm-aviso-in { opacity: 1; transition-delay: calc(var(--rad-dur-fast) / 2); }
+  .dm-aviso-caja {
+    max-width: 760px;
+    margin: 0 auto var(--rad-space-2);
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-3);
+    padding: var(--rad-space-2) var(--rad-space-2) var(--rad-space-2) var(--rad-space-4);
+    border-radius: var(--rad-radius-m);
+    background: color-mix(in srgb, var(--rad-warning) 10%, transparent);
+    box-shadow: inset 0 0 0 var(--rad-line-width) color-mix(in srgb, var(--rad-warning) 34%, transparent);
+    color: var(--rad-text-1);
+  }
+  .dm-aviso-caja > .rad-icon { color: var(--rad-warning); }
+  .dm-aviso-texto { flex: 1; min-width: 0; }
+
+  /* ---------- El campo para escribir ---------- */
+
+  .dm-redactor-caja { padding: var(--rad-space-1) var(--rad-space-6) var(--rad-space-4); }
+  .dm-redactor {
+    max-width: 760px;
+    margin-inline: auto;
+    display: flex;
+    align-items: flex-end;
+    gap: var(--rad-space-1);
+    padding: var(--rad-space-1);
+    border-radius: var(--rad-radius-l);
+    background: var(--rad-surface-2);
+    box-shadow: var(--rad-shadow-1);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-redactor:focus-within { background: var(--rad-surface-3); }
+  /* El campo va desnudo: la que tiene forma, y la que carga, es la barra. */
+  .dm-redactor .rad-input,
+  .dm-redactor .rad-input:hover,
+  .dm-redactor .rad-input:focus { background: none; box-shadow: none; }
+  .dm-area {
+    flex: 1;
+    padding: var(--rad-space-2) var(--rad-space-3);
+    font-size: var(--rad-text-l);
+    line-height: 1.45;
+  }
+  .dm-enviar { border-radius: calc(var(--rad-radius-l) - var(--rad-space-1)); color: var(--rad-text-1); }
+  .dm-enviar:disabled { color: var(--rad-text-3); pointer-events: none; }
+  /* Enviar y frenar viven en la misma celda y se relevan por opacidad. */
+  .dm-enviar-iconos { display: grid; }
+  .dm-enviar-iconos > * {
+    grid-area: 1 / 1;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out), transform var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .dm-enviar[data-modo='enviar'] .dm-ic-frenar,
+  .dm-enviar[data-modo='frenar'] .dm-ic-enviar { opacity: 0; transform: scale(0.7); }
+}
