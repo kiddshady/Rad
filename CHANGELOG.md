@@ -1,5 +1,22 @@
 # Changelog
 
+## @rad/skin-cyberpunk 0.1.0 · Rad Vitrina 0.7.0 (2026-11-23)
+
+- **Cyberpunk, la tercera piel.** Neón sobre negro y todo a filo: cian para lo
+  principal, magenta para lo que cambia (el foco, la selección, el modal) y
+  amarillo para lo clave. Los tres cuadraditos de la titlebar son la firma.
+  Bahnschrift para la interfaz, etiquetas en mayúsculas, el radio es un rombo
+  y el switch un bloque que cruza.
+- Los planos no se separan con sombra sino con una línea de luz, y lo que
+  flota resplandece. Los botones van completos y no hay cuadrícula de fondo
+  (Fran ya había sacado las dos cosas de este estilo); las líneas de monitor
+  van casi invisibles.
+- **Entradas propias de una piel**, sin tocar el núcleo: el menú y el tooltip
+  se despliegan desde el borde por donde nacen, el toast desde la derecha y
+  el modal se enciende como un monitor, desde una raya en el medio.
+- El humo ya no le exige respiro de scrollbar a una piel sin esquinas
+  redondeadas.
+
 ## @rad/core 0.7.1 · Rad Vitrina 0.6.1 (2026-11-23)
 
 - **El respiro de la scrollbar.** En algo que scrollea y tiene las esquinas

@@ -18,6 +18,7 @@ packages/core           @rad/core: los huesos
   renderer/             core.css, boot.js, scroll.js
 packages/skin-classic   @rad/skin-classic: la piel neutral
 packages/skin-glass     @rad/skin-glass: la piel de vidrio
+packages/skin-cyberpunk @rad/skin-cyberpunk: la piel de neón
 apps/showcase           la vitrina: todos los tokens con la piel activa
 tools/                  verificadores, humo y capturas
 ```
@@ -195,12 +196,15 @@ Una piel es una carpeta `packages/skin-<id>` con:
 
 Rad es solo oscuro: el verificador rechaza una superficie clara.
 
-Hoy hay dos:
+Hoy hay tres:
 
 - **classic**: neutral y sobria. Grafito, un acento azul acero, sombras suaves.
 - **glass**: vidrio ahumado sobre una luz lejana. El fondo es un telón casi
   negro con campos de color apagados, y todo lo demás son hojas que lo dejan
   pasar.
+- **cyberpunk**: neón sobre negro, a filo. Cian para lo principal, magenta
+  para lo que cambia, amarillo para lo clave. Los planos se separan con una
+  línea de luz y lo que aparece se despliega como un panel.
 
 ### Superficies translúcidas
 
@@ -219,6 +223,11 @@ Si algo scrollea y tiene las esquinas redondeadas, su scrollbar lleva respiro
 para que la curva no corte el pulgar: `--rad-a-scroll-inset` en ese elemento
 (vale también para lo propio de una app: `.mi-panel { --rad-a-scroll-inset:
 var(--rad-space-2); }`). No se hereda a los scrolls de adentro.
+
+Una piel también puede traer sus propias entradas: define sus `@keyframes`
+(con prefijo `skin-`) y pisa `--rad-a-in` / `--rad-a-out` en el componente.
+Cyberpunk lo hace con un recorte que se abre (`clip-path`); el recorte termina
+con margen negativo, así apagar la animación no corta ninguna sombra.
 
 Y el vidrio que esmerila (`backdrop-filter`) es solo para lo que flota sobre
 el contenido. No viaja: una piel cambia las entradas con transform del núcleo

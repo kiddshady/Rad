@@ -420,7 +420,9 @@ const labelOf = (sel) => ctl.querySelector(sel).closest('label');
 const notas = ctl.querySelector('textarea.rad-input');
 const inset = (el) => getComputedStyle(el).getPropertyValue('--rad-a-scroll-inset').trim();
 const track = (el) => getComputedStyle(el, '::-webkit-scrollbar-track');
-if (parseFloat(inset(notas)) <= 0) fail(`el textarea no declara respiro para su scrollbar (${inset(notas)})`);
+// El respiro es para las esquinas redondeadas: una piel a filo no lo necesita.
+const notasRadius = parseFloat(getComputedStyle(notas).borderTopRightRadius) || 0;
+if (notasRadius > 0 && parseFloat(inset(notas)) <= 0) fail(`el textarea es redondeado (${notasRadius}px) y no declara respiro para su scrollbar`);
 for (const el of [notas, ctl]) {
   const t = track(el);
   if (t.marginTop !== inset(el) || t.marginBottom !== inset(el)) fail(`la pista de ${el === ctl ? 'la vista' : 'el textarea'} tiene margen ${t.marginTop}/${t.marginBottom}, su respiro dice ${inset(el)}`);

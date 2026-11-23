@@ -1,0 +1,137 @@
+/* Rad · cyberpunk · capas.
+   Lo que flota es un panel negro con marco de neón y resplandor. No sube
+   flotando: se despliega desde el borde por donde nace (motion.css). */
+
+.rad-tooltip, .rad-menu {
+  --rad-a-in: skin-unfold-down var(--rad-dur-base) var(--rad-ease-out) both;
+  --rad-a-out: rad-fade-out var(--rad-dur-fast) var(--rad-ease-in) both;
+}
+.rad-tooltip[data-side='top'], .rad-menu[data-side='top'] {
+  --rad-a-in: skin-unfold-up var(--rad-dur-base) var(--rad-ease-out) both;
+}
+
+/* Tooltip */
+.rad-tooltip {
+  padding: var(--rad-space-1) var(--rad-space-2);
+  background-color: var(--rad-surface-3);
+  box-shadow: inset 0 0 0 1px var(--rad-line-strong), 0 6px 18px #000000b3;
+  color: var(--rad-text-1);
+  font-size: var(--rad-text-s);
+  line-height: 1.35;
+}
+.rad-tooltip-key {
+  font-family: var(--rad-font-mono);
+  font-size: var(--rad-text-xs);
+  color: var(--skin-key);
+}
+
+/* Menú */
+.rad-menu {
+  padding: var(--rad-space-1);
+  background-color: var(--rad-surface-2);
+  box-shadow: var(--rad-shadow-2);
+  font-size: var(--rad-text-m);
+}
+.rad-menu-item {
+  gap: var(--rad-space-3);
+  padding-inline: var(--rad-space-2) var(--rad-space-3);
+  color: var(--rad-text-1);
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-menu-item .rad-icon { color: var(--rad-text-2); transition: color var(--rad-dur-fast) var(--rad-ease-out); }
+.rad-menu-item.is-active {
+  background-color: var(--rad-accent-soft);
+  box-shadow: inset 2px 0 0 var(--rad-accent);
+  color: var(--rad-accent-strong);
+}
+.rad-menu-item.is-active .rad-icon { color: var(--rad-accent); }
+.rad-menu-item[aria-checked='true'] .rad-icon { color: var(--rad-accent); }
+.rad-menu-item[data-variant='danger'] { color: var(--rad-danger); }
+.rad-menu-item[data-variant='danger'] .rad-icon { color: var(--rad-danger); }
+.rad-menu-item[data-variant='danger'].is-active {
+  background-color: color-mix(in srgb, var(--rad-danger) 16%, transparent);
+  box-shadow: inset 2px 0 0 var(--rad-danger);
+  color: var(--rad-danger);
+}
+.rad-menu-item[data-variant='danger'].is-active .rad-icon { color: var(--rad-danger); }
+.rad-menu-item[aria-disabled='true'] { color: var(--rad-text-3); }
+.rad-menu-item[aria-disabled='true'] .rad-icon { color: var(--rad-text-3); }
+.rad-menu-key {
+  margin-left: var(--rad-space-4);
+  font-family: var(--rad-font-mono);
+  font-size: var(--rad-text-xs);
+  color: var(--rad-text-3);
+}
+.rad-menu-sep {
+  height: var(--rad-line-width);
+  margin: var(--rad-space-1) var(--rad-space-2);
+  background-color: var(--rad-line);
+}
+
+/* Modal: lo más alto, en magenta. Se enciende como un monitor. El velo
+   lleva las líneas de monitor. */
+.rad-scrim {
+  background-color: var(--rad-scrim);
+  background-image: var(--skin-scan);
+}
+.rad-modal {
+  --rad-a-in: skin-power-on var(--rad-dur-slow) var(--rad-ease-out) both;
+  --rad-a-out: skin-power-off var(--rad-dur-base) var(--rad-ease-in) both;
+  padding: var(--rad-space-5);
+  background-color: var(--rad-surface-2);
+  box-shadow: inset 0 2px 0 var(--skin-hot), var(--rad-shadow-3);
+  gap: var(--rad-space-3);
+}
+.rad-modal-title {
+  font-family: var(--rad-font-display);
+  font-size: var(--rad-text-m);
+  font-weight: var(--rad-weight-strong);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rad-text-1);
+}
+.rad-modal-body { color: var(--rad-text-2); line-height: 1.5; }
+.rad-modal-actions { gap: var(--rad-space-2); margin-top: var(--rad-space-3); }
+
+/* Toast: el color del aviso es su marco, su barra y su luz. */
+.rad-toast {
+  --skin-kind: var(--rad-accent);
+  --rad-a-in: skin-unfold-left var(--rad-dur-slow) var(--rad-ease-out) both;
+  gap: var(--rad-space-3);
+  padding: var(--rad-space-2) var(--rad-space-2) var(--rad-space-2) var(--rad-space-4);
+  min-height: calc(var(--rad-control-height) + var(--rad-space-3));
+  background-color: var(--rad-surface-2);
+  box-shadow:
+    inset 3px 0 0 var(--skin-kind),
+    inset 0 0 0 1px color-mix(in srgb, var(--skin-kind) 42%, transparent),
+    0 0 22px color-mix(in srgb, var(--skin-kind) 16%, transparent),
+    0 12px 30px #000000b8;
+  color: var(--rad-text-1);
+}
+.rad-toast[data-kind='success'] { --skin-kind: var(--rad-success); }
+.rad-toast[data-kind='warning'] { --skin-kind: var(--rad-warning); }
+.rad-toast[data-kind='danger'] { --skin-kind: var(--rad-danger); }
+.rad-toast-dot {
+  width: 6px;
+  height: 6px;
+  background-color: var(--skin-kind);
+  box-shadow: 0 0 10px var(--skin-kind);
+}
+.rad-toast-action {
+  height: calc(var(--rad-control-height) - var(--rad-space-1));
+  padding-inline: var(--rad-space-2);
+  color: var(--rad-accent-strong);
+  font-size: var(--rad-text-s);
+  font-weight: var(--rad-weight-strong);
+  letter-spacing: var(--skin-track);
+  text-transform: uppercase;
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-toast-action:hover { background-color: var(--rad-tint-hover); }
+.rad-toast-close {
+  width: calc(var(--rad-control-height) - var(--rad-space-1));
+  height: calc(var(--rad-control-height) - var(--rad-space-1));
+  color: var(--rad-text-3);
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-toast-close:hover { background-color: var(--rad-tint-hover); color: var(--rad-accent-strong); }

@@ -1,0 +1,90 @@
+/* Rad · cyberpunk · campos y controles de elección.
+   Un campo es una ranura negra con marco de luz; enfocado, el marco pasa a
+   cian lleno y resplandece. Las etiquetas van en mayúsculas chicas. */
+
+.rad-field-label {
+  font-size: var(--rad-text-xs);
+  font-weight: var(--rad-weight-strong);
+  letter-spacing: var(--skin-track);
+  text-transform: uppercase;
+  color: var(--rad-text-2);
+}
+.rad-field-hint {
+  font-size: var(--rad-text-s);
+  color: var(--rad-text-3);
+}
+.rad-field-error-text {
+  font-size: var(--rad-text-s);
+  color: var(--rad-danger);
+}
+
+.rad-input, .rad-select {
+  padding: var(--rad-space-1) var(--rad-space-3);
+  background-color: var(--rad-surface-0);
+  box-shadow: inset 0 0 0 1px var(--rad-line-strong);
+  color: var(--rad-text-1);
+  font-size: var(--rad-text-m);
+  caret-color: var(--skin-hot);
+  transition: box-shadow var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out);
+}
+textarea.rad-input { padding-block: var(--rad-space-2); line-height: 1.5; }
+.rad-input::placeholder { color: var(--rad-text-3); }
+.rad-input:hover, .rad-select:hover { box-shadow: inset 0 0 0 1px #19e3ff8c; }
+.rad-input:focus, .rad-select[aria-expanded='true'] {
+  box-shadow: inset 0 0 0 1px var(--rad-accent), 0 0 14px #19e3ff4d;
+}
+.rad-input:disabled { color: var(--rad-text-3); background-color: transparent; box-shadow: inset 0 0 0 1px var(--rad-line); }
+.rad-field[data-invalid] .rad-input { box-shadow: inset 0 0 0 1px var(--rad-danger); }
+.rad-field[data-invalid] .rad-input:focus { box-shadow: inset 0 0 0 1px var(--rad-danger), 0 0 14px #ff4d6a4d; }
+
+.rad-select[data-empty] .rad-select-value { color: var(--rad-text-3); }
+.rad-select-chevron { color: var(--rad-accent); }
+
+/* Check y radio. El radio es un rombo: el mismo cuadrado, girado. */
+.rad-check, .rad-radio, .rad-switch {
+  color: var(--rad-text-1);
+  font-size: var(--rad-text-m);
+}
+.rad-check-box, .rad-radio-dot {
+  background-color: var(--rad-surface-0);
+  box-shadow: inset 0 0 0 1px var(--rad-line-strong);
+  color: var(--rad-on-accent);
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-radio-dot { transform: rotate(45deg) scale(0.78); }
+.rad-check:hover .rad-check-box, .rad-radio:hover .rad-radio-dot { box-shadow: inset 0 0 0 1px var(--rad-accent); }
+.rad-check > input:checked + .rad-check-box,
+.rad-radio > input:checked + .rad-radio-dot {
+  background-color: var(--rad-accent);
+  box-shadow: 0 0 12px #19e3ff73;
+}
+.rad-check:has(> input:disabled), .rad-radio:has(> input:disabled), .rad-switch:has(> input:disabled) { color: var(--rad-text-3); }
+.rad-check:has(> input:disabled) .rad-check-box,
+.rad-radio:has(> input:disabled) .rad-radio-dot,
+.rad-switch:has(> input:disabled) .rad-switch-track { box-shadow: inset 0 0 0 1px var(--rad-line); }
+
+/* Switch: una ranura con un bloque que cruza y se enciende. */
+.rad-switch-track {
+  background-color: var(--rad-surface-0);
+  box-shadow: inset 0 0 0 1px var(--rad-line-strong);
+  transition: background-color var(--rad-dur-base) var(--rad-ease-in-out), box-shadow var(--rad-dur-base) var(--rad-ease-in-out);
+}
+.rad-switch-track::after { background-color: var(--rad-text-3); }
+.rad-switch > input:checked + .rad-switch-track {
+  background-color: var(--rad-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--rad-accent), 0 0 12px #19e3ff4d;
+}
+.rad-switch > input:checked + .rad-switch-track::after { background-color: var(--rad-accent); }
+
+/* Botón de ícono */
+.rad-iconbutton {
+  color: var(--rad-text-2);
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out), transform var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-iconbutton:hover { background-color: var(--rad-tint-hover); color: var(--rad-accent-strong); }
+.rad-iconbutton:active { background-color: var(--rad-tint-press); transform: scale(0.96); }
+.rad-iconbutton[aria-pressed='true'] {
+  color: var(--skin-hot);
+  background-color: #ff2fd01f;
+  box-shadow: inset 0 0 0 1px #ff2fd080;
+}

@@ -1,0 +1,48 @@
+/* Rad · cyberpunk · entradas propias.
+   Lo que aparece se despliega: se destapa desde un borde (o desde el medio)
+   en vez de subir flotando.
+
+   Cómo está armado el recorte, y por qué:
+   - los lados que no se mueven llevan margen negativo desde el arranque,
+     para no cortar el resplandor de afuera;
+   - el lado que se abre va de 100 % a 0 en casi todo el recorrido (el panel
+     entero) y recién al final sale al margen negativo: ahí se enciende el
+     resplandor de ese borde. Si fuera de 100 % al margen de un tirón, un
+     panel bajo terminaría de abrirse en el primer cuarto y el resto del
+     tiempo no se vería nada moverse;
+   - al terminar, el recorte equivale a no recortar: apagar la animación
+     (is-settled) no cambia un píxel;
+   - la opacidad llega a 1 en el primer tercio: se tiene que leer como un
+     panel que se abre, no como un fundido. */
+
+@keyframes skin-unfold-down {
+  from { opacity: 0; clip-path: inset(-64px -64px 100% -64px); }
+  30% { opacity: 1; }
+  85% { clip-path: inset(-64px -64px 0 -64px); }
+  to { opacity: 1; clip-path: inset(-64px); }
+}
+@keyframes skin-unfold-up {
+  from { opacity: 0; clip-path: inset(100% -64px -64px -64px); }
+  30% { opacity: 1; }
+  85% { clip-path: inset(0 -64px -64px -64px); }
+  to { opacity: 1; clip-path: inset(-64px); }
+}
+@keyframes skin-unfold-left {
+  from { opacity: 0; clip-path: inset(-64px -64px -64px 100%); }
+  30% { opacity: 1; }
+  85% { clip-path: inset(-64px -64px -64px 0); }
+  to { opacity: 1; clip-path: inset(-64px); }
+}
+/* El modal se enciende como un monitor: una raya en el medio que se abre. */
+@keyframes skin-power-on {
+  from { opacity: 0; clip-path: inset(50% -96px 50% -96px); }
+  25% { opacity: 1; }
+  82% { clip-path: inset(0 -96px 0 -96px); }
+  to { opacity: 1; clip-path: inset(-96px); }
+}
+@keyframes skin-power-off {
+  from { opacity: 1; clip-path: inset(-96px); }
+  18% { clip-path: inset(0 -96px 0 -96px); }
+  70% { opacity: 1; }
+  to { opacity: 0; clip-path: inset(50% -96px 50% -96px); }
+}

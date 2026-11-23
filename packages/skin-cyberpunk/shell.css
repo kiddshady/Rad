@@ -1,0 +1,111 @@
+/* Rad · cyberpunk · shell.
+   El chrome va sobre el negro; el escenario es un panel enmarcado por una
+   línea de luz. */
+
+/* Un resplandor lejano en las dos esquinas de arriba. No llega a la esquina
+   de abajo a la izquierda, que queda en el base (el humo la mide). */
+body {
+  background-image:
+    radial-gradient(ellipse 46% 60% at 0% 0%, #19e3ff17 0%, transparent 72%),
+    radial-gradient(ellipse 40% 54% at 100% 0%, #ff2fd014 0%, transparent 72%);
+  background-repeat: no-repeat;
+}
+
+/* Titlebar: los tres cuadraditos y el nombre en mayúsculas. */
+.rad-titlebar {
+  padding-left: var(--rad-space-4);
+  box-shadow: inset 0 -1px 0 var(--rad-line);
+}
+.rad-titlebar-head { align-items: center; }
+.rad-titlebar-head::before {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  margin-right: calc(var(--rad-space-3) + 16px);
+  background-color: var(--rad-accent);
+  box-shadow: 8px 0 0 var(--skin-hot), 16px 0 0 var(--skin-key);
+}
+.rad-titlebar-title {
+  font-family: var(--rad-font-display);
+  font-weight: var(--rad-weight-strong);
+  font-size: var(--rad-text-s);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rad-text-1);
+}
+.rad-titlebar-sub {
+  margin-left: var(--rad-space-3);
+  font-family: var(--rad-font-mono);
+  font-size: var(--rad-text-xs);
+  color: var(--skin-hot);
+}
+.rad-winbtn {
+  color: var(--rad-text-2);
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.rad-winbtn:hover { background-color: var(--rad-tint-hover); color: var(--rad-accent-strong); }
+.rad-winbtn:active { background-color: var(--rad-tint-press); }
+.rad-winbtn-close:hover { background-color: var(--rad-danger); color: var(--rad-on-accent); }
+.rad-winbtn:focus-visible { outline-offset: calc(var(--rad-line-width) * -3); }
+
+/* Rail */
+.rad-rail {
+  padding: var(--rad-space-2) var(--rad-space-2) var(--rad-space-3) 0;
+  gap: 2px;
+}
+/* El indicador: una barra de neón a la izquierda y su luz derramándose. */
+.rad-rail-indicator {
+  left: 0;
+  right: var(--rad-space-2);
+  background-image: linear-gradient(90deg, #19e3ff33 0%, #19e3ff12 45%, transparent 100%);
+  box-shadow: inset 2px 0 0 var(--rad-accent), -4px 0 14px #19e3ff66;
+}
+.rad-rail-item {
+  gap: var(--rad-space-3);
+  padding-inline: var(--rad-space-4) var(--rad-space-3);
+  color: var(--rad-text-2);
+  font-size: var(--rad-text-s);
+  letter-spacing: var(--skin-track);
+  text-transform: uppercase;
+  transition: color var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out), text-shadow var(--rad-dur-base) var(--rad-ease-out);
+}
+.rad-rail-item:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
+.rad-rail-item:active { background-color: var(--rad-tint-press); }
+.rad-rail-item[aria-current='page'] {
+  color: var(--rad-accent-strong);
+  text-shadow: 0 0 12px #19e3ff80;
+}
+.rad-rail-item[aria-current='page']:hover { background-color: transparent; }
+.rad-rail-item .rad-icon { transition: color var(--rad-dur-fast) var(--rad-ease-out); }
+.rad-rail-item[aria-current='page'] .rad-icon { color: var(--rad-accent); }
+
+/* Escenario: un panel enmarcado, con líneas de monitor casi invisibles. Es
+   opaco (la vista lo hereda y tapa). El marco va en un ::after por encima
+   de las vistas, que son opacas y taparían una sombra inset. */
+.rad-stage {
+  margin-right: var(--rad-space-2);
+  isolation: isolate;
+  background-color: var(--rad-surface-1);
+  background-image: var(--skin-scan);
+}
+.rad-shell:not([data-statusbar]) .rad-stage { margin-bottom: var(--rad-space-2); }
+.rad-shell:not([data-rail]) .rad-stage { margin-left: var(--rad-space-2); }
+.rad-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2000;
+  box-shadow: inset 0 0 0 1px var(--rad-line-strong), inset 0 1px 0 #19e3ff8c;
+  pointer-events: none;
+}
+
+/* Statusbar: telemetría. */
+.rad-statusbar {
+  padding-inline: var(--rad-space-4);
+  font-family: var(--rad-font-mono);
+  font-size: var(--rad-text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rad-text-3);
+}
