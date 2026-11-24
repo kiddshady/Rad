@@ -1,7 +1,7 @@
 {
   "name": "daimon",
   "productName": "Daimon",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Daimon: an AI chat with several agents, each with its own provider, model, instructions and chats.",
   "author": "Kidd Shady · Umbrovex Systems",

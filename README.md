@@ -430,7 +430,9 @@ y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
   el índice de chats y uno por chat.
 - Se instala y se actualiza desde `kiddshady/daimon-releases`. En Settings,
   About tiene un botón para buscar una versión nueva sin esperar al núcleo.
-- El ícono es provisorio.
+- El ícono es el «Radar»: dos aros cortados y un punto, con el oficio del de
+  NTX (baldosa negra, tinta blanca, resplandor). Lo hornea
+  `apps/Daimon/scripts/icon.mjs`.
 
 ### Publicar y actualizar
 
@@ -462,7 +464,8 @@ Daimon está en `apps/Daimon/renderer/actualizacion.js`.
 prueba la actualización de punta a punta sobre una versión instalada vieja.
 
 El ícono se hornea desde el código con la baldosa estándar
-(`tools/icon-kit.mjs`; el de la vitrina en `apps/showcase/scripts/icon.mjs`), y
+(`tools/icon-kit.mjs`; el de la vitrina en `apps/showcase/scripts/icon.mjs`;
+`rasterizeGlow` le suma un resplandor al dibujo, como el del ícono de Daimon), y
 `tools/icon-sheet.py` arma la hoja de control contra los íconos de las otras
 apps. En Windows la ventana usa el mismo `.ico` que el ejecutable.
 

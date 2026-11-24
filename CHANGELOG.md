@@ -1,5 +1,20 @@
 # Changelog
 
+## Daimon 0.3.1 (2026-11-23)
+
+- **El ícono de verdad: el «Radar».** Dos aros cortados en lados opuestos y
+  un punto en el centro, una presencia detectada. Lo eligió Fran entre
+  diecisiete candidatas, con el oficio del ícono de NTX tal cual: baldosa
+  negra con su degradé, tinta blanca de punta redonda y el resplandor en dos
+  pasadas. Reemplaza la medialuna provisoria. Es el mismo dibujo, con su
+  resplandor, en todos los tamaños del .ico (de 16 a 256) y en el de 1024.
+- El kit de íconos (`tools/icon-kit.mjs`) suma lo que hacía falta para
+  hornearlo sin dependencias: `rasterizeGlow` (copias desenfocadas del
+  dibujo detrás del trazo, con un gaussiano de verdad en chico y tres
+  promedios móviles en grande), `sdArc` (un arco de puntas redondas) y
+  `gradient` (el color de una capa puede ser un degradé). El ícono de la
+  vitrina sale idéntico byte a byte.
+
 ## Daimon 0.3.0 (2026-11-23)
 
 - **Daimon se instala y se actualiza sola.** Tiene su repo de releases
