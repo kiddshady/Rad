@@ -83,13 +83,20 @@ shell.setSubtitle('borrador');
   chica adentro: la piel pinta `.rad-winbtn::before`, no el botón.
 - **Rail** con un item por vista. El indicador viaja al activo, y las flechas
   lo recorren con el teclado. Se apaga con `rail: false`.
+- **Pestañas en la titlebar**: con `nav: 'titlebar'` las vistas van como
+  pestañas adentro de la titlebar en vez de en el rail, y el escenario gana
+  ese ancho. La activa muestra su rótulo y las demás solo el ícono, con el
+  rótulo en el tooltip (una vista sin ícono lo muestra siempre); las flechas
+  a los lados las recorren. De lo que ocupan no se arrastra la ventana.
+  `title: false` saca el nombre de la app de la titlebar. `nav` vale
+  `'rail'` (por defecto), `'titlebar'` o `'none'`.
 - **Escenario**: cada vista se monta la primera vez que se visita y queda
   viva, con su scroll y su estado. El cambio entre vistas es un fundido: la
   nueva está entera debajo y la vieja se esfuma encima.
 - **Statusbar** con dos lados; cada texto cambia con un relevo. Se apaga con
   `statusbar: false`.
 
-La anatomía (`.rad-titlebar`, `.rad-rail-item`, `.rad-stage`, `.rad-view`,
+La anatomía (`.rad-titlebar`, `.rad-rail-item`, `.rad-tab`, `.rad-stage`, `.rad-view`,
 `.rad-statusbar`…) es parte de la API: la piel se engancha ahí.
 
 ## Lo que flota
@@ -416,7 +423,8 @@ npm run smoke:pack:daimon   su humo contra la empaquetada
 La primera app hecha con Rad: un chat con IA donde se arman varios agentes,
 cada uno con su nombre, su proveedor y su modelo, sus instrucciones y sus
 propios chats. Por ahora conversa y nada más (sin herramientas), con los
-modelos de Anthropic y los de Venice. La interfaz está en inglés (el código
+modelos de Anthropic y los de Venice. Las vistas van como pestañas en la
+titlebar, sin rail ni nombre de la app. La interfaz está en inglés (el código
 y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
 
 - Las llaves de las APIs (una por proveedor) se pegan en Ajustes y se guardan

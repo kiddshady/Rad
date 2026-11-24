@@ -22,7 +22,11 @@ const views = [
 
 const shell = createShell({
   root: document.querySelector('.rad-root'),
-  title: 'Daimon',
+  // Las vistas van como pestañas en la titlebar, sin rail y sin el nombre
+  // de la app: todo el ancho queda para los chats, la conversación y lo que
+  // se abra al lado.
+  title: false,
+  nav: 'titlebar',
   views,
 });
 

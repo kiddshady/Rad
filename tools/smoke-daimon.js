@@ -24,7 +24,7 @@ const until = async (cond, ms = 9000) => {
 const settle = () => sleep(dur('base') + dur('fast') + 180);
 
 const view = (id) => document.querySelector(`.rad-view[data-view="${id}"]`);
-const go = async (id) => { document.querySelector(`.rad-rail-item[data-view="${id}"]`).click(); await sleep(dur('base') + 220); };
+const go = async (id) => { document.querySelector(`.rad-tab[data-view="${id}"]`).click(); await sleep(dur('base') + 220); };
 const alive = (list) => [...list].filter((el) => !el.closest('[data-rad-leaving]'));
 // El texto vivo de una celda de relevo: durante un relevo tiene las dos frases.
 const shown = (cell) => cell?.querySelector(':scope > :not(.rad-swap-out)')?.textContent ?? '';
@@ -154,9 +154,23 @@ const enIngles = (donde) => {
 if (window.rad.lang !== 'en' || document.documentElement.lang !== 'en') fail(`Daimon no arrancó en inglés: rad.lang "${window.rad.lang}", html lang "${document.documentElement.lang}"`);
 const ventana = [...document.querySelectorAll('.rad-winbtn')].map((b) => b.getAttribute('aria-label')).join(', ');
 if (ventana !== 'Minimize, Maximize, Close') fail(`los botones de la ventana dicen: ${ventana}`);
-const riel = [...document.querySelectorAll('.rad-rail-item')].map((b) => b.textContent.trim() || b.getAttribute('aria-label') || b.getAttribute('data-rad-tip')).join(', ');
+const riel = [...document.querySelectorAll('.rad-tab')].map((b) => b.textContent.trim() || b.getAttribute('aria-label') || b.getAttribute('data-rad-tip')).join(', ');
 if (riel !== 'Chat, Agents, Settings') fail(`las vistas se llaman: ${riel}`);
 enIngles('al arrancar');
+// Las vistas van como pestañas en la titlebar, sin rail y sin el nombre de
+// la app: lo primero de la barra son las pestañas, alineadas con la hoja, y
+// el escenario ocupa todo el ancho.
+{
+  const tabs = [...document.querySelectorAll('.rad-titlebar > .rad-tabs > .rad-tab')];
+  const stage = document.querySelector('.rad-stage').getBoundingClientRect();
+  if (document.querySelector('.rad-rail') || tabs.length !== 3) fail(`las vistas no están en la titlebar (${tabs.length} pestañas, rail: ${Boolean(document.querySelector('.rad-rail'))})`);
+  if (document.querySelector('.rad-titlebar-title') || /Daimon/.test(document.querySelector('.rad-titlebar').textContent)) fail('la titlebar sigue mostrando el nombre de la app');
+  if (tabs.length && Math.abs(tabs[0].getBoundingClientRect().left - stage.left) > 1) fail(`la primera pestaña empieza en ${r2(tabs[0].getBoundingClientRect().left)} y la hoja en ${r2(stage.left)}`);
+  if (stage.width < window.innerWidth - 24) fail(`sin rail, la hoja mide ${r2(stage.width)} en una ventana de ${window.innerWidth}`);
+  const activa = tabs.find((t) => t.getAttribute('aria-current') === 'page');
+  if (activa?.dataset.view !== 'chat' || activa.querySelector('.rad-tab-label').getBoundingClientRect().width < 12) fail('la pestaña de Chat no arranca activa y con su rótulo a la vista');
+  data.titlebar = `${tabs.length} pestañas desde ${r2(tabs[0]?.getBoundingClientRect().left)} px, hoja de ${r2(stage.width)} px`;
+}
 data.idioma = `${window.rad.lang}: ${ventana} · ${riel}`;
 
 // 0c. La fuente de código es Roboto Mono (viaja con Rad), cargada de verdad:
@@ -502,7 +516,7 @@ aj.querySelector('[data-accion="comprobar-llave"]').click();
 if (!await seComprobo(700)) fail('«Comprobar de nuevo» no volvió a preguntar');
 await until(() => estado.dataset.comprobacion !== 'comprobando', 3000);
 await go('chat');
-document.querySelector('.rad-rail-item[data-view="ajustes"]').click();
+document.querySelector('.rad-tab[data-view="ajustes"]').click();
 if (!await seComprobo(700)) fail('al volver a Ajustes no reintentó una comprobación que había quedado sin hacer');
 await until(() => estado.dataset.comprobacion !== 'comprobando', 3000);
 
@@ -511,7 +525,7 @@ await until(() => estado.dataset.comprobacion !== 'comprobando', 3000);
 await guardarLlave(LLAVE);
 if (estado.dataset.comprobacion !== 'aceptada') fail(`la última llave figura como ${estado.dataset.comprobacion}`);
 await go('chat');
-document.querySelector('.rad-rail-item[data-view="ajustes"]').click();
+document.querySelector('.rad-tab[data-view="ajustes"]').click();
 if (await seComprobo(700)) fail('al volver a Ajustes volvió a preguntar por una llave que la API ya había aceptado');
 if (estado.dataset.comprobacion !== 'aceptada') fail('al volver a Ajustes se perdió lo que había contestado la API');
 

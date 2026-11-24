@@ -26,7 +26,7 @@ const OUT = path.join(ROOT, '.smoke', 'shots');
 // crea acá aparece en la interfaz como si se hubiera hecho a mano.
 const PRELUDE = `
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const go = async (id) => { document.querySelector('.rad-rail-item[data-view="' + id + '"]').click(); await sleep(600); };
+const go = async (id) => { document.querySelector('.rad-tab[data-view="' + id + '"]').click(); await sleep(600); };
 const view = (id) => document.querySelector('.rad-view[data-view="' + id + '"]');
 const datos = await import('/datos.js');
 const llave = await import('/llave.js');

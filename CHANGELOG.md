@@ -1,5 +1,37 @@
 # Changelog
 
+## Daimon 0.4.0 (2026-11-23)
+
+- **Las vistas pasan a la titlebar, como pestañas, y se va el rail** (pedido
+  de Fran, como en Umbra). Chat, Agents y Settings son lo primero de la
+  barra, alineadas con la hoja; la activa muestra su nombre y las otras el
+  ícono, con el nombre en el tooltip. El ancho que ocupaba el rail queda
+  para el panel de chats, la conversación y lo que se abra al lado más
+  adelante (el canvas).
+- **La titlebar ya no dice «Daimon»**: arranca directo con las pestañas. La
+  barra de abajo sigue diciendo en qué vista estás.
+
+## @rad/core 0.15.0 · Rad 0.14.0 (2026-11-23)
+
+- **Pestañas de vistas en la titlebar:** `createShell({ nav: 'titlebar' })`.
+  Hasta acá las vistas solo podían ir en el rail; ahora también adentro de
+  la titlebar, dejándole todo el ancho al escenario. La pestaña activa
+  despliega su rótulo (la caja se abre de 0fr a 1fr, sin animar anchos a
+  mano) y las demás quedan en el ícono, con el rótulo en el tooltip. Una
+  vista sin ícono muestra el rótulo siempre. Las flechas a los lados las
+  recorren, y de lo que ocupan no se arrastra la ventana. `nav` vale
+  `'rail'` (por defecto), `'titlebar'` o `'none'`; `rail: false` sigue
+  andando. Anatomía nueva: `.rad-tabs`, `.rad-tab`, `.rad-tab-label`,
+  `.rad-tab-text`.
+- **`title: false`** saca el nombre de la app de la titlebar.
+- Las tres pieles visten las pestañas (classic 0.5.4, glass 0.1.5, mono
+  0.1.3): la activa es la gota de vidrio del rail en glass y mono, y lleva
+  el tinte del acento en classic.
+- La vitrina (0.14.0) las muestra con `RAD_SHOWCASE_NAV=titlebar`, y el
+  humo corre así su segunda pasada con cada piel: que no quede rail, que el
+  escenario gane el ancho, que las plegadas midan lo mismo y no dejen ver su
+  rótulo, y que el rótulo de la que se elige se despliegue de a poco.
+
 ## Daimon 0.3.1 (2026-11-23)
 
 - **El ícono de verdad: el «Radar».** Dos aros cortados en lados opuestos y
