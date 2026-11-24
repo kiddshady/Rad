@@ -12,8 +12,9 @@
 // Los toasts de este aviso no se van solos: es algo que hay que decidir.
 
 import { toast } from './toast.js';
+import { t } from './strings.js';
 
-export function wireUpdates({ name = window.rad?.app?.name ?? 'La app' } = {}) {
+export function wireUpdates({ name = window.rad?.app?.name ?? t.theApp } = {}) {
   const api = window.rad?.updates;
   if (!api) return;
   let current = null;
@@ -29,28 +30,28 @@ export function wireUpdates({ name = window.rad?.app?.name ?? 'La app' } = {}) {
     if (u.state === 'available' && shownFor !== `a:${u.version}`) {
       shownFor = `a:${u.version}`;
       replace({
-        text: `Hay una versión nueva de ${name}: ${u.version}`,
-        action: { label: 'Descargar', onClick: () => api.download() },
+        text: t.updateAvailable(name, u.version),
+        action: { label: t.download, onClick: () => api.download() },
       });
       return;
     }
     if (u.state === 'downloading' && shownFor?.startsWith('a:')) {
       shownFor = 'd';
-      replace({ text: 'Descargando la actualización…' });
+      replace({ text: t.downloading });
       return;
     }
     if (u.state === 'ready' && shownFor !== `r:${u.version}`) {
       shownFor = `r:${u.version}`;
       replace({
-        text: `La versión ${u.version} está lista`,
+        text: t.updateReady(u.version),
         kind: 'success',
-        action: { label: 'Reiniciar', onClick: () => api.install() },
+        action: { label: t.restart, onClick: () => api.install() },
       });
       return;
     }
     if (u.state === 'error' && shownFor === 'd') {
       shownFor = null;
-      replace({ text: 'No se pudo bajar la actualización', kind: 'danger' });
+      replace({ text: t.updateFailed, kind: 'danger' });
     }
   };
 

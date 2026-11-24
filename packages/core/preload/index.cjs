@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('rad', {
   core: arg('core'),
   app: arg('app'),
   fonts: arg('fonts') ?? {},
+  // El idioma de los textos que pone el núcleo: rad.start({ lang }).
+  lang: arg('lang') ?? 'es',
 
   // El puente de la app: solo canales app:*, nunca los internos rad:*.
   invoke: (channel, ...args) => ipcRenderer.invoke(checked(channel), ...args),

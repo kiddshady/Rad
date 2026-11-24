@@ -101,6 +101,8 @@
   .sc-choices { display: grid; gap: var(--rad-space-3); }
   .sc-choices-row { display: flex; flex-wrap: wrap; gap: var(--rad-space-5); }
   .sc-form-actions { display: flex; justify-content: flex-end; gap: var(--rad-space-2); }
+  /* Un campo angosto a propósito: la etiqueta larga del select no entra. */
+  .sc-narrow { width: 14rem; max-width: 100%; }
 
   .sc-facts {
     display: grid;

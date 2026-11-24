@@ -433,7 +433,10 @@
     text-align: start;
   }
   .rad-select-value { min-width: 0; white-space: nowrap; }
-  .rad-select-value > * { overflow: hidden; text-overflow: ellipsis; }
+  /* El tope va en el ítem: la celda se achica con el botón, pero un texto que
+     no parte renglón mide entero y se salía de la celda, por encima del
+     chevron. Con el tope se corta con puntos suspensivos. */
+  .rad-select-value > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .rad-select-chevron { transition: transform var(--rad-dur-base) var(--rad-ease-in-out); }
   .rad-select[aria-expanded='true'] .rad-select-chevron { transform: rotate(180deg); }
 

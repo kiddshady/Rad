@@ -21,6 +21,7 @@
 
 import { present, dismiss } from './motion.js';
 import { layer, pushOverlay, nextId, focusables } from './overlays.js';
+import { t } from './strings.js';
 
 let openCount = 0;
 const appRoot = () => document.querySelector('.rad-root');
@@ -119,7 +120,7 @@ export function openModal({ title, body, actions = [], dismissible = true } = {}
   return api;
 }
 
-export function confirm({ title, text, confirmLabel = 'Aceptar', cancelLabel = 'Cancelar', danger = false } = {}) {
+export function confirm({ title, text, confirmLabel = t.accept, cancelLabel = t.cancel, danger = false } = {}) {
   const m = openModal({
     title,
     body: text,

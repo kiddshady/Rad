@@ -127,6 +127,18 @@ const views = [
       el.querySelector('[data-demo="turno"]').replaceWith(turno.el);
       el._radSelect = turno; // para el humo
 
+      // Un select en un campo angosto: la etiqueta elegida no entra.
+      const presentacion = createSelect({
+        options: [
+          { value: 'larga', label: 'Comprimidos recubiertos de liberación prolongada' },
+          { value: 'corta', label: 'Gotas' },
+        ],
+        value: 'larga',
+      });
+      presentacion.el.setAttribute('aria-labelledby', 'sc-presentacion-label');
+      el.querySelector('[data-demo="presentacion"]').replaceWith(presentacion.el);
+      el._radSelectNarrow = presentacion; // para el humo
+
       const nombre = el.querySelector('[data-demo="nombre"]');
       const correo = el.querySelector('[data-demo="correo"]');
       const check = () => {

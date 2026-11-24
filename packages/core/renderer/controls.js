@@ -16,6 +16,7 @@
 
 import { swapText } from './motion.js';
 import { openMenu, closeMenus } from './menu.js';
+import { t } from './strings.js';
 
 const CHECK_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path pathLength="1" d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg>';
 const CHEVRON = '<svg viewBox="0 0 16 16" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>';
@@ -64,8 +65,12 @@ export function setFieldError(field, message) {
  *     onChange(value) { … },
  *   });
  *   form.append(s.el);   s.value;   s.value = 'b';
+ *
+ * Una etiqueta que no entra en el botón se corta con puntos suspensivos (el
+ * chevron no se mueve de su lugar) y el botón muestra la etiqueta entera en
+ * un tooltip.
  */
-export function createSelect({ options, value, placeholder = 'Elegí una opción', onChange, label } = {}) {
+export function createSelect({ options, value, placeholder = t.choose, onChange, label } = {}) {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'rad-select';
@@ -109,6 +114,22 @@ export function createSelect({ options, value, placeholder = 'Elegí una opción
     });
     el.setAttribute('aria-expanded', 'true');
   };
+
+  // La etiqueta cortada se lee entera en el tooltip del botón. Se mide al
+  // llegar (con el mouse o con el foco), antes de que el tooltip mire el
+  // atributo: el ancho del botón puede haber cambiado desde que se eligió.
+  // Un data-rad-tip que haya puesto la app no se toca.
+  let ownTip = false;
+  const syncTip = () => {
+    if (el.hasAttribute('data-rad-tip') && !ownTip) return;
+    const live = text.querySelector(':scope > :not(.rad-swap-out)');
+    const cut = Boolean(live) && live.scrollWidth > live.clientWidth;
+    ownTip = cut;
+    if (cut) el.setAttribute('data-rad-tip', live.textContent);
+    else el.removeAttribute('data-rad-tip');
+  };
+  el.addEventListener('pointerover', syncTip);
+  el.addEventListener('focus', syncTip);
 
   // La trampa del ancla, igual que en menuButton: el pointerdown sobre el
   // botón cierra el menú (openMenu lo marca en _radJustClosed), y el click

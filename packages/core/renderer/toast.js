@@ -11,6 +11,7 @@
 
 import { present, dismiss, flip } from './motion.js';
 import { layer } from './overlays.js';
+import { t } from './strings.js';
 
 const MAX = 4;
 const CLOSE_ICON = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6"/></svg>';
@@ -54,8 +55,8 @@ export function toast({ text, kind = 'info', duration = 4500, action } = {}) {
   const x = document.createElement('button');
   x.type = 'button';
   x.className = 'rad-toast-close';
-  x.setAttribute('aria-label', 'Cerrar');
-  x.setAttribute('data-rad-tip', 'Cerrar');
+  x.setAttribute('aria-label', t.close);
+  x.setAttribute('data-rad-tip', t.close);
   x.innerHTML = CLOSE_ICON;
   x.addEventListener('click', () => close());
   el.append(x);

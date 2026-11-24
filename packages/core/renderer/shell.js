@@ -16,6 +16,7 @@
 
 import { createRouter } from './router.js';
 import { swapText } from './motion.js';
+import { t } from './strings.js';
 
 // Los íconos de ventana, dibujados a mano (cero glifos).
 const ICONS = {
@@ -56,13 +57,13 @@ function titlebar({ title, subtitle }) {
   };
   // Maximizar y restaurar viven en la misma celda y se relevan por opacidad.
   const maxIcons = `<span class="rad-winbtn-swap">${ICONS.maximize.replace('<svg', '<svg class="rad-ic-max"')}${ICONS.restore.replace('<svg', '<svg class="rad-ic-restore"')}</span>`;
-  const maxBtn = btn('toggle-maximize', 'Maximizar', maxIcons);
-  btns.append(btn('minimize', 'Minimizar', ICONS.minimize), maxBtn, btn('close', 'Cerrar', ICONS.close, 'rad-winbtn-close'));
+  const maxBtn = btn('toggle-maximize', t.maximize, maxIcons);
+  btns.append(btn('minimize', t.minimize, ICONS.minimize), maxBtn, btn('close', t.close, ICONS.close, 'rad-winbtn-close'));
 
   const setMax = (on) => {
     bar.toggleAttribute('data-maximized', on);
-    maxBtn.setAttribute('aria-label', on ? 'Restaurar' : 'Maximizar');
-    maxBtn.setAttribute('data-rad-tip', on ? 'Restaurar' : 'Maximizar');
+    maxBtn.setAttribute('aria-label', on ? t.restore : t.maximize);
+    maxBtn.setAttribute('data-rad-tip', on ? t.restore : t.maximize);
   };
   window.rad?.window.isMaximized?.().then(setMax);
   window.rad?.window.onMaximizedChange?.(setMax);
@@ -72,7 +73,7 @@ function titlebar({ title, subtitle }) {
 }
 
 function rail({ views, router }) {
-  const nav = h('nav', 'rad-rail', { 'data-rad-chrome': '', 'aria-label': 'Vistas' });
+  const nav = h('nav', 'rad-rail', { 'data-rad-chrome': '', 'aria-label': t.views });
   const indicator = h('div', 'rad-rail-indicator', { 'aria-hidden': 'true' });
   nav.append(indicator);
 

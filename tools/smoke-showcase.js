@@ -80,6 +80,10 @@ if (viewAlpha < 1) fail(`la vista no tapa (fondo ${viewBg}): el fundido entre vi
 // más chica adentro, separada de los bordes.
 {
   const close = document.querySelector('.rad-winbtn-close');
+  // Sin rad.start({ lang }), los textos que pone el núcleo salen en castellano.
+  if (close.getAttribute('aria-label') !== 'Cerrar' || document.documentElement.lang !== 'es' || window.rad.lang !== 'es') {
+    fail(`sin elegir idioma el núcleo no quedó en castellano: cerrar dice "${close.getAttribute('aria-label')}", lang "${document.documentElement.lang}", rad.lang "${window.rad.lang}"`);
+  }
   const box = close.getBoundingClientRect();
   const plate = getComputedStyle(close, '::before');
   const plateH = parseFloat(plate.height);
@@ -713,6 +717,46 @@ sel.el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
 sel.el.click();
 await sleep(300);
 if (openMenus().length) fail('el click sobre el select volvió a abrir su menú');
+
+// 17b. Una etiqueta que no entra en el botón del select: se corta con puntos
+// suspensivos, el chevron queda en su lugar y a la vista, y la etiqueta
+// entera sale en el tooltip. (En Daimon, un modelo de nombre largo tapaba el
+// chevron: el texto medía entero y se salía de su celda.)
+{
+  const narrow = ctl._radSelectNarrow;
+  const LONG = 'Comprimidos recubiertos de liberación prolongada';
+  const btn = narrow.el;
+  btn.scrollIntoView({ block: 'center' });
+  await sleep(150);
+  const liveLabel = () => btn.querySelector('.rad-select-value > :not(.rad-swap-out)');
+  const hover = (on) => btn.dispatchEvent(new PointerEvent(on ? 'pointerover' : 'pointerout', { bubbles: true }));
+  const tips = () => [...document.querySelectorAll('.rad-overlays .rad-tooltip')].filter((t) => !t.hasAttribute('data-rad-leaving') && t.dataset.state !== 'closing');
+  const live = liveLabel();
+  const b = btn.getBoundingClientRect();
+  const lr = live.getBoundingClientRect();
+  const chev = btn.querySelector('.rad-select-chevron').getBoundingClientRect();
+  const textW = live.scrollWidth;
+  if (!(live.scrollWidth > live.clientWidth)) fail(`la etiqueta larga del select angosto no se corta: mide ${live.scrollWidth} en una caja de ${live.clientWidth}`);
+  if (getComputedStyle(live).textOverflow !== 'ellipsis') fail('la etiqueta cortada del select no lleva puntos suspensivos');
+  if (lr.right > chev.left + 0.5) fail(`la etiqueta del select llega hasta ${r2(lr.right)} y tapa el chevron, que empieza en ${r2(chev.left)}`);
+  if (chev.width < 8 || chev.right > b.right + 0.5 || chev.left < b.left) fail(`el chevron del select angosto quedó fuera del botón o aplastado: ${r2(chev.left)}–${r2(chev.right)} en un botón ${r2(b.left)}–${r2(b.right)}`);
+  hover(true);
+  if (btn.getAttribute('data-rad-tip') !== LONG) fail(`el select cortado no ofrece su etiqueta entera en el tooltip: "${btn.getAttribute('data-rad-tip')}"`);
+  await sleep(750);
+  const tip = tips()[0];
+  if (!tip || !tip.textContent.includes(LONG)) fail(`el tooltip del select cortado dice "${tip?.textContent ?? 'nada'}"`);
+  hover(false);
+  await sleep(dur('base') + 200);
+  // Con una etiqueta que entra no hay nada que aclarar: sin tooltip.
+  narrow.set('corta');
+  await sleep(dur('fast') + dur('base') + 150);
+  hover(true);
+  if (btn.hasAttribute('data-rad-tip')) fail('el select con una etiqueta que entra ofrece igual un tooltip');
+  hover(false);
+  narrow.set('larga');
+  await sleep(dur('fast') + dur('base') + 150);
+  data.selectCortado = `etiqueta ${r2(lr.left)}–${r2(lr.right)} de ${textW} px de texto, chevron ${r2(chev.left)}–${r2(chev.right)}, botón hasta ${r2(b.right)}`;
+}
 
 // 18. Error de campo: se despliega, y se pliega al corregir.
 const nombreIn = ctl.querySelector('[data-demo="nombre"]');

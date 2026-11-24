@@ -11,6 +11,10 @@ import { whenReleased } from './ready.js';
 import { wireControls } from './controls.js';
 // Los tooltips se activan solos: cualquier elemento con data-rad-tip los tiene.
 import './tooltip.js';
+import { lang } from './strings.js';
+
+// El idioma de la app (rad.start({ lang })) también es el del documento.
+document.documentElement.lang = lang;
 
 const FALLBACK_MS = 2000;
 const FONTS_MAX_MS = 1500;

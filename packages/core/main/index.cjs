@@ -173,10 +173,19 @@ function wireQuit() {
   });
 }
 
+// El idioma de los textos que el núcleo pone por su cuenta (los botones de
+// la ventana, los de un confirm, el aviso de actualización): renderer/strings.js.
+const LANGS = ['es', 'en'];
+function resolveLang(lang = 'es') {
+  if (!LANGS.includes(lang)) throw new Error(`[rad] idioma desconocido: ${JSON.stringify(lang)} (hay: ${LANGS.join(', ')})`);
+  return lang;
+}
+
 function start(options) {
   const { skin, renderer } = options;
   checkSkin(skin);
   const fonts = resolveFonts(options.fonts);
+  const lang = resolveLang(options.lang);
   if (!renderer) throw new Error('[rad] falta renderer: la carpeta del renderer de la app');
 
   // Una sola instancia: dos procesos escribiendo los mismos documentos se
@@ -199,7 +208,7 @@ function start(options) {
     // rad.start({ updates: false }) las apaga.
     updater.setup({ enabled: options.updates !== false });
     const appInfo = { name: options.window?.title ?? app.getName(), version: app.getVersion() };
-    const win = createWindow({ ...options, store: getStore(), appInfo, fonts });
+    const win = createWindow({ ...options, store: getStore(), appInfo, fonts, lang });
     app.on('second-instance', () => {
       if (win.isDestroyed()) return;
       if (win.isMinimized()) win.restore();
