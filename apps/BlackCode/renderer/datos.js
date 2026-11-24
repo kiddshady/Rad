@@ -23,6 +23,7 @@
 // corrió en el turno entero (de ahí sale el contador que se ve debajo).
 
 import { openDoc, removeDoc } from '/@core/store.js';
+import { paraElModelo } from './adjuntos.js';
 
 const nuevoId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 const GUARDAR_CADA_MS = 1500;
@@ -307,14 +308,28 @@ const titular = (texto) => {
 // Lo que vuelve a viajar al modelo: lo que tiene texto y no fue un error ni
 // una respuesta que el modelo declinó (esa se descarta entera), y las filas
 // de tools, que el proceso principal pliega en el registro de cada turno.
-const viaja = (m) => (m.rol === 'tool' ? m.estado !== 'run' : m.texto.trim() && m.estado !== 'error' && m.estado !== 'rechazo');
-const alViaje = (m) => (m.rol === 'tool' ? { rol: 'tool', tool: m.tool, texto: m.texto, estado: m.estado } : { rol: m.rol, texto: m.texto });
+// Un mensaje del usuario viaja si tiene texto o adjuntos. Sus archivos de
+// texto van antepuestos a lo que escribió (paraElModelo); sus imágenes, aparte.
+const conAdjuntos = (m) => Boolean(m.imagenes?.length || m.archivos?.length);
+const viaja = (m) => (m.rol === 'tool' ? m.estado !== 'run' : (m.texto.trim() || conAdjuntos(m)) && m.estado !== 'error' && m.estado !== 'rechazo');
+const alViaje = (m) => {
+  if (m.rol === 'tool') return { rol: 'tool', tool: m.tool, texto: m.texto, estado: m.estado };
+  if (m.rol !== 'user' || !conAdjuntos(m)) return { rol: m.rol, texto: m.texto };
+  return { rol: 'user', texto: paraElModelo(m), ...(m.imagenes?.length ? { imagenes: m.imagenes } : {}) };
+};
+/** ¿Ese modelo acepta imágenes? Los de Anthropic, todos; uno de Venice, solo
+ *  si Venice lo declara. */
+export const modeloVe = (prov, id) => prov === 'anthropic' || modelosDe(prov).find((m) => m.id === id)?.vision === true;
 
-/** Manda un mensaje y abre la respuesta. Devuelve si lo mandó. */
-export async function enviar(chatId, texto) {
+/** Manda un mensaje y abre la respuesta. Devuelve si lo mandó. `adjuntos`
+ *  es { imagenes: [dataUrl], archivos: [{ name, size, content }] }: con
+ *  adjuntos, el texto puede faltar. */
+export async function enviar(chatId, texto, adjuntos = null) {
   const limpio = texto.trim();
+  const imagenes = Array.isArray(adjuntos?.imagenes) ? adjuntos.imagenes : [];
+  const archivos = Array.isArray(adjuntos?.archivos) ? adjuntos.archivos : [];
   const c = chat(chatId);
-  if (!c || !limpio || respuestas.has(chatId)) return false;
+  if (!c || (!limpio && !imagenes.length && !archivos.length) || respuestas.has(chatId)) return false;
   const a = agente(c.agente);
   const doc = await hilo(chatId);
   if (respuestas.has(chatId) || !chat(chatId)) return false;
@@ -322,7 +337,7 @@ export async function enviar(chatId, texto) {
   // Se cambia el valor vivo del documento (no una copia): la respuesta se va
   // escribiendo sobre este mismo objeto mientras llega.
   const valor = doc.get();
-  const mio = { id: nuevoId(), rol: 'user', texto: limpio };
+  const mio = { id: nuevoId(), rol: 'user', texto: limpio, ...(imagenes.length ? { imagenes } : {}), ...(archivos.length ? { archivos } : {}) };
   const suyo = { id: nuevoId(), rol: 'assistant', texto: '', estado: 'escribiendo', modelo: a.modelo };
   const historial = [...valor.mensajes.filter(viaja), mio].map(alViaje);
   // Las tools del agente, si su modelo las acepta.
@@ -335,7 +350,8 @@ export async function enviar(chatId, texto) {
     const x = v.lista.find((y) => y.id === chatId);
     x.tocado = Date.now();
     x.cuenta = valor.mensajes.length;
-    if (x.auto && primero) x.titulo = titular(limpio);
+    // un chat que arranca solo con adjuntos se llama como el primero
+    if (x.auto && primero) x.titulo = titular(limpio || archivos[0]?.name || (imagenes.length ? 'Image' : ''));
     return v;
   });
 

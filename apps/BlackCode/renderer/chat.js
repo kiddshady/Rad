@@ -16,6 +16,9 @@ import { filaTool, ponerTool, cuentaTools, abrirPermiso } from './tools.js';
 import { h, icono } from './piezas.js';
 import { montarCanvas } from './canvas.js';
 import { montarNavegador } from './navegador.js';
+import { openMenu } from '/@core/menu.js';
+import { toast } from '/@core/toast.js';
+import { crearAdjuntos, adjuntosDe, ACEPTA } from './adjuntos.js';
 
 // Los items que no son un chat ni un mensaje: el lugar vacío de cada lista.
 const VACIO = '_vacio';
@@ -116,7 +119,13 @@ export function montarChat(el, { router }) {
   const area = h('textarea', 'rad-input dm-area', { rows: '1', spellcheck: 'false', 'aria-label': 'Message', placeholder: 'Write a message' });
   const boton = h('button', 'rad-iconbutton dm-enviar', { type: 'submit', 'data-modo': 'enviar', 'data-rad-tip-side': 'top' },
     h('span', 'dm-enviar-iconos', {}, icono('enviar', 'dm-ic-enviar'), icono('frenar', 'dm-ic-frenar')));
-  const redactor = h('form', 'dm-redactor', {}, area, boton);
+  // Los adjuntos del mensaje que se está escribiendo: arriba del texto, con
+  // el botón + a la izquierda. También entran pegando o soltando archivos.
+  const adjuntos = crearAdjuntos({ alCambiar: () => ponerRedactor() });
+  const mas = h('button', 'rad-iconbutton dm-mas', { type: 'button', 'data-accion': 'adjuntar', 'aria-label': 'Attach files or photos', 'data-rad-tip': 'Attach files or photos', 'data-rad-tip-key': 'Ctrl+U', 'data-rad-tip-side': 'top' }, icono('mas'));
+  const selectorArchivos = h('input', 'dm-selector', { type: 'file', multiple: true, accept: ACEPTA, tabindex: '-1', 'aria-hidden': 'true' });
+  const sinOjos = h('p', 'dm-redactor-nota rad-swap', { role: 'status' });
+  const redactor = h('form', 'dm-redactor', {}, adjuntos.tira, sinOjos, h('div', 'dm-redactor-fila', {}, mas, area, boton), selectorArchivos);
   // La escena: la conversación y, a su derecha, el panel que esté abierto
   // (el canvas). El panel empuja a la conversación; no la tapa.
   const escena = h('div', 'dm-escena');
@@ -224,6 +233,9 @@ export function montarChat(el, { router }) {
     }
     const cuerpo = h('div', m.rol === 'user' ? 'dm-msg-cuerpo' : 'dm-msg-cuerpo dm-md');
     const nodo = h('article', 'dm-msg', { 'data-rol': m.rol }, cuerpo);
+    // lo que adjuntó: va arriba del texto (el orden lo pone el CSS)
+    const suyos = m.rol === 'user' ? adjuntosDe(m) : null;
+    if (suyos) nodo.append(suyos);
     if (m.rol === 'assistant') {
       nodo.append(h('div', 'dm-msg-pie', {}, h('div', 'dm-msg-pie-in', {},
         h('span', 'dm-pulso', { 'aria-hidden': 'true' }, h('i')), h('span', 'dm-msg-nota rad-swap'))));
@@ -315,20 +327,75 @@ export function montarChat(el, { router }) {
     const rotulo = ocupado ? 'Stop' : 'Send';
     boton.setAttribute('aria-label', rotulo);
     boton.setAttribute('data-rad-tip', rotulo);
-    boton.disabled = !ocupado && !area.value.trim();
+    boton.disabled = !ocupado && !area.value.trim() && !adjuntos.hay();
     setBusy(redactor, ocupado);
+    // Con imágenes adjuntas y un modelo que no ve, se dice antes de mandar.
+    const a = datos.agenteActual();
+    const ciego = adjuntos.cuantas().imagenes > 0 && !datos.modeloVe(a.proveedor, a.modelo);
+    swapText(sinOjos, ciego ? 'This model can’t see images: they will stay in the chat, but it won’t get them.' : '');
+    redactor.toggleAttribute('data-con-nota', ciego);
   };
+
+  // ---------- Adjuntar ----------
+  const sumar = async (archivos) => {
+    for (const f of archivos) {
+      try { await adjuntos.agregar(f); } catch (err) { toast({ text: err.message, kind: 'danger' }); }
+    }
+    area.focus();
+  };
+  selectorArchivos.addEventListener('change', () => { const lista = [...selectorArchivos.files]; selectorArchivos.value = ''; sumar(lista); });
+  // El +: abre el selector de archivos. Con el navegador abierto ofrece además
+  // adjuntar una captura de la página que se está viendo.
+  mas.addEventListener('click', () => {
+    if (!nav.abierto()) { selectorArchivos.click(); return; }
+    openMenu({
+      anchor: mas,
+      side: 'top',
+      items: [
+        { id: 'archivos', label: 'Add files or photos', icon: icono('mas').innerHTML, onSelect: () => selectorArchivos.click() },
+        { id: 'pagina', label: 'Capture the browser page', icon: icono('globo').innerHTML, onSelect: async () => {
+          const png = await window.rad.invoke('browser:capture').catch(() => null);
+          if (!png) { toast({ text: 'There is no page to capture.', kind: 'danger' }); return; }
+          try { adjuntos.agregarImagen(png, 'page.png'); } catch (err) { toast({ text: err.message, kind: 'danger' }); }
+        } },
+      ],
+    });
+  });
+  // Pegar: una imagen del portapapeles (una captura) o archivos copiados.
+  area.addEventListener('paste', (e) => {
+    const lista = [...(e.clipboardData?.files ?? [])];
+    if (!lista.length) return; // texto: el pegado de siempre
+    e.preventDefault();
+    sumar(lista);
+  });
+  // Soltar archivos sobre la conversación. El resaltado va en el redactor.
+  const traeArchivos = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
+  conv.addEventListener('dragover', (e) => { if (!traeArchivos(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; redactor.setAttribute('data-soltar', ''); });
+  conv.addEventListener('dragleave', (e) => { if (!conv.contains(e.relatedTarget)) redactor.removeAttribute('data-soltar'); });
+  conv.addEventListener('drop', (e) => {
+    if (!traeArchivos(e)) return;
+    e.preventDefault();
+    redactor.removeAttribute('data-soltar');
+    sumar([...e.dataTransfer.files]);
+  });
+  // Un archivo soltado fuera de la conversación no hace nada (sin esto, el
+  // navegador de adentro intentaría abrirlo).
+  for (const ev of ['dragover', 'drop']) document.addEventListener(ev, (e) => { if (traeArchivos(e)) e.preventDefault(); });
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'u' && router.current === 'chat') { e.preventDefault(); selectorArchivos.click(); }
+  });
 
   async function mandar() {
     const texto = area.value;
-    if (!texto.trim()) return;
+    if (!texto.trim() && !adjuntos.hay()) return;
     let c = datos.chatActual();
+    // mientras contesta no se manda: lo adjuntado queda en el redactor
     if (c && datos.respondiendo(c.id)) return;
     if (!c) c = datos.crearChat(datos.agenteActual().id);
     area.value = '';
     ajustarAlto();
     if (hilo) hilo.pegado = true;
-    await datos.enviar(c.id, texto);
+    await datos.enviar(c.id, texto, adjuntos.tomar());
   }
 
   redactor.addEventListener('submit', (e) => {

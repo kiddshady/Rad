@@ -88,8 +88,11 @@ function fusionarUsersSeguidos(mensajes) {
   const out = [];
   for (const m of mensajes) {
     const prev = out[out.length - 1];
-    if (prev && prev.role === 'user' && m.role === 'user') prev.content = `${prev.content}\n\n${m.content}`;
-    else out.push({ role: m.role, content: m.content });
+    // dos `user` seguidos se funden, y con ellos sus imágenes, en orden
+    if (prev && prev.role === 'user' && m.role === 'user') {
+      prev.content = [prev.content, m.content].filter((t) => String(t ?? '').trim()).join('\n\n');
+      if (m.images?.length) prev.images = [...(prev.images ?? []), ...m.images];
+    } else out.push({ role: m.role, content: m.content, ...(m.images?.length ? { images: m.images } : {}) });
   }
   return out;
 }
@@ -130,7 +133,7 @@ async function responder({ modelo, instrucciones, mensajes }, { key, signal, onT
   const info = MODELOS.find((m) => m.id === modelo);
   const client = new Anthropic({ apiKey: key });
   const conTools = Boolean(sesion?.activa);
-  const convo = fusionarUsersSeguidos(mensajes.map((m) => ({ role: m.rol, content: m.texto })));
+  const convo = fusionarUsersSeguidos(mensajes.map((m) => ({ role: m.rol, content: m.texto, images: m.imagenes }))).map(conAdjuntos);
   const base = {
     model: modelo,
     max_tokens: MAX_TOKENS,
@@ -216,6 +219,15 @@ async function responder({ modelo, instrucciones, mensajes }, { key, signal, onT
     sesion.cerrarRonda(usos.map((u) => u.name));
     if (signal.aborted) return { motivo: 'frenado', modelo: message.model, uso };
   }
+}
+
+// Un mensaje del usuario con imágenes adjuntas: los bloques de imagen primero
+// y el texto al final (si no escribió nada, una frase: el contenido no puede
+// ir vacío). Sin imágenes queda como estaba, texto a secas.
+function conAdjuntos(m) {
+  const bloques = (m.images ?? []).map(bloqueDeImagen).filter(Boolean);
+  if (m.role !== 'user' || !bloques.length) return { role: m.role, content: m.content };
+  return { role: 'user', content: [...bloques, { type: 'text', text: String(m.content ?? '').trim() ? m.content : 'Look at this image.' }] };
 }
 
 // El contenido de un tool_result: el texto, o el texto y las imágenes que la

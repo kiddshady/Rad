@@ -38,6 +38,14 @@ const herramientas = require('./tools/index.cjs');
 const NOMBRES = { anthropic: 'Anthropic', venice: 'Venice' };
 const RESPONDER = { anthropic: anthropic.responder, venice: venice.responder };
 const ROLES = new Set(['user', 'assistant']);
+// Las imágenes que adjunta el usuario: data URLs de los cuatro tipos que
+// aceptan los modelos. La interfaz deja hasta 4 por mensaje; acá el tope es
+// más flojo, por si un chat viejo trae otra cuenta.
+const IMAGEN_OK = /^data:image\/(png|jpeg|gif|webp);base64,/;
+const IMAGENES_POR_MENSAJE = 8;
+const imagenesDe = (m) => (m.rol === 'user' && Array.isArray(m.imagenes)
+  ? m.imagenes.filter((u) => typeof u === 'string' && IMAGEN_OK.test(u.slice(0, 40))).slice(0, IMAGENES_POR_MENSAJE)
+  : []);
 
 // La lista de Venice se guarda (en un documento del main) para no pedirla en
 // cada arranque: se vuelve a pedir si tiene más de unas horas.
@@ -66,11 +74,14 @@ function limpiar(pedido) {
   // corrió y cómo terminó. Es la evidencia entre turnos: sin ella, la única
   // memoria que el modelo tiene de lo que hizo es su propia prosa.
   const lista = herramientas.plegar(mensajes
-    .filter((m) => m && (m.rol === 'tool' ? typeof m.tool === 'string' : ROLES.has(m.rol) && typeof m.texto === 'string' && m.texto.trim()))
-    .map((m) => (m.rol === 'tool'
-      ? { role: 'tool', tool: m.tool, content: String(m.texto ?? ''), status: m.estado }
-      : { role: m.rol, content: m.texto })))
-    .map((m) => ({ rol: m.role, texto: m.content }));
+    // (un mensaje del usuario puede venir sin texto si trae imágenes)
+    .filter((m) => m && (m.rol === 'tool' ? typeof m.tool === 'string' : ROLES.has(m.rol) && typeof m.texto === 'string' && (m.texto.trim() || imagenesDe(m).length)))
+    .map((m) => {
+      if (m.rol === 'tool') return { role: 'tool', tool: m.tool, content: String(m.texto ?? ''), status: m.estado };
+      const images = imagenesDe(m);
+      return { role: m.rol, content: m.texto, ...(images.length ? { images } : {}) };
+    }))
+    .map((m) => ({ rol: m.role, texto: m.content, ...(m.images?.length ? { imagenes: m.images } : {}) }));
   if (!lista.length || lista[0].rol !== 'user') throw new Error('[blackcode] el chat tiene que empezar con un mensaje del usuario');
   return {
     id,
@@ -304,6 +315,18 @@ function wire(rad, { llave }) {
     // Las tools, si el agente las tiene prendidas y el modelo las acepta (un
     // modelo de Venice que no las soporta conversa como siempre).
     const elModelo = proveedores().proveedores.find((p) => p.id === pedido.proveedor)?.modelos.find((m) => m.id === pedido.modelo);
+    // Un modelo que no ve no recibe las imágenes adjuntas: el proveedor
+    // rebotaría el pedido entero. Quedan en el chat, y el modelo se entera de
+    // que estaban (así no contesta como si no le hubieran mandado nada).
+    const ve = pedido.proveedor === 'anthropic' || elModelo?.vision === true;
+    if (!ve) {
+      pedido.mensajes = pedido.mensajes.map((m) => {
+        if (!m.imagenes?.length) return m;
+        const n = m.imagenes.length;
+        const nota = `[${n} image${n === 1 ? ' was' : 's were'} attached to this message, but this model cannot see images.]`;
+        return { rol: m.rol, texto: m.texto.trim() ? `${m.texto}\n\n${nota}` : nota };
+      });
+    }
     let sesion = null;
     if (pedido.tools.length && elModelo?.tools !== false) {
       sesion = herramientas.crearSesion({
@@ -342,7 +365,7 @@ function wire(rad, { llave }) {
         },
       });
       // ¿este modelo acepta imágenes? Lo usa la foto de browser_read
-      sesion.run.ve = pedido.proveedor === 'anthropic' || elModelo?.vision === true;
+      sesion.run.ve = ve;
       if (!sesion.activa) sesion = null;
     }
     const corrio = () => (sesion ? { tools: sesion.resumen(), agotado: sesion.run.stopped === 'maxrounds' } : {});

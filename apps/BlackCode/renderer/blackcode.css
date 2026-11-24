@@ -535,8 +535,7 @@
     max-width: 760px;
     margin-inline: auto;
     display: flex;
-    align-items: flex-end;
-    gap: var(--rad-space-1);
+    flex-direction: column;
     padding: var(--rad-space-1);
     border-radius: var(--rad-radius-l);
     background: var(--rad-surface-2);
@@ -544,6 +543,87 @@
     transition: background-color var(--rad-dur-fast) var(--rad-ease-out);
   }
   .dm-redactor:focus-within { background: var(--rad-surface-3); }
+  /* El renglón de escribir: el +, el texto y el botón de mandar. */
+  .dm-redactor-fila { display: flex; align-items: flex-end; gap: var(--rad-space-1); min-width: 0; }
+  .dm-redactor-fila .dm-area { flex: 1; min-width: 0; }
+  .dm-selector { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+  .dm-mas { color: var(--rad-text-3); }
+  .dm-mas:hover, .dm-mas[aria-expanded='true'] { color: var(--rad-text-1); }
+  /* Mientras se arrastra un archivo sobre la conversación. */
+  .dm-redactor { transition: background-color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-redactor[data-soltar] { background: var(--rad-surface-3); box-shadow: var(--rad-shadow-1), inset 0 0 0 var(--rad-line-width) var(--rad-line-strong), 0 0 0 3px var(--rad-accent-soft); }
+  .dm-redactor-nota { margin: 0; padding: 0 var(--rad-space-3); color: var(--rad-warning); font-size: var(--rad-text-xs); }
+  .dm-redactor:not([data-con-nota]) .dm-redactor-nota { display: none; }
+  .dm-redactor[data-con-nota] .dm-redactor-nota { padding-bottom: var(--rad-space-1); }
+
+  /* ---------- Los adjuntos ---------- */
+  /* La tira del redactor: sin adjuntos no ocupa lugar; se despliega con el
+     primero. */
+  .dm-adjuntos-tira { display: grid; grid-template-rows: 0fr; min-width: 0; transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-adjuntos-tira[data-con-adjuntos] { grid-template-rows: 1fr; }
+  .dm-adjuntos-tira-in { min-height: 0; overflow: hidden; }
+  .dm-adjuntos-lista { position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--rad-space-2); padding: var(--rad-space-2) var(--rad-space-2) var(--rad-space-1); }
+  .dm-adjunto { position: relative; flex: none; animation: rad-fade-in var(--rad-dur-base) var(--rad-ease-out) both; }
+  .dm-adjunto-miniatura { height: 72px; }
+  .dm-adjunto-ver { display: block; height: 100%; border-radius: var(--rad-radius-m); overflow: hidden; box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line); }
+  .dm-adjunto-ver img { display: block; height: 100%; width: auto; max-width: 220px; object-fit: cover; }
+  .dm-adjunto-chip {
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    max-width: 260px;
+    min-height: var(--rad-control-height);
+    padding: 0 var(--rad-space-1) 0 var(--rad-space-3);
+    border-radius: var(--rad-radius-m);
+    background: color-mix(in srgb, var(--rad-surface-0) 55%, transparent);
+    box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line);
+    color: var(--rad-text-2);
+    font-size: var(--rad-text-s);
+  }
+  .dm-adjunto-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dm-adjunto-peso { flex: none; color: var(--rad-text-3); font-size: var(--rad-text-xs); }
+  .dm-adjunto-x {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--rad-radius-pill);
+    color: var(--rad-text-2);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-adjunto-x .rad-icon { width: 11px; height: 11px; }
+  .dm-adjunto-x:hover { background: var(--rad-tint-press); color: var(--rad-text-1); }
+  /* en una miniatura, la × va en la esquina, sobre un fondo que se lea */
+  .dm-adjunto-miniatura .dm-adjunto-x { position: absolute; top: 4px; right: 4px; background: color-mix(in srgb, var(--rad-surface-0) 78%, transparent); color: var(--rad-text-1); }
+  .dm-adjunto-miniatura .dm-adjunto-x:hover { background: var(--rad-surface-0); }
+
+  /* En un mensaje ya enviado: arriba del texto, alineados con la burbuja. */
+  .dm-msg[data-rol='user'] { justify-items: end; gap: var(--rad-space-2); }
+  .dm-adjuntos-msg { order: -1; display: grid; justify-items: end; gap: var(--rad-space-2); min-width: 0; }
+  .dm-adjuntos-imagenes, .dm-adjuntos-archivos { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--rad-space-2); }
+  .dm-adjunto-imagen { flex: none; display: block; line-height: 0; border-radius: var(--rad-radius-m); overflow: hidden; box-shadow: var(--rad-shadow-1); transition: filter var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-adjunto-imagen:hover { filter: brightness(1.12); }
+  .dm-adjunto-imagen img { display: block; width: auto; height: auto; max-width: 320px; max-height: 240px; }
+  .dm-adjunto-archivo { display: inline-flex; align-items: center; gap: var(--rad-space-2); max-width: 260px; padding: var(--rad-space-1) var(--rad-space-3); border-radius: var(--rad-radius-m); background: var(--rad-surface-2); color: var(--rad-text-2); font-size: var(--rad-text-s); }
+  .dm-msg[data-rol='user'] .dm-msg-cuerpo:empty { display: none; }
+
+  /* El visor: una imagen a pantalla completa. Un clic o Esc la cierra. */
+  .dm-visor {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    padding: var(--rad-space-6);
+    background: var(--rad-scrim);
+    cursor: zoom-out;
+    opacity: 0;
+    transition: opacity var(--rad-dur-base) var(--rad-ease-in-out);
+    pointer-events: auto;
+  }
+  .dm-visor[data-abierto] { opacity: 1; }
+  .dm-visor-imagen { max-width: 100%; max-height: 100%; border-radius: var(--rad-radius-m); box-shadow: var(--rad-shadow-3); transform: scale(0.97); transition: transform var(--rad-dur-base) var(--rad-ease-out); }
+  .dm-visor[data-abierto] .dm-visor-imagen { transform: none; }
   /* El campo va desnudo: la que tiene forma, y la que carga, es la barra. */
   .dm-redactor .rad-input,
   .dm-redactor .rad-input:hover,

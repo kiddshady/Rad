@@ -350,6 +350,54 @@ try {
     const p3 = r.pedidos[2];
     check(p3.messages.filter((m) => Array.isArray(m.content)).length === 1 && p3.messages.map((m) => m.role).join() === 'system,user,assistant,tool,tool,tool,user,assistant,tool,user', `venice, captura: la tercera ronda viajó como ${p3.messages.map((m) => m.role).join()}`);
   }
+
+  // 15. Las imágenes que adjunta el usuario, en Anthropic: bloques de imagen
+  //     primero y el texto al final. Dos `user` seguidos se funden con sus
+  //     imágenes en orden, y un mensaje que es solo una imagen lleva una frase
+  //     (el contenido no puede ir vacío).
+  {
+    const A = 'data:image/png;base64,QUFB';
+    const B = 'data:image/jpeg;base64,QkJC';
+    const s = nuevaSesion({ tools: [] });
+    const r = await correr(anthropic, { modelo: 'claude-opus-5-5', instrucciones: '', mensajes: [
+      { rol: 'user', texto: 'primero', imagenes: [A] },
+      { rol: 'user', texto: '', imagenes: [B, 'data:text/html;base64,PGI+', 'no-es-una-imagen'] },
+    ] }, s, [deAnthropic([{ type: 'text', text: 'veo' }])]);
+    check(!r.err && r.fin?.motivo === 'fin', `adjuntos, anthropic: ${JSON.stringify(r.fin)} ${r.err?.message ?? ''}`);
+    const m = r.pedidos[0].messages;
+    check(m.length === 1 && m[0].role === 'user' && Array.isArray(m[0].content), `adjuntos, anthropic: el pedido llevó ${JSON.stringify(m).slice(0, 200)}`);
+    const c = m[0].content;
+    check(c.length === 3 && c[0].type === 'image' && c[0].source.media_type === 'image/png' && c[0].source.data === 'QUFB'
+      && c[1].type === 'image' && c[1].source.media_type === 'image/jpeg' && c[1].source.data === 'QkJC'
+      && c[2].type === 'text' && c[2].text === 'primero', `adjuntos, anthropic: los bloques son ${JSON.stringify(c).slice(0, 300)}`);
+    const s2 = nuevaSesion({ tools: [] });
+    const r2 = await correr(anthropic, { modelo: 'claude-opus-5-5', instrucciones: '', mensajes: [{ rol: 'user', texto: '', imagenes: [A] }] }, s2, [deAnthropic([{ type: 'text', text: 'veo' }])]);
+    const c2 = r2.pedidos[0].messages[0].content;
+    check(Array.isArray(c2) && c2.length === 2 && c2[1].type === 'text' && c2[1].text === 'Look at this image.', `adjuntos, anthropic: un mensaje que es solo una imagen viajó como ${JSON.stringify(c2).slice(0, 200)}`);
+    // sin imágenes, el mensaje sigue siendo texto a secas
+    const s3 = nuevaSesion({ tools: [] });
+    const r3 = await correr(anthropic, { modelo: 'claude-opus-5-5', instrucciones: '', mensajes: [{ rol: 'user', texto: 'hola' }] }, s3, [deAnthropic([{ type: 'text', text: 'hola' }])]);
+    check(r3.pedidos[0].messages[0].content === 'hola', 'adjuntos, anthropic: un mensaje sin imágenes dejó de ser texto');
+  }
+
+  // 16. …y en Venice: el mensaje va en partes, el texto y después cada imagen.
+  {
+    const A = 'data:image/png;base64,QUFB';
+    const B = 'data:image/jpeg;base64,QkJC';
+    const s = nuevaSesion({ tools: [] });
+    const r = await correr(venice, { modelo: 'alfa-2', instrucciones: '', mensajes: [
+      { rol: 'user', texto: 'mirá', imagenes: [A, B] },
+      { rol: 'assistant', texto: 'ok' },
+      { rol: 'user', texto: 'y esto' },
+    ] }, s, [deVenice([{ content: 'veo' }])]);
+    check(!r.err && r.fin?.motivo === 'fin', `adjuntos, venice: ${JSON.stringify(r.fin)} ${r.err?.message ?? ''}`);
+    const m = r.pedidos[0].messages;
+    check(m.length === 3 && Array.isArray(m[0].content) && m[0].content.length === 3
+      && m[0].content[0].type === 'text' && m[0].content[0].text === 'mirá'
+      && m[0].content[1].type === 'image_url' && m[0].content[1].image_url.url === A && m[0].content[2].image_url.url === B,
+      `adjuntos, venice: el primer mensaje viajó como ${JSON.stringify(m[0]).slice(0, 260)}`);
+    check(m[1].content === 'ok' && m[2].content === 'y esto', 'adjuntos, venice: los mensajes sin imágenes dejaron de ser texto');
+  }
 } finally {
   server.close();
   fs.rmSync(taller, { recursive: true, force: true });
@@ -360,4 +408,4 @@ if (failures.length) {
   for (const f of failures) console.error('  ' + f);
   process.exit(1);
 }
-console.log(`test-blackcode-tools-loop: ok (${checks} comprobaciones: los dos loops, el registro del turno, la última ronda, el rescate, el presupuesto, la confirmación y las imágenes de una tool)`);
+console.log(`test-blackcode-tools-loop: ok (${checks} comprobaciones: los dos loops, el registro del turno, la última ronda, el rescate, el presupuesto, la confirmación, las imágenes de una tool y los adjuntos del usuario)`);

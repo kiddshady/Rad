@@ -429,7 +429,9 @@ cada uno con su nombre, su proveedor y su modelo, sus instrucciones y sus
 propios chats, con los modelos de Anthropic y los de Venice. Un agente puede
 tener tools prendidas (archivos, comandos y jobs, código, SQLite, web, abrir cosas, mirar la pantalla, un canvas y un navegador al lado del chat, y una libreta de notas) y entonces actúa en la PC;
 cómo están armadas, en `apps/BlackCode/docs/tools.md`. Las respuestas dibujan las
-fórmulas en LaTeX (KaTeX, con mhchem). Las vistas van como pestañas en la
+fórmulas en LaTeX (KaTeX, con mhchem). A un mensaje se le adjuntan imágenes y
+archivos de texto con el botón +, pegando o soltándolos sobre la conversación
+(`renderer/adjuntos.js`). Las vistas van como pestañas en la
 titlebar, sin rail ni nombre de la app. La interfaz está en inglés (el código
 y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
 

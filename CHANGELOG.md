@@ -1,5 +1,32 @@
 # Changelog
 
+## BlackCode 0.12.0 (2026-11-24)
+
+- **Adjuntos en los mensajes.** Imágenes y archivos de texto, por tres
+  caminos: el botón **+** a la izquierda del redactor (o Ctrl+U), pegando
+  (una captura del portapapeles, o archivos copiados) y arrastrando y soltando
+  sobre la conversación. Lo adjuntado se ve arriba del texto, como miniaturas
+  y chips con su ×; un clic en una miniatura la muestra entera.
+- Son los adjuntos de NeonCode, con sus números: hasta 4 imágenes y 6 archivos
+  de texto por mensaje, 256 KB por archivo. Una imagen se achica antes de
+  guardarla (lado mayor 1568 px, en PNG; en JPEG solo si pesa demasiado). Un
+  archivo de texto viaja antepuesto al mensaje, entre `<file name="…">` y
+  `</file>`. Un PDF o un binario se rechazan, y se dice por qué.
+- Al modelo le llegan como imágenes de verdad: bloques de imagen en Anthropic,
+  partes `image_url` en Venice. Un mensaje puede ser solo una imagen.
+- **Un modelo que no ve no las recibe** (en NeonCode viajaban igual y el
+  proveedor rebotaba el pedido entero): se avisa antes de mandar, la imagen
+  queda en el chat y al modelo se le dice que había una.
+- Con el navegador abierto, el **+** ofrece además adjuntar una captura de la
+  página que se está viendo.
+- Todo se lee en la interfaz, de los archivos que el usuario eligió: el
+  proceso principal no abre ninguna ruta por un adjunto. Un archivo soltado
+  fuera de la conversación no hace nada.
+- Las imágenes quedan guardadas con el chat y se reenvían en cada turno, como
+  el resto de la conversación.
+- El humo del navegador esperaba mal a la pestaña nueva y a veces fallaba en
+  la app empaquetada: ahora espera a que esté activa.
+
 ## BlackCode 0.11.0 (2026-11-24)
 
 - **Notas.** Una vista nueva (la pestaña Notes) con la libreta del usuario,

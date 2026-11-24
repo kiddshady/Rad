@@ -1127,7 +1127,7 @@ else {
     for (let i = 0; i < 60 && !String((await estadoNav())?.url).endsWith('/'); i++) await sleep(50);
     if (String((await estadoNav())?.url) !== SMOKE_URL) fail('navegador: Atrás no volvió a la primera página: ' + (await estadoNav())?.url);
     nav.querySelector('[data-accion="nav-nueva"]').click();
-    await until(() => tabsN().length === 2, 3000);
+    await until(() => tabsN().length === 2 && tabsN()[1].getAttribute('aria-selected') === 'true' && hueco.hasAttribute('data-vacio'), 4000);
     if (tabsN().length !== 2 || tabsN()[1].getAttribute('aria-selected') !== 'true') fail('navegador: la pestaña nueva no quedó abierta y activa (' + tabsN().length + ' pestañas)');
     if (!hueco.hasAttribute('data-vacio')) fail('navegador: una pestaña en blanco no muestra su texto de ayuda');
     tabsN()[1].querySelector('.dm-nav-tab-x').click();
@@ -1283,6 +1283,142 @@ else {
     datosM.ponerModoTools('manual');
     data.notas = 'escrita y guardada sola, leída y corregida por el agente, borrador protegido, papelera y restore, fijar, buscar, mover, plegar y borrar';
     await go('chat');
+  }
+
+  // 11f. Adjuntos: soltar y pegar archivos en el redactor, lo que se acepta y
+  // lo que no, el tope, quitar, el visor, y que al mandar lleguen al proveedor.
+  {
+    const datosM = await import('/datos.js');
+    await go('chat');
+    chatView.querySelector('[data-accion="nuevo-chat"]').click();
+    await settle();
+    const conv = chatView.querySelector('.dm-conv');
+    const tira = chatView.querySelector('.dm-adjuntos-tira');
+    const items = () => alive(tira.querySelectorAll('.dm-adjunto'));
+    const fotos = () => items().filter((n) => n.dataset.clase === 'imagen');
+    const avisos = () => [...document.querySelectorAll('.rad-toast')].filter((n) => !n.hasAttribute('data-rad-leaving'));
+    const enviar = chatView.querySelector('.dm-enviar');
+    const mas = chatView.querySelector('[data-accion="adjuntar"]');
+    const quieto = async () => { await sleep(200); for (let i = 0; i < 400 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50); await settle(); };
+    // archivos de mentira: una captura grande, un markdown y un PDF
+    const lienzoP = document.createElement('canvas');
+    lienzoP.width = 2400;
+    lienzoP.height = 1200;
+    const ctx = lienzoP.getContext('2d');
+    ctx.fillStyle = '#204080';
+    ctx.fillRect(0, 0, 2400, 1200);
+    ctx.fillStyle = '#e0e0e0';
+    ctx.fillRect(200, 200, 800, 300);
+    const foto = async (nombre) => new File([await new Promise((r) => lienzoP.toBlob(r, 'image/png'))], nombre, { type: 'image/png' });
+    const apunte = new File(['# Notes\nline two\n'], 'notes.md', { type: 'text/markdown' });
+    const pdf = new File([new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3])], 'paper.pdf', { type: 'application/pdf' });
+    const carga = (archivos) => { const dt = new DataTransfer(); for (const f of archivos) dt.items.add(f); return dt; };
+    const soltar = (archivos) => {
+      const dt = carga(archivos);
+      conv.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+      const marcado = composer.hasAttribute('data-soltar');
+      conv.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+      return marcado;
+    };
+
+    if (tira.hasAttribute('data-con-adjuntos') || !enviar.disabled) fail('adjuntos: un redactor vacío arranca con adjuntos o con el botón de mandar prendido');
+    if (!mas || mas.getBoundingClientRect().right > area.getBoundingClientRect().left + 1) fail('adjuntos: el botón + no está a la izquierda del texto');
+    // Soltar una imagen y un archivo de texto.
+    const marcado = soltar([await foto('screenshot.png'), apunte]);
+    await until(() => items().length === 2, 4000);
+    if (!marcado || composer.hasAttribute('data-soltar')) fail('adjuntos: el redactor no se marca mientras se arrastra, o queda marcado después de soltar');
+    if (items().length !== 2 || !tira.hasAttribute('data-con-adjuntos')) fail('adjuntos: después de soltar dos archivos hay ' + items().length + ' en la tira');
+    const mini = fotos()[0]?.querySelector('img');
+    await until(() => mini?.naturalWidth > 0, 3000);
+    // la imagen se achica: 2400×1200 queda en 1568×784
+    if (mini?.naturalWidth !== 1568 || mini?.naturalHeight !== 784) fail('adjuntos: la imagen quedó de ' + mini?.naturalWidth + '×' + mini?.naturalHeight + ', se esperaba 1568×784');
+    const chip = items().find((n) => n.dataset.clase === 'texto');
+    if (!chip?.textContent.includes('notes.md') || !chip.textContent.includes('17 B')) fail('adjuntos: el archivo de texto figura como «' + chip?.textContent + '»');
+    if (enviar.disabled) fail('adjuntos: con adjuntos y sin texto no se puede mandar');
+    // (la tira se despliega: se mide cuando terminó)
+    await until(() => tira.getBoundingClientRect().height > 60, 2000);
+    await settle();
+    if (tira.getBoundingClientRect().height < 60 || tira.getBoundingClientRect().bottom > area.getBoundingClientRect().top + 2) fail('adjuntos: la tira no va arriba del texto (mide ' + Math.round(tira.getBoundingClientRect().height) + ' px, termina en ' + Math.round(tira.getBoundingClientRect().bottom) + ' y el texto empieza en ' + Math.round(area.getBoundingClientRect().top) + ')');
+    // Lo que no se puede adjuntar se rechaza, y se dice.
+    soltar([pdf]);
+    await until(() => avisos().some((n) => n.textContent.includes('paper.pdf')), 3000);
+    if (items().length !== 2 || !avisos().some((n) => n.textContent.includes('paper.pdf') && n.textContent.includes('can’t be attached'))) fail('adjuntos: un PDF no se rechazó con su aviso');
+    // Pegar una imagen (una captura del portapapeles).
+    area.dispatchEvent(new ClipboardEvent('paste', { clipboardData: carga([await foto('pasted.png')]), bubbles: true, cancelable: true }));
+    await until(() => fotos().length === 2, 4000);
+    if (fotos().length !== 2) fail('adjuntos: pegar una imagen no la sumó');
+    // El tope: cuatro imágenes por mensaje.
+    soltar([await foto('c.png'), await foto('d.png'), await foto('e.png')]);
+    await until(() => avisos().some((n) => n.textContent.includes('Up to 4 images')), 5000);
+    if (fotos().length !== 4) fail('adjuntos: con el tope de 4 imágenes quedaron ' + fotos().length);
+    // Quitar es por identidad: sale la que se toca, no la que quedó en su lugar.
+    const segunda = fotos()[1];
+    segunda.querySelector('.dm-adjunto-x').click();
+    segunda.querySelector('.dm-adjunto-x').click();
+    await until(() => fotos().length === 3, 3000);
+    if (fotos().length !== 3 || fotos().includes(segunda)) fail('adjuntos: dos clics en la × de una imagen dejaron ' + fotos().length + ' (tenían que quedar 3)');
+    for (const n of fotos().slice(1)) n.querySelector('.dm-adjunto-x').click();
+    await until(() => fotos().length === 1, 3000);
+    // El visor: un clic en la miniatura la muestra entera; Esc la cierra.
+    fotos()[0].querySelector('.dm-adjunto-ver').click();
+    await until(() => document.querySelector('.dm-visor[data-abierto]'), 2000);
+    if (!document.querySelector('.dm-visor[data-abierto] .dm-visor-imagen')) fail('adjuntos: la miniatura no abre el visor');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await until(() => !document.querySelector('.dm-visor'), 2000);
+    if (document.querySelector('.dm-visor')) fail('adjuntos: Esc no cerró el visor');
+    enIngles('con adjuntos en el redactor');
+
+    // Mandar: el mensaje guarda sus adjuntos, la tira queda vacía, y al
+    // proveedor le llegan la imagen y el archivo (antepuesto al texto).
+    type(area, 'What is in this?');
+    key(area, 'Enter');
+    await quieto();
+    const mio = msgs().filter((m) => m.dataset.rol === 'user').at(-1);
+    if (items().length || tira.hasAttribute('data-con-adjuntos')) fail('adjuntos: después de mandar la tira no quedó vacía');
+    if (mio?.querySelectorAll('.dm-adjunto-imagen img').length !== 1 || !mio.querySelector('.dm-adjunto-archivo')?.textContent.includes('notes.md')) fail('adjuntos: el mensaje enviado no muestra su imagen y su archivo');
+    if (mio?.querySelector('.dm-msg-cuerpo').textContent !== 'What is in this?') fail('adjuntos: la burbuja del mensaje dice «' + mio?.querySelector('.dm-msg-cuerpo').textContent + '»');
+    const caja = mio?.querySelector('.dm-adjunto-imagen');
+    const dib = caja?.querySelector('img');
+    await until(() => dib?.naturalWidth > 0, 2000);
+    if (caja && Math.abs(caja.getBoundingClientRect().width - dib.getBoundingClientRect().width) > 1) fail('adjuntos: en el mensaje, la caja de la imagen mide ' + Math.round(caja.getBoundingClientRect().width) + ' px y la imagen ' + Math.round(dib.getBoundingClientRect().width));
+    const img = mio?.querySelector('.dm-adjunto-imagen');
+    if (!img || img.getBoundingClientRect().bottom > mio.querySelector('.dm-msg-cuerpo').getBoundingClientRect().top + 1) fail('adjuntos: en el mensaje, la imagen no va arriba del texto');
+    const eco = ultimo().textContent;
+    if (!eco.includes('images in the last message: 1')) fail('adjuntos: al proveedor no le llegó la imagen');
+    if (!eco.includes('<file name="notes.md">') || !eco.includes('line two') || !eco.includes('What is in this?')) fail('adjuntos: al proveedor no le llegó el archivo antepuesto al texto: ' + eco.slice(0, 200));
+
+    // Un mensaje que es solo una imagen, sin texto.
+    soltar([await foto('alone.png')]);
+    await until(() => fotos().length === 1, 4000);
+    key(area, 'Enter');
+    await quieto();
+    const solo = msgs().filter((m) => m.dataset.rol === 'user').at(-1);
+    if (solo?.querySelectorAll('.dm-adjunto-imagen').length !== 1 || solo.querySelector('.dm-msg-cuerpo').getBoundingClientRect().height > 1) fail('adjuntos: un mensaje que es solo una imagen no se mandó, o muestra una burbuja vacía');
+    if (!ultimo().textContent.includes('images in the last message: 1')) fail('adjuntos: la imagen sola no le llegó al proveedor');
+
+    // Un modelo que no ve: se avisa antes de mandar, y la imagen no viaja.
+    const anterior = datosM.agenteActual();
+    const ciego = datosM.listaAgentes().find((a) => !datosM.modeloVe(a.proveedor, a.modelo));
+    if (!ciego) fail('adjuntos: el humo no tiene un agente con un modelo que no ve');
+    else {
+      datosM.elegirAgente(ciego.id);
+      await settle();
+      chatView.querySelector('[data-accion="nuevo-chat"]').click();
+      await settle();
+      soltar([await foto('blind.png')]);
+      await until(() => fotos().length === 1, 4000);
+      const nota = chatView.querySelector('.dm-redactor-nota');
+      if (!composer.hasAttribute('data-con-nota') || !shown(nota).includes('can’t see images')) fail('adjuntos: con un modelo que no ve no se avisa antes de mandar («' + shown(nota) + '»)');
+      type(area, 'hello');
+      key(area, 'Enter');
+      await quieto();
+      const eco2 = ultimo().textContent;
+      if (eco2.includes('images in the last message') || !eco2.includes('this model cannot see images')) fail('adjuntos: a un modelo que no ve le viajó la imagen, o no se le dijo que estaba: ' + eco2.slice(0, 200));
+      if (composer.hasAttribute('data-con-nota')) fail('adjuntos: el aviso de que el modelo no ve quedó puesto después de mandar');
+      datosM.elegirAgente(anterior.id);
+      await settle();
+    }
+    data.adjuntos = 'soltar y pegar, imagen achicada a ' + mini?.naturalWidth + '×' + mini?.naturalHeight + ', PDF rechazado, tope de 4, quitar, visor, mandar con archivo, imagen sola y modelo que no ve';
   }
 
   // Cambiarle las tools a un agente que YA existía, desde su formulario.

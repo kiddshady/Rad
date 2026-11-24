@@ -159,7 +159,11 @@ async function leerRonda(res, ronda, { signal, onTexto, onPensando }) {
  */
 async function responder({ modelo, instrucciones, mensajes }, { key, signal, onTexto, onPensando, sesion = null }) {
   const conTools = Boolean(sesion?.activa);
-  const convo = mensajes.map((m) => ({ role: m.rol, content: m.texto }));
+  // Un mensaje del usuario con imágenes adjuntas va en partes: el texto y,
+  // después, cada imagen (el formato de OpenAI).
+  const convo = mensajes.map((m) => (m.rol === 'user' && m.imagenes?.length
+    ? { role: 'user', content: [{ type: 'text', text: String(m.texto ?? '').trim() ? m.texto : 'Look at this image.' }, ...m.imagenes.map((u) => ({ type: 'image_url', image_url: { url: u } }))] }
+    : { role: m.rol, content: m.texto }));
   const system = conTools ? sesion.sistema(instrucciones) : instrucciones;
   if (system) convo.unshift({ role: 'system', content: system });
 

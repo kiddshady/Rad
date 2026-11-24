@@ -93,6 +93,8 @@ function respuesta({ proveedor, modelo, instrucciones, mensajes }) {
     `- instructions: ${instrucciones ? instrucciones.length : 0} characters`,
     `- messages in the request: ${mensajes.length}`,
     `- provider: ${proveedor}`,
+    // (solo si el último mensaje las trae: el humo cuenta estos renglones)
+    ...(mensajes.at(-1)?.imagenes?.length ? [`- images in the last message: ${mensajes.at(-1).imagenes.length}`] : []),
     ``,
     `A code block, to see the mono font:`,
     ``,

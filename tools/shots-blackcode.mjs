@@ -197,6 +197,39 @@ const SCENES = {
     await sleep(700);
     [...view('notas').querySelectorAll('.dm-notas-nota')].find((n) => n.textContent.includes('Biochemistry')).click();
     await sleep(1500);`,
+  // Los adjuntos: un mensaje enviado con una imagen y un archivo, y otros en el redactor.
+  adjuntos: `
+    const lienzo = document.createElement('canvas');
+    lienzo.width = 1600;
+    lienzo.height = 900;
+    const ctx = lienzo.getContext('2d');
+    const g1 = ctx.createLinearGradient(0, 0, 1600, 900);
+    g1.addColorStop(0, '#101418');
+    g1.addColorStop(1, '#2a3340');
+    ctx.fillStyle = g1;
+    ctx.fillRect(0, 0, 1600, 900);
+    ctx.fillStyle = '#d8dde4';
+    for (let i = 0; i < 9; i++) ctx.fillRect(120, 140 + i * 70, 500 + ((i * 137) % 600), 22);
+    const foto = async (n) => new File([await new Promise((r) => lienzo.toBlob(r, 'image/png'))], n, { type: 'image/png' });
+    const conv = document.querySelector('.dm-conv');
+    const soltar = async (archivos) => { const dt = new DataTransfer(); for (const f of archivos) dt.items.add(f); conv.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true })); await sleep(900); };
+    const c = datos.crearChat(blackcode.id);
+    datos.elegirChat(c.id);
+    await sleep(400);
+    await soltar([await foto('screenshot.png'), new File(['# Lab report\\n\\nResults of the titration.\\n'], 'lab-report.md', { type: 'text/markdown' })]);
+    const area = document.querySelector('.dm-area');
+    area.value = 'Can you check the report against this screenshot?';
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    area.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    await sleep(400);
+    await quietos();
+    datos.renombrarChat(c.id, 'Report and screenshot');
+    await soltar([await foto('second.png'), new File(['a,b\\n1,2\\n'], 'data.csv', { type: 'text/csv' })]);
+    area.value = 'And these two?';
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    const hilo = document.querySelector('.dm-hilo:not([data-rad-leaving])');
+    hilo.scrollTop = 0;
+    await sleep(700);`,
   'sin-llave': `
     await go('ajustes');
     await sleep(400);`,
