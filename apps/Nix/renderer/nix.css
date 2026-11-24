@@ -550,4 +550,153 @@
   }
   .dm-enviar[data-modo='enviar'] .dm-ic-frenar,
   .dm-enviar[data-modo='frenar'] .dm-ic-enviar { opacity: 0; transform: scale(0.7); }
+
+  /* ---------- Las tools ---------- */
+
+  /* La fila de una llamada, entre los mensajes: qué tool, sobre qué y cómo
+     terminó. Es más angosta y más callada que un mensaje: es un registro. */
+  .dm-tool {
+    /* todas del ancho de la columna: una tira pareja, no chips de anchos sueltos */
+    align-self: stretch;
+    max-width: 100%;
+    min-width: 0;
+    display: grid;
+    border-radius: var(--rad-radius-m);
+    background: var(--rad-tint-hover);
+    box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line);
+    /* pegada a la que venga antes o después: una tira, no tarjetas sueltas */
+    margin-block: calc(var(--rad-space-3) * -1);
+  }
+  .dm-tool:first-child { margin-top: 0; }
+  .dm-tool-cabeza {
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    min-width: 0;
+    min-height: var(--rad-control-height);
+    padding-inline: var(--rad-space-3);
+    border-radius: inherit;
+    font-size: var(--rad-text-s);
+    color: var(--rad-text-2);
+    text-align: start;
+    transition: color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-tool[data-con-salida] .dm-tool-cabeza:hover { color: var(--rad-text-1); }
+  .dm-tool:not([data-con-salida]) .dm-tool-cabeza { cursor: default; }
+  .dm-tool-icono { flex: none; color: var(--rad-text-3); transition: color var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-tool-nombre { flex: none; font-family: var(--rad-font-mono); color: var(--rad-text-1); }
+  .dm-tool-que.rad-swap, .dm-tool-estado.rad-swap { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+  .dm-tool-que { flex: 0 1 auto; }
+  .dm-tool-que > *, .dm-tool-estado > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dm-tool-estado { flex: none; margin-inline-start: var(--rad-space-2); color: var(--rad-text-3); transition: color var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-tool-chevron {
+    flex: none;
+    color: var(--rad-text-3);
+    opacity: 0;
+    transition: transform var(--rad-dur-base) var(--rad-ease-in-out), opacity var(--rad-dur-fast) var(--rad-ease-in-out);
+  }
+  .dm-tool[data-con-salida] .dm-tool-chevron { opacity: 1; }
+  .dm-tool[data-abierto] .dm-tool-chevron { transform: rotate(180deg); }
+  /* El estado va en el color del ícono y de la palabra, no en un bloque. */
+  .dm-tool[data-estado='run'] .dm-tool-icono { color: var(--rad-accent-strong); animation: dm-latido calc(var(--rad-dur-slow) * 2.5) var(--rad-ease-in-out) infinite alternate; }
+  .dm-tool[data-estado='ok'] .dm-tool-icono, .dm-tool[data-estado='ok'] .dm-tool-estado { color: var(--rad-success); }
+  .dm-tool[data-estado='error'] .dm-tool-icono, .dm-tool[data-estado='error'] .dm-tool-estado { color: var(--rad-danger); }
+  .dm-tool[data-estado='blocked'] .dm-tool-icono, .dm-tool[data-estado='blocked'] .dm-tool-estado,
+  .dm-tool[data-estado='declined'] .dm-tool-icono, .dm-tool[data-estado='declined'] .dm-tool-estado { color: var(--rad-warning); }
+  /* Lo que devolvió: se despliega debajo. */
+  .dm-tool-salida {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .dm-tool[data-abierto] .dm-tool-salida { grid-template-rows: 1fr; }
+  .dm-tool-salida-in {
+    min-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out);
+  }
+  .dm-tool[data-abierto] .dm-tool-salida-in { opacity: 1; transition-delay: calc(var(--rad-dur-fast) / 2); }
+  .dm-tool-pre {
+    margin: 0;
+    padding: var(--rad-space-1) var(--rad-space-3) var(--rad-space-3);
+    max-height: 240px;
+    overflow: auto;
+    font-size: var(--rad-text-xs);
+    line-height: 1.5;
+    color: var(--rad-text-2);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+
+  /* Un tramo de texto que quedó vacío no ocupa lugar. */
+  .dm-msg[data-vacio] { display: none; }
+
+  /* El contador de tools, debajo de la respuesta. */
+  .dm-msg-cuenta {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .dm-msg-cuenta[data-abierto] { grid-template-rows: 1fr; }
+  .dm-msg-cuenta-in {
+    min-height: 0;
+    overflow: hidden;
+    font-size: var(--rad-text-xs);
+    font-family: var(--rad-font-mono);
+    color: var(--rad-text-3);
+    opacity: 0;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out);
+  }
+  .dm-msg-cuenta[data-abierto] .dm-msg-cuenta-in { opacity: 1; transition-delay: calc(var(--rad-dur-fast) / 2); }
+  .dm-msg-cuenta-texto { padding-top: var(--rad-space-2); }
+
+  /* La tarjeta de permiso (adentro del modal). */
+  .rad-modal:has(.dm-permiso) { --rad-modal-width: 600px; }
+  .dm-permiso { display: grid; gap: var(--rad-space-3); min-width: 0; }
+  .dm-permiso-que { color: var(--rad-text-1); overflow-wrap: anywhere; }
+  .dm-permiso-vista { display: grid; gap: var(--rad-space-2); min-width: 0; }
+  .dm-permiso-ruta { font-size: var(--rad-text-xs); color: var(--rad-text-3); overflow-wrap: anywhere; user-select: text; }
+  .dm-permiso-frase { color: var(--rad-text-2); }
+  .dm-permiso-frase[data-tono='warning'] { color: var(--rad-warning); }
+  .dm-permiso-args {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--rad-space-1) var(--rad-space-3);
+    margin: 0;
+    max-height: 220px;
+    overflow: auto;
+    font-size: var(--rad-text-s);
+  }
+  .dm-permiso-args dt { color: var(--rad-text-3); }
+  .dm-permiso-args dd { margin: 0; color: var(--rad-text-1); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+  /* El diff: un pozo, con cada renglón teñido por lo que le pasa. */
+  .dm-diff {
+    max-height: 300px;
+    overflow: auto;
+    padding-block: var(--rad-space-2);
+    border-radius: var(--rad-radius-m);
+    background: color-mix(in srgb, var(--rad-surface-0) 62%, transparent);
+    box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line);
+    font-size: var(--rad-text-xs);
+    line-height: 1.55;
+    user-select: text;
+  }
+  .dm-diff-renglon { display: grid; grid-template-columns: var(--rad-space-5) minmax(0, 1fr); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--rad-text-2); }
+  .dm-diff-signo { text-align: center; color: var(--rad-text-3); user-select: none; }
+  .dm-diff-renglon[data-t='mas'] { background: color-mix(in srgb, var(--rad-success) 14%, transparent); color: var(--rad-text-1); }
+  .dm-diff-renglon[data-t='mas'] .dm-diff-signo { color: var(--rad-success); }
+  .dm-diff-renglon[data-t='menos'] { background: color-mix(in srgb, var(--rad-danger) 14%, transparent); color: var(--rad-text-1); }
+  .dm-diff-renglon[data-t='menos'] .dm-diff-signo { color: var(--rad-danger); }
+  .dm-diff-salto { height: var(--rad-space-2); margin-block: var(--rad-space-1); box-shadow: inset 0 var(--rad-line-width) 0 var(--rad-line); }
+
+  /* Las tools en el formulario del agente y en su tarjeta. */
+  .dm-tools-lista { display: grid; gap: var(--rad-space-2); }
+  .dm-tools-grupo { display: grid; min-width: 0; }
+  .dm-tools-grupo small { font-family: var(--rad-font-mono); font-size: var(--rad-text-xs); color: var(--rad-text-3); overflow-wrap: anywhere; }
+  .rad-field[data-sin-soporte] .dm-tools-lista { opacity: 0.5; transition: opacity var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-tools-lista { transition: opacity var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-tarjeta-datos { display: flex; flex-wrap: wrap; gap: var(--rad-space-1) var(--rad-space-3); min-width: 0; }
+  .dm-tarjeta-tools { font-size: var(--rad-text-s); color: var(--rad-text-3); }
 }

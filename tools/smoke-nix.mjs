@@ -92,6 +92,13 @@ function checkDisk(data, report) {
   for (const doc of ['_llave.json', '_llave_venice.json']) {
     if (!files.includes(doc)) failures.push(`una llave no se guardó (falta ${doc})`);
   }
+  // Las tools del humo trabajaron en <datos>/workspace: lo que quedó en el
+  // disco tiene que ser lo que el guion aprobó, y nada de lo que rechazó.
+  const taller = path.join(data, 'workspace');
+  const leer = (f) => { try { return fs.readFileSync(path.join(taller, f), 'utf8'); } catch { return null; } };
+  if (leer('note.txt') !== 'one\n2\n') failures.push(`note.txt quedó como ${JSON.stringify(leer('note.txt'))}: se esperaba la edición aprobada y no la rechazada`);
+  if (leer('auto.txt') !== 'auto\n') failures.push(`auto.txt quedó como ${JSON.stringify(leer('auto.txt'))}`);
+  if (leer('x.txt') !== null) failures.push('una llamada con argumentos incompletos escribió un archivo');
   const borrado = report.script?.chatBorrado;
   if (!borrado) failures.push('el guion no dijo qué chat borró');
   else if (files.some((f) => f.startsWith(`chat-${borrado}.`))) failures.push(`el documento del chat borrado sigue en el disco: ${files.filter((f) => f.startsWith(`chat-${borrado}.`)).join(', ')}`);

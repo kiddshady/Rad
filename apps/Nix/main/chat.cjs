@@ -12,14 +12,26 @@
 //     tipo 'error'  { mensaje }  no hubo respuesta, y por qué
 //   rad.invoke('chat:frenar', id)
 //
+// Con tools (el agente las tiene prendidas y el modelo las acepta) el pedido
+// trae además { chat, tools, modo } y aparecen tres eventos:
+//     tipo 'tool'      { callId, kind, label }             se pidió una tool
+//     tipo 'tool-fin'  { callId, status, ms, out, outCut } cómo terminó
+//     tipo 'confirmar' { callId, name, label, args, vista } pide permiso;
+//                      se contesta con rad.invoke('chat:confirmar', { callId, permitir, confiar, chat })
+//   y 'fin' y 'error' llevan `tools`: lo que corrió en el turno.
+//   rad.invoke('chat:tools')    los grupos de tools y la carpeta de trabajo
+//
 //   rad.invoke('chat:modelos')   los proveedores con sus modelos
 //   rad.on('chat:modelos', …)    la lista cambió (llegó la de Venice)
 //
-// Sin herramientas: el modelo solo conversa.
+// Las tools viven en main/tools (ver su index.cjs).
 
+const fs = require('node:fs');
+const path = require('node:path');
 const anthropic = require('./anthropic.cjs');
 const venice = require('./venice.cjs');
 const simulado = require('./simulado.cjs');
+const herramientas = require('./tools/index.cjs');
 
 const NOMBRES = { anthropic: 'Anthropic', venice: 'Venice' };
 const RESPONDER = { anthropic: anthropic.responder, venice: venice.responder };
@@ -31,24 +43,82 @@ const DOC_VENICE = '_venice_modelos';
 const VENCE_MS = 6 * 60 * 60 * 1000;
 // Las notas de cada modelo se guardan ya escritas. Si cambia cómo se
 // escriben (hasta la 0.1.1 iban en castellano), lo guardado se vuelve a pedir.
-const FORMATO_VENICE = 2;
+const FORMATO_VENICE = 3;
+
+// Donde se guarda la carpeta de trabajo de las tools, para el arranque siguiente.
+const DOC_TOOLS = '_tools';
+// Lo más largo que la tarjeta de confirmación muestra de un argumento.
+const ARG_MAX = 1500;
 const ESPERA_MODELOS_MS = 8000;
 
 function limpiar(pedido) {
-  const { id, proveedor = 'anthropic', modelo, instrucciones, mensajes } = pedido ?? {};
+  const { id, chat = '', proveedor = 'anthropic', modelo, instrucciones, mensajes, tools = [], modo = 'manual' } = pedido ?? {};
   if (typeof id !== 'string' || !id) throw new Error('[nix] el pedido no trae id');
   if (!RESPONDER[proveedor]) throw new Error(`[nix] proveedor desconocido: ${JSON.stringify(proveedor)}`);
   if (typeof modelo !== 'string' || !modelo) throw new Error('[nix] el pedido no trae modelo');
   if (!Array.isArray(mensajes) || !mensajes.length) throw new Error('[nix] el pedido no trae mensajes');
-  const lista = mensajes
-    .filter((m) => m && ROLES.has(m.rol) && typeof m.texto === 'string' && m.texto.trim())
-    .map((m) => ({ rol: m.rol, texto: m.texto }));
+  // Las filas de tools de los turnos anteriores (rol 'tool') viajan plegadas:
+  // un mensaje de la app, justo antes de la respuesta que las siguió, con qué
+  // corrió y cómo terminó. Es la evidencia entre turnos: sin ella, la única
+  // memoria que el modelo tiene de lo que hizo es su propia prosa.
+  const lista = herramientas.plegar(mensajes
+    .filter((m) => m && (m.rol === 'tool' ? typeof m.tool === 'string' : ROLES.has(m.rol) && typeof m.texto === 'string' && m.texto.trim()))
+    .map((m) => (m.rol === 'tool'
+      ? { role: 'tool', tool: m.tool, content: String(m.texto ?? ''), status: m.estado }
+      : { role: m.rol, content: m.texto })))
+    .map((m) => ({ rol: m.role, texto: m.content }));
   if (!lista.length || lista[0].rol !== 'user') throw new Error('[nix] el chat tiene que empezar con un mensaje del usuario');
-  return { id, proveedor, modelo, instrucciones: typeof instrucciones === 'string' ? instrucciones.trim() : '', mensajes: lista };
+  return {
+    id,
+    chat: String(chat ?? ''),
+    proveedor,
+    modelo,
+    instrucciones: typeof instrucciones === 'string' ? instrucciones.trim() : '',
+    mensajes: lista,
+    tools: Array.isArray(tools) ? tools.filter((t) => typeof t === 'string') : [],
+    modo: modo === 'auto' ? 'auto' : 'manual',
+  };
 }
 
 function wire(rad, { llave }) {
   const activos = new Map(); // id del pedido -> AbortController
+
+  // ---------- Las tools ----------
+  const { shell } = require('electron');
+  // Con el proveedor de mentira (el humo, las capturas) las tools no tocan
+  // nada de verdad: trabajan en una carpeta adentro de los datos descartables
+  // y lo que «borran» va a una papelera que es otra carpeta ahí mismo.
+  const taller = llave.SIMULADO && process.env.RAD_DATA ? path.join(process.env.RAD_DATA, 'workspace') : null;
+  if (taller) {
+    fs.mkdirSync(path.join(taller, '.trash'), { recursive: true });
+    herramientas.iniciar({ trash: (ruta) => fs.promises.rename(ruta, path.join(taller, '.trash', `${Date.now()}-${path.basename(ruta)}`)) });
+    herramientas.setCwd(taller);
+  } else {
+    herramientas.iniciar({ trash: (ruta) => shell.trashItem(ruta) });
+    herramientas.setCwd(rad.store.read(DOC_TOOLS)?.carpeta);
+  }
+  const guardarCarpeta = () => {
+    const carpeta = herramientas.getCwd();
+    if (!taller && rad.store.read(DOC_TOOLS)?.carpeta !== carpeta) rad.store.write(DOC_TOOLS, { carpeta }).catch(() => {});
+  };
+  const pendientes = new Map(); // callId -> resolver de la tarjeta que espera
+  // Los chats donde el usuario tildó «no preguntar más». En memoria: al
+  // reabrir la app, vuelve a preguntar.
+  const confiados = new Set();
+  const recortar = (args) => Object.fromEntries(Object.entries(args || {}).map(([k, v]) => {
+    const t = typeof v === 'string' ? v : JSON.stringify(v);
+    return [k, t.length > ARG_MAX ? `${t.slice(0, ARG_MAX)}… (${t.length - ARG_MAX} more characters)` : t];
+  }));
+
+  rad.handle('chat:tools', () => herramientas.catalogo());
+  rad.handle('chat:confirmar', (respuesta) => {
+    const { callId, permitir, confiar, chat } = respuesta ?? {};
+    const resolver = pendientes.get(callId);
+    if (!resolver) return { ok: false };
+    if (permitir === true && confiar === true && chat) confiados.add(String(chat));
+    resolver(permitir === true);
+    return { ok: true };
+  });
 
   // ---------- Los modelos ----------
   const veniceGuardado = () => (llave.SIMULADO ? simulado.VENICE : rad.store.read(DOC_VENICE) ?? { lista: [], inicial: '' });
@@ -97,10 +167,49 @@ function wire(rad, { llave }) {
     const control = new AbortController();
     activos.set(pedido.id, control);
 
+    // Las tools, si el agente las tiene prendidas y el modelo las acepta (un
+    // modelo de Venice que no las soporta conversa como siempre).
+    const elModelo = proveedores().proveedores.find((p) => p.id === pedido.proveedor)?.modelos.find((m) => m.id === pedido.modelo);
+    let sesion = null;
+    if (pedido.tools.length && elModelo?.tools !== false) {
+      sesion = herramientas.crearSesion({
+        reqId: pedido.id,
+        convoId: pedido.chat,
+        ac: control,
+        tools: pedido.tools,
+        confirma: () => pedido.modo !== 'auto' && !confiados.has(pedido.chat),
+        // los runners avisan sin saber su callId: se lo pone la corrida
+        notify(canal, datos) {
+          const callId = datos.callId ?? this._callId;
+          if (canal === 'tool:activity') avisar('tool', { callId, kind: datos.kind, label: datos.label });
+          else if (canal === 'tool:result') avisar('tool-fin', { callId, status: datos.status, ms: datos.ms, out: datos.out, outCut: datos.outCut });
+        },
+        // La tarjeta: se le manda a la interfaz qué se va a correr (y, si es
+        // un archivo, qué cambia) y se espera la respuesta. Un Stop la cierra.
+        async confirm(name, args, callId) {
+          if (control.signal.aborted) return 'abort';
+          const vista = await herramientas.vistaPrevia(sesion.run, name, args);
+          return new Promise((resolve) => {
+            const alFrenar = () => { pendientes.delete(callId); resolve('abort'); };
+            control.signal.addEventListener('abort', alFrenar, { once: true });
+            pendientes.set(callId, (permitir) => {
+              control.signal.removeEventListener('abort', alFrenar);
+              pendientes.delete(callId);
+              resolve(permitir);
+            });
+            avisar('confirmar', { callId, name, label: herramientas.argsDigest(name, args), args: recortar(args), vista });
+          });
+        },
+      });
+      if (!sesion.activa) sesion = null;
+    }
+    const corrio = () => (sesion ? { tools: sesion.resumen(), agotado: sesion.run.stopped === 'maxrounds' } : {});
+
     const opciones = {
       signal: control.signal,
       onPensando: () => avisar('pensando'),
       onTexto: (texto) => avisar('texto', { texto }),
+      sesion,
     };
     let trabajo;
     if (llave.SIMULADO) {
@@ -114,8 +223,8 @@ function wire(rad, { llave }) {
 
     // No se espera acá: el invoke vuelve enseguida y lo demás llega por eventos.
     trabajo
-      .then((fin) => avisar('fin', fin), (err) => avisar('error', { mensaje: err.message }))
-      .finally(() => activos.delete(pedido.id));
+      .then((fin) => avisar('fin', { ...fin, ...corrio() }), (err) => avisar('error', { mensaje: err.message, ...corrio() }))
+      .finally(() => { activos.delete(pedido.id); if (sesion) guardarCarpeta(); });
     return { ok: true };
   });
 

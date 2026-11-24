@@ -12,6 +12,7 @@ import * as datos from './datos.js';
 import * as llave from './llave.js';
 import { pintar } from './markdown.js';
 import { abrirAgente } from './agentes.js';
+import { filaTool, ponerTool, cuentaTools, abrirPermiso } from './tools.js';
 import { h, icono } from './piezas.js';
 
 // Los items que no son un chat ni un mensaje: el lugar vacío de cada lista.
@@ -176,6 +177,7 @@ export function montarChat(el, { router }) {
   };
 
   const mensaje = (m) => {
+    if (m.rol === 'tool') return filaTool(m);
     if (m.id === VACIO) {
       const a = datos.agenteActual();
       return h('div', 'dm-vacio', {}, h('strong', '', {}, a.nombre), h('span', '', {}, 'Write something to get started.'));
@@ -185,11 +187,15 @@ export function montarChat(el, { router }) {
     if (m.rol === 'assistant') {
       nodo.append(h('div', 'dm-msg-pie', {}, h('div', 'dm-msg-pie-in', {},
         h('span', 'dm-pulso', { 'aria-hidden': 'true' }, h('i')), h('span', 'dm-msg-nota rad-swap'))));
+      // El contador de tools del turno: siempre que el turno las tuvo, también
+      // cuando no corrió ninguna. Es un dato, no una acusación.
+      nodo.append(h('div', 'dm-msg-cuenta', {}, h('div', 'dm-msg-cuenta-in', {}, h('span', 'dm-msg-cuenta-texto rad-swap'))));
     }
     ponerMensaje(nodo, m);
     return nodo;
   };
   const ponerMensaje = (nodo, m) => {
+    if (m.rol === 'tool') { ponerTool(nodo, m); return; }
     if (m.id === VACIO) return;
     const cuerpo = nodo.firstElementChild;
     if (m.rol === 'user') {
@@ -202,6 +208,12 @@ export function montarChat(el, { router }) {
     const nota = notaDe(m, hilo?.chatId);
     nodo.querySelector('.dm-msg-pie').toggleAttribute('data-abierto', estado !== 'ok');
     if (nota) swapText(nodo.querySelector('.dm-msg-nota'), nota);
+    const cuenta = cuentaTools(m);
+    if (cuenta) swapText(nodo.querySelector('.dm-msg-cuenta-texto'), cuenta);
+    nodo.querySelector('.dm-msg-cuenta').toggleAttribute('data-abierto', Boolean(cuenta) && estado !== 'escribiendo');
+    // un tramo de texto que quedó vacío (el agente llamó tools sin escribir
+    // nada antes) no ocupa lugar
+    nodo.toggleAttribute('data-vacio', !m.texto && estado !== 'escribiendo' && estado !== 'error');
   };
 
   const alFondo = () => { if (hilo) hilo.scroller.scrollTop = hilo.scroller.scrollHeight; };
@@ -329,6 +341,17 @@ export function montarChat(el, { router }) {
     if (hilo?.chatId === chat) dibujarMensajes();
   });
   llave.on(ponerAviso);
+
+  // La tarjeta de permiso: una tool del chat que se está viendo pide correr.
+  let tarjeta = null;
+  const ponerTarjeta = () => {
+    const c = datos.chatActual();
+    const pide = c ? datos.confirmacion(c.id) : null;
+    if (tarjeta && tarjeta.callId !== pide?.callId) { tarjeta.cerrar(); tarjeta = null; }
+    if (pide && !tarjeta) tarjeta = abrirPermiso(c.id, pide);
+  };
+  datos.on('confirmar', ponerTarjeta);
+  datos.on('seleccion', ponerTarjeta);
 
   ponerCabeza();
   dibujarLista();

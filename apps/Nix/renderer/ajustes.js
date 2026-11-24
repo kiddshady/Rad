@@ -7,6 +7,7 @@ import { toast } from '/@core/toast.js';
 import { setBusy } from '/@core/busy.js';
 import * as llave from './llave.js';
 import * as actualizacion from './actualizacion.js';
+import * as datosApp from './datos.js';
 import { h } from './piezas.js';
 
 const PROVEEDORES = [
@@ -193,11 +194,38 @@ function tarjetaAcerca() {
   return tarjeta;
 }
 
+// Las tools: si cada llamada pide permiso. Qué tools tiene cada agente se
+// elige en el agente; acá va lo que vale para todos.
+function tarjetaTools() {
+  const input = h('input', '', { type: 'checkbox', role: 'switch', id: 'dm-tools-preguntar', 'data-campo': 'preguntar' });
+  const nota = h('p', 'dm-tarjeta-instr rad-swap');
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'tools' },
+    h('h2', 'dm-tarjeta-nombre', {}, 'Tools'),
+    h('p', 'dm-tarjeta-instr', {}, 'An agent with tools can read and write files, run commands and use the web on this PC. Which tools each agent has is set on the agent.'),
+    h('label', 'rad-switch', {}, input, h('span', 'rad-switch-track'), 'Ask before each tool call'),
+    nota);
+  wireControls(tarjeta);
+  const poner = () => {
+    const manual = datosApp.modoTools() === 'manual';
+    input.checked = manual;
+    swapText(nota, manual
+      ? 'Every call shows you what it is about to do and waits for your answer.'
+      : 'Calls run without asking. There is no folder limit and no command filter: an agent can change anything your Windows user can.');
+    nota.toggleAttribute('data-vacio', false);
+    tarjeta.dataset.modo = manual ? 'manual' : 'auto';
+  };
+  input.addEventListener('change', () => datosApp.ponerModoTools(input.checked ? 'manual' : 'auto'));
+  poner();
+  datosApp.on('ajustes', poner);
+  return tarjeta;
+}
+
 export function montarAjustes(el, { router }) {
 
   el.append(h('div', 'dm-pagina', {},
     h('header', 'dm-pagina-cabeza', {}, h('div', '', {}, h('h1', '', {}, 'Settings'), h('p', '', {}, 'What Nix needs to talk to the models.'))),
     ...PROVEEDORES.map(tarjetaLlave),
+    tarjetaTools(),
     tarjetaAcerca()));
 
   // Al abrir Ajustes se le pregunta a la API por cada llave guardada. Lo que

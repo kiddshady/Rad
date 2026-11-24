@@ -633,6 +633,161 @@ else {
   if (shown(chatView.querySelector('.dm-agente-nombre')) !== 'Galen on call' || msgs().length !== 4) fail(`cambiar de agente desde el selector no trajo su chat (${msgs().length} mensajes a la vista)`);
 }
 
+// 11b. Tools. Un agente con las tools de archivos y de comandos prendidas. El
+// proveedor de mentira pide las llamadas que el mensaje le dicta (un renglón
+// «TOOLS: […]») por el motor de verdad, sobre una carpeta descartable: lo que
+// se mide es el despachador, la tarjeta de permiso, las filas con su estado y
+// el contador. Es el circuito entero menos el modelo.
+{
+  const tools = () => alive(thread()?.querySelectorAll('.dm-tool') ?? []);
+  const fila = (name, n = -1) => tools().filter((t) => t.dataset.tool === name).at(n);
+  const permiso = () => alive(document.querySelectorAll('.rad-overlays .rad-modal[data-permiso]')).find((m) => m.dataset.state === 'open');
+  const ultimo = () => msgs().at(-1);
+  const cuenta = () => shown(ultimo()?.querySelector('.dm-msg-cuenta-texto'));
+  const pedir = async (llamadas) => { type(area, `TOOLS: ${llamadas.map((r) => JSON.stringify(r)).join(' ;; ')}`); key(area, 'Enter'); };
+  const terminado = (n) => until(() => msgs().length === n && ultimo().dataset.estado === 'ok', 20000);
+
+  await go('agentes');
+  view('agentes').querySelector('[data-accion="nuevo-agente"]').click();
+  await frame();
+  const form = modal();
+  type(form.querySelector('[data-campo="nombre"]'), 'Toolsmith');
+  const interruptores = [...form.querySelectorAll('[data-campo="tools"] input[role="switch"]')];
+  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,web' || interruptores.some((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
+  for (const i of interruptores.slice(0, 2)) i.click(); // archivos y comandos; la web queda apagada
+  enIngles('en el formulario con tools');
+  primary().click();
+  await closed();
+  await settle();
+  const herrero = cards().at(-1);
+  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'No tools') fail('un agente sin tools no dice que no las tiene');
+  herrero.querySelector('[data-accion="abrir"]').click();
+  await sleep(dur('base') + 260);
+
+  // Escribir un archivo. En modo manual (el de fábrica) primero pide permiso:
+  // la tarjeta dice qué va a correr y qué va a cambiar, y hasta que no se
+  // contesta no hay fila ni archivo.
+  await pedir([[{ name: 'fs_write', args: { path: 'note.txt', content: 'one\ntwo\n' } }]]);
+  await until(() => permiso(), 5000);
+  const p1 = permiso();
+  if (!p1) fail('una tool en modo manual no pidió permiso');
+  else {
+    if (!p1.textContent.includes('Allow fs_write?') || !p1.textContent.includes('A new file, 2 lines.')) fail(`la tarjeta de permiso dice: ${p1.textContent.slice(0, 160)}`);
+    if (tools().length) fail('la tool dejó su fila antes de que se contestara la tarjeta');
+    enIngles('con la tarjeta de permiso');
+    primary().click();
+    await closed();
+  }
+  await terminado(3);
+  if (fila('fs_write')?.dataset.estado !== 'ok') fail(`la fila de fs_write quedó en «${fila('fs_write')?.dataset.estado}»`);
+  if (shown(fila('fs_write')?.querySelector('.dm-tool-que')) !== 'note.txt' || shown(fila('fs_write')?.querySelector('.dm-tool-estado')) !== 'done') fail('la fila no dice qué archivo tocó ni que terminó');
+  if (cuenta() !== '1 tool · 1 done') fail(`el contador dice «${cuenta()}»`);
+  const dijo = ultimo().querySelector('.dm-msg-cuerpo').textContent;
+  if (!dijo.includes('record seen: yes') || !dijo.includes('protocol: yes')) fail('la app no le puso al modelo el registro del turno o el protocolo de tools');
+  // La tira en orden: lo que dijo antes, la fila, y lo que dijo después.
+  const orden = [...thread().querySelectorAll('.dm-col > :not([data-rad-leaving])')].map((n) => (n.classList.contains('dm-tool') ? 'tool' : n.dataset.rol)).join(',');
+  if (orden !== 'user,assistant,tool,assistant') fail(`el turno quedó en este orden: ${orden}`);
+
+  // Rechazar: la tarjeta muestra el diff, y al decir que no queda la fila
+  // como rechazada y el archivo sin tocar.
+  await pedir([[{ name: 'fs_edit', args: { path: 'note.txt', edits: [{ old: 'two', new: 'DECLINED' }] } }]]);
+  await until(() => permiso(), 5000);
+  const p2 = permiso();
+  const renglones = [...(p2?.querySelectorAll('.dm-diff-renglon') ?? [])].map((r) => `${r.dataset.t}:${r.querySelector('.dm-diff-texto').textContent}`);
+  if (!renglones.includes('menos:two') || !renglones.includes('mas:DECLINED')) fail(`la tarjeta de fs_edit no muestra el cambio: ${renglones.join(' | ')}`);
+  [...p2.querySelectorAll('.rad-button')].find((b) => b.textContent === 'Decline').click();
+  await closed();
+  await terminado(6);
+  if (fila('fs_edit')?.dataset.estado !== 'declined' || cuenta() !== '1 tool · 1 declined') fail(`una tool rechazada quedó como «${fila('fs_edit')?.dataset.estado}», contador «${cuenta()}»`);
+
+  // Dos rondas, y «no preguntar más en este chat»: la primera tarjeta se
+  // aprueba tildando eso, y las llamadas que siguen corren sin preguntar.
+  await pedir([
+    [{ name: 'fs_read', args: { paths: ['note.txt'] } }],
+    [
+      { name: 'fs_edit', args: { path: 'note.txt', edits: [{ old: 'two', new: '2' }] } },
+      { name: 'shell_exec', args: { command: 'Write-Output nix-smoke' } },
+      // corre en un proceso aparte (el worker de búsqueda): en la app
+      // empaquetada es lo primero que se rompe si el archivo no viajó
+      { name: 'code_search', args: { mode: 'content', pattern: 'one', path: '.' } },
+    ],
+  ]);
+  await until(() => permiso(), 5000);
+  permiso().querySelector('.rad-check input').click();
+  primary().click();
+  await closed();
+  let otraTarjeta = false;
+  await until(() => { otraTarjeta ||= Boolean(permiso()); return ultimo()?.dataset.estado === 'ok' && msgs().length === 10; }, 30000);
+  if (otraTarjeta) fail('después de «no preguntar más en este chat» volvió a pedir permiso');
+  if (cuenta() !== '4 tools · 4 done') fail(`con cuatro llamadas en dos rondas el contador dice «${cuenta()}»`);
+  if (!fila('code_search')?.querySelector('.dm-tool-pre').textContent.includes('note.txt')) fail(`code_search no encontró el archivo: ${fila('code_search')?.querySelector('.dm-tool-pre').textContent.slice(0, 120)}`);
+  // Lo que devolvió cada una se lee abriendo su fila. El fs_read vio el
+  // archivo SIN la edición rechazada.
+  const leida = fila('fs_read');
+  leida.querySelector('.dm-tool-cabeza').click();
+  await sleep(dur('base') + 160);
+  if (!leida.hasAttribute('data-abierto') || leida.querySelector('.dm-tool-salida').getBoundingClientRect().height < 20) fail('la fila de una tool no se abre para mostrar lo que devolvió');
+  const vio = leida.querySelector('.dm-tool-pre').textContent;
+  if (!vio.includes('two') || vio.includes('DECLINED')) fail(`fs_read devolvió: ${vio.slice(0, 120)}`);
+  if (!fila('shell_exec')?.querySelector('.dm-tool-pre').textContent.includes('nix-smoke')) fail('shell_exec no devolvió la salida del comando');
+  // Nada de la tira se sale de la columna.
+  const col = thread().querySelector('.dm-col').getBoundingClientRect();
+  const afuera = tools().find((t) => t.getBoundingClientRect().right > col.right + 0.5);
+  if (afuera) fail(`la fila de ${afuera.dataset.tool} se sale de la columna`);
+
+  // Argumentos incompletos, y una tool que este agente no tiene: ninguna
+  // corre, las dos dejan su fila como fallida, y no hay tarjeta que contestar.
+  await pedir([[{ name: 'fs_write', args: { path: 'x.txt' } }, { name: 'fetch', args: { url: 'https://example.com' } }]]);
+  await terminado(13);
+  if (fila('fs_write')?.dataset.estado !== 'error' || fila('fetch')?.dataset.estado !== 'error' || cuenta() !== '2 tools · 2 failed') fail(`argumentos incompletos y una tool apagada: ${fila('fs_write')?.dataset.estado}, ${fila('fetch')?.dataset.estado}, «${cuenta()}»`);
+  if (!fila('fetch').querySelector('.dm-tool-pre').textContent.includes('not available in this run')) fail('una tool que el agente no tiene prendida no fue rechazada por eso');
+
+  // Sin el renglón TOOLS el agente conversa, y el contador lo dice igual.
+  type(area, 'Just say hi.');
+  key(area, 'Enter');
+  await terminado(15);
+  if (cuenta() !== 'no tools') fail(`un turno con tools prendidas que no usó ninguna dice «${cuenta()}»`);
+  enIngles('en un chat con tools');
+
+  // Modo automático: Settings lo dice, y una escritura corre sin tarjeta.
+  await go('ajustes');
+  const tarjetaTools = view('ajustes').querySelector('[data-tarjeta="tools"]');
+  const preguntar = tarjetaTools.querySelector('[data-campo="preguntar"]');
+  if (!preguntar.checked) fail('de fábrica las tools no piden permiso');
+  preguntar.click();
+  await settle();
+  if (tarjetaTools.dataset.modo !== 'auto' || !shown(tarjetaTools.querySelector('.dm-tarjeta-instr.rad-swap')).includes('without asking')) fail('Settings no dice que las tools corren sin preguntar');
+  enIngles('en Settings con tools');
+  await go('chat');
+  chatView.querySelector('[data-accion="nuevo-chat"]').click();
+  await settle();
+  await pedir([[{ name: 'fs_write', args: { path: 'auto.txt', content: 'auto\n' } }]]);
+  let tarjetaEnAuto = false;
+  await until(() => { tarjetaEnAuto ||= Boolean(permiso()); return msgs().length === 3 && ultimo().dataset.estado === 'ok'; }, 15000);
+  if (tarjetaEnAuto || cuenta() !== '1 tool · 1 done') fail(`en modo automático: tarjeta ${tarjetaEnAuto}, contador «${cuenta()}»`);
+  await go('ajustes');
+  preguntar.click();
+  await settle();
+  if (tarjetaTools.dataset.modo !== 'manual') fail('el modo manual no volvió');
+  data.tools = `Toolsmith: ${tools().length} filas en el último chat; permiso, rechazo, dos rondas, confianza por chat, argumentos malos y modo automático`;
+
+  // El agente de prueba se va, con sus chats, y vuelve a quedar Galen abierto
+  // (la pasada 2 espera encontrar lo de antes).
+  await go('agentes');
+  cards().find((c) => shown(c.querySelector('.dm-tarjeta-nombre')) === 'Toolsmith').querySelector('[data-accion="eliminar"]').click();
+  await frame();
+  primary().click();
+  await closed();
+  await settle();
+  if (cards().length !== 3) fail(`después de borrar al agente con tools quedan ${cards().length} tarjetas`);
+  await go('chat');
+  chatView.querySelector('[data-accion="agente"]').click();
+  await frame();
+  await pick('Galen on call');
+  await until(() => msgs().length === 4, 2500);
+}
+
 // 12. About: el botón para buscar una actualización. Abierta desde el repo
 // no hay updater, y lo dice; en la app instalada le pregunta a GitHub. Los
 // demás estados (hay una versión, bajando, lista) se recorren dándole al

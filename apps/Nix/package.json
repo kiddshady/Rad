@@ -1,7 +1,7 @@
 {
   "name": "daimon",
   "productName": "Nix",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Nix: an AI chat with several agents, each with its own provider, model, instructions and chats.",
   "author": "Kidd Shady · Umbrovex Systems",
@@ -34,10 +34,14 @@
     "files": [
       "main.cjs",
       "main/**/*",
+      "docs/**/*",
       "renderer/**/*",
       "build/icon.ico",
       "build/icon.png",
       "package.json"
+    ],
+    "asarUnpack": [
+      "main/tools/code-search-worker.cjs"
     ],
     "win": {
       "target": [

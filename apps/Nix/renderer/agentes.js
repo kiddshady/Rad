@@ -42,7 +42,7 @@ export function abrirAgente(agente = null) {
       options: modelos.map((m) => ({ value: m.id, label: m.nombre })),
       value: suyo ?? p.inicial,
       placeholder: 'No models yet',
-      onChange: ponerNota,
+      onChange: () => { ponerNota(); ponerTools(); },
     });
     select.el.setAttribute('aria-labelledby', `dm-modelo-${n}`);
     select.el.dataset.campo = 'modelo';
@@ -63,7 +63,7 @@ export function abrirAgente(agente = null) {
   const proveedor = createSelect({
     options: lista.map((p) => ({ value: p.id, label: p.nombre })),
     value: actual,
-    onChange: (v) => { actual = v; setFieldError(campoModelo, null); ponerProveedor(); },
+    onChange: (v) => { actual = v; setFieldError(campoModelo, null); ponerProveedor(); ponerTools(); },
   });
   proveedor.el.setAttribute('aria-labelledby', `dm-proveedor-${n}`);
   proveedor.el.dataset.campo = 'proveedor';
@@ -78,7 +78,32 @@ export function abrirAgente(agente = null) {
     instrucciones,
     h('span', 'rad-field-hint', {}, 'The model reads this before every chat. It can be left empty.'));
 
-  const form = h('form', 'dm-form', {}, campoNombre, h('div', 'dm-form-par', {}, campoProveedor, campoModelo), campoInstr);
+  // Las tools del agente, por grupo. Apagadas, el agente solo conversa. Si el
+  // modelo elegido no las acepta (pasa con varios de Venice) quedan como
+  // están pero no se usan, y se dice.
+  const elegidas = new Set(datos.toolsDe(agente));
+  const notaTools = h('span', 'rad-field-hint rad-swap');
+  const filas = datos.gruposTools().map((g) => {
+    const input = h('input', '', { type: 'checkbox', role: 'switch', 'data-grupo': g.id });
+    input.checked = g.tools.some((t) => elegidas.has(t));
+    return { g, input, nodo: h('label', 'rad-switch', {}, input, h('span', 'rad-switch-track'), h('span', 'dm-tools-grupo', {}, g.nombre, h('small', '', {}, g.tools.join(', ')))) };
+  });
+  const toolsElegidas = () => filas.filter((f) => f.input.checked).flatMap((f) => f.g.tools);
+  const ponerTools = () => {
+    const modelo = selects.get(actual)?.select.value;
+    const acepta = !modelo || datos.modeloConTools(actual, modelo);
+    swapText(notaTools, acepta
+      ? 'Off, the agent only talks. On, it can act on this PC: each call asks first unless you turn that off in Settings.'
+      : 'This model does not accept tools: the agent will only talk while it uses it.');
+    campoTools.toggleAttribute('data-sin-soporte', !acepta);
+  };
+  const campoTools = h('div', 'rad-field', { 'data-campo': 'tools' },
+    h('span', 'rad-field-label', {}, 'Tools'),
+    h('div', 'dm-tools-lista', {}, ...filas.map((f) => f.nodo)),
+    notaTools);
+  ponerTools();
+
+  const form = h('form', 'dm-form', {}, campoNombre, h('div', 'dm-form-par', {}, campoProveedor, campoModelo), campoInstr, campoTools);
   wireControls(form);
   form.addEventListener('submit', (e) => e.preventDefault());
 
@@ -94,7 +119,7 @@ export function abrirAgente(agente = null) {
       setFieldError(campoModelo, `There are no ${datos.nombreProveedor(actual)} models to choose from yet.`);
       return false;
     }
-    const valores = { nombre: nombre.value, proveedor: actual, modelo, instrucciones: instrucciones.value };
+    const valores = { nombre: nombre.value, proveedor: actual, modelo, instrucciones: instrucciones.value, tools: toolsElegidas() };
     if (agente) {
       datos.editarAgente(agente.id, valores);
       resultado = datos.agente(agente.id);
@@ -154,11 +179,12 @@ export function montarAgentes(el, { router }) {
     const borrar = h('button', 'rad-iconbutton', { type: 'button', 'aria-label': 'Delete', 'data-accion': 'eliminar' }, icono('tacho'));
     const instr = h('p', 'dm-tarjeta-instr');
     const cuenta = h('span', 'dm-tarjeta-cuenta rad-swap');
+    const susTools = h('span', 'dm-tarjeta-tools rad-swap');
     const abrir = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'abrir' }, 'Open chats');
     const nodo = h('article', 'dm-tarjeta', { role: 'listitem' },
       h('div', 'dm-tarjeta-cabeza', {}, h('div', 'dm-tarjeta-titulo', {}, nombre, modelo), h('div', 'dm-tarjeta-acciones', {}, editar, borrar)),
       instr,
-      h('div', 'dm-tarjeta-pie', {}, cuenta, abrir));
+      h('div', 'dm-tarjeta-pie', {}, h('span', 'dm-tarjeta-datos', {}, cuenta, susTools), abrir));
     const yo = () => datos.agente(nodo.dataset.radKey);
     editar.addEventListener('click', () => abrirAgente(yo()));
     borrar.addEventListener('click', () => { if (borrar.getAttribute('aria-disabled') !== 'true') eliminar(yo()); });
@@ -175,6 +201,8 @@ export function montarAgentes(el, { router }) {
     if (instr.textContent !== texto) instr.textContent = texto;
     instr.toggleAttribute('data-vacio', !a.instrucciones);
     swapText(nodo.querySelector('.dm-tarjeta-cuenta'), cuantos(datos.chatsDe(a.id).length, 'chat', 'chats', 'No chats'));
+    const grupos = datos.modeloConTools(a.proveedor, a.modelo) ? datos.gruposDe(a) : [];
+    swapText(nodo.querySelector('.dm-tarjeta-tools'), grupos.length ? `Tools: ${grupos.join(', ')}` : 'No tools');
     // El último agente no se borra: la app siempre tiene con quién hablar.
     const unico = datos.listaAgentes().length <= 1;
     const borrar = nodo.querySelector('[data-accion="eliminar"]');

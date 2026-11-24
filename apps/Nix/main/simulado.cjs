@@ -21,7 +21,8 @@ const VENICE = {
     { id: 'zai-org-glm-5-2', nombre: 'GLM 5.2', nota: 'private, no retention · 1M context' },
     { id: 'grok-4-7', nombre: 'Grok 4.7', nota: 'private, no retention · 500k context' },
     { id: 'kimi-k3', nombre: 'Kimi K3', nota: 'private, no retention · 1M context' },
-    { id: 'venice-uncensored-1-2', nombre: 'Venice Uncensored 1.2', nota: 'private, no retention · 128k context' },
+    // uno que no acepta tools, como varios de los de verdad
+    { id: 'venice-uncensored-1-2', nombre: 'Venice Uncensored 1.2', nota: 'private, no retention · 128k context', tools: false },
   ],
   inicial: 'grok-4-7',
 };
@@ -59,7 +60,48 @@ const dormir = (ms, signal) => new Promise((resolve) => {
   signal.addEventListener('abort', () => { clearTimeout(t); resolve(); }, { once: true });
 });
 
-async function responder(pedido, { signal, onTexto, onPensando }) {
+// Con tools, el proveedor de mentira hace lo que el mensaje le diga en un
+// renglón «TOOLS: [{ "name": …, "args": { … } }, …]»: pide esas llamadas (una
+// ronda por cada grupo separado por «;;») a través de la sesión de verdad, o
+// sea por el mismo despachador, la misma tarjeta y los mismos chips que un
+// modelo real. Después cuenta lo que pasó. Sin ese renglón, conversa.
+function guion(pedido) {
+  const ultimo = pedido.mensajes.at(-1)?.texto ?? '';
+  const m = ultimo.match(/^TOOLS:\s*(.+)$/m);
+  if (!m) return null;
+  try { return m[1].split(';;').map((r) => JSON.parse(r)); } catch { return null; }
+}
+
+async function conTools(pedido, { signal, onTexto, onPensando, sesion }) {
+  const rondas = guion(pedido);
+  const escribir = async (texto) => {
+    for (let i = 0; i < texto.length && !signal.aborted; i += TROZO) { onTexto(texto.slice(i, i + TROZO)); await dormir(PAUSA_MS, signal); }
+  };
+  onPensando();
+  await dormir(PENSAR_MS, signal);
+  if (!rondas) {
+    await escribir(`Simulated answer with tools on: ${sesion.nombres.join(', ')}. Nothing was called.`);
+    return signal.aborted ? { motivo: 'frenado' } : { motivo: 'fin', modelo: pedido.modelo };
+  }
+  const lineas = [];
+  for (const [n, llamadas] of rondas.entries()) {
+    if (signal.aborted || sesion.esFinal()) break;
+    await escribir(`Round ${n + 1}: running ${llamadas.length} call${llamadas.length === 1 ? '' : 's'}.`);
+    for (const c of llamadas) {
+      const r = await sesion.correr(c.name, c.args ?? {}, c.raw ? { crudo: c.raw } : {});
+      lineas.push(`- \`${c.name}\`: ${r.error ? 'failed' : 'ok'} — ${r.out.replace(/\s+/g, ' ').slice(0, 90)}`);
+    }
+    sesion.cerrarRonda(llamadas.map((c) => c.name));
+  }
+  if (signal.aborted) return { motivo: 'frenado' };
+  // lo que la app le habría puesto al modelo al final del pedido siguiente
+  const cola = sesion.cola({ final: sesion.esFinal() }) ?? '';
+  await escribir(['## Tool run', '', ...lineas, '', `record seen: ${/ACTUALLY executed/.test(cola) ? 'yes' : 'no'} · protocol: ${/HOW TOOLS ACTUALLY WORK/.test(sesion.sistema(pedido.instrucciones)) ? 'yes' : 'no'}`].join('\n'));
+  return signal.aborted ? { motivo: 'frenado' } : { motivo: 'fin', modelo: pedido.modelo };
+}
+
+async function responder(pedido, { signal, onTexto, onPensando, sesion = null }) {
+  if (sesion?.activa) return conTools(pedido, { signal, onTexto, onPensando, sesion });
   onPensando();
   await dormir(PENSAR_MS, signal);
   const texto = respuesta(pedido);

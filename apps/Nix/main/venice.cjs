@@ -56,7 +56,7 @@ async function modelos({ key, signal } = {}) {
       const spec = m.model_spec ?? {};
       const partes = [spec.privacy === 'private' ? 'private, no retention' : 'anonymized'];
       if (spec.availableContextTokens) partes.push(`${contexto(spec.availableContextTokens)} context`);
-      return { id: m.id, nombre: spec.name || m.id, nota: partes.join(' · '), rasgos: spec.traits ?? [] };
+      return { id: m.id, nombre: spec.name || m.id, nota: partes.join(' · '), tools: spec.capabilities?.supportsFunctionCalling === true, rasgos: spec.traits ?? [] };
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'en', { numeric: true }));
   // El que se ofrece primero: el que Venice marca como predeterminado, o el
@@ -66,47 +66,47 @@ async function modelos({ key, signal } = {}) {
   return { lista: lista.map(({ rasgos, ...m }) => m), inicial };
 }
 
-async function responder({ modelo, instrucciones, mensajes }, { key, signal, onTexto, onPensando }) {
-  const messages = mensajes.map((m) => ({ role: m.rol, content: m.texto }));
-  if (instrucciones) messages.unshift({ role: 'system', content: instrucciones });
-
-  let res;
-  try {
-    res = await fetch(`${BASE}/chat/completions`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: modelo,
-        messages,
-        stream: true,
-        stream_options: { include_usage: true },
-        venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
-      }),
-      signal,
-    });
-  } catch (err) {
-    if (signal.aborted) return { motivo: 'frenado' };
-    throw new Error('Could not connect to Venice. Is there an internet connection?');
-  }
-  if (!res.ok) throw new Error(explicar(res.status, await detalleDe(res)));
-
-  let motivo = 'fin';
-  let uso = { entrada: 0, salida: 0 };
+// Lee el stream de UNA ronda (eventos SSE con el formato de OpenAI) y devuelve
+// lo que trajo: el texto, lo que pensó, las llamadas a tools y cómo terminó.
+// Los eventos llegan partidos en cualquier lado: se junta hasta el salto de
+// línea y se lee renglón por renglón.
+async function leerRonda(res, ronda, { signal, onTexto, onPensando }) {
+  const r = { content: '', reasoning: '', reasoningDetails: [], calls: [], motivo: 'fin', uso: null };
   let pensando = false;
+  // Las llamadas se arman de a pedazos. La documentación de Venice avisa que
+  // dos llamadas en paralelo pueden compartir el `index` y que lo único que
+  // las distingue es el `id`: un id nuevo en un índice ya usado abre otra.
+  const porIndice = new Map();
   const alLlegar = (dato) => {
     if (dato.error) throw new Error(`Venice cut the answer short: ${typeof dato.error === 'string' ? dato.error : dato.error.message ?? 'no details'}`);
-    if (dato.usage) uso = { entrada: dato.usage.prompt_tokens ?? 0, salida: dato.usage.completion_tokens ?? 0 };
+    if (dato.usage) r.uso = { entrada: dato.usage.prompt_tokens ?? 0, salida: dato.usage.completion_tokens ?? 0 };
     const opcion = dato.choices?.[0];
     if (!opcion) return;
     const delta = opcion.delta ?? {};
-    if (delta.reasoning_content && !pensando) { pensando = true; onPensando(); }
-    if (delta.content) { pensando = false; onTexto(delta.content); }
-    if (opcion.finish_reason === 'length') motivo = 'largo';
-    else if (opcion.finish_reason === 'content_filter') motivo = 'rechazo';
+    if (delta.reasoning_content) {
+      r.reasoning += delta.reasoning_content;
+      if (!pensando) { pensando = true; onPensando(); }
+    }
+    if (Array.isArray(delta.reasoning_details)) r.reasoningDetails.push(...delta.reasoning_details);
+    if (delta.content) { pensando = false; r.content += delta.content; onTexto(delta.content); }
+    for (const tc of delta.tool_calls || []) {
+      const i = tc.index ?? 0;
+      let call = porIndice.get(i);
+      if (!call || (tc.id && call.idReal && tc.id !== call.id)) {
+        // el id de reserva lleva la ronda adentro: numerado solo por índice, la
+        // ronda siguiente repetiría `call_0` y el historial quedaría con dos
+        // tool_call_id iguales
+        call = { id: tc.id || `call_r${ronda}_${r.calls.length}`, idReal: Boolean(tc.id), type: 'function', function: { name: '', arguments: '' } };
+        porIndice.set(i, call);
+        r.calls.push(call);
+      } else if (tc.id && !call.idReal) { call.id = tc.id; call.idReal = true; }
+      if (tc.function?.name) call.function.name += tc.function.name;
+      if (tc.function?.arguments) call.function.arguments += tc.function.arguments;
+    }
+    if (opcion.finish_reason === 'length') r.motivo = 'largo';
+    else if (opcion.finish_reason === 'content_filter') r.motivo = 'rechazo';
   };
 
-  // Los eventos llegan partidos en cualquier lado: se junta hasta el salto
-  // de línea y se lee renglón por renglón.
   const decoder = new TextDecoder();
   let resto = '';
   let fin = false;
@@ -129,12 +129,106 @@ async function responder({ modelo, instrucciones, mensajes }, { key, signal, onT
     }
     if (!fin && resto) renglon(resto);
   } catch (err) {
-    if (signal.aborted) return { motivo: 'frenado' };
+    if (signal.aborted) return { ...r, motivo: 'frenado' };
     if (err.message.startsWith('Venice ')) throw err;
     throw new Error('The connection to Venice dropped in the middle of the answer.');
   }
-  if (signal.aborted) return { motivo: 'frenado' };
-  return { motivo, modelo, uso };
+  if (signal.aborted) return { ...r, motivo: 'frenado' };
+  for (const c of r.calls) delete c.idReal;
+  return r;
+}
+
+/**
+ * Pide la respuesta. Sin tools es un solo pedido. Con tools (opts.sesion, ver
+ * tools/sesion.cjs) es un loop con el formato de OpenAI: el modelo pide
+ * `tool_calls`, se corren, cada resultado vuelve como un mensaje `role: tool`,
+ * y sigue hasta que contesta sin pedir ninguna o se acaba el presupuesto.
+ *
+ * Lo que viene de NeonCode (chatOpenAI):
+ *   - el registro del turno va como un mensaje `user` AL FINAL de cada pedido
+ *     y es efímero: nunca entra a la conversación;
+ *   - la última ronda sale sin tools, con su aviso;
+ *   - unos argumentos que no son JSON vuelven al proveedor como `{}` (si no,
+ *     rechaza el pedido entero) pero la tool no corre: el modelo se entera por
+ *     el resultado;
+ *   - una llamada que el modelo escribió como texto (un bloque ```tool) se
+ *     rescata y se corre, en vez de quedar como una respuesta que no hizo nada.
+ *
+ * Y de la documentación de Venice: el mensaje del modelo se devuelve con lo
+ * que pensó (`reasoning_content`, `reasoning_details`) tal cual llegó.
+ */
+async function responder({ modelo, instrucciones, mensajes }, { key, signal, onTexto, onPensando, sesion = null }) {
+  const conTools = Boolean(sesion?.activa);
+  const convo = mensajes.map((m) => ({ role: m.rol, content: m.texto }));
+  const system = conTools ? sesion.sistema(instrucciones) : instrucciones;
+  if (system) convo.unshift({ role: 'system', content: system });
+
+  const uso = { entrada: 0, salida: 0 };
+  for (let ronda = 0; ; ronda++) {
+    const final = conTools && sesion.esFinal();
+    const cola = conTools ? sesion.cola({ final }) : null;
+    if (final) sesion.marcarAgotado();
+    const body = {
+      model: modelo,
+      messages: cola ? [...convo, { role: 'user', content: cola }] : convo,
+      stream: true,
+      stream_options: { include_usage: true },
+      venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
+    };
+    if (conTools && !final) body.tools = sesion.paraOpenAI();
+
+    let res;
+    try {
+      res = await fetch(`${BASE}/chat/completions`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        signal,
+      });
+    } catch (err) {
+      if (signal.aborted) return { motivo: 'frenado', uso };
+      throw new Error('Could not connect to Venice. Is there an internet connection?');
+    }
+    if (!res.ok) throw new Error(explicar(res.status, await detalleDe(res)));
+
+    const r = await leerRonda(res, ronda, { signal, onTexto, onPensando });
+    if (r.uso) { uso.entrada += r.uso.entrada; uso.salida += r.uso.salida; }
+    if (r.motivo === 'frenado') return { motivo: 'frenado', modelo, uso };
+    if (!conTools || final) return { motivo: r.motivo, modelo, uso };
+
+    let calls = r.calls.filter((c) => c.function.name);
+    let rescatada = false;
+    if (!calls.length) {
+      const rescate = sesion.rescatar(r.content);
+      if (rescate?.length) { calls = rescate; rescatada = true; }
+    }
+    if (!calls.length || r.motivo !== 'fin') return { motivo: r.motivo, modelo, uso };
+
+    // El proveedor VALIDA los tool_calls que se le devuelven: unos argumentos
+    // que no son JSON hacen rebotar el pedido entero. Salen normalizados; la
+    // tool se corre (o no) con los ORIGINALES.
+    convo.push({
+      role: 'assistant',
+      content: r.content || null,
+      tool_calls: calls.map((c) => {
+        let args = c.function.arguments || '{}';
+        try { JSON.parse(args); } catch { args = '{}'; }
+        return { id: c.id, type: 'function', function: { name: c.function.name, arguments: args } };
+      }),
+      ...(r.reasoning ? { reasoning_content: r.reasoning } : {}),
+      ...(r.reasoningDetails.length ? { reasoning_details: r.reasoningDetails } : {}),
+    });
+    for (const c of calls) {
+      let args = null;
+      let crudo = null;
+      try { args = JSON.parse(c.function.arguments || '{}'); } catch { crudo = c.function.arguments; }
+      const out = await sesion.correr(c.function.name, args, { crudo });
+      convo.push({ role: 'tool', tool_call_id: c.id, content: out.out });
+    }
+    sesion.cerrarRonda(calls.map((c) => c.function.name));
+    if (rescatada) sesion.run.rescatadas = (sesion.run.rescatadas || 0) + calls.length;
+    if (signal.aborted) return { motivo: 'frenado', modelo, uso };
+  }
 }
 
 module.exports = { responder, modelos };

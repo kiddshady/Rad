@@ -1,5 +1,40 @@
 # Changelog
 
+## Nix 0.6.0 (2026-11-23)
+
+- **Tools: un agente puede actuar en la PC.** Diez para empezar, en tres
+  grupos que se prenden por agente: archivos (`fs_read`, `fs_write`,
+  `fs_edit`, `fs_delete`, `code_search`), comandos (`shell_exec`,
+  `cmd_exec`) y web (`fetch`, `web_search`, `http_request`). Un agente sin
+  ninguna prendida conversa como siempre.
+- **Vienen de NeonCode, portadas tal cual.** El código de cada tool, el
+  despachador, el corte de bucles y los textos de guardrail se trajeron de
+  NeonCode 1.11.3 sin reescribir, con sus comentarios y sus pruebas (469
+  comprobaciones entre las tres familias). Fran aprobó publicarlo. Lo que
+  cuenta qué vino y qué no está en `apps/Nix/docs/tools.md`.
+- **Un solo registro de lo que corrió, y lo leen tres.** Cada llamada deja
+  una fila en la conversación con su estado (corriendo, hecha, fallida,
+  rechazada, cancelada o cortada por repetirse), que se abre para ver lo que
+  devolvió. Debajo de la respuesta va el contador del turno, también cuando
+  no corrió ninguna. Y el modelo recibe ese mismo registro al final de cada
+  pedido, que es donde decide.
+- **Permiso.** De fábrica, cada llamada muestra una tarjeta con lo que va a
+  correr y, si toca un archivo, el diff; se puede aprobar, rechazar o tildar
+  «no preguntar más en este chat». En Settings se pasa a modo automático, que
+  no pregunta. No hay límite de carpetas ni filtro de comandos: la única
+  barrera es esa tarjeta.
+- **Los dos proveedores tienen su loop.** El de Anthropic, con su formato; el
+  de Venice, con el de OpenAI, para los modelos que Venice declara que aceptan
+  tools (los demás conversan, y el formulario del agente lo dice). Un turno
+  admite 15 rondas que cambien algo; las de pura lectura no se cobran. Al
+  llegar al tope, la última ronda sale sin tools y la app declara el corte.
+- **Sin probar con un modelo de verdad.** Todo se probó contra servidores
+  locales y el proveedor de mentira, sin gastar un token.
+- No vinieron todavía: deshacer, mandar un mensaje a mitad del turno, jobs,
+  `run_code`, SQLite, canvas, notas, memoria, subagentes, MCP, skills,
+  navegador y tareas programadas. Tampoco el detector de «dije que lo hice»,
+  que es la única medida que juzga texto.
+
 ## Nix 0.5.0, antes Daimon (2026-11-23)
 
 - **La app pasa a llamarse Nix** (así se llamaba la gatita de Fran). Cambian

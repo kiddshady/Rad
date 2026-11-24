@@ -94,6 +94,30 @@ const SCENES = {
     act.recibir({ state: 'available', version: '0.4.0' });
     view('ajustes').querySelector('[data-tarjeta="acerca"]').scrollIntoView({ block: 'center' });
     await sleep(900);`,
+  tools: `
+    datos.ponerModoTools('auto');
+    const t = datos.crearAgente({ nombre: 'Toolsmith', proveedor: 'anthropic', modelo: 'claude-sonnet-5-5', instrucciones: 'You keep my notes in order.', tools: ['fs_read', 'fs_write', 'fs_edit', 'fs_delete', 'code_search', 'shell_exec', 'cmd_exec'] });
+    const c = datos.crearChat(t.id);
+    await datos.enviar(c.id, 'TOOLS: ' + JSON.stringify([{ name: 'fs_write', args: { path: 'notes.md', content: '# Notes\\n\\n- one\\n- two\\n' } }]) + ' ;; ' + JSON.stringify([{ name: 'fs_read', args: { paths: ['notes.md'] } }, { name: 'shell_exec', args: { command: 'Get-Date -Format yyyy' } }, { name: 'fs_read', args: { paths: ['missing.txt'] } }]));
+    await quietos();
+    datos.renombrarChat(c.id, 'Notes in order');
+    await sleep(600);
+    [...document.querySelectorAll('.dm-tool')].find((n) => n.dataset.tool === 'fs_read').querySelector('.dm-tool-cabeza').click();
+    await sleep(700);`,
+  permiso: `
+    datos.ponerModoTools('auto');
+    const t = datos.crearAgente({ nombre: 'Toolsmith', proveedor: 'anthropic', modelo: 'claude-sonnet-5-5', instrucciones: '', tools: ['fs_read', 'fs_write', 'fs_edit'] });
+    const c = datos.crearChat(t.id);
+    await datos.enviar(c.id, 'TOOLS: ' + JSON.stringify([{ name: 'fs_write', args: { path: 'notes.md', content: '# Notes\\n\\n- one\\n- two\\n- three\\n' } }]));
+    await quietos();
+    datos.ponerModoTools('manual');
+    datos.enviar(c.id, 'TOOLS: ' + JSON.stringify([{ name: 'fs_edit', args: { path: 'notes.md', edits: [{ old: '- two', new: '- two, and a half' }] } }]));
+    await sleep(1600);`,
+  'agente-tools': `
+    const t = datos.crearAgente({ nombre: 'Toolsmith', proveedor: 'anthropic', modelo: 'claude-sonnet-5-5', instrucciones: 'You keep my notes in order.', tools: ['fs_read', 'fs_write', 'fs_edit', 'fs_delete', 'code_search'] });
+    await go('agentes');
+    [...view('agentes').querySelectorAll('[data-accion="editar"]')].at(-1).click();
+    await sleep(900);`,
   'sin-llave': `
     await go('ajustes');
     await sleep(400);`,

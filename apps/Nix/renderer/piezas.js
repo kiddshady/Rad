@@ -27,6 +27,8 @@ export const ICONOS = {
   tacho: svg('<path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.5 9h6l.5-9"/>'),
   chevron: svg('<path d="M4.5 6.5 8 10l3.5-3.5"/>'),
   llave: svg('<circle cx="5.25" cy="10.75" r="2.75"/><path d="M7.3 8.7l6.2-6.2M11 5l2 2M9.2 6.8l1.6 1.6"/>'),
+  // una tool: una llave fija
+  tool: svg('<path d="M10.2 2.6a3.4 3.4 0 0 0-3 4.9L2.6 12.1a1 1 0 0 0 0 1.4l.1.1a1 1 0 0 0 1.4 0l4.6-4.6a3.4 3.4 0 0 0 4.8-3.7l-2 2-1.9-.5-.5-1.9 2-2a3.4 3.4 0 0 0-.9-.3z"/>'),
 };
 
 /** Un ícono en su caja: icono('mas') -> <span class="rad-icon">…</span>. */
