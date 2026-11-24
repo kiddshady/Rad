@@ -30,7 +30,7 @@ const GUARDAR_CADA_MS = 1500;
 const TITULO_MAX = 46;
 const TITULO_NUEVO = 'New chat';
 
-let agentes, busqueda;
+let agentes, busqueda, delegados;
 let chats;
 let ui;
 let catalogo = { proveedores: [] }; // los proveedores con sus modelos
@@ -54,7 +54,8 @@ const avisar = (tipo, detalle = {}) => { for (const fn of oyentes.get(tipo) ?? [
 
 // ---------- Arranque ----------
 export async function abrir() {
-  [busqueda, agentes, chats, ui, catalogo, herramientas] = await Promise.all([
+  [delegados, busqueda, agentes, chats, ui, catalogo, herramientas] = await Promise.all([
+    openDoc('subagentes', { proveedor: null, modelo: '' }),
     openDoc('busqueda', { proveedor: 'duckduckgo' }),
     openDoc('agentes', { lista: [] }),
     openDoc('chats', { lista: [] }),
@@ -151,6 +152,20 @@ export const BUSCADORES = ['duckduckgo', 'tavily', 'brave'];
 export const buscador = () => (BUSCADORES.includes(busqueda.get().proveedor) ? busqueda.get().proveedor : 'duckduckgo');
 export function ponerBuscador(id) {
   busqueda.patch({ proveedor: BUSCADORES.includes(id) ? id : 'duckduckgo' });
+  avisar('ajustes');
+}
+
+/** Con qué corren los subagentes de la tool delegate: { proveedor, modelo }.
+ *  proveedor null = el mismo modelo del agente que los lanza. Lo lee el proceso
+ *  principal de este mismo documento. */
+export function subagentes() {
+  const v = delegados.get();
+  const proveedor = catalogo.proveedores.some((p) => p.id === v.proveedor) ? v.proveedor : null;
+  return { proveedor, modelo: proveedor ? String(v.modelo ?? '') : '' };
+}
+export function ponerSubagentes({ proveedor = null, modelo = '' } = {}) {
+  const valido = catalogo.proveedores.some((p) => p.id === proveedor) ? proveedor : null;
+  delegados.set({ proveedor: valido, modelo: valido ? String(modelo ?? '') : '' });
   avisar('ajustes');
 }
 
@@ -321,12 +336,17 @@ const titular = (texto) => {
 // Un mensaje del usuario viaja si tiene texto o adjuntos. Sus archivos de
 // texto van antepuestos a lo que escribió (paraElModelo); sus imágenes, aparte.
 const conAdjuntos = (m) => Boolean(m.imagenes?.length || m.archivos?.length);
-const viaja = (m) => (m.rol === 'tool' ? m.estado !== 'run' : (m.texto.trim() || conAdjuntos(m)) && m.estado !== 'error' && m.estado !== 'rechazo');
+// Lo que corrió un subagente tampoco viaja: el agente no lo ejecutó, y plegarlo
+// en su registro le haría creer que leyó o editó lo que leyó otro. Lo que sí
+// hizo el agente está en la fila de `delegate`, que viaja como cualquiera.
+const viaja = (m) => (m.rol === 'tool' ? m.estado !== 'run' && !m.sub : (m.texto.trim() || conAdjuntos(m)) && m.estado !== 'error' && m.estado !== 'rechazo');
 const alViaje = (m) => {
   if (m.rol === 'tool') return { rol: 'tool', tool: m.tool, texto: m.texto, estado: m.estado };
   if (m.rol !== 'user' || !conAdjuntos(m)) return { rol: m.rol, texto: m.texto };
   return { rol: 'user', texto: paraElModelo(m), ...(m.imagenes?.length ? { imagenes: m.imagenes } : {}) };
 };
+/** Lo que viajaría al modelo de una lista de mensajes (para el humo). */
+export const historialDe = (mensajes) => mensajes.filter(viaja).map(alViaje);
 /** ¿Ese modelo acepta imágenes? Los de Anthropic, todos; uno de Venice, solo
  *  si Venice lo declara. */
 export const modeloVe = (prov, id) => prov === 'anthropic' || modelosDe(prov).find((m) => m.id === id)?.vision === true;
@@ -424,7 +444,8 @@ function alLlegar(ev) {
     // el agente creó o cambió un canvas: lo muestra el panel (canvas.js)
     avisar('canvas', { chat: chatId, canvas: ev.canvas });
   } else if (ev.tipo === 'confirmar') {
-    r.confirmacion = { callId: ev.callId, name: ev.name, label: ev.label, args: ev.args ?? {}, vista: ev.vista ?? null };
+    // (`sub`: la pide un subagente; un número si hay varios trabajando a la vez)
+    r.confirmacion = { callId: ev.callId, name: ev.name, label: ev.label, args: ev.args ?? {}, vista: ev.vista ?? null, sub: ev.sub ?? null };
     avisar('confirmar', { chat: chatId });
   } else if (ev.tipo === 'fin') {
     terminar(chatId, ESTADO[ev.motivo] ?? 'ok', null, ev);
@@ -444,7 +465,9 @@ function alPedirTool(chatId, r, ev) {
   if (existente) {
     existente.texto = ev.label ?? existente.texto;
   } else {
-    const fila = { id: ev.callId, rol: 'tool', tool: ev.kind, texto: ev.label ?? '', estado: 'run' };
+    // `sub`: la corrió un subagente y cuelga de esa fila de delegate; `subN`
+    // dice cuál, cuando son varios a la vez
+    const fila = { id: ev.callId, rol: 'tool', tool: ev.kind, texto: ev.label ?? '', estado: 'run', ...(ev.sub ? { sub: ev.sub, ...(ev.subN ? { subN: ev.subN } : {}) } : {}) };
     const i = lista.indexOf(r.mensaje);
     if (r.mensaje.texto.trim()) {
       r.mensaje.estado = 'ok';

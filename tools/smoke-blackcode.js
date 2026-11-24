@@ -739,7 +739,7 @@ else {
   const form = modal();
   type(form.querySelector('[data-campo="nombre"]'), 'Toolsmith');
   const interruptores = [...form.querySelectorAll('[data-campo="tools"] input[role="switch"]')];
-  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas,notes' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
+  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas,notes,subagents' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
   // un agente nuevo nace con todas prendidas: se le apaga la web
   for (const i of interruptores) if (i.dataset.grupo === 'web') i.click();
   enIngles('en el formulario con tools');
@@ -747,13 +747,13 @@ else {
   await closed();
   await settle();
   const herrero = cards().at(-1);
-  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Browser, Desktop, Screen, Canvas, Notes') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
-  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Browser, Desktop, Screen, Canvas, Notes') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Browser, Desktop, Screen, Canvas, Notes, Subagents') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Browser, Desktop, Screen, Canvas, Notes, Subagents') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
   herrero.querySelector('[data-accion="abrir"]').click();
   await sleep(dur('base') + 260);
   await until(() => statusRight().includes('Toolsmith'), 3000);
-  // todas (27) menos las tres de la web
-  if (!statusRight().endsWith('· 24 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
+  // todas (28) menos las tres de la web
+  if (!statusRight().endsWith('· 25 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
 
   // Escribir un archivo. En modo manual (el de fábrica) primero pide permiso:
   // la tarjeta dice qué va a correr y qué va a cambiar, y hasta que no se
@@ -921,17 +921,17 @@ else {
     const abrir = async () => { boton.click(); await until(() => menus().length > 0, 2000); await sleep(dur('base') + 60); };
     await abrir();
     const filasMenu = [...menus()[0].querySelectorAll('.rad-menu-item')].map((i) => i.textContent.trim());
-    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Notes,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
+    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Notes,Subagents,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
     await pick('Turn all off');
     if (dice() !== 'Tools: off' || boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· no tools')) fail(`apagar todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     await pick('Turn all on');
-    if (dice() !== '27 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 27 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
+    if (dice() !== '28 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 28 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     const marcadas = [...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].length;
-    if (marcadas !== 10) fail(`con todas prendidas el menú marca ${marcadas} grupos de 10`);
+    if (marcadas !== 11) fail(`con todas prendidas el menú marca ${marcadas} grupos de 11`);
     await pick('Web');
-    if (dice() !== '24 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
+    if (dice() !== '25 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
     // y las recibe el modelo: el pedido siguiente corre una de esas tools
     // (en modo manual, que es como quedó: pide permiso y se le da)
     await pedir([[{ name: 'fs_read', args: { paths: ['note.txt'] } }]]);
@@ -939,7 +939,7 @@ else {
     primary()?.click();
     await until(() => !composer.querySelector('.rad-busy') && ultimo()?.dataset.estado === 'ok' && cuenta() === '1 tool · 1 done', 20000);
     if (cuenta() !== '1 tool · 1 done') fail(`después de prender las tools desde la conversación, el contador dice «${cuenta()}»`);
-    data.toolsEnElChat = `${antes} → Tools: off → 27 tools → 24 tools`;
+    data.toolsEnElChat = `${antes} → Tools: off → 28 tools → 25 tools`;
   }
 
   // 11c. El canvas: el agente deja un documento en el panel de al lado, lo
@@ -1469,6 +1469,119 @@ else {
     await go('chat');
   }
 
+  // 11h. Subagentes: la tool delegate. El proveedor de mentira hace de padre y
+  // de hijo: el padre pide `delegate` y cada hijo sigue el guion que trae su
+  // brief (o conversa). Corre todo lo de verdad: la sesión del hijo, sus tools,
+  // sus filas colgadas de la de delegate, y la tarjeta que dice quién pide.
+  {
+    const datosM = await import('/datos.js');
+    const llaveM = await import('/llave.js');
+    const actual = datosM.agenteActual();
+    datosM.ponerTools(actual.id, datosM.todasLasTools());
+    datosM.ponerModoTools('auto');
+    await go('chat');
+    chatView.querySelector('[data-accion="nuevo-chat"]').click();
+    await settle();
+    const listo = async () => {
+      await sleep(200);
+      for (let i = 0; i < 600 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50);
+      await settle();
+    };
+    const guionHijo = (llamadas) => 'TOOLS: ' + JSON.stringify(llamadas);
+    // las filas de subagente que quedaron debajo de la última de delegate
+    const hijas = () => { const todas = tools(); return todas.slice(todas.lastIndexOf(fila('delegate')) + 1).filter((t) => t.dataset.sub); };
+    const informe = () => fila('delegate')?.querySelector('.dm-tool-pre').textContent ?? '';
+
+    // Dos a la vez, con acceso completo: uno escribe y lee, el otro conversa.
+    await pedir([[{ name: 'delegate', args: { tasks: [guionHijo([{ name: 'fs_write', args: { path: 'sub-note.txt', content: 'from a subagent\n' } }, { name: 'fs_read', args: { paths: ['sub-note.txt'] } }]), 'Say what you are.'], access: 'full' } }]]);
+    await listo();
+    const del = fila('delegate');
+    if (!del || del.dataset.estado !== 'ok') fail('subagentes: la fila de delegate quedó en «' + del?.dataset.estado + '»');
+    if (!/ · 2 tasks · full access$/.test(shown(del?.querySelector('.dm-tool-que')) ?? '')) fail('subagentes: la fila de delegate dice «' + shown(del?.querySelector('.dm-tool-que')) + '»');
+    if (del?.querySelector('.dm-tool-icono')?.dataset.icono !== 'delegate') fail('subagentes: la fila de delegate no lleva su ícono');
+    const deDos = hijas().map((t) => t.dataset.tool + ':' + t.dataset.subn + ':' + t.dataset.estado).join();
+    if (deDos !== 'fs_write:1:ok,fs_read:1:ok') fail('subagentes: las filas del hijo son: ' + deDos);
+    const h1 = hijas()[0];
+    if (h1) {
+      const corrida = h1.getBoundingClientRect().left - del.getBoundingClientRect().left;
+      const riel = getComputedStyle(h1, '::before');
+      const numero = getComputedStyle(h1, '::after');
+      if (corrida < 16 || riel.width !== '2px' || numero.content !== '"1"') fail('subagentes: una fila del hijo no cuelga de la de delegate (corrida ' + corrida + ' px, riel ' + riel.width + ', número ' + numero.content + ')');
+      if (!hijas()[1].querySelector('.dm-tool-pre').textContent.includes('from a subagent')) fail('subagentes: el hijo no leyó lo que escribió');
+      data.subagenteCorrido = Math.round(corrida) + ' px';
+    }
+    if (!/## Subagent 1 of 2 \([^,]+, fs_write, fs_read, \d+ s/.test(informe()) || !informe().includes('## Subagent 2 of 2') || !informe().includes('messages in the request: 1')) fail('subagentes: el informe que vuelve al agente dice: ' + informe().slice(0, 240));
+    if (cuenta() !== '1 tool · 1 done') fail('subagentes: el contador del turno dice «' + cuenta() + '» (las tools del hijo no son del agente)');
+    // la fila de delegate se abre para leer el informe
+    del.querySelector('.dm-tool-cabeza').click();
+    await sleep(dur('base') + 120);
+    if (!del.hasAttribute('data-abierto')) fail('subagentes: la fila de delegate no se abre para leer el informe');
+    del.querySelector('.dm-tool-cabeza').click();
+    // lo que corrió un subagente no vuelve al modelo como si lo hubiera corrido el agente
+    const viaja = datosM.historialDe([
+      { id: 'u', rol: 'user', texto: 'a' },
+      { id: 'r:1', rol: 'tool', tool: 'delegate', texto: 'm · x', estado: 'ok' },
+      { id: 'r:1.1:1', rol: 'tool', tool: 'fs_read', texto: 'f', estado: 'ok', sub: 'r:1', subN: 1 },
+      { id: 'a', rol: 'assistant', texto: 'b', estado: 'ok' },
+    ]).map((m) => m.tool ?? m.rol).join();
+    if (viaja !== 'user,delegate,assistant') fail('subagentes: al modelo le viajaría ' + viaja);
+
+    // Uno solo, y de lectura (lo de fábrica): no puede escribir, y su fila no lleva número.
+    await pedir([[{ name: 'delegate', args: { task: guionHijo([{ name: 'fs_write', args: { path: 'sub-no.txt', content: 'x' } }]) } }]]);
+    await listo();
+    const sola = hijas()[0];
+    if (hijas().length !== 1 || sola.dataset.estado !== 'error' || sola.dataset.subn !== undefined || !sola.querySelector('.dm-tool-pre').textContent.includes("tool 'fs_write' is not available in this run")) fail('subagentes: un hijo de lectura con fs_write dejó: ' + hijas().map((t) => t.dataset.tool + ':' + t.dataset.estado + ':' + t.dataset.subn).join());
+    if (fila('delegate').dataset.estado !== 'ok' || !informe().includes('fs_write (1 did not succeed)')) fail('subagentes: el informe no cuenta la tool que no corrió: ' + informe().slice(0, 160));
+
+    // En manual: primero la tarjeta de delegate, que es del agente, y después la
+    // de la tool del hijo, que dice que la pide un subagente.
+    datosM.ponerModoTools('manual');
+    await pedir([[{ name: 'delegate', args: { task: guionHijo([{ name: 'fs_write', args: { path: 'sub-asked.txt', content: 'asked\n' } }]), access: 'full' } }]]);
+    await until(() => permiso()?.textContent.includes('Allow delegate?'), 6000);
+    if (!permiso()?.querySelector('.dm-permiso-que')?.textContent.startsWith('The agent wants to run delegate')) fail('subagentes: la tarjeta de delegate dice: ' + permiso()?.textContent.slice(0, 120));
+    primary().click();
+    await closed();
+    await until(() => permiso()?.textContent.includes('Allow fs_write?'), 6000);
+    const deHijo = permiso()?.querySelector('.dm-permiso-que');
+    if (!deHijo?.textContent.startsWith('A subagent wants to run fs_write') || deHijo.dataset.sub !== 'true') fail('subagentes: la tarjeta de una tool del hijo dice: ' + permiso()?.textContent.slice(0, 160));
+    enIngles('con la tarjeta de un subagente');
+    primary().click();
+    await closed();
+    await listo();
+    if (hijas().map((t) => t.dataset.tool + ':' + t.dataset.estado).join() !== 'fs_write:ok') fail('subagentes: con las dos tarjetas aceptadas el hijo dejó: ' + hijas().map((t) => t.dataset.tool + ':' + t.dataset.estado).join());
+    datosM.ponerModoTools('auto');
+
+    // Settings: con qué modelo corren. De fábrica, el del agente.
+    await go('ajustes');
+    const ts = view('ajustes').querySelector('[data-tarjeta="subagentes"]');
+    ts.scrollIntoView({ block: 'center' });
+    const selP = ts.querySelector('[data-campo="sub-proveedor"]');
+    const diceS = () => shown(ts.querySelector(':scope > .dm-estado .dm-estado-texto'));
+    const tonoS = () => ts.querySelector(':scope > .dm-estado').dataset.tono;
+    const activoS = () => ts.querySelector('.dm-modelos > [data-activo]');
+    const elegirS = async (boton, nombre) => { boton.click(); await until(() => menus().length > 0, 2000); await pick(nombre); await settle(); };
+    if (datosM.subagentes().proveedor !== null || !selP.textContent.includes('Same as the agent') || activoS()?.dataset.proveedor !== 'mismo' || !activoS().disabled || tonoS() !== 'success' || !diceS().includes('same model as the agent')) fail('subagentes: de fábrica la tarjeta dice «' + selP.textContent + '» / «' + diceS() + '» y el modelo activo es ' + activoS()?.dataset.proveedor);
+    await elegirS(selP, 'Venice');
+    const conLlave = llaveM.de('venice').estado === 'lista';
+    if (datosM.subagentes().proveedor !== 'venice' || datosM.subagentes().modelo !== 'grok-4-7' || activoS()?.dataset.proveedor !== 'venice' || !activoS().textContent.includes('Grok 4.7')) fail('subagentes: elegir Venice dejó ' + JSON.stringify(datosM.subagentes()) + ' y a la vista «' + activoS()?.textContent + '»');
+    await elegirS(activoS(), 'Kimi K3');
+    if (datosM.subagentes().modelo !== 'kimi-k3') fail('subagentes: elegir el modelo dejó ' + JSON.stringify(datosM.subagentes()));
+    if (conLlave ? (tonoS() !== 'success' || diceS() !== 'Subagents run on Kimi K3.') : (tonoS() !== 'warning' || !diceS().includes('no Venice key'))) fail('subagentes: con Venice y Kimi K3 la tarjeta dice «' + diceS() + '» (' + tonoS() + ', llave ' + llaveM.de('venice').estado + ')');
+    // un modelo que no usa tools no sirve para un subagente: se avisa
+    await elegirS(activoS(), 'Venice Uncensored 1.2');
+    if (conLlave && (tonoS() !== 'warning' || !diceS().includes('cannot use tools'))) fail('subagentes: un modelo sin tools no avisa: «' + diceS() + '»');
+    await elegirS(activoS(), 'Kimi K3');
+    enIngles('en la tarjeta de subagentes');
+    // …y el hijo corre con eso
+    await go('chat');
+    await pedir([[{ name: 'delegate', args: { task: 'Say what you are.' } }]]);
+    await listo();
+    if (!(shown(fila('delegate').querySelector('.dm-tool-que')) ?? '').startsWith('kimi-k3 · ') || !informe().startsWith('Subagent report (kimi-k3, no tools,') || !informe().includes('provider: venice')) fail('subagentes: con Kimi K3 elegido, delegate dice «' + shown(fila('delegate').querySelector('.dm-tool-que')) + '» / ' + informe().slice(0, 120));
+    datosM.ponerModoTools('manual');
+    data.subagentes = 'dos a la vez con sus filas colgadas, lectura que no escribe, tarjeta que dice quién pide, y Kimi K3 elegido en Settings';
+    await go('chat');
+  }
+
   // Cambiarle las tools a un agente que YA existía, desde su formulario.
   {
     await go('agentes');
@@ -1479,7 +1592,7 @@ else {
     const guardar = async () => { primary().click(); await closed(); await settle(); };
     await editar();
     if (!sw('files')?.checked || !sw('screen')?.checked) fail('el formulario de un agente con todas las tools no las muestra prendidas');
-    for (const g of ['commands', 'code', 'data', 'web', 'browser', 'desktop', 'canvas', 'notes']) sw(g).click();
+    for (const g of ['commands', 'code', 'data', 'web', 'browser', 'desktop', 'canvas', 'notes', 'subagents']) sw(g).click();
     await guardar();
     if (tarjeta() !== 'Tools: Files, Screen') fail(`apagarle grupos a un agente desde su formulario dejó la tarjeta en «${tarjeta()}»`);
     await editar();

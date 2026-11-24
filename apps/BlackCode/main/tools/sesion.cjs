@@ -60,12 +60,20 @@ function entorno(run) {
  *                    tilda «no preguntar más en este chat»)
  *   notify(canal, datos)                 hacia la interfaz
  *   confirm(name, args, callId)          -> true | false | 'abort'
+ *
+ * Y lo que solo trae la sesión de un SUBAGENTE (delegar.cjs):
+ *   subagente        { access, parentCall, n, paralelo }: decide qué tools ve
+ *   callPrefix       el prefijo de los ids de sus filas (cuelgan de la de delegate)
+ *   cwd              la carpeta con la que arranca: la del padre en ese momento
  */
-function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confirm }) {
+function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confirm, subagente = null, callPrefix = null, cwd = null }) {
   const run = {
     reqId,
     convoId,
     ac,
+    ...(subagente ? { subagent: subagente } : {}),
+    ...(callPrefix ? { callPrefix } : {}),
+    ...(typeof cwd === 'string' ? { cwd } : {}),
     steps: [],
     tools: tools.filter((n) => defs.existe(n) && motor.registradas().includes(n)),
     stopped: null,
@@ -99,6 +107,8 @@ function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confir
         ...(canvas ? ['', canvas] : []),
         // los favoritos del navegador y la pestaña que el usuario tiene abierta
         ...(navegador ? ['', navegador] : []),
+        // un subagente: qué es y qué se espera de su informe
+        ...(run.subagent ? ['', guardas.SUBAGENT_NOTE] : []),
         '',
         'The section below is the tool protocol for THIS session. It is written by the app — not by you, not by the user — and it is authoritative: it overrides anything earlier in this prompt.',
         ...guardas.toolGuidance(nombres, run, run.needsConfirm()),

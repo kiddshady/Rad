@@ -48,6 +48,12 @@ export function filaTool(m) {
 export function ponerTool(nodo, m) {
   nodo.dataset.estado = m.estado;
   nodo.dataset.tool = m.tool;
+  // Lo que corrió un subagente cuelga de la fila de delegate que lo lanzó; con
+  // varios a la vez, cada fila dice de cuál es.
+  if (m.sub) {
+    nodo.dataset.sub = m.sub;
+    if (m.subN) nodo.dataset.subn = String(m.subN);
+  }
   const nombre = nodo.querySelector('.dm-tool-nombre');
   if (nombre.textContent !== m.tool) nombre.textContent = m.tool;
   swapText(nodo.querySelector('.dm-tool-que'), m.texto || '');
@@ -129,7 +135,7 @@ export function abrirPermiso(chatId, pide) {
   }
   const vista = vistaDe(pide.vista);
   const cuerpo = h('div', 'dm-permiso', {},
-    h('p', 'dm-permiso-que', {}, 'The agent wants to run ', h('strong', 'rad-mono', {}, pide.name), pide.label ? ' on ' : '.', pide.label ? h('strong', '', {}, pide.label) : null, pide.label ? '.' : null),
+    h('p', 'dm-permiso-que', pide.sub ? { 'data-sub': String(pide.sub) } : {}, pide.sub ? (pide.sub === true ? 'A subagent wants to run ' : `Subagent ${pide.sub} wants to run `) : 'The agent wants to run ', h('strong', 'rad-mono', {}, pide.name), pide.label ? ' on ' : '.', pide.label ? h('strong', '', {}, pide.label) : null, pide.label ? '.' : null),
     vista,
     // con un diff a la vista, los argumentos crudos repiten lo mismo en feo
     pide.vista?.mode === 'diff' || pide.vista?.mode === 'new' ? null : (args.childElementCount ? args : null),

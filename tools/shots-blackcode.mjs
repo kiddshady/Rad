@@ -231,6 +231,29 @@ const SCENES = {
     hilo.scrollTop = 0;
     await sleep(700);`,
   // La tarjeta de la búsqueda en la web: Tavily elegido con su llave, Brave sin la suya.
+  // Subagentes: dos a la vez, con sus filas colgadas de la de delegate y el informe abierto.
+  subagentes: `
+    datos.ponerModoTools('auto');
+    const t = datos.crearAgente({ nombre: 'Toolsmith', proveedor: 'anthropic', modelo: 'claude-sonnet-5-5', instrucciones: 'You keep my notes in order.', tools: ['fs_read', 'fs_write', 'code_search', 'delegate'] });
+    const c = datos.crearChat(t.id);
+    await datos.enviar(c.id, 'TOOLS: ' + JSON.stringify([{ name: 'fs_write', args: { path: 'notes.md', content: '# Notes\\n\\n- one\\n- two\\n' } }]));
+    await quietos();
+    const hijo = (llamadas) => 'TOOLS: ' + JSON.stringify(llamadas);
+    await datos.enviar(c.id, 'TOOLS: ' + JSON.stringify([{ name: 'delegate', args: { tasks: [hijo([{ name: 'fs_read', args: { paths: ['notes.md'] } }, { name: 'code_search', args: { mode: 'content', pattern: 'two' } }]), hijo([{ name: 'code_search', args: { mode: 'files', glob: '*.md' } }, { name: 'fs_read', args: { paths: ['missing.md'] } }])] } }]));
+    await quietos();
+    datos.renombrarChat(c.id, 'Two subagents on the notes');
+    await sleep(600);
+    [...document.querySelectorAll('.dm-tool')].filter((n) => n.dataset.tool === 'delegate').at(-1).querySelector('.dm-tool-cabeza').click();
+    await sleep(900);
+    const hilo = document.querySelector('.dm-hilo:not([data-rad-leaving])');
+    hilo.scrollTop = hilo.scrollHeight;
+    await sleep(600);`,
+  // La tarjeta de Settings: con qué modelo corren.
+  'subagentes-ajustes': `
+    datos.ponerSubagentes({ proveedor: 'anthropic', modelo: 'claude-haiku-5-5' });
+    await go('ajustes');
+    view('ajustes').querySelector('[data-tarjeta="subagentes"]').scrollIntoView({ block: 'center' });
+    await sleep(1200);`,
   busqueda: `
     await llave.guardar('tavily', 'tvly-captura-de-blackcode-no-es-una-llave-3333');
     datos.ponerBuscador('tavily');

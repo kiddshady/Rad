@@ -30,6 +30,7 @@ encabezado de qué parte de NeonCode salió y qué se le adaptó.
 | `captura.cjs` | `screen_capture`: una foto de un monitor o de una ventana, que el modelo ve |
 | `canvas.cjs`, `canvas-store.cjs` | `canvas`: documentos y código en el panel de al lado, y su base |
 | `notas.cjs`, `notes-store.cjs` | `notepad` y `notepad_write`: la libreta del usuario, y su base |
+| `delegar.cjs` | `delegate`: los subagentes |
 | `navegador.cjs`, `browser/` | Las seis `browser_*` y el navegador que manejan (`agent-browser.cjs`), con su preload de sesión |
 | `index.cjs` | Arma todo y es lo único que conoce el chat |
 
@@ -57,6 +58,7 @@ agente. La barra de estado repite la cuenta.
 | Screen | `screen_capture` |
 | Canvas | `canvas` |
 | Notes | `notepad`, `notepad_write` |
+| Subagents | `delegate` |
 
 La pantalla va sola en su grupo: es lo más privado que una tool puede mirar
 (lo que haya abierto, sin elegir qué), y se prende aparte de todo lo demás.
@@ -248,13 +250,55 @@ usuario de Windows, las carpetas de inicio, Escritorio, Documentos y Descargas,
 la carpeta de trabajo y la fecha. Eso sale hacia el proveedor (Anthropic o
 Venice) en cada pedido de un agente con tools.
 
+## Los subagentes
+
+`delegate` (grupo Subagents, desde la 0.13.0) le pasa un trabajo a un
+**subagente**: un turno hijo que arranca con el contexto vacío (solo el brief),
+trabaja con sus tools y le devuelve al agente UNA cosa, su informe. Lo que el
+hijo leyó se queda en el hijo. Viene de NeonCode 1.11.3 (`runDelegate`,
+`correrSubagente`), con sus textos tal cual; está en `main/tools/delegar.cjs`.
+
+- **Qué es el hijo acá.** Una sesión de tools como la de cualquier turno
+  (`crearSesion`, con `subagente`, `callPrefix` y `cwd`) y una llamada al
+  proveedor (`responder`). Las dos cosas las inyecta la app: `delegar.cjs` no
+  conoce a los proveedores.
+- **Qué tools ve** (`activeToolNames` en `motor.cjs`): las del agente menos
+  `delegate` (un solo nivel). Con `access: 'read'`, que es lo de fábrica, solo
+  las de lectura (`READ_ROUND_TOOLS`); con `'full'`, todas. Varios hijos a la
+  vez no reciben las del navegador que actúan (`BROWSER_ACTION_TOOLS`): la
+  pestaña es una sola.
+- **Cuántos.** Hasta 4 por llamada (`tasks`), a la vez. Varias llamadas a
+  `delegate` en una ronda corren en serie.
+- **Su system.** El de cualquier turno con tools más `SUBAGENT_NOTE`
+  (`guardas.cjs`), y la línea de la mecánica que dice que su prosa de entre
+  tools se descarta. Lleva las instrucciones del agente.
+- **El informe.** La última ronda de texto del hijo (el texto se parte en
+  rondas cada vez que su sesión cierra una). Vuelve con una cabecera que dice
+  el modelo, qué tools corrió, cuánto tardó y cuántos tokens escribió, y con
+  notas si lo frenaron, falló, se quedó sin pasos, lo cortó el largo o el
+  modelo se negó. Techo: 24000 caracteres entre todos; la fila guarda 4000.
+- **Las filas.** Las del hijo llegan con `sub` (el id de la fila de delegate)
+  y `subN` (cuál hijo, si son varios): la interfaz las cuelga debajo y NO las
+  manda de vuelta al modelo (`viaja` en `renderer/datos.js`). Sus ids van
+  bajo el de delegate: `<pedido>:1.2:3` es el paso 3 del segundo hijo.
+- **Permiso y Stop.** La tarjeta de una tool del hijo es la del chat, y dice
+  que la pide un subagente; las de dos hijos a la vez se piden de a una. El
+  Stop del turno corta a los hijos, y la fila de delegate queda cancelada.
+- **Con qué modelo.** El del agente, salvo que en Settings (tarjeta
+  «Subagents», documento `subagentes`) se elija otro para todos. Lo resuelve
+  `destinoDeSubagentes` en `chat.cjs`, que también dice por qué no puede (sin
+  llave, modelo que ya no está, modelo sin tools).
+- **No vino de NeonCode:** el recall de memorias con el brief, el latido para
+  corridas sin ventana, el deshacer del turno. El uso de tokens del hijo no se
+  suma al del turno: solo figura en el informe.
+
 ## Lo que todavía no vino
 
 - El diario para deshacer lo que escribió una tool (los ganchos están en
   `fs.cjs`, sin nada enchufado).
 - Mandar un mensaje a mitad del turno (steer).
 - Memoria, búsqueda en chats.
-- Subagentes, MCP, skills, tareas programadas.
+- MCP, skills, tareas programadas.
 - Dónde guardar secretos para `http_request` (`{{secret:NOMBRE}}`): un pedido
   con un secreto falla diciendo que no está.
 - Con qué busca `web_search` se elige en Settings (tarjeta «Web search», desde

@@ -9,7 +9,7 @@
 // cometían de verdad, y el comentario que algunas llevan adentro cuenta cuál.
 // Por ahora: archivos y búsqueda, comandos y jobs, código, bases de datos,
 // web, el navegador, abrir cosas en el escritorio, mirar la pantalla, el
-// canvas y las notas.
+// canvas, las notas y los subagentes.
 
 // Lo que algunas definiciones nombran: cuántos días duran la papelera del
 // canvas y la de las notas, y las teclas que acepta browser_press.
@@ -435,6 +435,32 @@ const TOOL_DEFS = [{
     },
     required: ['action'],
   },
+}, {
+  // SUBAGENTES. Un turno hijo con contexto propio: lee, busca y prueba por su
+  // cuenta y le devuelve al padre SOLO su informe. Lo que lee el hijo no entra
+  // al contexto del padre, que es el motivo de todo esto. Ver delegar.cjs.
+  name: 'delegate',
+  description: 'Hand a self-contained piece of work to a SUBAGENT: a fresh copy of you, with its own empty context and the same tools, that works on it and returns only its final report. '
+    + 'Use it when the work would flood your context with material you do not need afterwards — reading many files, searching a codebase, researching on the web, trying something on the side — or to run several independent pieces at the same time (`tasks`). '
+    + 'The subagent sees NOTHING of this conversation: the brief is all it gets, so write it like a message to a colleague who just walked in — the goal, the exact paths/URLs/names involved, what you already know or ruled out, and what the report must contain. '
+    + 'Do not delegate what one or two tool calls settle yourself, and do not delegate the final answer to the user.',
+  parameters: {
+    type: 'object',
+    properties: {
+      task: { type: 'string', description: 'The complete brief for ONE subagent.' },
+      tasks: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 4,
+        description: 'Up to 4 INDEPENDENT briefs, each run by its own subagent at the same time. Use instead of `task` when the pieces do not depend on each other. Subagents running together share one browser tab, so they can read it but not navigate or click in it: give browser work to a single subagent.',
+      },
+      access: {
+        type: 'string',
+        enum: ['read', 'full'],
+        description: "'read' (default): the subagent can only look — read files, search, fetch, read the open browser tab, take screenshots. 'full': it can also write and edit files and run commands and code. Ask for 'full' only when the task is to change or run something.",
+      },
+    },
+  },
 }];
 
 // Los grupos con que se prenden y se apagan en un agente.
@@ -451,6 +477,8 @@ const GRUPOS = [
   { id: 'screen', nombre: 'Screen', tools: ['screen_capture'] },
   { id: 'canvas', nombre: 'Canvas', tools: ['canvas'] },
   { id: 'notes', nombre: 'Notes', tools: ['notepad', 'notepad_write'] },
+  // otro agente trabajando por encargo de este
+  { id: 'subagents', nombre: 'Subagents', tools: ['delegate'] },
 ];
 
 const porNombre = new Map(TOOL_DEFS.map((t) => [t.name, t]));

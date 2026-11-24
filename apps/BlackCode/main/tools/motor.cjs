@@ -21,8 +21,10 @@
 //     manual / automático de BlackCode), no una config global.
 //   - El motor no conoce a las familias: lo que necesita de una (cómo es el
 //     destino de os_open) le llega por configurar().
-//   - No hay skills, MCP ni subagentes todavía: sus ramas de runTool no
-//     vinieron. Tampoco el registro de verificación (M10).
+//   - No hay skills ni MCP todavía: sus ramas de runTool no vinieron.
+//     Tampoco el registro de verificación (M10). Los subagentes llegaron en
+//     la 0.13.0 (delegar.cjs): acá está qué tools ve un hijo y cómo se cierra
+//     la fila de `delegate`.
 
 const { resolverEn } = require('./base.cjs');
 const path = require('node:path');
@@ -45,7 +47,27 @@ function registrar(runners) {
 }
 const registradas = () => Object.keys(TOOL_RUNNERS);
 /** Las tools de ESTA corrida: las que el agente tiene prendidas y existen. */
-const activeToolNames = (run) => (Array.isArray(run?.tools) ? run.tools.filter((n) => n in TOOL_RUNNERS) : []);
+function activeToolNames(run) {
+  let names = Array.isArray(run?.tools) ? run.tools.filter((n) => n in TOOL_RUNNERS) : [];
+  // Un subagente no delega (un solo nivel: un hijo que lanza hijos es el mismo
+  // runaway que una tarea que agenda tareas), no agenda y no guarda memorias
+  // del usuario: no lo está escuchando. Con access 'read' se queda con las de
+  // lectura, que son las mismas que no gastan presupuesto (READ_ROUND_TOOLS).
+  // El filtro es fijo para todo el turno del hijo, así que no le cambia la lista
+  // de tools detrás de un bloque thinking.
+  if (run?.subagent) {
+    names = names.filter((n) => n !== 'delegate' && n !== 'schedule' && n !== 'remember');
+    if (run.subagent.access !== 'full') names = names.filter((n) => READ_ROUND_TOOLS.has(n));
+    // El browser es UNO, compartido con el padre y el usuario, y todas sus tools
+    // trabajan sobre la pestaña activa. Dos hijos a la vez con browser_navigate
+    // o browser_click se pisan: uno cambia de página o de pestaña en medio del
+    // read → click del otro, y el click del segundo cae en otra página, con la
+    // sesión real del usuario. Los que corren juntos solo pueden LEER la pestaña;
+    // el trabajo de browser va a un subagente solo, que la tiene entera.
+    if (run.subagent.paralelo) names = names.filter((n) => !BROWSER_ACTION_TOOLS.has(n));
+  }
+  return names;
+}
 
 // Rondas que NO se cobran del presupuesto de tools: si TODAS las calls de una
 // ronda son de LECTURA, la ronda es gratis — "leer no es entregar" (el doc de
@@ -72,6 +94,10 @@ const activeToolNames = (run) => (Array.isArray(run?.tools) ? run.tools.filter((
 // cambia, y leer la salida de un job tampoco cambia el job.
 const READ_ROUND_TOOLS = new Set(['fs_read', 'code_search', 'chat_search', 'rag_search',
   'notepad', 'list_skills', 'web_search', 'fetch', 'browser_read', 'screen_capture', 'job_output']);
+
+// Las del browser que CAMBIAN la pestaña (todas menos browser_read). Ver el
+// filtro de subagentes en paralelo en activeToolNames.
+const BROWSER_ACTION_TOOLS = new Set(['browser_navigate', 'browser_click', 'browser_type', 'browser_press', 'browser_upload']);
 
 // ¿La ronda fue toda de lectura? Las skills de instrucciones también cuentan:
 // llamarlas DEVUELVE texto (el cuerpo del .md) y no ejecuta nada.
@@ -460,7 +486,9 @@ async function runTool(run, name, args) {
     // el flag, 600 caracteres cortados al medio se leen como si fueran todo lo
     // que la tool devolvió
     const completo = String(out ?? '');
-    step.out = completo.slice(0, CHIP_CHARS);
+    // el chip de `delegate` es donde el usuario lee el informe del subagente:
+    // con 600 caracteres no se lee nada
+    step.out = completo.slice(0, name === 'delegate' ? DELEGATE_CHIP_CHARS : CHIP_CHARS);
     step.outCut = completo.length > step.out.length;
     run._callId = null;
     notifyOriginal.call(run, 'tool:result', {
@@ -500,14 +528,20 @@ async function runTool(run, name, args) {
     }
   }
   try {
-    return settle('ok', await runner(run, args || {}));
+    const out = await runner(run, args || {});
+    // Un `delegate` cortado por el Stop vuelve con los informes parciales y no
+    // con un error, así que el chip quedaba con su tilde de ok arriba de cuatro
+    // subagentes cortados y el pie decía "1 ok". Lo que pasó fue un cancel.
+    return settle(name === 'delegate' && run.ac?.signal?.aborted ? 'aborted' : 'ok', out);
   } catch (err) {
     return settle('error', `error: ${String(err?.message || err)}`);
   }
 }
 
-// Lo que el chip guarda de la salida de una tool.
+// Lo que el chip guarda de la salida de una tool, y lo que guarda del informe
+// de un subagente.
 const CHIP_CHARS = 600;
+const DELEGATE_CHIP_CHARS = 4000;
 
 /**
  * Una llamada que no llegó a despacharse porque sus argumentos no se pudieron
@@ -532,5 +566,5 @@ function anotarRechazo(run, name, args, out) {
 module.exports = {
   registrar, configurar, registradas, activeToolNames, runTool, anotarRechazo, argsDigest, failedOut,
   thrashCheck, thrashRecord, thrashState, thrashOf, congelarRutas, rondaEsLectura,
-  READ_ROUND_TOOLS, IDEMPOTENT_TOOLS, THRASH, CHIP_CHARS,
+  READ_ROUND_TOOLS, BROWSER_ACTION_TOOLS, IDEMPOTENT_TOOLS, THRASH, CHIP_CHARS, DELEGATE_CHIP_CHARS,
 };

@@ -127,6 +127,33 @@ function wire(rad, { llave }) {
     webSearch: () => ({ provider: buscador(), maxResults: 5 }),
     getKey: (nombre) => (nombre === 'websearch' && CON_LLAVE.has(buscador()) ? llave.leer(rad.store, buscador()) : null),
   };
+  // Los subagentes (la tool delegate): con qué modelo corre un hijo y cómo se
+  // lo llama. De fábrica, el mismo del agente; en Settings se puede elegir
+  // otro (el documento `subagentes`: { proveedor, modelo }).
+  const destinoDeSubagentes = (run) => {
+    const sa = rad.store.read('subagentes') ?? {};
+    const elegido = RESPONDER[sa.proveedor] ? sa.proveedor : null;
+    const proveedor = elegido ?? run.proveedor;
+    const p = proveedores().proveedores.find((x) => x.id === proveedor);
+    const modelo = elegido ? (String(sa.modelo ?? '').trim() || p?.inicial || '') : run.modelo;
+    const m = p?.modelos.find((x) => x.id === modelo);
+    const nombre = NOMBRES[proveedor] ?? String(proveedor ?? '');
+    let error = null;
+    if (!RESPONDER[proveedor]) error = 'the subagent provider is not set (Settings → Subagents)';
+    else if (!modelo) error = `no model chosen for ${nombre}, the subagent provider (Settings → Subagents)`;
+    else if (elegido && !m) error = `the subagent model '${modelo}' is not in ${nombre}'s list any more (Settings → Subagents)`;
+    else if (m?.tools === false) error = `the subagent model '${modelo}' cannot use tools: pick another one (Settings → Subagents)`;
+    else if (!llave.SIMULADO && !llave.leer(rad.store, proveedor)) error = `no API key set for ${nombre}, the subagent provider`;
+    return { proveedor, modelo, nombre, mismo: !elegido, ve: proveedor === 'anthropic' || m?.vision === true, error };
+  };
+  const paraLosSubagentes = {
+    subagentes: {
+      destino: destinoDeSubagentes,
+      responder: (pedido, opciones) => (llave.SIMULADO
+        ? simulado.responder(pedido, opciones)
+        : RESPONDER[pedido.proveedor](pedido, { ...opciones, key: llave.leer(rad.store, pedido.proveedor) })),
+    },
+  };
   // El navegador pinta su página encima de la ventana principal: hay que
   // saber cuál es (las ventanas de login que abre una página también son
   // ventanas) y dormirle la capa cuando la ventana no se ve.
@@ -160,6 +187,7 @@ function wire(rad, { llave }) {
       ...paraElCanvas,
       ...paraElNavegador,
       ...paraLaBusqueda,
+      ...paraLosSubagentes,
       abrirAfuera: (u) => anotar(`url ${u}`),
       trash: (ruta) => fs.promises.rename(ruta, path.join(taller, '.trash', `${Date.now()}-${path.basename(ruta)}`)),
       // y no miran la pantalla de nadie: capturan una de mentira
@@ -177,7 +205,7 @@ function wire(rad, { llave }) {
     const carpeta = path.join(path.dirname(rad.store.dir), 'tools');
     fs.mkdirSync(carpeta, { recursive: true });
     const { desktopCapturer, screen } = require('electron');
-    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, abrirAfuera: (u) => shell.openExternal(u) });
+    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, ...paraLosSubagentes, abrirAfuera: (u) => shell.openExternal(u) });
     herramientas.setCwd(rad.store.read(DOC_TOOLS)?.carpeta);
   }
   // Al salir, lo que quedó corriendo en segundo plano se mata.
@@ -351,14 +379,16 @@ function wire(rad, { llave }) {
         // los runners avisan sin saber su callId: se lo pone la corrida
         notify(canal, datos) {
           const callId = datos.callId ?? this._callId;
-          if (canal === 'tool:activity') avisar('tool', { callId, kind: datos.kind, label: datos.label });
+          // (`sub`: la corrió un subagente, y cuelga de esa fila de delegate)
+          if (canal === 'tool:activity') avisar('tool', { callId, kind: datos.kind, label: datos.label, ...(datos.sub ? { sub: datos.sub, subN: datos.subN || 0 } : {}) });
           else if (canal === 'tool:result') avisar('tool-fin', { callId, status: datos.status, ms: datos.ms, out: datos.out, outCut: datos.outCut });
           else if (canal === 'canvas:opened') avisar('canvas', { canvas: datos.canvas });
           else if (canal === 'tool:artifact') avisar('tool-imagenes', { callId, imagenes: (datos.images || []).slice(0, IMAGENES_MAX) });
         },
         // La tarjeta: se le manda a la interfaz qué se va a correr (y, si es
         // un archivo, qué cambia) y se espera la respuesta. Un Stop la cierra.
-        async confirm(name, args, callId) {
+        // (`quien`: { sub } si la pide un subagente, para que la tarjeta lo diga)
+        async confirm(name, args, callId, quien = null) {
           if (control.signal.aborted) return 'abort';
           const vista = await herramientas.vistaPrevia(sesion.run, name, args);
           return new Promise((resolve) => {
@@ -369,12 +399,19 @@ function wire(rad, { llave }) {
               pendientes.delete(callId);
               resolve(permitir);
             });
-            avisar('confirmar', { callId, name, label: herramientas.argsDigest(name, args), args: recortar(args), vista });
+            avisar('confirmar', { callId, name, label: herramientas.argsDigest(name, args), args: recortar(args), vista, ...(quien?.sub ? { sub: quien.sub } : {}) });
           });
         },
       });
       // ¿este modelo acepta imágenes? Lo usa la foto de browser_read
       sesion.run.ve = ve;
+      // lo que un subagente hereda de esta corrida, y con qué modelo va a
+      // hablar (se lo dice la guía de delegate)
+      Object.assign(sesion.run, { proveedor: pedido.proveedor, modelo: pedido.modelo, instrucciones: pedido.instrucciones });
+      if (sesion.nombres.includes('delegate')) {
+        const d = destinoDeSubagentes(sesion.run);
+        sesion.run.etiquetaSubagente = d.mismo ? 'the same model as you' : `running on ${d.modelo || '(no model chosen)'} via ${d.nombre}`;
+      }
       if (!sesion.activa) sesion = null;
     }
     const corrio = () => (sesion ? { tools: sesion.resumen(), agotado: sesion.run.stopped === 'maxrounds' } : {});

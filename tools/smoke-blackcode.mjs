@@ -59,7 +59,8 @@ function armarGuion(carpeta) {
 }
 // RAD_SMOKE_TIMEOUT (ms) lo estira y RAD_SMOKE_KEEP=1 deja la carpeta de datos
 // para mirarla: las dos son para depurar un guion que se cuelga.
-const TIMEOUT_MS = Number(process.env.RAD_SMOKE_TIMEOUT) || 240000;
+// (360 s desde la 0.13.0: con el bloque de subagentes la primera pasada pasa los cuatro minutos)
+const TIMEOUT_MS = Number(process.env.RAD_SMOKE_TIMEOUT) || 360000;
 // Todas las llaves que escribe el guion en Ajustes llevan esta marca. No son
 // llaves: son textos con su forma, para comprobar que lo que se guarda no
 // queda en claro.
@@ -133,6 +134,17 @@ function checkDisk(data, report) {
     const b = JSON.parse(fs.readFileSync(path.join(dir, 'busqueda.json'), 'utf8'));
     if (b.proveedor !== 'tavily') failures.push(`el buscador guardado es ${JSON.stringify(b.proveedor)}, no tavily`);
   } catch { failures.push('el buscador elegido no quedó guardado (falta busqueda.json)'); }
+  // …y con qué corren los subagentes
+  try {
+    const s = JSON.parse(fs.readFileSync(path.join(dir, 'subagentes.json'), 'utf8'));
+    if (s.proveedor !== 'venice' || s.modelo !== 'kimi-k3') failures.push(`el modelo de los subagentes guardado es ${JSON.stringify(s)}, no Venice con kimi-k3`);
+  } catch { failures.push('el modelo de los subagentes no quedó guardado (falta subagentes.json)'); }
+  // lo que escribieron los subagentes del humo: el de acceso completo sí, el de lectura no
+  {
+    const en = (f) => { try { return fs.readFileSync(path.join(data, 'workspace', f), 'utf8'); } catch { return null; } };
+    if (en('sub-note.txt') !== 'from a subagent\n' || en('sub-asked.txt') !== 'asked\n') failures.push(`lo que escribieron los subagentes: ${JSON.stringify([en('sub-note.txt'), en('sub-asked.txt')])}`);
+    if (en('sub-no.txt') !== null) failures.push('un subagente de solo lectura escribió sub-no.txt');
+  }
   // Las tools del humo trabajaron en <datos>/workspace: lo que quedó en el
   // disco tiene que ser lo que el guion aprobó, y nada de lo que rechazó.
   const taller = path.join(data, 'workspace');

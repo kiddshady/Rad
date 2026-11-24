@@ -265,6 +265,111 @@ function tarjetaBusqueda() {
   return tarjeta;
 }
 
+// Los subagentes: con qué modelo corre lo que un agente le pasa a la tool
+// delegate. De fábrica, el mismo del agente; se puede elegir uno más barato o
+// más rápido para todos. Cada proveedor tiene su select de modelos, los dos en
+// la misma celda (como en el formulario de un agente), y «el mismo» tiene uno
+// apagado que lo dice.
+const MISMO = 'mismo';
+function tarjetaSubagentes() {
+  const celda = h('div', 'dm-modelos');
+  const texto = h('span', 'dm-estado-texto rad-swap');
+  const estado = h('p', 'dm-estado', { role: 'status' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), texto);
+  const guardar = (proveedor) => {
+    const s = selects.get(proveedor);
+    datosApp.ponerSubagentes(proveedor === MISMO ? { proveedor: null, modelo: '' } : { proveedor, modelo: s?.select.value ?? '' });
+  };
+  const proveedor = createSelect({
+    options: [{ value: MISMO, label: 'Same as the agent' }, ...datosApp.proveedores().map((p) => ({ value: p.id, label: p.nombre }))],
+    value: datosApp.subagentes().proveedor ?? MISMO,
+    onChange: (v) => guardar(v),
+  });
+  proveedor.el.setAttribute('aria-labelledby', 'dm-sub-proveedor');
+  proveedor.el.dataset.campo = 'sub-proveedor';
+
+  // Los selects de modelos se arman de nuevo cuando llega la lista de Venice.
+  const selects = new Map();
+  const armar = () => {
+    for (const { select } of selects.values()) select.close();
+    selects.clear();
+    const mismo = createSelect({ options: [], placeholder: 'The agent’s own model' });
+    mismo.el.disabled = true;
+    mismo.el.dataset.proveedor = MISMO;
+    selects.set(MISMO, { select: mismo, modelos: [] });
+    const guardado = datosApp.subagentes();
+    for (const p of datosApp.proveedores()) {
+      const suyo = guardado.proveedor === p.id && guardado.modelo ? guardado.modelo : null;
+      // un modelo que salió de la lista del proveedor se deja a la vista, con su id
+      const modelos = suyo && !p.modelos.some((m) => m.id === suyo) ? [{ id: suyo, nombre: suyo }, ...p.modelos] : p.modelos;
+      const select = createSelect({
+        options: modelos.map((m) => ({ value: m.id, label: m.nombre })),
+        value: suyo ?? p.inicial,
+        placeholder: 'No models yet',
+        onChange: () => guardar(p.id),
+      });
+      select.el.dataset.proveedor = p.id;
+      select.el.disabled = !modelos.length;
+      selects.set(p.id, { select, modelos });
+    }
+    for (const { select } of selects.values()) {
+      select.el.setAttribute('aria-labelledby', 'dm-sub-modelo');
+      select.el.dataset.campo = 'sub-modelo';
+    }
+    celda.replaceChildren(...[...selects.values()].map((s) => s.select.el));
+  };
+
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'subagentes' },
+    h('h2', 'dm-tarjeta-nombre', {}, 'Subagents'),
+    h('p', 'dm-tarjeta-instr', {}, 'An agent with the delegate tool can hand part of its work to subagents: copies of itself that start with an empty context, work on their own and send back only a report. Up to four run at once. They can only read unless the agent asks for full access, and they cannot start subagents of their own.'),
+    h('div', 'dm-subagentes', {},
+      h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-sub-proveedor' }, 'Run them on'), proveedor.el),
+      h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-sub-modelo' }, 'Model'), celda)),
+    estado);
+  wireControls(tarjeta);
+
+  const poner = () => {
+    const { proveedor: prov, modelo } = datosApp.subagentes();
+    const actual = prov ?? MISMO;
+    if (proveedor.value !== actual) proveedor.value = actual;
+    for (const [id, { select }] of selects) {
+      const activo = id === actual;
+      select.el.toggleAttribute('data-activo', activo);
+      select.el.inert = !activo;
+      if (!activo) select.close();
+    }
+    tarjeta.dataset.subagentes = actual;
+    if (!prov) {
+      estado.dataset.tono = 'success';
+      swapText(texto, 'Subagents run on the same model as the agent that starts them.');
+      return;
+    }
+    const s = selects.get(prov);
+    const elegido = modelo || s?.select.value || '';
+    if (s && elegido && s.select.value !== elegido) s.select.value = elegido;
+    const m = s?.modelos.find((x) => x.id === elegido);
+    const nombre = datosApp.nombreProveedor(prov);
+    if (llave.de(prov).estado !== 'lista') {
+      estado.dataset.tono = 'warning';
+      swapText(texto, `There is no ${nombre} key saved: delegate will fail until you add one above, or pick another.`);
+    } else if (!elegido) {
+      estado.dataset.tono = 'warning';
+      swapText(texto, `${nombre} has no models to choose from yet.`);
+    } else if (m?.tools === false) {
+      estado.dataset.tono = 'warning';
+      swapText(texto, `${m.nombre} cannot use tools, so a subagent could not do any work with it. Pick another model.`);
+    } else {
+      estado.dataset.tono = 'success';
+      swapText(texto, `Subagents run on ${m?.nombre ?? elegido}.`);
+    }
+  };
+  armar();
+  poner();
+  datosApp.on('ajustes', poner);
+  datosApp.on('modelos', () => { armar(); poner(); });
+  llave.on(poner);
+  return tarjeta;
+}
+
 function tarjetaTools() {
   const input = h('input', '', { type: 'checkbox', role: 'switch', id: 'dm-tools-preguntar', 'data-campo': 'preguntar' });
   const nota = h('p', 'dm-tarjeta-instr rad-swap');
@@ -296,6 +401,7 @@ export function montarAjustes(el, { router }) {
     ...PROVEEDORES.map((p) => tarjetaLlave(p)),
     tarjetaBusqueda(),
     tarjetaTools(),
+    tarjetaSubagentes(),
     tarjetaAcerca()));
 
   // Al abrir Ajustes se le pregunta a la API por cada llave guardada. Lo que

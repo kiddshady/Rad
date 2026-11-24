@@ -24,6 +24,7 @@ const captura = require('./captura.cjs');
 const lienzo = require('./canvas.cjs');
 const navegador = require('./navegador.cjs');
 const notas = require('./notas.cjs');
+const delegar = require('./delegar.cjs');
 
 let listo = false;
 
@@ -43,8 +44,10 @@ let listo = false;
  *   getKey(nombre)     una llave guardada, o null (web_search con Tavily o Brave)
  *   getSecret(nombre)  el valor de un {{secret:NOMBRE}}, o null (http_request)
  *   webSearch()        { provider, maxResults } de la búsqueda web
+ *   subagentes         { destino(run), responder(pedido, opciones) }: con qué
+ *                      modelo corre un hijo de `delegate` y cómo se lo llama
  */
-function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null } = {}) {
+function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null } = {}) {
   archivos.configurar({ trash });
   web.configurar({ getKey, getSecret, webSearch });
   abrir.configurar({ shell });
@@ -68,10 +71,12 @@ function iniciar({ carpeta = null, trash = null, shell = null, capturador = null
     ...(avisar ? { broadcast: avisar } : {}),
   });
   motor.configurar({ classifyOsTarget: abrir.classifyOsTarget });
+  // el hijo de `delegate` es una sesión como la de cualquier turno
+  delegar.configurar({ crearSesion: (opciones) => module.exports.crearSesion(opciones), ...(subagentes ?? {}) });
   if (listo) return;
   motor.registrar({
     ...archivos.runners, ...comandos.runners, ...trabajos.runners, ...busqueda.runners,
-    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners,
+    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners, ...delegar.runners,
   });
   listo = true;
 }

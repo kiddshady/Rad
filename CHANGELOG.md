@@ -1,5 +1,26 @@
 # Changelog
 
+## BlackCode 0.13.0 (2026-11-24)
+
+- **Subagentes.** Tool nueva, `delegate` (grupo Subagents): el agente le pasa
+  un trabajo a un subagente, una copia suya que arranca con el contexto vacío,
+  trabaja con sus tools y le devuelve solo su informe. Lo que el subagente leyó
+  no ocupa el contexto del agente. Viene de NeonCode 1.11.3, con sus textos.
+- Hasta cuatro a la vez en una llamada. Solo miran (leer, buscar, la web, la
+  pestaña abierta), salvo que el agente pida acceso completo; no pueden lanzar
+  subagentes propios, y los que corren juntos no actúan en el navegador.
+- En el chat, las tools de cada subagente cuelgan debajo de la fila de
+  `delegate`, numeradas cuando son varios; la fila se abre para leer el
+  informe. Lo que corrió un subagente no vuelve al modelo como si lo hubiera
+  corrido el agente.
+- La tarjeta de permiso dice cuándo la pide un subagente, y las de dos a la
+  vez se piden de a una. El Stop los corta.
+- Settings › Subagents elige con qué modelo corren: el del agente (de fábrica)
+  u otro para todos, por ejemplo uno más barato.
+- Son 28 tools en 11 grupos; los agentes que tenían todas reciben sola la
+  nueva.
+- El humo de BlackCode pasa a tener 6 minutos por pasada.
+
 ## BlackCode 0.12.4 (2026-11-24)
 
 - **Los resultados de `web_search` salen limpios.** Un fragmento que traía el
