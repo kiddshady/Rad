@@ -36,8 +36,9 @@ documentación de cada API.
 
 ## Los grupos
 
-Las tools se prenden por grupo y por agente, y nacen todas apagadas. Hay dos
-lugares para hacerlo: el botón de arriba a la derecha de la conversación (dice
+Las tools se prenden por grupo y por agente. Un agente nuevo nace con todas
+prendidas (desde la 0.7.3; los de antes quedaron como estaban). Hay dos
+lugares para cambiarlas: el botón de arriba a la derecha de la conversación (dice
 cuántas lleva el agente y su menú cambia cada grupo) y el formulario del
 agente. La barra de estado repite la cuenta.
 
@@ -253,3 +254,5 @@ verdad pidiendo tools, ni un modelo de Venice recibiendo una imagen.
    siempre lo mismo, a `IDEMPOTENT_TOOLS` (las dos en `motor.cjs`).
 5. Su línea en `toolGuidance` (`guardas.cjs`) y cómo se resume en el chip
    (`argsDigest`, en `motor.cjs`).
+6. Su ícono en `renderer/iconos-tools.js` (el mapa `DE_TOOL`). Sin uno, la
+   fila lleva la llave fija.

@@ -78,10 +78,11 @@ export function abrirAgente(agente = null) {
     instrucciones,
     h('span', 'rad-field-hint', {}, 'The model reads this before every chat. It can be left empty.'));
 
-  // Las tools del agente, por grupo. Apagadas, el agente solo conversa. Si el
+  // Las tools del agente, por grupo. Un agente nuevo las trae todas prendidas;
+  // apagadas, el agente solo conversa. Si el
   // modelo elegido no las acepta (pasa con varios de Venice) quedan como
   // están pero no se usan, y se dice.
-  const elegidas = new Set(datos.toolsDe(agente));
+  const elegidas = new Set(agente ? datos.toolsDe(agente) : datos.todasLasTools());
   const notaTools = h('span', 'rad-field-hint rad-swap');
   const filas = datos.gruposTools().map((g) => {
     const input = h('input', '', { type: 'checkbox', role: 'switch', 'data-grupo': g.id });

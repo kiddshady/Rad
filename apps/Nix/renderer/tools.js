@@ -11,6 +11,7 @@ import { wireControls } from '/@core/controls.js';
 import { swapText } from '/@core/motion.js';
 import * as datos from './datos.js';
 import { h, icono } from './piezas.js';
+import { iconoTool } from './iconos-tools.js';
 
 const ESTADOS = {
   run: 'running',
@@ -25,7 +26,7 @@ const ESTADOS = {
  *  ver lo que devolvió. */
 export function filaTool(m) {
   const cabeza = h('button', 'dm-tool-cabeza', { type: 'button', 'aria-expanded': 'false' },
-    icono('tool', 'dm-tool-icono'),
+    iconoTool(m.tool, 'dm-tool-icono'),
     h('span', 'dm-tool-nombre'),
     h('span', 'dm-tool-que rad-swap'),
     h('span', 'dm-tool-estado rad-swap'),

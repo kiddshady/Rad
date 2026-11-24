@@ -1,5 +1,24 @@
 # Changelog
 
+## Nix 0.7.3 (2026-11-24)
+
+- **Un agente nuevo nace con todas las tools prendidas** (pedido de Fran). El
+  formulario de un agente nuevo trae los siete grupos prendidos, y el agente
+  de fábrica también. Los agentes que ya existían no cambian: quedan como
+  estaban.
+- **Cada tool tiene su ícono**, como en NeonCode: es su mismo sistema, con los
+  paths de su `icons.js` y el mapa de qué ícono lleva cada tool (el lápiz
+  para escribir y editar, la carpeta para leer, la terminal para los comandos
+  y los jobs, el ojo para la pantalla…). Las de una familia lo comparten. Una
+  tool sin ícono propio lleva el genérico de siempre, la llave fija, que
+  también sigue en el botón de la conversación. Están ya los íconos de las
+  tools que todavía no vinieron (canvas, navegador, notas, skills, MCP).
+- Varios de esos paths son de Feather Icons (MIT): el aviso viaja en el
+  archivo y en `apps/Nix/THIRD-PARTY.md`, que va dentro del instalador.
+- El proveedor de mentira contesta lo de siempre cuando el agente tiene tools
+  y no se le pide ninguna (antes, una frase corta): ahora todos nacen con
+  tools y el humo mide esa respuesta.
+
 ## Nix 0.7.2 (2026-11-24)
 
 - **Las tools se prenden desde la conversación.** Arriba a la derecha del

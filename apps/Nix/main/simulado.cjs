@@ -110,10 +110,6 @@ async function conTools(pedido, { signal, onTexto, onPensando, sesion }) {
   };
   onPensando();
   await dormir(PENSAR_MS, signal);
-  if (!rondas) {
-    await escribir(`Simulated answer with tools on: ${sesion.nombres.join(', ')}. Nothing was called.`);
-    return signal.aborted ? { motivo: 'frenado' } : { motivo: 'fin', modelo: pedido.modelo };
-  }
   const lineas = [];
   let ultimoJob = '';
   for (const [n, llamadas] of rondas.entries()) {
@@ -137,7 +133,9 @@ async function conTools(pedido, { signal, onTexto, onPensando, sesion }) {
 }
 
 async function responder(pedido, { signal, onTexto, onPensando, sesion = null }) {
-  if (sesion?.activa) return conTools(pedido, { signal, onTexto, onPensando, sesion });
+  // con tools y un renglón TOOLS: se piden esas llamadas; sin el renglón, el
+  // agente contesta lo de siempre (todos nacen con tools)
+  if (sesion?.activa && guion(pedido)) return conTools(pedido, { signal, onTexto, onPensando, sesion });
   onPensando();
   await dormir(PENSAR_MS, signal);
   const texto = respuesta(pedido);

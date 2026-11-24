@@ -66,7 +66,7 @@ export async function abrir() {
     chats.update((v) => { for (const c of v.lista) if (c.auto && c.titulo === 'Chat nuevo') c.titulo = TITULO_NUEVO; return v; });
   }
   // La primera vez hay un agente para empezar a escribir sin armar nada.
-  if (!agentes.get().lista.length) crearAgente({ nombre: 'Nix', proveedor: PROVEEDOR_INICIAL, modelo: modeloInicial(PROVEEDOR_INICIAL), instrucciones: '' });
+  if (!agentes.get().lista.length) crearAgente({ nombre: 'Nix', proveedor: PROVEEDOR_INICIAL, modelo: modeloInicial(PROVEEDOR_INICIAL), instrucciones: '', tools: todasLasTools() });
   window.rad.on('chat:evento', alLlegar);
   // La lista de modelos de Venice llega después, cuando el main la trae.
   window.rad.on('chat:modelos', (nuevo) => { catalogo = nuevo; avisar('modelos'); });
@@ -95,6 +95,9 @@ export const modeloConTools = (prov, id) => modelosDe(prov).find((m) => m.id ===
 export const toolsDe = (a) => (Array.isArray(a?.tools) ? a.tools : []);
 /** Los grupos que un agente tiene prendidos enteros o en parte, por nombre. */
 export const gruposDe = (a) => herramientas.grupos.filter((g) => g.tools.some((t) => toolsDe(a).includes(t))).map((g) => g.nombre);
+/** Todas las tools que hay. Un agente nuevo nace con todas prendidas (Fran lo
+ *  pidió el 24/11/2026: apagadas de fábrica, no las encontraba). */
+export const todasLasTools = () => herramientas.grupos.flatMap((g) => g.tools);
 /** Cuántas tools viajan de verdad en un pedido de ese agente: las que tiene
  *  prendidas, o ninguna si su modelo no las acepta. */
 export const toolsQueViajan = (a) => (a && modeloConTools(a.proveedor, a.modelo) ? toolsDe(a).length : 0);

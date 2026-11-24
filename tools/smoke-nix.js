@@ -653,16 +653,16 @@ else {
   const form = modal();
   type(form.querySelector('[data-campo="nombre"]'), 'Toolsmith');
   const interruptores = [...form.querySelectorAll('[data-campo="tools"] input[role="switch"]')];
-  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,desktop,screen' || interruptores.some((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
-  for (const i of interruptores) if (i.dataset.grupo !== 'web') i.click(); // todo menos la web, que queda apagada
+  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,desktop,screen' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
+  // un agente nuevo nace con todas prendidas: se le apaga la web
+  for (const i of interruptores) if (i.dataset.grupo === 'web') i.click();
   enIngles('en el formulario con tools');
   primary().click();
   await closed();
   await settle();
   const herrero = cards().at(-1);
   if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Desktop, Screen') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
-  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'No tools') fail('un agente sin tools no dice que no las tiene');
-  if (!statusRight().endsWith('· no tools')) fail(`la barra de estado no dice que el agente actual no tiene tools: «${statusRight()}»`);
+  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Desktop, Screen') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
   herrero.querySelector('[data-accion="abrir"]').click();
   await sleep(dur('base') + 260);
   await until(() => statusRight().includes('Toolsmith'), 3000);
@@ -779,6 +779,18 @@ else {
   if (!salio('screen_capture').includes('captured a region of display 1 of 1')) fail(`screen_capture devolvió: ${salio('screen_capture').slice(0, 160)}`);
   data.capturas = `entera ${entera?.naturalWidth}×${entera?.naturalHeight}, región ${zona?.naturalWidth}×${zona?.naturalHeight}, a ${Math.round(entera?.getBoundingClientRect().width ?? 0)} px de ancho en la fila`;
 
+  // Cada fila lleva el ícono de su tool (los de NeonCode), y las de una misma
+  // familia lo comparten.
+  {
+    const ic = (name) => fila(name)?.querySelector('.dm-tool-icono')?.dataset.icono ?? '(genérico)';
+    const esperados = { fs_write: 'edit', fs_read: 'folder', shell_exec: 'terminal', job_start: 'terminal', run_code: 'code', db_query: 'db', os_open: 'external', screen_capture: 'eye' };
+    const mal = Object.entries(esperados).filter(([t, i]) => fila(t) && ic(t) !== i).map(([t, i]) => `${t}: ${ic(t)} (se esperaba ${i})`);
+    if (mal.length) fail(`íconos de las tools: ${mal.join('; ')}`);
+    const dibujo = fila('run_code')?.querySelector('.dm-tool-icono svg path');
+    if (!dibujo || dibujo.getBoundingClientRect().width < 6) fail('el ícono de una tool no se dibuja');
+    data.iconos = Object.keys(esperados).filter((t) => fila(t)).map((t) => `${t}=${ic(t)}`).join(' ');
+  }
+
   // Argumentos incompletos, y una tool que este agente no tiene: ninguna
   // corre, las dos dejan su fila como fallida, y no hay tarjeta que contestar.
   await pedir([[{ name: 'fs_write', args: { path: 'x.txt' } }, { name: 'fetch', args: { url: 'https://example.com' } }]]);
@@ -844,30 +856,30 @@ else {
     data.toolsEnElChat = `${antes} → Tools: off → 18 tools → 15 tools`;
   }
 
-  // Prenderle tools a un agente que YA existía, desde su formulario: es lo que
-  // hace quien tiene agentes de antes de que hubiera tools.
+  // Cambiarle las tools a un agente que YA existía, desde su formulario.
   {
     await go('agentes');
     const primera = () => cards()[0];
-    const nombreDe = shown(primera().querySelector('.dm-tarjeta-nombre')) || primera().textContent.slice(0, 20);
-    primera().querySelector('[data-accion="editar"]').click();
-    await frame();
-    await sleep(dur('base') + 200);
+    const tarjeta = () => shown(primera().querySelector('.dm-tarjeta-tools'));
     const sw = (g) => modal().querySelector('[data-campo="tools"] input[data-grupo="' + g + '"]');
-    if (!sw('files') || sw('files').checked) fail(`editar un agente sin tools: el interruptor de Files ${sw('files') ? 'ya estaba prendido' : 'no está'}`);
+    const editar = async () => { primera().querySelector('[data-accion="editar"]').click(); await frame(); await sleep(dur('base') + 200); };
+    const guardar = async () => { primary().click(); await closed(); await settle(); };
+    await editar();
+    if (!sw('files')?.checked || !sw('screen')?.checked) fail('el formulario de un agente con todas las tools no las muestra prendidas');
+    for (const g of ['commands', 'code', 'data', 'web', 'desktop']) sw(g).click();
+    await guardar();
+    if (tarjeta() !== 'Tools: Files, Screen') fail(`apagarle grupos a un agente desde su formulario dejó la tarjeta en «${tarjeta()}»`);
+    await editar();
+    if (!sw('files').checked || !sw('screen').checked || sw('commands').checked) fail('el formulario no recuerda las tools que quedaron prendidas');
     sw('files').click();
     sw('screen').click();
-    primary().click();
-    await closed();
-    await settle();
-    if (shown(primera().querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Screen') fail(`prenderle tools a «${nombreDe}» desde su formulario dejó la tarjeta en «${shown(primera().querySelector('.dm-tarjeta-tools'))}»`);
-    primera().querySelector('[data-accion="editar"]').click();
-    await frame();
-    await sleep(dur('base') + 200);
-    if (!sw('files').checked || !sw('screen').checked || sw('commands').checked) fail('el formulario no recuerda las tools que se le prendieron al agente');
-    modal().querySelector('.rad-button:not([data-variant])')?.click();
-    await closed();
-    data.toolsAlEditar = shown(primera().querySelector('.dm-tarjeta-tools'));
+    await guardar();
+    if (tarjeta() !== 'No tools') fail(`un agente sin tools no dice que no las tiene: «${tarjeta()}»`);
+    await editar();
+    sw('files').click();
+    await guardar();
+    data.toolsAlEditar = tarjeta();
+    if (tarjeta() !== 'Tools: Files') fail(`volver a prenderle un grupo dejó la tarjeta en «${tarjeta()}»`);
   }
 
   data.tools = `Toolsmith: ${tools().length} filas en el último chat; permiso, rechazo, dos rondas, confianza por chat, código, base propia, un job, dos capturas, argumentos malos y modo automático`;
