@@ -40,6 +40,11 @@ const PROVEEDORES = {
     pista: (key) => `…${key.slice(-4)}`,
     comprobar: null, // su lista de modelos no pide llave: no hay pedido gratis que la pruebe
   },
+  // Los buscadores de web_search que piden llave. No son proveedores de
+  // modelos: acá solo se guardan sus llaves, igual de cifradas. No se
+  // comprueban: ninguno tiene un pedido gratis que diga si la llave sirve.
+  tavily: { doc: '_llave_tavily', pista: (key) => `…${key.slice(-4)}`, comprobar: null },
+  brave: { doc: '_llave_brave', pista: (key) => `…${key.slice(-4)}`, comprobar: null },
 };
 
 const de = (proveedor) => {

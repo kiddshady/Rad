@@ -255,9 +255,12 @@ Venice) en cada pedido de un agente con tools.
 - Mandar un mensaje a mitad del turno (steer).
 - Memoria, búsqueda en chats.
 - Subagentes, MCP, skills, tareas programadas.
-- Dónde guardar secretos para `http_request` (`{{secret:NOMBRE}}`) y la llave
-  de Tavily o Brave para `web_search`. Sin eso, un pedido con un secreto falla
-  diciendo que no está, y la búsqueda usa DuckDuckGo: desde la 0.7.4 lee su
+- Dónde guardar secretos para `http_request` (`{{secret:NOMBRE}}`): un pedido
+  con un secreto falla diciendo que no está.
+- Con qué busca `web_search` se elige en Settings (tarjeta «Web search», desde
+  la 0.12.2): DuckDuckGo sin llave, o Tavily o Brave con la suya, guardada
+  cifrada (`main/llave.cjs`). El elegido está en el documento `busqueda`, que
+  lee `chat.cjs`. De fábrica es DuckDuckGo: desde la 0.7.4 lee su
   página de resultados web (no es una API: si cambian el HTML deja de
   encontrar resultados, o pueden pedir una comprobación humana si se busca
   mucho), con su API de respuestas instantáneas de segundo intento. Es el

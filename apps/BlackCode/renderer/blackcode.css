@@ -33,6 +33,11 @@
     background: var(--rad-surface-2);
     box-shadow: var(--rad-shadow-1);
   }
+  /* Un bloque adentro de una tarjeta (la llave de un buscador): separado del
+     resto por una línea. */
+  .dm-subtarjeta { position: relative; display: grid; gap: var(--rad-space-3); padding-top: var(--rad-space-4); margin-top: var(--rad-space-1); box-shadow: inset 0 var(--rad-line-width) 0 var(--rad-line); }
+  .dm-subtarjeta-nombre { font-family: var(--rad-font-display); font-size: var(--rad-text-m); font-weight: var(--rad-weight-strong); }
+  .dm-buscador { max-width: 320px; }
   .dm-tarjeta-cabeza { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--rad-space-3); }
   .dm-tarjeta-titulo { display: grid; gap: 2px; min-width: 0; }
   .dm-tarjeta-nombre {

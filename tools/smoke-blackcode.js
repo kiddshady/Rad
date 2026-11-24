@@ -1421,6 +1421,54 @@ else {
     data.adjuntos = 'soltar y pegar, imagen achicada a ' + mini?.naturalWidth + '×' + mini?.naturalHeight + ', PDF rechazado, tope de 4, quitar, visor, mandar con archivo, imagen sola y modelo que no ve';
   }
 
+  // 11g. La búsqueda en la web: Settings elige con qué busca web_search y guarda
+  // la llave de cada buscador. Sin tocar la red: un buscador con llave pero sin
+  // su llave falla antes de salir, y eso alcanza para ver que lo elegido llega
+  // a la tool.
+  {
+    const datosM = await import('/datos.js');
+    await go('ajustes');
+    const tb = view('ajustes').querySelector('[data-tarjeta="busqueda"]');
+    const selB = tb.querySelector('[data-campo="buscador"]');
+    const dice = () => shown(tb.querySelector(':scope > .dm-estado .dm-estado-texto'));
+    const tono = () => tb.querySelector(':scope > .dm-estado').dataset.tono;
+    const elegir = async (nombre) => { selB.click(); await until(() => menus().length > 0, 2000); await pick(nombre); await settle(); };
+    tb.scrollIntoView({ block: 'center' });
+    if (datosM.buscador() !== 'duckduckgo' || !selB.textContent.includes('DuckDuckGo') || tono() !== 'success' || !dice().includes('DuckDuckGo')) fail('búsqueda: de fábrica no es DuckDuckGo sin llave («' + selB.textContent + '» / «' + dice() + '»)');
+    const sub = [...tb.querySelectorAll('.dm-subtarjeta')].map((n) => n.dataset.proveedor).join();
+    if (sub !== 'tavily,brave') fail('búsqueda: la tarjeta ofrece las llaves de: ' + sub);
+    // Elegir Brave sin haberle cargado la llave: se avisa…
+    await elegir('Brave');
+    if (datosM.buscador() !== 'brave' || tono() !== 'warning' || !dice().includes('no Brave key')) fail('búsqueda: elegir Brave sin llave dejó «' + dice() + '» (' + tono() + ')');
+    // …y la tool lo sabe: falla diciendo qué falta, sin salir a la red.
+    const actual = datosM.agenteActual();
+    datosM.ponerTools(actual.id, datosM.todasLasTools());
+    datosM.ponerModoTools('auto');
+    await go('chat');
+    chatView.querySelector('[data-accion="nuevo-chat"]').click();
+    await settle();
+    await pedir([[{ name: 'web_search', args: { query: 'anything' } }]]);
+    await sleep(200);
+    for (let i = 0; i < 300 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50);
+    await settle();
+    const salioB = fila('web_search')?.querySelector('.dm-tool-pre').textContent ?? '';
+    if (salioB !== 'error: web search needs a Brave API key (Settings)') fail('búsqueda: con Brave elegido y sin llave, web_search devolvió: ' + salioB.slice(0, 160));
+    datosM.ponerModoTools('manual');
+    // Cargarle la llave a Tavily y elegirlo: queda cifrada, y el aviso se va.
+    await go('ajustes');
+    const tav = tb.querySelector('.dm-subtarjeta[data-proveedor="tavily"]');
+    type(tav.querySelector('[data-campo="llave"]'), 'tvly-humo-de-blackcode-no-es-una-llave-2222');
+    tav.querySelector('[data-accion="guardar-llave"]').click();
+    await until(() => tav.querySelector('.dm-estado').dataset.llave === 'lista', 4000);
+    if (tav.querySelector('.dm-estado').dataset.llave !== 'lista' || !shown(tav.querySelector('.dm-estado-texto')).includes('2222')) fail('búsqueda: la llave de Tavily no quedó guardada («' + shown(tav.querySelector('.dm-estado-texto')) + '»)');
+    if (tav.textContent.includes('tvly-humo')) fail('búsqueda: la llave de Tavily quedó a la vista');
+    await elegir('Tavily');
+    if (datosM.buscador() !== 'tavily' || tono() !== 'success' || dice() !== 'Agents search with Tavily.') fail('búsqueda: con la llave cargada, elegir Tavily dejó «' + dice() + '» (' + tono() + ')');
+    enIngles('en la tarjeta de la búsqueda');
+    data.busqueda = 'DuckDuckGo de fábrica; Brave sin llave avisa y la tool falla sin salir a la red; Tavily con su llave cifrada';
+    await go('chat');
+  }
+
   // Cambiarle las tools a un agente que YA existía, desde su formulario.
   {
     await go('agentes');

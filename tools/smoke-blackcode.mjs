@@ -125,9 +125,14 @@ function checkDisk(data, report) {
     const text = fs.readFileSync(path.join(dir, f), 'utf8');
     if (text.includes(MARCA_DE_LLAVE)) failures.push(`una llave quedó en claro en ${f}`);
   }
-  for (const doc of ['_llave.json', '_llave_venice.json']) {
+  for (const doc of ['_llave.json', '_llave_venice.json', '_llave_tavily.json']) {
     if (!files.includes(doc)) failures.push(`una llave no se guardó (falta ${doc})`);
   }
+  // el buscador elegido quedó guardado donde lo lee el proceso principal
+  try {
+    const b = JSON.parse(fs.readFileSync(path.join(dir, 'busqueda.json'), 'utf8'));
+    if (b.proveedor !== 'tavily') failures.push(`el buscador guardado es ${JSON.stringify(b.proveedor)}, no tavily`);
+  } catch { failures.push('el buscador elegido no quedó guardado (falta busqueda.json)'); }
   // Las tools del humo trabajaron en <datos>/workspace: lo que quedó en el
   // disco tiene que ser lo que el guion aprobó, y nada de lo que rechazó.
   const taller = path.join(data, 'workspace');

@@ -1,7 +1,7 @@
 // La vista de ajustes: una llave por proveedor, y de qué está hecha la app.
 
 import { confirm } from '/@core/modal.js';
-import { setFieldError, wireControls } from '/@core/controls.js';
+import { createSelect, setFieldError, wireControls } from '/@core/controls.js';
 import { swapText } from '/@core/motion.js';
 import { toast } from '/@core/toast.js';
 import { setBusy } from '/@core/busy.js';
@@ -26,6 +26,32 @@ const PROVEEDORES = [
     ejemplo: 'Your Venice API key',
     sitio: 'https://venice.ai/settings/api',
     rotulo: 'Open the Venice API settings',
+  },
+];
+
+// Con qué busca web_search. DuckDuckGo no pide llave; los otros dos son APIs
+// de búsqueda y la suya se guarda acá, cifrada como las de los modelos.
+const BUSCADORES = [
+  { id: 'duckduckgo', nombre: 'DuckDuckGo' },
+  {
+    id: 'tavily',
+    nombre: 'Tavily',
+    conLlave: true,
+    texto: 'A search API made for AI agents: it returns the relevant text of each page, not just a title and a summary.',
+    ejemplo: 'tvly-…',
+    sitio: 'https://tavily.com',
+    rotulo: 'Get a Tavily key',
+    alQuitar: 'Web searches will fail while Tavily is selected, until you paste another one.',
+  },
+  {
+    id: 'brave',
+    nombre: 'Brave',
+    conLlave: true,
+    texto: 'Brave’s search API, with its own index: titles, summaries and links.',
+    ejemplo: 'Your Brave Search API key',
+    sitio: 'https://brave.com/search/api/',
+    rotulo: 'Get a Brave Search API key',
+    alQuitar: 'Web searches will fail while Brave is selected, until you paste another one.',
   },
 ];
 
@@ -56,7 +82,9 @@ function describir(p, e, c) {
   return { tono: 'idle', texto: `Saved and encrypted on this PC: ${e.pista}` };
 }
 
-function tarjetaLlave(p) {
+// Con `sub`, en vez de una tarjeta entera es un bloque para ir adentro de
+// otra (las llaves de los buscadores, en la tarjeta de la búsqueda).
+function tarjetaLlave(p, { sub = false } = {}) {
   const texto = h('span', 'dm-estado-texto rad-swap');
   const estado = h('p', 'dm-estado', { role: 'status' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), texto);
   // Lo que dijo la API, tal cual, debajo de la frase: se despliega si hay.
@@ -76,8 +104,8 @@ function tarjetaLlave(p) {
   const acciones = h('div', 'dm-llave-acciones', {}, quitar, guardar);
   const form = h('form', 'dm-llave', {}, caja, acciones);
   wireControls(form);
-  const tarjeta = h('section', 'dm-tarjeta', { 'data-proveedor': p.id },
-    h('h2', 'dm-tarjeta-nombre', {}, `${p.nombre} key`),
+  const tarjeta = h(sub ? 'div' : 'section', sub ? 'dm-subtarjeta' : 'dm-tarjeta', { 'data-proveedor': p.id },
+    h(sub ? 'h3' : 'h2', sub ? 'dm-subtarjeta-nombre' : 'dm-tarjeta-nombre', {}, `${p.nombre} key`),
     h('p', 'dm-tarjeta-instr', {}, p.texto),
     estado, cajaDetalle, form, sitio);
 
@@ -114,7 +142,7 @@ function tarjetaLlave(p) {
   quitar.addEventListener('click', async () => {
     const si = await confirm({
       title: `Remove the ${p.nombre} key?`,
-      text: 'Agents that use it won’t be able to answer until you paste another one.',
+      text: p.alQuitar ?? 'Agents that use it won’t be able to answer until you paste another one.',
       confirmLabel: 'Remove',
       danger: true,
     });
@@ -196,6 +224,47 @@ function tarjetaAcerca() {
 
 // Las tools: si cada llamada pide permiso. Qué tools tiene cada agente se
 // elige en el agente; acá va lo que vale para todos.
+// La búsqueda en la web: con qué busca la tool web_search, y la llave de cada
+// buscador que la pide. Se pueden cargar las dos y cambiar de uno a otro.
+function tarjetaBusqueda() {
+  const select = createSelect({
+    options: BUSCADORES.map((b) => ({ value: b.id, label: b.conLlave ? b.nombre : `${b.nombre} (no key needed)` })),
+    value: datosApp.buscador(),
+    onChange: (v) => datosApp.ponerBuscador(v),
+  });
+  select.el.setAttribute('aria-labelledby', 'dm-buscador-rotulo');
+  select.el.dataset.campo = 'buscador';
+  const texto = h('span', 'dm-estado-texto rad-swap');
+  const estado = h('p', 'dm-estado', { role: 'status' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), texto);
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'busqueda' },
+    h('h2', 'dm-tarjeta-nombre', {}, 'Web search'),
+    h('p', 'dm-tarjeta-instr', {}, 'What agents search the web with (the web_search tool). DuckDuckGo needs no key. Tavily and Brave are search APIs: save a key for the ones you have and pick which one to use.'),
+    h('div', 'rad-field dm-buscador', {}, h('span', 'rad-field-label', { id: 'dm-buscador-rotulo' }, 'Search with'), select.el),
+    estado,
+    ...BUSCADORES.filter((b) => b.conLlave).map((b) => tarjetaLlave(b, { sub: true })));
+  wireControls(tarjeta);
+  const poner = () => {
+    const id = datosApp.buscador();
+    if (select.value !== id) select.value = id;
+    const b = BUSCADORES.find((x) => x.id === id);
+    tarjeta.dataset.buscador = id;
+    if (!b.conLlave) {
+      estado.dataset.tono = 'success';
+      swapText(texto, 'Agents search with DuckDuckGo. It reads its results page, so it may ask for a human check if they search a lot.');
+    } else if (llave.de(id).estado === 'lista') {
+      estado.dataset.tono = 'success';
+      swapText(texto, `Agents search with ${b.nombre}.`);
+    } else {
+      estado.dataset.tono = 'warning';
+      swapText(texto, `There is no ${b.nombre} key saved: web searches will fail until you add one below, or pick another.`);
+    }
+  };
+  poner();
+  datosApp.on('ajustes', poner);
+  llave.on(poner);
+  return tarjeta;
+}
+
 function tarjetaTools() {
   const input = h('input', '', { type: 'checkbox', role: 'switch', id: 'dm-tools-preguntar', 'data-campo': 'preguntar' });
   const nota = h('p', 'dm-tarjeta-instr rad-swap');
@@ -224,7 +293,8 @@ export function montarAjustes(el, { router }) {
 
   el.append(h('div', 'dm-pagina', {},
     h('header', 'dm-pagina-cabeza', {}, h('div', '', {}, h('h1', '', {}, 'Settings'), h('p', '', {}, 'What BlackCode needs to talk to the models.'))),
-    ...PROVEEDORES.map(tarjetaLlave),
+    ...PROVEEDORES.map((p) => tarjetaLlave(p)),
+    tarjetaBusqueda(),
     tarjetaTools(),
     tarjetaAcerca()));
 

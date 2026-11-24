@@ -30,7 +30,7 @@ const GUARDAR_CADA_MS = 1500;
 const TITULO_MAX = 46;
 const TITULO_NUEVO = 'New chat';
 
-let agentes;
+let agentes, busqueda;
 let chats;
 let ui;
 let catalogo = { proveedores: [] }; // los proveedores con sus modelos
@@ -54,7 +54,8 @@ const avisar = (tipo, detalle = {}) => { for (const fn of oyentes.get(tipo) ?? [
 
 // ---------- Arranque ----------
 export async function abrir() {
-  [agentes, chats, ui, catalogo, herramientas] = await Promise.all([
+  [busqueda, agentes, chats, ui, catalogo, herramientas] = await Promise.all([
+    openDoc('busqueda', { proveedor: 'duckduckgo' }),
     openDoc('agentes', { lista: [] }),
     openDoc('chats', { lista: [] }),
     openDoc('ui', { agente: null, chats: {} }),
@@ -142,6 +143,15 @@ export function ponerTools(id, tools) {
     return v;
   });
   avisar('agentes');
+}
+
+/** Con qué busca web_search: 'duckduckgo' (sin llave), 'tavily' o 'brave'. Lo
+ *  lee el proceso principal de este mismo documento. */
+export const BUSCADORES = ['duckduckgo', 'tavily', 'brave'];
+export const buscador = () => (BUSCADORES.includes(busqueda.get().proveedor) ? busqueda.get().proveedor : 'duckduckgo');
+export function ponerBuscador(id) {
+  busqueda.patch({ proveedor: BUSCADORES.includes(id) ? id : 'duckduckgo' });
+  avisar('ajustes');
 }
 
 /** 'manual' pregunta antes de cada llamada; 'auto' no pregunta nunca. */

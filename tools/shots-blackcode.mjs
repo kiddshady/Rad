@@ -230,6 +230,13 @@ const SCENES = {
     const hilo = document.querySelector('.dm-hilo:not([data-rad-leaving])');
     hilo.scrollTop = 0;
     await sleep(700);`,
+  // La tarjeta de la búsqueda en la web: Tavily elegido con su llave, Brave sin la suya.
+  busqueda: `
+    await llave.guardar('tavily', 'tvly-captura-de-blackcode-no-es-una-llave-3333');
+    datos.ponerBuscador('tavily');
+    await go('ajustes');
+    view('ajustes').querySelector('[data-tarjeta="busqueda"]').scrollIntoView({ block: 'start' });
+    await sleep(1200);`,
   'sin-llave': `
     await go('ajustes');
     await sleep(400);`,

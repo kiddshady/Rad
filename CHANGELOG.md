@@ -1,5 +1,20 @@
 # Changelog
 
+## BlackCode 0.12.2 (2026-11-24)
+
+- **Settings elige con qué buscan los agentes.** Una tarjeta nueva, «Web
+  search», con un selector entre DuckDuckGo (sin llave, el de fábrica), Tavily
+  y Brave, y debajo la llave de cada uno de los dos que la piden. Se pueden
+  cargar las dos y cambiar de uno a otro. Las llaves se guardan cifradas, como
+  las de los modelos, y nunca llegan a la interfaz.
+- Tavily y Brave ya estaban en la tool `web_search` desde el port de NeonCode,
+  pero la app no tenía dónde elegirlos ni dónde cargar su llave: siempre caía
+  en DuckDuckGo.
+- Si se elige un buscador que pide llave y no la tiene, la tarjeta lo avisa y
+  la tool falla diciendo qué falta, sin salir a la red.
+- Las llaves de los buscadores no se comprueban al guardarlas: ninguno de los
+  dos tiene un pedido gratis que diga si la llave sirve.
+
 ## BlackCode 0.12.1 (2026-11-24)
 
 - **Ícono nuevo: el Cubo.** Un hexágono con sus tres aristas de adentro: un

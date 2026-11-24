@@ -119,6 +119,14 @@ function wire(rad, { llave }) {
       else if (String(canal).startsWith('browser:')) rad.send(canal, datos);
     },
   };
+  // web_search: con qué busca lo elige el usuario en Settings (el documento
+  // `busqueda`), y la llave es la del buscador elegido. DuckDuckGo no pide.
+  const CON_LLAVE = new Set(['tavily', 'brave']);
+  const buscador = () => { const p = rad.store.read('busqueda')?.proveedor; return CON_LLAVE.has(p) ? p : 'duckduckgo'; };
+  const paraLaBusqueda = {
+    webSearch: () => ({ provider: buscador(), maxResults: 5 }),
+    getKey: (nombre) => (nombre === 'websearch' && CON_LLAVE.has(buscador()) ? llave.leer(rad.store, buscador()) : null),
+  };
   // El navegador pinta su página encima de la ventana principal: hay que
   // saber cuál es (las ventanas de login que abre una página también son
   // ventanas) y dormirle la capa cuando la ventana no se ve.
@@ -151,6 +159,7 @@ function wire(rad, { llave }) {
       alProducir,
       ...paraElCanvas,
       ...paraElNavegador,
+      ...paraLaBusqueda,
       abrirAfuera: (u) => anotar(`url ${u}`),
       trash: (ruta) => fs.promises.rename(ruta, path.join(taller, '.trash', `${Date.now()}-${path.basename(ruta)}`)),
       // y no miran la pantalla de nadie: capturan una de mentira
@@ -168,7 +177,7 @@ function wire(rad, { llave }) {
     const carpeta = path.join(path.dirname(rad.store.dir), 'tools');
     fs.mkdirSync(carpeta, { recursive: true });
     const { desktopCapturer, screen } = require('electron');
-    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, abrirAfuera: (u) => shell.openExternal(u) });
+    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, abrirAfuera: (u) => shell.openExternal(u) });
     herramientas.setCwd(rad.store.read(DOC_TOOLS)?.carpeta);
   }
   // Al salir, lo que quedó corriendo en segundo plano se mata.
