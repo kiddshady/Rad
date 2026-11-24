@@ -1,5 +1,30 @@
 # Changelog
 
+## BlackCode 0.10.0, antes Nix (2026-11-24) · núcleo 0.17.0
+
+- **La app pasa a llamarse BlackCode.** Fran quería un nombre más genérico y
+  que fuera con su estilo: el paso siguiente de NeonCode. Cambian el nombre a
+  la vista, la ventana, el `.exe`, el instalador, la carpeta
+  (`apps/BlackCode`), los archivos de pruebas (`tools/smoke-blackcode.*`,
+  `tools/test-blackcode-*`), los comandos (`npm run blackcode`,
+  `smoke:blackcode`, `pack:blackcode`…) y la variable del proveedor de
+  mentira (`BLACKCODE_PROVEEDOR`). El agente de fábrica de una instalación
+  nueva también se llama así.
+- **No cambia, a propósito:** el `name` del paquete (`daimon`), el `appId`
+  (`com.umbrovex.daimon`) y el repo `kiddshady/daimon-releases`, que es por
+  donde la app instalada encuentra su actualización; y la partición del
+  navegador (`persist:nix-browser`), donde están los inicios de sesión.
+- **Los datos vienen enteros.** BlackCode estrena `%APPDATA%\BlackCode` y
+  adopta lo de `%APPDATA%\Nix`: los agentes, los chats y las llaves (con la
+  clave que las cifra), lo que guardaron las tools (los canvas, la base del
+  agente, los favoritos y las pestañas del navegador) y el perfil del
+  navegador, con sus inicios de sesión. No viajan los cachés ni el entorno de
+  Python de `run_code`, que lleva rutas absolutas adentro y se arma solo de
+  nuevo. La carpeta vieja no se toca.
+- **Núcleo 0.17.0:** `rad.adoptData(nombre, { also, skip })`. `also` suma
+  carpetas de la app vieja además de sus documentos; `skip(ruta)` deja afuera
+  lo que no sirve copiar. Antes solo viajaban los documentos y la clave.
+
 ## Nix 0.9.0 (2026-11-24)
 
 - **Navegador.** Un navegador de verdad en un panel al lado de la

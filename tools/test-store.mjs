@@ -133,6 +133,28 @@ const onDisk = (dir, name) => {
   await s2.flushAll();
   check(adopt(old, now) === false, 'adoptar: volvió a adoptar sobre una carpeta que ya existía');
   check(onDisk(now, 'ajustes').piel === 'glass', 'adoptar: pisó los datos nuevos con los viejos');
+  // Con `skip`, lo que no sirve copiar se queda (un caché, un entorno): la
+  // carpeta que se adopta no se saltea a sí misma.
+  {
+    const de = path.join(base, 'ViejaTools', 'tools');
+    const a = path.join(base, 'NuevaTools', 'tools');
+    fs.mkdirSync(path.join(de, 'code-workspace', '.venv', 'Scripts'), { recursive: true });
+    fs.mkdirSync(path.join(de, 'Cache'), { recursive: true });
+    fs.writeFileSync(path.join(de, 'canvas.db'), 'base');
+    fs.writeFileSync(path.join(de, 'code-workspace', 'out.txt'), 'hola');
+    fs.writeFileSync(path.join(de, 'code-workspace', '.venv', 'Scripts', 'python.exe'), 'x');
+    fs.writeFileSync(path.join(de, 'Cache', 'data_0'), 'x');
+    const fuera = new Set(['.venv', 'Cache']);
+    check(adopt(de, a, { skip: (ruta) => fuera.has(path.basename(ruta)) }) === true, 'adoptar con skip: no adoptó');
+    check(fs.readFileSync(path.join(a, 'canvas.db'), 'utf8') === 'base' && fs.readFileSync(path.join(a, 'code-workspace', 'out.txt'), 'utf8') === 'hola', 'adoptar con skip: no llegó lo que sí viaja');
+    check(!fs.existsSync(path.join(a, 'code-workspace', '.venv')) && !fs.existsSync(path.join(a, 'Cache')), 'adoptar con skip: se trajo lo que había que saltear');
+    check(fs.existsSync(path.join(de, 'code-workspace', '.venv', 'Scripts', 'python.exe')), 'adoptar con skip: tocó la carpeta vieja');
+    // una carpeta que se llama como lo salteado se adopta igual: skip mira lo de adentro
+    const cache = path.join(base, 'ViejaTools', 'Cache');
+    fs.mkdirSync(cache, { recursive: true });
+    fs.writeFileSync(path.join(cache, 'x'), '1');
+    check(adopt(cache, path.join(base, 'NuevaTools', 'Cache'), { skip: (ruta) => fuera.has(path.basename(ruta)) }) === true && fs.existsSync(path.join(base, 'NuevaTools', 'Cache', 'x')), 'adoptar con skip: salteó la propia carpeta pedida');
+  }
   const nada = path.join(base, 'Otra', 'data');
   check(adopt(path.join(base, 'NoExiste', 'data'), nada) === false && !fs.existsSync(nada), 'adoptar: sin carpeta vieja creó algo');
 

@@ -11,7 +11,7 @@
 //   });
 //   rad.send('notas:cambiaron', datos);               // avisarle al renderer
 //   rad.store.read('ajustes');                        // el mismo store del renderer
-//   rad.adoptData('Nombre viejo');                    // si la app cambió de nombre
+//   rad.adoptData('Nombre viejo', { also: ['tools'] }); // si la app cambió de nombre
 //
 // Hay que requerirlo antes de app.whenReady(): registra el esquema rad:// en
 // el momento de cargarse, y Electron solo lo acepta antes de ready.
@@ -100,7 +100,13 @@ function getStore() {
 // la app (una llave de una API, por ejemplo): sin eso, los datos llegan pero
 // lo cifrado queda ilegible. Por eso se llama ANTES de app ready, arriba de
 // todo en el main: después, Chromium ya creó una clave nueva para la carpeta.
-function adoptData(formerName) {
+//
+// `also` suma otras carpetas de la app vieja, relativas a su carpeta de
+// usuario (lo que guardan sus tools, el perfil de un navegador propio en
+// 'Partitions'): cada una viaja si la nueva todavía no la tiene. `skip(ruta)`
+// deja afuera lo que no sirve copiar (cachés, un entorno de Python, que
+// lleva rutas absolutas adentro).
+function adoptData(formerName, { also = [], skip = null } = {}) {
   if (typeof formerName !== 'string' || !formerName.trim() || /[\/:*?"<>|]/.test(formerName)) {
     throw new Error(`[rad] adoptData: nombre de app inválido: ${JSON.stringify(formerName)}`);
   }
@@ -112,6 +118,13 @@ function adoptData(formerName) {
     if (!adopt(path.join(from, 'data'), path.join(to, 'data'))) return false;
     if (app.isReady()) console.warn('[rad:store] adoptData se llamó después de app ready: lo cifrado con safeStorage no se va a poder leer');
     else adoptSecrets(from, to);
+    for (const rel of Array.isArray(also) ? also : []) {
+      // solo carpetas de adentro: ni rutas absolutas ni subir con ..
+      if (typeof rel !== 'string' || !rel.trim() || path.isAbsolute(rel) || rel.split(/[\\/]/).includes('..')) continue;
+      try { adopt(path.join(from, rel), path.join(to, rel), { skip }); } catch (err) {
+        console.warn(`[rad:store] no se pudo adoptar "${rel}" de "${formerName}": ${err.message}`);
+      }
+    }
     return true;
   } catch (err) {
     console.warn(`[rad:store] no se pudieron adoptar los datos de "${formerName}": ${err.message}`);

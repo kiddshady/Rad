@@ -183,13 +183,15 @@ class Store {
 // vieja sí, se copia entera. Va a un temporal y se renombra al final: o
 // queda completa o no queda (una copia a medias no se tomaría nunca más por
 // buena ni se reintentaría). No pisa nada y no borra la vieja.
-function adopt(oldDir, newDir) {
+// `skip(ruta)` deja afuera lo que no sirve copiar (un caché, un entorno que
+// lleva rutas absolutas adentro): recibe cada ruta de la carpeta vieja.
+function adopt(oldDir, newDir, { skip = null } = {}) {
   if (fs.existsSync(newDir) || !fs.existsSync(oldDir)) return false;
   const tmp = `${newDir}.adopt-${process.pid}`;
   fs.rmSync(tmp, { recursive: true, force: true });
   fs.mkdirSync(path.dirname(newDir), { recursive: true });
   try {
-    fs.cpSync(oldDir, tmp, { recursive: true, filter: (src) => !src.endsWith('.tmp') });
+    fs.cpSync(oldDir, tmp, { recursive: true, filter: (src) => !src.endsWith('.tmp') && !(typeof skip === 'function' && src !== oldDir && skip(src)) });
     fs.renameSync(tmp, newDir);
   } catch (err) {
     fs.rmSync(tmp, { recursive: true, force: true });
