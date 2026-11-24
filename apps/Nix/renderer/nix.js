@@ -31,10 +31,14 @@ const shell = createShell({
 });
 
 // La barra de abajo: a la izquierda la vista, a la derecha con quién se habla
-// (o que alguien está contestando).
+// (o que alguien está contestando). Dice también cuántas tools lleva ese
+// agente en cada pedido: nacen apagadas, y sin esto no hay forma de saber,
+// desde el chat, si el modelo las tiene o no.
 const ponerEstado = () => {
   const a = datos.agenteActual();
-  shell.status.set('right', datos.algunoRespondiendo() ? 'Answering…' : `${a.nombre} · ${datos.modeloDe(a)}`);
+  const n = datos.modeloConTools(a.proveedor, a.modelo) ? datos.toolsDe(a).length : 0;
+  const tools = n ? `${n} tool${n === 1 ? '' : 's'}` : 'no tools';
+  shell.status.set('right', datos.algunoRespondiendo() ? 'Answering…' : `${a.nombre} · ${datos.modeloDe(a)} · ${tools}`);
 };
 shell.status.set('left', views.find((v) => v.id === shell.router.current).label);
 shell.router.on('change', ({ label }) => shell.status.set('left', label));

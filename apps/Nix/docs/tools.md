@@ -230,6 +230,11 @@ para arreglarlos de a uno, con su prueba:
   anota lo que habría abierto en vez de abrirlo, y la pantalla que se captura
   es un degradé: no se fotografía el escritorio.
 
+- El humo en modo real (`tools/smoke-nix-real.mjs`): Nix sin el proveedor de
+  mentira, con las dos APIs reemplazadas por un servidor local. Mira qué viaja
+  de verdad en el pedido de un agente con tools (las tools, el protocolo) y
+  que una llamada corra y vuelva, con Anthropic y con Venice.
+
 Ninguna toca la red ni gasta un token. Lo que no está probado es un modelo de
 verdad pidiendo tools, ni un modelo de Venice recibiendo una imagen.
 

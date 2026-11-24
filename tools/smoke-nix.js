@@ -662,8 +662,12 @@ else {
   const herrero = cards().at(-1);
   if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Desktop, Screen') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
   if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'No tools') fail('un agente sin tools no dice que no las tiene');
+  if (!statusRight().endsWith('· no tools')) fail(`la barra de estado no dice que el agente actual no tiene tools: «${statusRight()}»`);
   herrero.querySelector('[data-accion="abrir"]').click();
   await sleep(dur('base') + 260);
+  await until(() => statusRight().includes('Toolsmith'), 3000);
+  // todas menos las tres de la web
+  if (!statusRight().endsWith('· 15 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
 
   // Escribir un archivo. En modo manual (el de fábrica) primero pide permiso:
   // la tarjeta dice qué va a correr y qué va a cambiar, y hasta que no se

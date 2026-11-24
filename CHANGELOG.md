@@ -1,5 +1,22 @@
 # Changelog
 
+## Nix 0.7.1 (2026-11-24)
+
+- **La barra de estado dice cuántas tools lleva el agente** («· 15 tools», o
+  «· no tools»). Fran les preguntó a dos agentes si tenían tools y dijeron que
+  no: las tools nacen apagadas en cada agente y, desde el chat, no había forma
+  de saber si el modelo las estaba recibiendo. La cuenta es la que viaja en el
+  pedido: cero si el modelo elegido no las acepta.
+- **Humo en modo real** (`npm run smoke:nix:real`, y dentro de `npm run
+  smoke`). El humo de siempre corre con el proveedor de mentira, que deja sin
+  ejercer lo que une la interfaz con un proveedor de verdad. Este abre Nix sin
+  él, con las dos APIs reemplazadas por un servidor local: guarda las llaves,
+  manda un mensaje con un agente de Anthropic y otro de Venice que tienen
+  todas las tools, y mira que el pedido las lleve con su protocolo, que la
+  llamada corra y que su resultado vuelva. No toca la red ni gasta un token.
+  Con las tools prendidas, las 18 viajan y corren, también en la app
+  empaquetada: el reporte de Fran no se pudo reproducir como un defecto.
+
 ## Nix 0.7.0 (2026-11-24)
 
 - **Ocho tools más, y son 18.** Se suman a los grupos que se prenden por
