@@ -21,6 +21,15 @@
 //   { state: 'ready', version, releaseName }
 //   { state: 'error', message }
 //   { state: 'portable' }
+//
+// Buscar a mano (rad.updates.check(), para un botón «Buscar actualizaciones»)
+// devuelve qué encontró, que los eventos no dicen: no hay evento de «estás
+// al día», y fuera de la app instalada no hay updater a quien preguntarle.
+//   { supported: false, reason: 'dev' | 'portable' | 'disabled' | 'missing' }
+//   { supported: true, available, version, error }
+//     available  hay una versión más nueva que la instalada
+//     version    la última publicada (null si no se pudo saber)
+//     error      por qué no se pudo saber, en un renglón (null si se pudo)
 
 const { app, ipcMain, BrowserWindow } = require('electron');
 
@@ -29,6 +38,8 @@ const EVERY_MS = 6 * 60 * 60 * 1000;
 
 let updater = null;
 let last = null;
+// Por qué no hay updater, mientras no lo hay.
+let unsupported = 'disabled';
 
 function broadcast(payload) {
   last = payload;
@@ -47,8 +58,10 @@ function setup({ enabled = true } = {}) {
   });
   ipcMain.handle('rad:update:install', () => install());
 
-  if (!enabled || !app.isPackaged) return null;
+  if (!enabled) return null;
+  if (!app.isPackaged) { unsupported = 'dev'; return null; }
   if (process.env.PORTABLE_EXECUTABLE_FILE) {
+    unsupported = 'portable';
     broadcast({ state: 'portable' });
     return null;
   }
@@ -57,6 +70,7 @@ function setup({ enabled = true } = {}) {
     ({ autoUpdater: updater } = require('electron-updater'));
   } catch (err) {
     console.warn(`[rad:update] sin electron-updater: ${err.message}`);
+    unsupported = 'missing';
     return null;
   }
   updater.autoDownload = false;
@@ -71,20 +85,23 @@ function setup({ enabled = true } = {}) {
   }));
   updater.on('download-progress', (p) => broadcast({ state: 'downloading', percent: p.percent }));
   updater.on('update-downloaded', (info) => broadcast({ state: 'ready', version: info.version, releaseName: info.releaseName || null }));
-  updater.on('error', (err) => broadcast({ state: 'error', message: String(err?.message || err).split('\n')[0] }));
+  updater.on('error', (err) => broadcast({ state: 'error', message: firstLine(err) }));
 
   setTimeout(check, FIRST_CHECK_MS);
   setInterval(check, EVERY_MS);
   return updater;
 }
 
+const firstLine = (err) => String(err?.message || err).split('\n')[0];
+
 async function check() {
-  if (!updater) return null;
+  if (!updater) return { supported: false, reason: unsupported };
   try {
     const r = await updater.checkForUpdates();
-    return r?.updateInfo?.version ?? null;
-  } catch {
-    return null; // el error ya viajó por el evento 'error'
+    return { supported: true, available: Boolean(r?.isUpdateAvailable), version: r?.updateInfo?.version ?? null, error: null };
+  } catch (err) {
+    // El error también viajó por el evento 'error'.
+    return { supported: true, available: false, version: null, error: firstLine(err) };
   }
 }
 
