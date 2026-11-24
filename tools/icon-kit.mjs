@@ -78,6 +78,25 @@ export function gradient(c0, c1, p0, p1) {
   };
 }
 
+/**
+ * Como gradient, con varias paradas: `stops` es [[posición de 0 a 1, [r,g,b]], …]
+ * en orden. Es el `linearGradient` de SVG con sus `stop`.
+ */
+export function gradientStops(stops, p0, p1) {
+  const dx = p1[0] - p0[0];
+  const dy = p1[1] - p0[1];
+  const len2 = dx * dx + dy * dy;
+  return (x, y) => {
+    const t = Math.min(1, Math.max(0, ((x - p0[0]) * dx + (y - p0[1]) * dy) / len2));
+    let i = 0;
+    while (i < stops.length - 2 && t > stops[i + 1][0]) i++;
+    const [t0, c0] = stops[i];
+    const [t1, c1] = stops[i + 1];
+    const k = Math.min(1, Math.max(0, (t - t0) / (t1 - t0)));
+    return [0, 1, 2].map((n) => c0[n] + (c1[n] - c0[n]) * k);
+  };
+}
+
 // ---------- Rasterizado ----------
 
 /**

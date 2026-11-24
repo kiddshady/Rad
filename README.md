@@ -447,9 +447,10 @@ y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
 - Se instala y se actualiza desde `kiddshady/daimon-releases`. En Settings,
   About tiene un botón para buscar una versión nueva sin esperar al núcleo.
 - El ícono es el «Cubo»: un hexágono con sus tres aristas de adentro, un cubo
-  visto de punta, con el oficio del de NTX (baldosa negra, tinta blanca,
-  resplandor). Lo hornea `apps/BlackCode/scripts/icon.mjs`. Hasta la 0.12.0
-  fue el «Radar».
+  visto de punta, sobre baldosa negra, con el trazo en el degradé metálico del
+  hexágono de UmbroSys y un resplandor suave (hasta la 0.12.2 era blanco, con
+  el resplandor de NTX). Lo hornea `apps/BlackCode/scripts/icon.mjs`. Hasta la
+  0.12.0 fue el «Radar».
 
 ### Publicar y actualizar
 

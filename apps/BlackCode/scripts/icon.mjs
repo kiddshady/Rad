@@ -4,10 +4,14 @@
 // lo eligió el 24/11/2026, cuando la app pasó a llamarse BlackCode; es la
 // candidata 12 de la hoja en que se eligió el ícono anterior
 // (S:\mockups\daimon\icono.html; hasta la 0.12.0 fue la 17, el «Radar»).
-// El oficio es el del ícono de NTX, tal cual: baldosa negra con su degradé,
-// tinta blanca de punta redonda, y el resplandor en dos pasadas. Los números
-// salen de esa hoja (un lienzo de 64) y del master de NTX
-// (S:\tools\NTX\build\icon.svg).
+// El oficio es el del ícono de NTX: baldosa negra con su degradé, trazo de
+// punta redonda y el resplandor en dos pasadas. Las medidas salen de esa hoja
+// (un lienzo de 64) y del master de NTX (S:\tools\NTX\build\icon.svg).
+//
+// Desde la 0.12.3 la tinta no es blanca: es el degradé metálico del hexágono
+// de UmbroSys (S:\tools\UmbroSys\tools\icono.cjs), gris arriba y casi blanco
+// abajo, y el resplandor bajó a menos de la mitad. Fran lo pidió así para que
+// combine con la piel mono de Rad.
 //
 // Sobre la baldosa estándar (a sangre, sin borde, esquinas al 19 %). El
 // dibujo es EXACTO en todos los tamaños: el mismo, con su resplandor, de 16
@@ -19,14 +23,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hexToRgb, rasterizeGlow, gradient, sdSegment, encodePNG, encodeICO, ICO_SIZES } from '../../../tools/icon-kit.mjs';
+import { hexToRgb, rasterizeGlow, gradient, gradientStops, sdSegment, encodePNG, encodeICO, ICO_SIZES } from '../../../tools/icon-kit.mjs';
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // La baldosa de NTX: un degradé vertical, de arriba hacia abajo.
 const TILE = gradient(hexToRgb('#1a1a1a'), hexToRgb('#0a0a0a'), [0, -0.5], [0, 0.5]);
-// La tinta: blanca, con un aliento de gris hacia abajo a la derecha.
-const INK = [hexToRgb('#ffffff'), hexToRgb('#dcdce0')];
+// La tinta: el metal de UmbroSys, de arriba hacia abajo, con sus tres paradas.
+const INK = [[0, hexToRgb('#7d7d7d')], [0.52, hexToRgb('#bdbdbd')], [1, hexToRgb('#f5f5f5')]];
 
 // Las medidas, en el lienzo de 64 de la hoja de candidatas (el centro es 32, 32).
 const U = 1 / 64;
@@ -41,8 +45,9 @@ const ARISTAS = [
   ...HEX.map((p, i) => [p, HEX[(i + 1) % HEX.length]]),
   ...ADENTRO.map((p) => [CENTRO, p]),
 ];
-// El resplandor de NTX: una pasada ancha y difusa, y otra ceñida encima.
-const GLOW = [{ sigma: 3.86, opacity: 0.42 }, { sigma: 2, opacity: 0.72 }];
+// El resplandor: una pasada ancha y difusa, y otra ceñida encima, como en
+// NTX pero a menos de la mitad (el de NTX es 3.86 al 42 % y 2 al 72 %).
+const GLOW = [{ sigma: 2.2, opacity: 0.3 }, { sigma: 0.9, opacity: 0.6 }];
 
 // `s` es el diámetro del dibujo (0.62 del lienzo, o 0.68 por debajo de 64
 // px): las medidas de arriba son para 0.62, y todo se escala junto.
@@ -50,7 +55,8 @@ const unit = (s) => (U * s) / 0.62;
 
 const glyph = (s) => {
   const u = unit(s);
-  const ink = gradient(INK[0], INK[1], [-18 * u, -18 * u], [18 * u, 16 * u]);
+  // De la punta de arriba del hexágono a la de abajo (13 y 51 en el lienzo de 64).
+  const ink = gradientStops(INK, [0, -19 * u], [0, 19 * u]);
   const half = (STROKE / 2) * u;
   const en = ([px, py]) => [(px - 32) * u, (py - 32) * u];
   return ARISTAS.map(([a, b]) => {

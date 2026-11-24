@@ -1,5 +1,13 @@
 # Changelog
 
+## BlackCode 0.12.3 (2026-11-24)
+
+- **El ícono pasa a metal.** El Cubo es el mismo dibujo, pero el trazo ya no es
+  blanco: lleva el degradé gris del hexágono de UmbroSys (gris arriba, casi
+  blanco abajo) y el resplandor bajó a menos de la mitad. Combina mejor con la
+  piel mono de Rad.
+- `tools/icon-kit.mjs` gana `gradientStops`, un degradé de varias paradas.
+
 ## BlackCode 0.12.2 (2026-11-24)
 
 - **Settings elige con qué buscan los agentes.** Una tarjeta nueva, «Web
