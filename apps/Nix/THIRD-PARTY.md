@@ -6,11 +6,18 @@ and under which license.
 | Work | Where | License |
 |---|---|---|
 | [Feather Icons](https://github.com/feathericons/feather) | paths inside `renderer/iconos-tools.js` | MIT — © Cole Bemis |
+| [KaTeX](https://katex.org) | `renderer/vendor/katex/` (module, mhchem extension, stylesheet) | MIT — © Khan Academy and other contributors |
+| KaTeX fonts | `renderer/vendor/katex/fonts/` | OFL-1.1 — © Khan Academy and other contributors |
 | [Roboto Mono](https://github.com/googlefonts/RobotoMono) | `@rad/fonts` | OFL-1.1 — © The Roboto Mono Project Authors |
 
 The tool icons in `renderer/iconos-tools.js` came with the tools from NeonCode.
 They are a mix: several paths are Feather's verbatim, others are modified or
 original.
+
+`renderer/vendor/katex/` is KaTeX's own distribution, copied verbatim by
+`scripts/vendor-katex.mjs` (the version is in `renderer/vendor/katex/VERSION`,
+and its license text in `renderer/vendor/katex/LICENSE`). Only the `woff2`
+variant of each font is shipped.
 
 Electron, Chromium and their third-party components ship their own notices
 inside the installer as `LICENSE.electron.txt` and `LICENSES.chromium.html`.

@@ -140,6 +140,12 @@ const SCENES = {
     await sleep(700);
     document.querySelector('[data-accion="tools"]').click();
     await sleep(900);`,
+  // Fórmulas en LaTeX, en bloque, en línea y de química.
+  formulas: `
+    const c = await charla(nix, 'Thermite', 'MATH please');
+    await quietos();
+    datos.elegirChat(c.id);
+    await sleep(1500);`,
   'sin-llave': `
     await go('ajustes');
     await sleep(400);`,

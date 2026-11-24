@@ -1,7 +1,7 @@
 {
   "name": "daimon",
   "productName": "Nix",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "private": true,
   "description": "Nix: an AI chat with several agents, each with its own provider, model, instructions and chats.",
   "author": "Kidd Shady · Umbrovex Systems",
@@ -9,6 +9,7 @@
   "scripts": {
     "start": "electron .",
     "icon": "node scripts/icon.mjs",
+    "katex": "node scripts/vendor-katex.mjs",
     "pack": "electron-builder --win dir --publish never",
     "build": "electron-builder --win --publish never"
   },
@@ -55,5 +56,8 @@
       "allowToChangeInstallationDirectory": true,
       "artifactName": "Nix-Setup-${version}.${ext}"
     }
+  },
+  "devDependencies": {
+    "katex": "0.18.1"
   }
 }

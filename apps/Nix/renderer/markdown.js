@@ -5,8 +5,9 @@
 // una respuesta sale como texto.
 //
 // Entiende: párrafos, títulos, **negrita**, *cursiva*, ~~tachado~~, `código`,
-// links, listas (anidadas por sangría), citas, reglas, tablas simples y
-// bloques de código con ```.
+// links, listas (anidadas por sangría), citas, reglas, tablas simples,
+// bloques de código con ``` y fórmulas en LaTeX (ver formula.js): en bloque
+// con $$…$$ o \[…\], y en línea con $…$ o \(…\).
 //
 // pintar(contenedor, texto) se puede llamar todas las veces que haga falta
 // con el texto cada vez más largo (la respuesta llega de a poco): no rehace
@@ -17,6 +18,7 @@
 import { swapText } from '/@core/motion.js';
 import { toast } from '/@core/toast.js';
 import { h } from './piezas.js';
+import { DELIMS, finDeFormula, formula, abreBloque } from './formula.js';
 
 const FENCE = /^ {0,3}(`{3,}|~{3,})\s*([^\s`]*)\s*$/;
 const HEADING = /^ {0,3}(#{1,6})\s+(.*?)\s*#*\s*$/;
@@ -25,7 +27,7 @@ const ITEM = /^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$/;
 const QUOTE = /^ {0,3}>\s?(.*)$/;
 const TABLE_SEP = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
 const INDENTED = /^\s{2,}\S/;
-const startsBlock = (l) => FENCE.test(l) || HEADING.test(l) || HR.test(l) || QUOTE.test(l);
+const startsBlock = (l) => FENCE.test(l) || HEADING.test(l) || HR.test(l) || QUOTE.test(l) || Boolean(abreBloque(l));
 
 /** El texto partido en bloques: [{ tipo, … }]. */
 export function bloques(texto) {
@@ -62,6 +64,33 @@ export function bloques(texto) {
       out.push({ tipo: 'regla' });
       i++;
       continue;
+    }
+
+    // Una fórmula en bloque: abre con $$ o \[ al principio de la línea y llega
+    // hasta su cierre, aunque haya líneas en el medio. Si después del cierre
+    // sigue texto en la misma línea no es un bloque: es una fórmula adentro de
+    // un párrafo, y la resuelve enLinea. Sin cierre todavía (está llegando, o
+    // el modelo no la cerró) llega hasta la primera línea en blanco y se
+    // muestra como texto.
+    const abre = abreBloque(linea);
+    if (abre) {
+      const resto = lineas.slice(i).join('\n');
+      const desde = resto.indexOf(abre.left) + abre.left.length;
+      const fin = finDeFormula(abre.right, resto, desde);
+      if (fin >= 0) {
+        const cola = resto.slice(fin + abre.right.length).split('\n')[0];
+        if (!cola.trim()) {
+          out.push({ tipo: 'formula', tex: resto.slice(desde, fin).trim() });
+          i += resto.slice(0, fin + abre.right.length).split('\n').length;
+          continue;
+        }
+      } else {
+        const cuerpo = [linea];
+        i++;
+        while (i < lineas.length && lineas[i].trim()) { cuerpo.push(lineas[i]); i++; }
+        out.push({ tipo: 'formula', abierta: true, tex: cuerpo.join('\n') });
+        continue;
+      }
     }
 
     if (QUOTE.test(linea)) {
@@ -116,10 +145,13 @@ export function bloques(texto) {
 
 // ---------- En línea ----------
 
-// En orden: código, negrita (** y __), tachado, cursiva (* y _), link,
-// dirección suelta y escape. En la misma posición gana la primera.
+// En orden: código, fórmula, negrita (** y __), tachado, cursiva (* y _),
+// link, dirección suelta y escape. En la misma posición gana la primera. De
+// la fórmula acá solo se reconoce dónde ABRE (un grupo con nombre); dónde
+// cierra lo decide finDeFormula, que cuenta llaves y barras.
 const INLINE = [
   '(`+)([^`]|[^`][\\s\\S]*?[^`])\\1(?!`)',
+  '(?<abre>\\$\\$|\\\\\\[|\\\\\\(|\\$)',
   '\\*\\*([^\\s*](?:[\\s\\S]*?[^\\s])?)\\*\\*',
   '__([^\\s_](?:[\\s\\S]*?[^\\s])?)__',
   '~~([^\\s~](?:[\\s\\S]*?[^\\s])?)~~',
@@ -157,28 +189,43 @@ function enLinea(padre, texto) {
   while ((m = re.exec(texto))) {
     plano(padre, texto.slice(desde, m.index));
     desde = re.lastIndex;
+    if (m.groups.abre !== undefined) {
+      // ¿cierra, y es una fórmula de verdad? Si no, el delimitador es texto.
+      const d = DELIMS.find((x) => x.left === m.groups.abre);
+      const fin = finDeFormula(d.right, texto, desde);
+      const tex = fin >= 0 ? texto.slice(desde, fin) : '';
+      if (fin >= 0 && d.vale(tex, texto, m.index, fin)) {
+        padre.append(formula(tex.trim(), d.display));
+        desde = fin + d.right.length;
+        re.lastIndex = desde;
+      } else {
+        // un \( o un \[ sueltos siguen siendo el escape de siempre
+        plano(padre, d.left.startsWith('\\') ? d.left.slice(1) : d.left);
+      }
+      continue;
+    }
     if (m[1] !== undefined) {
       const code = document.createElement('code');
       code.textContent = m[2];
       padre.append(code);
-    } else if (m[3] !== undefined || m[4] !== undefined) {
+    } else if (m[4] !== undefined || m[5] !== undefined) {
       const b = document.createElement('strong');
-      enLinea(b, m[3] ?? m[4]);
+      enLinea(b, m[4] ?? m[5]);
       padre.append(b);
-    } else if (m[5] !== undefined) {
+    } else if (m[6] !== undefined) {
       const s = document.createElement('del');
-      enLinea(s, m[5]);
+      enLinea(s, m[6]);
       padre.append(s);
-    } else if (m[6] !== undefined || m[7] !== undefined) {
+    } else if (m[7] !== undefined || m[8] !== undefined) {
       const e = document.createElement('em');
-      enLinea(e, m[6] ?? m[7]);
+      enLinea(e, m[7] ?? m[8]);
       padre.append(e);
-    } else if (m[8] !== undefined) {
-      link(padre, m[8], m[9], true);
-    } else if (m[10] !== undefined) {
-      link(padre, m[10], m[10], false);
+    } else if (m[9] !== undefined) {
+      link(padre, m[9], m[10], true);
     } else if (m[11] !== undefined) {
-      plano(padre, m[11]);
+      link(padre, m[11], m[11], false);
+    } else if (m[12] !== undefined) {
+      plano(padre, m[12]);
     }
   }
   plano(padre, texto.slice(desde));
@@ -280,6 +327,11 @@ function armar(b) {
   }
   if (b.tipo === 'lista') return lista(b.items);
   if (b.tipo === 'tabla') return tabla(b);
+  if (b.tipo === 'formula') {
+    // sin cerrar todavía: se ve el texto que va llegando, tal cual
+    if (b.abierta) return h('p', 'dm-formula-abierta rad-mono', {}, b.tex);
+    return h('div', 'dm-formula-bloque', {}, formula(b.tex, true));
+  }
   return codigo(b);
 }
 

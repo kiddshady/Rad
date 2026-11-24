@@ -369,6 +369,92 @@ else {
   }
 }
 
+// 6b. Fórmulas en LaTeX. Se pinta un texto de prueba con el mismo pintor de
+// los mensajes, adentro de la conversación, y se mira lo que quedó dibujado.
+{
+  const { pintar } = await import('/markdown.js');
+  const formulas = await import('/formula.js');
+  const violaciones = [];
+  const alViolar = (e) => violaciones.push(e.violatedDirective + ' ' + (e.blockedURI || '') + ' ' + (e.sample || ''));
+  document.addEventListener('securitypolicyviolation', alViolar);
+  const caja = document.createElement('div');
+  caja.className = 'dm-msg-cuerpo dm-md';
+  thread().append(caja);
+  const B = String.fromCharCode(92); // la barra invertida
+  const TEXTO = [
+    'Block:',
+    '',
+    '$$',
+    B + 'mathrm{Fe_2O_3 + 2' + B + ',Al ' + B + 'longrightarrow 2' + B + ',Fe + Al_2O_3} ' + B + 'qquad ' + B + 'Delta H^' + B + 'circ ' + B + 'approx -851.5' + B + ' ' + B + 'mathrm{kJ/mol}',
+    '$$',
+    '',
+    'Inline: $' + B + 'mathrm{Fe_2O_3 + 2Al ' + B + 'rightarrow 2Fe + Al_2O_3}$ and ' + B + '(x^2 + y^2 = z^2' + B + ') here.',
+    '',
+    'Chemistry: $' + B + 'ce{Fe2O3 + 2Al -> 2Fe + Al2O3}$',
+    '',
+    'On its own line:',
+    '',
+    B + '[ E = mc^2 ' + B + ']',
+    '',
+    'Money: it costs $5 and then $10, not math. And code: ' + String.fromCharCode(96) + '$x$' + String.fromCharCode(96) + ' stays code.',
+    '',
+    '- in a list: $a_1 + a_2$',
+    '',
+    'Broken: $' + B + 'frac{1}{$',
+    '',
+    '$$',
+    'x = ' + B + 'frac{1}{2}',
+  ].join('\n');
+  pintar(caja, TEXTO);
+  // Antes de que KaTeX llegue (o en el mismo cuadro, si ya estaba) la fórmula
+  // existe con su texto: nunca queda un hueco.
+  const todas = () => [...caja.querySelectorAll('.dm-formula')];
+  if (todas().length !== 6) fail('fórmulas: se reconocieron ' + todas().length + ' de 6 (' + todas().map((f) => f.dataset.tex.slice(0, 14)).join(' | ') + ')');
+  if (todas().some((f) => !f.textContent.trim())) fail('fórmulas: una nació vacía');
+  await formulas.lista();
+  await until(() => todas().every((f) => f.dataset.estado !== 'pendiente'), 5000);
+  await document.fonts.ready;
+  await sleep(dur('base') + 120);
+  const estados = todas().map((f) => f.dataset.estado).join();
+  if (estados !== 'lista,lista,lista,lista,lista,lista') fail('fórmulas: quedaron ' + estados);
+  const bloque = caja.querySelector('.dm-formula-bloque .dm-formula');
+  if (!bloque || bloque.dataset.display !== 'bloque' || !bloque.querySelector('.katex-display')) fail('fórmulas: el bloque $$ no se dibujó como bloque');
+  if (caja.querySelectorAll('.dm-formula-bloque').length !== 2) fail('fórmulas: se esperaban dos bloques ($$ y la de una línea), hay ' + caja.querySelectorAll('.dm-formula-bloque').length);
+  // KaTeX pone sus medidas por estilos: si la CSP se los comiera, los
+  // subíndices quedarían a la altura del renglón.
+  const sub = bloque?.querySelector('.msupsub .vlist span[style]') ?? bloque?.querySelector('.vlist > span');
+  if (!sub || !sub.style.top) fail('fórmulas: los estilos de KaTeX no llegaron al DOM (¿los frenó la CSP?)');
+  const base = bloque?.querySelector('.katex-html .mord');
+  if (!base || !getComputedStyle(base).fontFamily.includes('KaTeX')) fail('fórmulas: no usan las fuentes de KaTeX: ' + (base ? getComputedStyle(base).fontFamily : 'sin nodo'));
+  if (!document.fonts.check('16px KaTeX_Main')) fail('fórmulas: la fuente KaTeX_Main no cargó');
+  // la química de mhchem: Fe2O3 sale con sus subíndices, no con el texto \ce
+  const quimica = todas().find((f) => f.dataset.tex.startsWith(B + 'ce'));
+  if (!quimica || quimica.querySelector('.katex-error') || !quimica.querySelector('.msupsub') || quimica.querySelector('.katex-html').textContent.includes('ce{')) fail('fórmulas: \\ce de mhchem no se dibujó');
+  // lo que NO es una fórmula
+  const plata = [...caja.querySelectorAll('p')].find((p) => p.textContent.startsWith('Money'));
+  if (!plata || plata.querySelector('.dm-formula') || !plata.textContent.includes('$5 and then $10') || plata.querySelector('code')?.textContent !== '$x$') fail('fórmulas: tomó plata o código por una fórmula: «' + plata?.textContent + '»');
+  const rota = [...caja.querySelectorAll('p')].find((p) => p.textContent.startsWith('Broken'));
+  if (!rota || rota.querySelector('.dm-formula')) fail('fórmulas: una fórmula sin cerrar se dibujó');
+  // una fórmula en bloque que todavía está llegando se ve como texto
+  const abierta = caja.querySelector('.dm-formula-abierta');
+  if (!abierta || !abierta.textContent.includes('frac{1}{2}')) fail('fórmulas: un bloque sin cerrar no muestra su texto');
+  // …y al llegar el cierre se dibuja, sin rehacer las de arriba
+  const primera = todas()[0];
+  pintar(caja, TEXTO + '\n$$');
+  await sleep(60);
+  if (caja.querySelector('.dm-formula-abierta') || caja.querySelectorAll('.dm-formula-bloque').length !== 3) fail('fórmulas: el bloque no se dibujó al cerrarse');
+  if (todas()[0] !== primera) fail('fórmulas: al llegar más texto se rehicieron las que ya estaban');
+  // no ensancha la conversación, y nada que frenó la CSP rompió el dibujo
+  if (thread().scrollWidth > thread().clientWidth + 1) fail('fórmulas: una fórmula ensanchó la conversación');
+  const alto = Math.round(bloque.getBoundingClientRect().height);
+  if (alto < 18 || alto > 90) fail('fórmulas: el bloque mide ' + alto + ' px de alto');
+  document.removeEventListener('securitypolicyviolation', alViolar);
+  const graves = violaciones.filter((v) => !v.startsWith('style-src-attr'));
+  if (graves.length) fail('fórmulas: la CSP frenó ' + graves.join('; '));
+  data.formulas = todas().length + ' dibujadas, bloque de ' + alto + ' px, fuente ' + getComputedStyle(base).fontFamily.split(',')[0] + ' peso ' + getComputedStyle(base).fontWeight + ' de ' + getComputedStyle(base).fontSize + (violaciones.length ? ', ' + violaciones.length + ' estilos en atributo descartados por la CSP' : '');
+  caja.remove();
+}
+
 // 7. Un segundo chat. La conversación anterior se va y recién después entra
 // la nueva: nunca las dos a la vista.
 chatView.querySelector('[data-accion="nuevo-chat"]').click();

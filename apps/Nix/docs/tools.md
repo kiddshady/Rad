@@ -180,8 +180,12 @@ Venice) en cada pedido de un agente con tools.
 - Canvas, notepad, memoria, búsqueda en chats.
 - Subagentes, MCP, skills, navegador, tareas programadas.
 - Dónde guardar secretos para `http_request` (`{{secret:NOMBRE}}`) y la llave
-  de Tavily o Brave para `web_search`. Sin eso, la búsqueda usa DuckDuckGo y un
-  pedido con un secreto falla diciendo que no está.
+  de Tavily o Brave para `web_search`. Sin eso, un pedido con un secreto falla
+  diciendo que no está, y la búsqueda usa DuckDuckGo: desde la 0.7.4 lee su
+  página de resultados web (no es una API: si cambian el HTML deja de
+  encontrar resultados, o pueden pedir una comprobación humana si se busca
+  mucho), con su API de respuestas instantáneas de segundo intento. Es el
+  único arreglo hecho sobre el código portado: sin él la tool no servía.
 
 ## Defectos conocidos que vinieron con el código
 

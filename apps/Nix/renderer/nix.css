@@ -654,6 +654,28 @@
     animation: rad-fade-in var(--rad-dur-slow) var(--rad-ease-out) both;
   }
 
+  /* Fórmulas (KaTeX). La de bloque va centrada y, si no entra, se desplaza
+     ella sola: nunca ensancha el mensaje. Hasta que KaTeX carga, o si no pudo
+     leerla, se ve su texto en la mono. */
+  .dm-formula-bloque {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: var(--rad-space-2) 0;
+    text-align: center;
+    --rad-a-scroll-inset: var(--rad-space-1);
+  }
+  .dm-formula-bloque .katex-display { margin: 0; }
+  .dm-formula[data-estado='pendiente'], .dm-formula[data-estado='error'], .dm-formula-abierta {
+    font-family: var(--rad-font-mono);
+    font-size: 0.92em;
+    white-space: pre-wrap;
+  }
+  .dm-formula[data-estado='pendiente'], .dm-formula-abierta { color: var(--rad-text-2); }
+  /* Lo que KaTeX no entendió lo marca él; el color lo pone la app (el suyo
+     va en un atributo de estilo, que la CSP no deja pasar). */
+  .dm-formula .katex-error, .dm-formula[data-estado='error'] { color: var(--rad-warning); }
+  .dm-formula .katex { animation: rad-fade-in var(--rad-dur-base) var(--rad-ease-out) both; }
+
   /* Un tramo de texto que quedó vacío no ocupa lugar. */
   .dm-msg[data-vacio] { display: none; }
 

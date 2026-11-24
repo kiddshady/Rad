@@ -58,8 +58,32 @@ function pantallaDeMentira() {
   };
 }
 
+// Una respuesta con fórmulas, para ver cómo se dibujan (un mensaje que
+// empieza con «MATH»).
+const FORMULAS = String.raw`**Aluminothermic reaction (thermite)**
+
+As a block:
+
+$$
+\mathrm{Fe_2O_3 + 2\,Al \longrightarrow 2\,Fe + Al_2O_3} \qquad \Delta H^\circ \approx -851.5\ \mathrm{kJ/mol}
+$$
+
+Inline: $\mathrm{Fe_2O_3 + 2Al \rightarrow 2Fe + Al_2O_3}$, and with mhchem: $\ce{Fe2O3 + 2Al -> 2Fe + Al2O3}$.
+
+The half-reactions:
+
+- Oxidation: $\ce{Al -> Al^3+ + 3e-}$
+- Reduction: $\ce{Fe^3+ + 3e- -> Fe}$
+
+And something that is not chemistry:
+
+\[ x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a} \qquad \int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2} \]
+
+It costs $5 and then $10: that is money, not math.`;
+
 function respuesta({ proveedor, modelo, instrucciones, mensajes }) {
   const ultimo = mensajes.at(-1)?.texto ?? '';
+  if (ultimo.startsWith('MATH')) return FORMULAS;
   return [
     `## Simulated answer`,
     ``,

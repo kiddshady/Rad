@@ -599,12 +599,15 @@ try {
   }
 
   {
-    // sin configurar nada: DuckDuckGo, sin llave, cinco resultados
-    const requests = banco(() => ({ json: DDG }));
+    // sin configurar nada: DuckDuckGo, sin llave, cinco resultados. Primero
+    // sus resultados web; acá la página no trae ninguno, así que sigue con la
+    // API de respuestas instantáneas.
+    const requests = banco((url) => (url.startsWith('https://html.duckduckgo.com/') ? { body: '<html><body>No results.</body></html>' } : { json: DDG }));
     const run = hacerRun();
     const out = await runners.web_search(run, { query: ' mate & bombilla ' });
-    igual(requests.length, 1, 'web_search sin configurar hace un pedido');
-    igual(requests[0].url, 'https://api.duckduckgo.com/?q=mate%20%26%20bombilla&format=json&no_html=1&no_redirect=1', 'web_search sin configurar va a DuckDuckGo');
+    igual(requests.length, 2, 'web_search sin configurar: la búsqueda web y, sin resultados, la API instantánea');
+    igual(requests[0].url, 'https://html.duckduckgo.com/html/?q=mate%20%26%20bombilla', 'web_search sin configurar busca primero en la web de DuckDuckGo');
+    igual(requests[1].url, 'https://api.duckduckgo.com/?q=mate%20%26%20bombilla&format=json&no_html=1&no_redirect=1', 'web_search: el segundo intento va a la API instantánea');
     igual(out.split('\n'), [
       '[1] Mate — Infusión de yerba mate. (https://es.wikipedia.org/wiki/Mate)',
       '[2] Yerba mate — Yerba mate - La planta (https://duckduckgo.com/Yerba_mate)',
@@ -642,6 +645,52 @@ try {
       `web_search no cortó la lista en 2000 caracteres: ${out.length} caracteres, ${out.split('\n').length} renglones`);
     banco(() => ({ status: 500 }));
     igual(await runners.web_search(hacerRun(), { query: 'q' }), 'error: web search failed: HTTP 500', 'web_search: un error del servidor');
+  }
+
+  {
+    // La búsqueda web sin llave: la página de resultados de DuckDuckGo, con la
+    // forma que tiene de verdad. Un aviso pago, un resultado con entidades y
+    // etiquetas adentro, y la dirección real envuelta en su redirect.
+    const fila = (href, titulo, resumen) => `<div class="result results_links results_links_deep web-result"><div class="links_main links_deep result__body">
+      <h2 class="result__title"><a rel="nofollow" class="result__a" href="${href}">${titulo}</a></h2>
+      <a class="result__snippet" href="${href}">${resumen}</a></div></div>`;
+    const PAGINA = `<html><body><div id="links" class="results">
+      ${fila('//duckduckgo.com/y.js?ad_domain=x.example&amp;u3=https%3A%2F%2Fx.example', 'Un aviso pago', 'compre ya')}
+      ${fila('//duckduckgo.com/l/?uddg=https%3A%2F%2Fz.ai%2Fblog%2Fglm%2D5.3&amp;rut=abc123', 'GLM-5.3: <b>Frontier</b> Coding &amp; more', 'Today we are   releasing <b>GLM-5.3</b>.\n It&#x27;s new.')}
+      ${fila('https://directo.example/pagina?a=1&amp;b=2', 'Directo', 'sin redirect')}
+      ${fila('//duckduckgo.com/l/?uddg=https%3A%2F%2Ftres.example%2F&amp;rut=def', 'Tres', '')}
+    </div></body></html>`;
+    const requests = banco(() => ({ body: PAGINA }));
+    const out = await runners.web_search(hacerRun(), { query: 'GLM-5.3 news' });
+    igual(requests.length, 1, 'web_search: con resultados web no hace falta el segundo intento');
+    igual(requests[0].url, 'https://html.duckduckgo.com/html/?q=GLM-5.3%20news', 'web_search: a dónde va la búsqueda web');
+    check(/Nix/.test(requests[0].headers['User-Agent'] ?? '') && requests[0].signal instanceof AbortSignal, 'web_search: la búsqueda web no se identifica o no lleva señal');
+    igual(out.split('\n'), [
+      '[1] GLM-5.3: Frontier Coding & more — Today we are releasing GLM-5.3 . It\'s new. (https://z.ai/blog/glm-5.3)',
+      '[2] Directo — sin redirect (https://directo.example/pagina?a=1&b=2)',
+      '[3] Tres —  (https://tres.example/)',
+    ], 'web_search: título, resumen y dirección real de cada resultado, sin el aviso');
+    igual((await runners.web_search(hacerRun(), { query: 'q', count: 2 })).split('\n').length, 2, 'web_search: count también corta los resultados web');
+    igual(web.leerResultadosDdg('<a class="otra result__a x" href="https://a.example">A</a>', 5), [{ title: 'A', url: 'https://a.example/', snippet: '' }], 'leerResultadosDdg: la clase puede venir con otras');
+    igual(web.leerResultadosDdg('<p>nada</p>', 5), [], 'leerResultadosDdg: una página sin resultados');
+
+    // Nada en la web y la API instantánea contesta con el cuerpo vacío (un 202
+    // de verdad): es «sin resultados», no un JSON roto.
+    banco((url) => (url.startsWith('https://html.') ? { body: '<html></html>' } : { status: 202, body: '' }));
+    igual(await runners.web_search(hacerRun(), { query: 'q' }), 'No web results found.', 'web_search: un cuerpo vacío de la API instantánea no es un error');
+    // DuckDuckGo pide una comprobación humana y la otra no trae nada: eso NO es
+    // «sin resultados», y el modelo tiene que saberlo.
+    banco((url) => (url.startsWith('https://html.') ? { body: '<html><div class="anomaly-modal">Select all squares</div></html>' } : { json: {} }));
+    igual(await runners.web_search(hacerRun(), { query: 'q' }), 'error: web search failed: DuckDuckGo asked for a human check instead of answering', 'web_search: una búsqueda que no se pudo hacer no dice «sin resultados»');
+    // …pero si la API instantánea sí tenía algo, sirve
+    banco((url) => (url.startsWith('https://html.') ? { status: 503 } : { json: DDG }));
+    check((await runners.web_search(hacerRun(), { query: 'q' })).startsWith('[1] Mate'), 'web_search: con la búsqueda web caída no usó la API instantánea');
+    // un Stop corta sin ir al segundo intento
+    const colgado = bancoColgado();
+    const runS = hacerRun();
+    const p = runners.web_search(runS, { query: 'q' });
+    setTimeout(() => runS.ac.abort(), 30);
+    check((await p).startsWith('error: web search failed:') && colgado.length === 1, `web_search: un Stop hizo ${colgado.length} pedidos`);
   }
 
   {
@@ -686,7 +735,7 @@ try {
     configurar({ webSearch: () => ({ provider: 'otro' }) });
     const reqD = banco(() => ({ json: DDG }));
     await runners.web_search(hacerRun(), { query: 'q' });
-    check(reqD[0].url.startsWith('https://api.duckduckgo.com/') && !JSON.stringify(reqD[0]).includes(LLAVE), 'un proveedor desconocido no cayó a DuckDuckGo sin llave');
+    check(reqD.length === 2 && reqD[0].url.startsWith('https://html.duckduckgo.com/') && reqD[1].url.startsWith('https://api.duckduckgo.com/') && !JSON.stringify(reqD).includes(LLAVE), 'un proveedor desconocido no cayó a DuckDuckGo sin llave');
     sinConfigurar();
   }
 

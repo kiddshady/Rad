@@ -1,5 +1,29 @@
 # Changelog
 
+## Nix 0.7.4 (2026-11-24)
+
+- **LaTeX en las respuestas.** Las fórmulas se dibujan con KaTeX: en bloque
+  con `$$…$$` o `\[…\]`, y en línea con `$…$` o `\(…\)`. Viene con mhchem,
+  así que `\ce{Fe2O3 + 2Al -> 2Fe + Al2O3}` sale como química. Los
+  delimitadores y la forma de encontrar dónde cierra una fórmula son los que
+  NeonCode afinó. «Cuesta $5 y $10» sigue siendo plata, un `$` adentro de un
+  tramo de código sigue siendo código, y una fórmula que todavía está llegando
+  se ve como texto hasta que cierra. Una fórmula ancha se desplaza sola, sin
+  ensanchar la conversación.
+- KaTeX corre con la CSP estricta de la app (`style-src 'self'`, sin
+  `unsafe-inline`): arma nodos, nunca HTML, y `trust` va apagado. Se carga
+  con la primera fórmula, no al abrir. Vive copiado en
+  `renderer/vendor/katex` (`npm run katex -w daimon` lo vuelve a copiar).
+- **`web_search` busca de verdad sin llave.** Fran vio al agente recibir «No
+  web results found» para búsquedas con miles de resultados, y un «Unexpected
+  end of JSON input». Sin llave, la tool iba a la API de respuestas
+  instantáneas de DuckDuckGo, que no es un buscador: solo contesta por cosas
+  con ficha propia, y para el resto devuelve vacío. Ahora lee los resultados
+  web de DuckDuckGo y deja esa API de segundo intento. Y cuando la búsqueda
+  no se pudo hacer, el modelo recibe un error que lo dice, no un «sin
+  resultados» que nadie comprobó. Tavily y Brave, con llave, no cambian
+  (todavía no hay dónde cargar esa llave en Settings).
+
 ## Nix 0.7.3 (2026-11-24)
 
 - **Un agente nuevo nace con todas las tools prendidas** (pedido de Fran). El

@@ -428,7 +428,8 @@ La primera app hecha con Rad: un chat con IA donde se arman varios agentes,
 cada uno con su nombre, su proveedor y su modelo, sus instrucciones y sus
 propios chats, con los modelos de Anthropic y los de Venice. Un agente puede
 tener tools prendidas (archivos, comandos y jobs, código, SQLite, web, abrir cosas, mirar la pantalla) y entonces actúa en la PC;
-cómo están armadas, en `apps/Nix/docs/tools.md`. Las vistas van como pestañas en la
+cómo están armadas, en `apps/Nix/docs/tools.md`. Las respuestas dibujan las
+fórmulas en LaTeX (KaTeX, con mhchem). Las vistas van como pestañas en la
 titlebar, sin rail ni nombre de la app. La interfaz está en inglés (el código
 y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
 

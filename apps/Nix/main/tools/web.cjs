@@ -1,7 +1,7 @@
 'use strict';
 
 // Las tools de Nix que salen a la red: `fetch` (trae una página y la devuelve
-// como texto legible), `web_search` (búsqueda por una API fija: DuckDuckGo sin
+// como texto legible), `web_search` (búsqueda en un servicio fijo: DuckDuckGo sin
 // llave, Tavily o Brave con la llave del usuario) y `http_request` (hablarle a
 // cualquier API HTTP, con los secretos como {{secret:NAME}} que el modelo
 // nunca ve resueltos).
@@ -24,6 +24,16 @@
 //     Sin configurar nada, DuckDuckGo y fetch andan igual, y un {{secret:…}}
 //     falla como fallaba allá uno que no existe («missing secret(s)»), antes
 //     de salir a la red.
+//   - web_search SIN LLAVE busca de verdad (Nix 0.7.4). Allá, sin llave, iba a
+//     la API de respuestas instantáneas de DuckDuckGo, que no es un buscador:
+//     solo contesta cuando la consulta es el nombre de algo con ficha propia, y
+//     para lo demás devuelve un JSON vacío (o un cuerpo vacío, que reventaba
+//     como «Unexpected end of JSON input»). El modelo leía «No web results
+//     found» para búsquedas que tienen miles de resultados. Ahora primero se
+//     leen los resultados web de DuckDuckGo (wsDdgWeb) y la API instantánea
+//     queda de segundo intento; y si la búsqueda no se pudo hacer, vuelve un
+//     «error:» que lo dice, no un «sin resultados» que es mentira. Tavily y
+//     Brave, con llave, no cambian.
 //   - En el texto que lee el modelo, dónde se guarda un secreto o una llave es
 //     «Settings» a secas (allá eran «Settings → Integrations» y «Settings →
 //     Tools», secciones que Nix no tiene por qué repetir).
@@ -298,7 +308,11 @@ async function wsDdg(query, count, signal) {
   const url = 'https://api.duckduckgo.com/?q=' + encodeURIComponent(query) + '&format=json&no_html=1&no_redirect=1';
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
+  // Para lo que no tiene ficha contesta un 202 con el cuerpo vacío: eso es «no
+  // tengo nada», no un error (res.json() reventaba ahí).
+  const crudo = await res.text();
+  let data = {};
+  try { data = crudo.trim() ? JSON.parse(crudo) : {}; } catch { data = {}; }
   const results = [];
   if (data.AbstractText) results.push({ title: data.Heading || query, url: data.AbstractURL || '', snippet: data.AbstractText });
   const walk = (topics) => {
@@ -310,6 +324,54 @@ async function wsDdg(query, count, signal) {
   };
   walk(data.RelatedTopics);
   return results.slice(0, count);
+}
+
+// Los resultados web de DuckDuckGo, sin llave: su página de resultados en HTML
+// liso (html.duckduckgo.com), que es la que sirve a los navegadores sin
+// JavaScript. De cada resultado sale el título, la dirección de verdad (viene
+// envuelta en un redirect de DuckDuckGo, en el parámetro uddg) y el resumen.
+// Los avisos pagos se saltean. No es una API: si cambian el HTML deja de
+// encontrar resultados, y por eso runWebSearch tiene un segundo intento.
+const DDG_WEB = 'https://html.duckduckgo.com/html/?q=';
+const textoDe = (html) => htmlToText(String(html || '')).replace(/\s+/g, ' ').trim();
+function destinoDdg(href) {
+  let h = String(href || '').replace(/&amp;/g, '&');
+  if (h.startsWith('//')) h = 'https:' + h;
+  try {
+    const u = new URL(h, 'https://duckduckgo.com');
+    const real = u.hostname.endsWith('duckduckgo.com') && u.pathname === '/l/' ? u.searchParams.get('uddg') : null;
+    return real || u.href;
+  } catch { return ''; }
+}
+function leerResultadosDdg(html, count) {
+  const out = [];
+  const titulo = /<a\b[^>]*\bclass="[^"]*\bresult__a\b[^"]*"[^>]*>([\s\S]*?)<\/a>/g;
+  const marcas = [...String(html).matchAll(titulo)];
+  for (const [i, m] of marcas.entries()) {
+    if (out.length >= count) break;
+    const href = /\bhref="([^"]*)"/.exec(m[0])?.[1] ?? '';
+    const url = destinoDdg(href);
+    // un aviso: su destino pasa por el contador de clics de DuckDuckGo
+    if (!url || /duckduckgo\.com\/y\.js/.test(url)) continue;
+    const hasta = marcas[i + 1]?.index ?? html.length;
+    const tramo = html.slice(m.index + m[0].length, hasta);
+    const snippet = /<a\b[^>]*\bclass="[^"]*\bresult__snippet\b[^"]*"[^>]*>([\s\S]*?)<\/a>/.exec(tramo)?.[1] ?? '';
+    const title = textoDe(m[1]);
+    if (title) out.push({ title, url, snippet: textoDe(snippet) });
+  }
+  return out;
+}
+async function wsDdgWeb(query, count, signal) {
+  const res = await fetch(DDG_WEB + encodeURIComponent(query), {
+    headers: { 'User-Agent': 'Nix/1.0 (local assistant)', Accept: 'text/html', 'Accept-Language': 'en-US,en;q=0.8' },
+    signal,
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const html = await res.text();
+  const results = leerResultadosDdg(html, count);
+  // sin resultados Y con su página de «parecés un robot»: no es «no hay nada»
+  if (!results.length && /anomaly|challenge-form|unusual traffic/i.test(html)) throw new Error('DuckDuckGo asked for a human check instead of answering');
+  return results;
 }
 
 async function wsTavily(query, count, key, signal) {
@@ -350,7 +412,22 @@ async function runWebSearch(run, { query, count } = {}) {
       if (!key) return 'error: web search needs a Brave API key (Settings)';
       results = await wsBrave(q, n, key, signal);
     } else {
-      results = await wsDdg(q, n, signal);
+      // Sin llave: los resultados web de DuckDuckGo y, si no trajeron nada, su
+      // API de respuestas instantáneas. Si la búsqueda web no se pudo hacer y
+      // la otra tampoco trajo nada, es un error y se dice: «sin resultados»
+      // sería afirmar algo que nadie comprobó.
+      let fallo = null;
+      try { results = await wsDdgWeb(q, n, signal); } catch (err) {
+        if (signal.aborted) throw err;
+        fallo = err;
+      }
+      if (!results?.length) {
+        try { results = await wsDdg(q, n, signal); } catch (err) {
+          if (signal.aborted) throw err;
+          fallo ??= err;
+        }
+      }
+      if (!results?.length && fallo) throw fallo;
     }
     if (!results?.length) return 'No web results found.';
     // lista numerada capada a 2000 chars (mismo formato que Umbra)
@@ -459,7 +536,7 @@ const runners = {
 module.exports = {
   runners, configurar, htmlToText,
   runFetch, runWebSearch, runHttpRequest,
-  resolveSecrets, httpBackoffMs, abortableSleep, wsDdg, wsTavily, wsBrave,
+  resolveSecrets, httpBackoffMs, abortableSleep, wsDdg, wsDdgWeb, leerResultadosDdg, wsTavily, wsBrave,
   FETCH_CHAR_BUDGET, HTTP_MAX_BODY, HTTP_METHODS, HTTP_WRITE, HTTP_IDEMPOTENT,
   HTTP_RETRY_STATUS, HTTP_MAX_RETRIES, HTTP_KEEP_HEADERS, HTTP_REDIRECT_STATUS,
   HTTP_MAX_REDIRECTS, WEB_SEARCH_DEFAULTS,
