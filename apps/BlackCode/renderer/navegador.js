@@ -17,7 +17,11 @@
 //     de la página. Sin esto, la tarjeta de permiso quedaba tapada y el turno
 //     colgado;
 //   - con otra vista de la app al frente (Agents, Settings) la capa se apaga.
-// Comparte el hueco de la escena con el canvas: uno solo abierto a la vez.
+// Comparte el hueco de la escena con el canvas y la terminal: uno solo abierto
+// a la vez. Es el único de los tres que se puede ESTIRAR (la manija de su
+// borde izquierdo): adentro hay una página ajena con su propio layout, y en el
+// ancho de la casa media web se va al modo teléfono. Lo que crece no empuja a
+// la conversación: la tapa.
 
 import { menuButton } from '/@core/menu.js';
 import { reconcile } from '/@core/list.js';
@@ -68,10 +72,17 @@ export function montarNavegador({ escena, turnos, router }) {
   const foto = h('img', 'dm-nav-foto', { alt: '', 'aria-hidden': 'true' });
   const vacio = h('p', 'dm-nav-vacio', {}, 'Type an address above, or ask an agent with the Browser tools to open a page. You and the agent share this tab.');
   const hueco = h('div', 'dm-nav-hueco', {}, vacio, foto);
+  // La manija: un separador que se arrastra, y que también se maneja con las
+  // flechas. Su rótulo sale arriba, sobre las barras: lejos de la página.
+  const manija = h('div', 'dm-nav-manija', { role: 'separator', 'aria-orientation': 'vertical', 'aria-label': 'Resize the browser', tabindex: '0', 'data-rad-tip': 'Drag to resize', 'data-rad-tip-side': 'top' }, h('span'));
+  // Cuánto mide el panel en el ancho de la casa: un testigo invisible con la
+  // misma cuenta del CSS, para no repetir acá el 52 % ni los topes.
+  const casaEl = h('div', 'dm-nav-casa', { 'aria-hidden': 'true' });
+  escena.append(casaEl);
   const panel = h('aside', 'dm-nav', { 'aria-label': 'Browser', 'aria-hidden': 'true' },
     h('div', 'dm-nav-tira', { 'data-rad-chrome': '' }, tabs, bNueva, h('span', 'dm-nav-aire'), bCerrar),
     h('div', 'dm-nav-barra', { 'data-rad-chrome': '' }, bAtras, bAdelante, bRecargar, barraUrl, bEstrella, bFavoritos, bAfuera),
-    hueco);
+    hueco, manija);
   panel.inert = true;
 
   const abierto = () => panel.hasAttribute('data-abierto');
@@ -95,8 +106,11 @@ export function montarNavegador({ escena, turnos, router }) {
   // El eclipse: algo de la app (lo que vive en .rad-overlays) cae sobre el hueco.
   let turnoEclipse = 0;
   function tapado() {
+    // (con el panel cerrado no se mide nada: medir obliga a maquetar, y esto
+    // corre con cada rótulo y cada menú de la app)
+    if (!abierto()) return false;
     const r = hueco.getBoundingClientRect();
-    if (!abierto() || r.width < 2) return false;
+    if (r.width < 2) return false;
     const capas = document.querySelector('.rad-overlays');
     if (!capas) return false;
     for (const nodo of capas.querySelectorAll(':scope > *, :scope > * > *')) {
@@ -129,7 +143,102 @@ export function montarNavegador({ escena, turnos, router }) {
   const capas = document.querySelector('.rad-overlays') ?? document.body;
   new MutationObserver(() => { revisarEclipse(); setTimeout(revisarEclipse, ms('dur-base') + 60); }).observe(capas, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-state', 'data-rad-leaving'] });
   new ResizeObserver(() => { if (abierto()) { mandarBounds(); revisarEclipse(); } }).observe(hueco);
-  window.addEventListener('resize', () => requestAnimationFrame(() => { if (abierto()) mandarBounds(); }));
+  window.addEventListener('resize', () => requestAnimationFrame(() => { reencajar(); if (abierto()) mandarBounds(); }));
+
+  // ---------- Estirarlo ----------
+  // El ancho arrastrado dura la sesión (cerrar y reabrir el panel lo conserva;
+  // reiniciar la app vuelve al de la casa). El piso es el ancho de la casa: la
+  // manija es para agrandar. El techo deja un pedazo de conversación a la
+  // vista, para que se note que sigue ahí abajo. Viene de NeonCode, con sus
+  // números.
+  const CHAT_A_LA_VISTA = 120;
+  const PASO_TECLA = 32;
+  let ancho = 0; // 0 = el de la casa
+  const casa = () => casaEl.getBoundingClientRect().width;
+  // (el margen derecho del panel también cuenta: es lo que separa al testigo del borde de la escena)
+  const techo = () => {
+    const e = escena.getBoundingClientRect();
+    const margen = e.right - casaEl.getBoundingClientRect().right;
+    return Math.max(casa(), Math.round(e.width - CHAT_A_LA_VISTA - margen));
+  };
+  const anchoAhora = () => (ancho || casa());
+  function ponerAncho(w) {
+    const piso = casa();
+    const justo = Math.min(techo(), Math.max(piso, Math.round(w)));
+    // en el piso vuelve a ser «el de la casa», que sigue a la ventana
+    ancho = justo <= piso + 0.5 ? 0 : justo;
+    if (ancho) panel.style.setProperty('--dm-nav-w', `${ancho}px`);
+    else panel.style.removeProperty('--dm-nav-w');
+    panel.toggleAttribute('data-estirado', ancho > 0);
+    manija.setAttribute('aria-valuenow', String(Math.round(anchoAhora())));
+    mandarBounds();
+  }
+  // La ventana cambió de tamaño: el ancho arrastrado se vuelve a encajar entre
+  // el piso y el techo, que cambiaron con ella.
+  function reencajar() { if (ancho) ponerAncho(ancho); }
+  new ResizeObserver(reencajar).observe(escena);
+
+  // Volver al ancho de la casa (doble clic, Home). Va cuadro por cuadro por el
+  // mismo camino que el arrastre, para que la página lo acompañe. Con la
+  // ventana tapada no hay cuadros: el plazo lo deja en su lugar igual.
+  let vuelta = null;
+  function cortarVuelta() { if (vuelta) { cancelAnimationFrame(vuelta.raf); clearTimeout(vuelta.plazo); vuelta = null; } }
+  function volver() {
+    cortarVuelta();
+    if (!ancho) return;
+    const desde = ancho;
+    const hasta = casa();
+    const dura = ms('dur-base');
+    const t0 = performance.now();
+    const fin = () => { cortarVuelta(); ponerAncho(0); };
+    const paso = (t) => {
+      const k = Math.min(1, (t - t0) / dura);
+      if (k >= 1) { fin(); return; }
+      // (el +1 es para que no caiga al piso, y deje de estar estirado, antes de llegar)
+      ponerAncho(desde + (hasta - desde) * (1 - (1 - k) ** 3) + 1);
+      vuelta.raf = requestAnimationFrame(paso);
+    };
+    vuelta = { raf: requestAnimationFrame(paso), plazo: setTimeout(fin, dura + 120) };
+  }
+
+  manija.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    cortarVuelta();
+    // Con el puntero capturado, los movimientos siguen llegando acá aunque el
+    // mouse se vaya de la manija (y se va enseguida).
+    try { manija.setPointerCapture(e.pointerId); } catch { /* un puntero que no es de verdad (el humo) */ }
+    document.documentElement.classList.add('dm-estirando');
+    const x0 = e.clientX;
+    const w0 = panel.getBoundingClientRect().width;
+    let ultimo = w0;
+    // Un pointermove no es un cuadro: un mouse manda varios por cada uno que se
+    // pinta. Se guarda el último y se aplica uno por cuadro.
+    let pendiente = 0;
+    const aplicar = () => { pendiente = 0; ponerAncho(ultimo); };
+    // hacia la izquierda es MÁS ancho: el panel crece contra la conversación
+    const mover = (ev) => { ultimo = w0 + (x0 - ev.clientX); if (!pendiente) pendiente = requestAnimationFrame(aplicar); };
+    const soltar = () => {
+      if (pendiente) { cancelAnimationFrame(pendiente); pendiente = 0; }
+      manija.removeEventListener('pointermove', mover);
+      manija.removeEventListener('pointerup', soltar);
+      manija.removeEventListener('pointercancel', soltar);
+      document.documentElement.classList.remove('dm-estirando');
+      ponerAncho(ultimo);
+      try { manija.releasePointerCapture(e.pointerId); } catch { /* ya se soltó */ }
+    };
+    manija.addEventListener('pointermove', mover);
+    manija.addEventListener('pointerup', soltar);
+    // (el sistema se llevó el puntero: Alt+Tab con el botón apretado)
+    manija.addEventListener('pointercancel', soltar);
+  });
+  manija.addEventListener('dblclick', volver);
+  manija.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); cortarVuelta(); ponerAncho(anchoAhora() + PASO_TECLA); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); cortarVuelta(); ponerAncho(anchoAhora() - PASO_TECLA); }
+    else if (e.key === 'Home') { e.preventDefault(); volver(); }
+  });
+
   router.on('change', ({ id }) => { enChat = id === 'chat'; aplicarCapa(); });
 
   // ---------- Pintar ----------

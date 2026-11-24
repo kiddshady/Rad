@@ -292,6 +292,16 @@ hijo leyó se queda en el hijo. Viene de NeonCode 1.11.3 (`runDelegate`,
   corridas sin ventana, el deshacer del turno. El uso de tokens del hijo no se
   suma al del turno: solo figura en el informe.
 
+## La terminal del panel no es una tool
+
+Desde la 0.14.0 hay una terminal al lado de la conversación (`main/terminal.cjs`,
+`renderer/terminal.js`): una shell viva del usuario, sin tarjeta de permiso, sin
+guardas y sin tiempo límite. **Ninguna tool está registrada contra ese módulo**
+(lo cuida `tools/test-blackcode-terminal.mjs`), y así tiene que seguir: para
+que el agente corra un comando están `shell_exec`, `cmd_exec` y los jobs, que
+sí pasan por el permiso. Lo único que comparten es la carpeta de trabajo: la
+shell del panel abre donde están parados los agentes.
+
 ## Lo que todavía no vino
 
 - El diario para deshacer lo que escribió una tool (los ganchos están en

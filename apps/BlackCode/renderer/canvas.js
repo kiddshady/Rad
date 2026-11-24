@@ -61,7 +61,9 @@ export function montarCanvas({ escena, turnos }) {
   const bCancelar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'canvas-cancelar' }, 'Cancel');
   const acciones = h('div', 'dm-canvas-acciones', {}, bEditar, bCopiar, bExportar, bBorrar, bCerrar);
   const accionesEdicion = h('div', 'dm-canvas-acciones dm-canvas-acciones-edicion', {}, bCancelar, bGuardar);
-  const cuerpo = h('div', 'dm-canvas-cuerpo rad-scroll', { 'data-rad-line': 'top' });
+  // Arriba no hay línea: la cabecera va sobre la misma hoja, así que lo que
+  // sube por debajo del título se esfuma (antes se cortaba al aire).
+  const cuerpo = h('div', 'dm-canvas-cuerpo rad-scroll');
   wireScroll(cuerpo);
   const panel = h('aside', 'dm-canvas', { 'aria-label': 'Canvas', 'aria-hidden': 'true' },
     h('header', 'dm-canvas-cabeza', { 'data-rad-chrome': '' },
@@ -72,7 +74,15 @@ export function montarCanvas({ escena, turnos }) {
   panel.inert = true;
 
   // ---------- La barra de tarjetas del chat ----------
-  const tarjetas = h('div', 'dm-canvas-tarjetas', { role: 'list' });
+  // La tira scrollea de costado, con el esfumado del lado que recorta. La
+  // rueda la mueve: no tiene barra, y sin esto había que saber lo del Shift.
+  const tarjetas = h('div', 'dm-canvas-tarjetas rad-scroll-x', { role: 'list' });
+  wireScroll(tarjetas);
+  tarjetas.addEventListener('wheel', (e) => {
+    if (e.deltaX || !e.deltaY || tarjetas.scrollWidth <= tarjetas.clientWidth) return;
+    e.preventDefault();
+    tarjetas.scrollLeft += e.deltaY;
+  }, { passive: false });
   const botonBiblioteca = h('button', 'rad-iconbutton dm-canvas-biblioteca', { type: 'button', 'data-accion': 'canvas-biblioteca', 'aria-label': 'All canvases', 'data-rad-tip': 'All canvases', 'data-rad-tip-side': 'bottom' }, icono('biblioteca'));
   const barra = h('div', 'dm-canvas-barra', { 'data-rad-chrome': '' }, h('div', 'dm-canvas-barra-in', {}, tarjetas));
 
@@ -81,6 +91,7 @@ export function montarCanvas({ escena, turnos }) {
 
   // La tarjeta de un canvas, al día. (reconcile no llama a update para un
   // nodo recién creado: por eso create también pasa por acá.)
+  let tarjetaALaVista = null;
   function ponerTarjeta(nodo, c) {
     const nombre = nodo.querySelector('.dm-canvas-tarjeta-nombre');
     if (nombre.textContent !== c.title) nombre.textContent = c.title;
@@ -100,6 +111,14 @@ export function montarCanvas({ escena, turnos }) {
       update: ponerTarjeta,
     });
     barra.toggleAttribute('data-con-tarjetas', items.length > 0);
+    // La tarjeta del que se acaba de abrir, a la vista: en una tira más larga
+    // que su lugar podía quedar del lado que no se ve. Solo cuando cambia cuál
+    // está abierto, para no pelearle el scroll a quien la está recorriendo.
+    const abierta = abierto() ? (activo?.id ?? null) : null;
+    if (abierta !== tarjetaALaVista) {
+      tarjetaALaVista = abierta;
+      if (abierta) requestAnimationFrame(() => tarjetas.querySelector('.dm-canvas-tarjeta[data-activa]')?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' }));
+    }
   }
 
   async function cargarBarra() {

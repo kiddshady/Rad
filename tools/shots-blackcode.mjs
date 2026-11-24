@@ -183,6 +183,52 @@ const SCENES = {
     const hueco = document.querySelector('.dm-nav-hueco');
     if (foto) { hueco.querySelector('.dm-nav-foto').src = foto; hueco.setAttribute('data-foto', ''); }
     await sleep(500);`,
+  // La terminal: la shell del panel (en las capturas, cmd y no la del usuario).
+  terminal: `
+    await charla(blackcode, 'Names for the app', 'Give me some name ideas.');
+    await quietos();
+    document.querySelector('[data-accion="terminal"]').click();
+    for (let i = 0; i < 160 && !document.querySelector('.dm-term-cuerpo .xterm-rows'); i++) await sleep(50);
+    await sleep(1500);
+    document.querySelector('.dm-term-cuerpo .xterm-helper-textarea').dispatchEvent(new FocusEvent('focus'));
+    for (const linea of ['cls', 'prompt $E[38;2;140;140;140mblackcode$E[0m$G ', 'echo The shell of the panel', 'dir /b']) { await window.rad.invoke('term:input', linea + '\\r'); await sleep(500); }
+    await sleep(900);
+    // (sin el foco de la ventana xterm dibuja el cursor en contorno: acá se lo muestra como se ve al usarla)
+    const cursor = document.querySelector('.dm-term-cuerpo .xterm-cursor');
+    if (cursor) { cursor.classList.remove('xterm-cursor-outline'); cursor.classList.add('xterm-cursor-block'); }
+    await sleep(300);`,
+  // El navegador estirado con la manija: crece por encima de la conversación.
+  'navegador-estirado': `
+    datos.ponerModoTools('auto');
+    const c = await charla(blackcode, 'A page to read', 'Can you show me what an answer looks like as it arrives?');
+    await quietos();
+    await datos.enviar(c.id, 'TOOLS: ' + JSON.stringify([{ name: 'browser_navigate', args: { url: 'https://example.com' } }]));
+    await quietos();
+    await sleep(1500);
+    const manija = document.querySelector('.dm-nav-manija');
+    const x0 = manija.getBoundingClientRect().left + 4;
+    const puntero = (tipo, x) => manija.dispatchEvent(new PointerEvent(tipo, { pointerId: 7, button: 0, buttons: 1, clientX: x, clientY: 300, bubbles: true, cancelable: true }));
+    puntero('pointerdown', x0);
+    for (let i = 1; i <= 10; i++) { puntero('pointermove', x0 - i * 26); await sleep(30); }
+    puntero('pointerup', x0 - 260);
+    await sleep(900);
+    const foto = await window.rad.invoke('browser:freeze');
+    const hueco = document.querySelector('.dm-nav-hueco');
+    if (foto) { hueco.querySelector('.dm-nav-foto').src = foto; hueco.setAttribute('data-foto', ''); }
+    await sleep(500);`,
+  // El canvas con el texto subido (se esfuma debajo del título) y la tira de tarjetas corrida.
+  'canvas-esfumado': `
+    datos.ponerModoTools('auto');
+    const c = datos.crearChat(blackcode.id);
+    const largo = Array.from({ length: 40 }, (_, i) => 'Paragraph ' + (i + 1) + ' of the notes: something long enough to fill a couple of lines in the panel.').join('\\n\\n');
+    await datos.enviar(c.id, 'TOOLS: ' + JSON.stringify(['Chemistry jokes', 'Curious facts about the universe', 'Cat jokes', 'Reading list for the summer', 'Notes on the lost sock'].map((title) => ({ name: 'canvas', args: { action: 'create', title, kind: 'document', content: '# ' + title + '\\n\\n' + largo } }))));
+    await quietos();
+    datos.renombrarChat(c.id, 'Five canvases');
+    await sleep(1500);
+    document.querySelector('.dm-canvas-cuerpo').scrollTop = 260;
+    const tira = document.querySelector('.dm-canvas-tarjetas');
+    tira.scrollLeft = (tira.scrollWidth - tira.clientWidth) / 2;
+    await sleep(900);`,
   // Las notas: carpetas, una fijada y una abierta, dibujada.
   notas: `
     const crear = (content, folderId = null) => window.rad.invoke('notas:crear', { content, folderId });

@@ -156,10 +156,15 @@ export function flip(container, mutate, { skip = () => false } = {}) {
   mutate();
   const dur = ms('dur-base');
   const easing = token('ease-in-out');
+  // Primero se miden todos y después se anima: intercalado, cada animación
+  // obliga a remaquetar para la medición que sigue (ver reconcile en list.js).
+  const moves = [];
   for (const [k, top] of before) {
     if (!k.isConnected || skip(k)) continue;
     const dy = top - k.getBoundingClientRect().top;
-    if (Math.abs(dy) < 0.5) continue;
+    if (Math.abs(dy) >= 0.5) moves.push([k, dy]);
+  }
+  for (const [k, dy] of moves) {
     k.animate([{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0px)' }], { duration: dur, easing, composite: 'add' });
   }
 }

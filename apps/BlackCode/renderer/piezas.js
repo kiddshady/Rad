@@ -45,6 +45,8 @@ export const ICONOS = {
   marcadores: svg('<path d="M4.5 2.5h7v11L8 11l-3.5 2.5z"/>'),
   externo: svg('<path d="M9 3h4v4M13 3 7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/>'),
   candado: svg('<rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>'),
+  // la terminal: una ventana con su prompt
+  terminal: svg('<rect x="2" y="3" width="12" height="10" rx="1.75"/><path d="M5 6.5 7 8 5 9.5M8.5 10H11"/>'),
   // el canvas: una hoja con su cabecera y una columna
   canvas: svg('<rect x="2.5" y="2.5" width="11" height="11" rx="1.75"/><path d="M2.5 6.25h11M6.5 6.25v7.25"/>'),
   codigo: svg('<path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/>'),

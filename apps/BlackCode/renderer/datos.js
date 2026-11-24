@@ -263,6 +263,8 @@ function soltarChat(id) {
   const r = respuestas.get(id);
   if (r) {
     window.rad.invoke('chat:frenar', r.pedido);
+    // (lo que quedaba por guardar ya no se guarda: recrearía el documento de un chat borrado)
+    clearTimeout(r.porGuardar);
     porPedido.delete(r.pedido);
     respuestas.delete(id);
   }
@@ -410,6 +412,24 @@ export function frenar(chatId) {
 
 const ESTADO = { fin: 'ok', frenado: 'frenado', largo: 'largo', rechazo: 'rechazo' };
 
+// Baja al disco la conversación que está llegando: si la app se cierra, queda
+// lo que había. A lo sumo una vez cada GUARDAR_CADA_MS, porque guardar cuesta
+// lo que PESA el chat entero (viaja al proceso principal y se serializa): un
+// chat con cien capturas son 30 MB, y guardarlo en cada pedazo de texto y en
+// cada tool frenaba el turno a la mitad. Lo que llega en el medio queda
+// anotado y baja cuando toca; `ya` (el fin del turno) no espera.
+function bajar(r, ya = false) {
+  const guardar = () => {
+    clearTimeout(r.porGuardar);
+    r.porGuardar = null;
+    r.guardado = Date.now();
+    r.doc.set(r.doc.get());
+  };
+  const falta = GUARDAR_CADA_MS - (Date.now() - r.guardado);
+  if (ya || falta <= 0) guardar();
+  else if (!r.porGuardar) r.porGuardar = setTimeout(guardar, falta);
+}
+
 function alLlegar(ev) {
   const chatId = porPedido.get(ev.id);
   const r = chatId && respuestas.get(chatId);
@@ -423,22 +443,18 @@ function alLlegar(ev) {
     r.mensaje.texto += ev.texto;
     if (antes) avisar('respuesta', { chat: chatId });
     avisar('texto', { chat: chatId, mensaje: r.mensaje });
-    // Cada tanto baja al disco: si la app se cierra, queda lo que había llegado.
-    if (Date.now() - r.guardado > GUARDAR_CADA_MS) {
-      r.guardado = Date.now();
-      r.doc.set(r.doc.get());
-    }
+    bajar(r);
   } else if (ev.tipo === 'tool') {
     alPedirTool(chatId, r, ev);
   } else if (ev.tipo === 'tool-fin') {
     const fila = r.doc.get().mensajes.find((m) => m.rol === 'tool' && m.id === ev.callId);
     if (fila) Object.assign(fila, { estado: ev.status, ms: ev.ms, salida: ev.out ?? '', cortada: ev.outCut === true });
-    r.doc.set(r.doc.get());
+    bajar(r);
     avisar('mensajes', { chat: chatId });
   } else if (ev.tipo === 'tool-imagenes') {
     const fila = r.doc.get().mensajes.find((m) => m.rol === 'tool' && m.id === ev.callId);
     if (fila && Array.isArray(ev.imagenes)) fila.imagenes = ev.imagenes.map(({ name, dataUrl }) => ({ name, dataUrl }));
-    r.doc.set(r.doc.get());
+    bajar(r);
     avisar('mensajes', { chat: chatId });
   } else if (ev.tipo === 'canvas') {
     // el agente creó o cambió un canvas: lo muestra el panel (canvas.js)
@@ -478,7 +494,7 @@ function alPedirTool(chatId, r, ev) {
     }
   }
   r.pensando = false;
-  r.doc.set(r.doc.get());
+  bajar(r);
   avisar('mensajes', { chat: chatId });
   avisar('respuesta', { chat: chatId });
 }
@@ -499,7 +515,7 @@ function terminar(chatId, estado, nota, ev = null) {
   for (const m of r.doc.get().mensajes) if (m.rol === 'tool' && m.estado === 'run') m.estado = 'aborted';
   const habiaTarjeta = Boolean(r.confirmacion);
   r.confirmacion = null;
-  r.doc.set(r.doc.get());
+  bajar(r, true);
   porPedido.delete(r.pedido);
   respuestas.delete(chatId);
   chats.update((v) => { const x = v.lista.find((y) => y.id === chatId); if (x) x.cuenta = r.doc.get().mensajes.length; return v; });

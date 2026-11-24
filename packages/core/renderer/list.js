@@ -43,7 +43,9 @@ export function reconcile(container, items, { key, create, update, animateFirst 
   const keep = new Set(wanted.map((w) => w.k));
   if (keep.size !== wanted.length) throw new Error('[rad] reconcile: hay claves repetidas');
 
-  // Dónde está cada uno antes de tocar nada (para el viaje).
+  // Dónde está cada uno antes de tocar nada (para el viaje), y dónde está el
+  // contenedor: el viaje se mide CONTRA ÉL, no contra la ventana.
+  const origin = container.getBoundingClientRect();
   const before = new Map();
   for (const el of live.values()) before.set(el, el.getBoundingClientRect());
 
@@ -95,14 +97,39 @@ export function reconcile(container, items, { key, create, update, animateFirst 
 
   // El viaje (FLIP) de los que siguen. Se suma a lo que ya estén animando:
   // si venían viajando de un cambio anterior, siguen desde donde iban.
+  //
+  // Tres cuidados, y los tres salieron de un chat de 700 mensajes que dejaba
+  // la ventana congelada 7 segundos cada vez que entraba una fila:
+  //   - Se mide contra el contenedor. Si lo que cambió fue el scroll (al
+  //     insertar un nodo, el navegador lo corrige solo para que lo que se
+  //     estaba leyendo no salte), contra la ventana «se movieron» todos, y
+  //     todos salían a viajar para quedarse donde estaban.
+  //   - Primero se miden TODOS y recién después se anima. Intercalado, cada
+  //     animación ensucia el estilo y la medición siguiente obliga a
+  //     remaquetar la lista entera: una maquetación por fila.
+  //   - El que está fuera de la ventana antes y después no viaja: nadie lo ve.
   const dur = ms('dur-base');
   const easing = token('ease-in-out');
+  const frame = container.getBoundingClientRect();
+  const shiftX = frame.left - origin.left;
+  const shiftY = frame.top - origin.top;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const seen = (left, top, r) => left < vw && left + r.width > 0 && top < vh && top + r.height > 0;
+  const moves = [];
   for (const [el, rect] of before) {
     if (leaving(el)) continue;
     const now = el.getBoundingClientRect();
-    const dx = rect.left - now.left;
-    const dy = rect.top - now.top;
+    // (dónde estaba, en las coordenadas de ahora)
+    const wasLeft = rect.left + shiftX;
+    const wasTop = rect.top + shiftY;
+    const dx = wasLeft - now.left;
+    const dy = wasTop - now.top;
     if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
+    if (!seen(now.left, now.top, now) && !seen(wasLeft, wasTop, rect)) continue;
+    moves.push([el, dx, dy]);
+  }
+  for (const [el, dx, dy] of moves) {
     el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0px, 0px)' }], { duration: dur, easing, composite: 'add' });
   }
 

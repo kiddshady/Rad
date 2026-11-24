@@ -16,6 +16,7 @@ import { filaTool, ponerTool, cuentaTools, abrirPermiso } from './tools.js';
 import { h, icono } from './piezas.js';
 import { montarCanvas } from './canvas.js';
 import { montarNavegador } from './navegador.js';
+import { montarTerminal } from './terminal.js';
 import { openMenu } from '/@core/menu.js';
 import { toast } from '/@core/toast.js';
 import { crearAdjuntos, adjuntosDe, ACEPTA } from './adjuntos.js';
@@ -126,22 +127,25 @@ export function montarChat(el, { router }) {
   const selectorArchivos = h('input', 'dm-selector', { type: 'file', multiple: true, accept: ACEPTA, tabindex: '-1', 'aria-hidden': 'true' });
   const sinOjos = h('p', 'dm-redactor-nota rad-swap', { role: 'status' });
   const redactor = h('form', 'dm-redactor', {}, adjuntos.tira, sinOjos, h('div', 'dm-redactor-fila', {}, mas, area, boton), selectorArchivos);
-  // La escena: la conversación y, a su derecha, el panel que esté abierto
-  // (el canvas). El panel empuja a la conversación; no la tapa.
+  // La escena: la conversación y, a su derecha, el panel que esté abierto (el
+  // canvas, el navegador o la terminal). El panel empuja a la conversación; no
+  // la tapa (salvo el navegador cuando se lo estira).
   const escena = h('div', 'dm-escena');
   // El hueco de la escena es uno solo: abrir un panel cierra el otro.
   const turnos = {
     pedir(quien) {
       if (quien !== 'canvas') lienzo.cerrar({ rescatar: true });
       if (quien !== 'browser') nav.cerrar();
+      if (quien !== 'terminal') consola.cerrar();
     },
   };
   const lienzo = montarCanvas({ escena, turnos });
   const nav = montarNavegador({ escena, turnos, router });
+  const consola = montarTerminal({ escena, turnos, router });
   const conv = h('section', 'dm-conv', {},
-    h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, sub, nav.boton, lienzo.botonBiblioteca, botonTools),
+    h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, sub, nav.boton, consola.boton, lienzo.botonBiblioteca, botonTools),
     lienzo.barra, celda, aviso, h('div', 'dm-redactor-caja', {}, redactor));
-  escena.append(conv, lienzo.panel, nav.panel);
+  escena.append(conv, lienzo.panel, nav.panel, consola.panel);
 
   el.append(lado, escena);
 
@@ -293,6 +297,11 @@ export function montarChat(el, { router }) {
     scroller.addEventListener('scroll', () => {
       este.pegado = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop <= PEGADO_PX;
     }, { passive: true });
+    // Pegado al final también cuando el contenido cambia de alto sin que nadie
+    // scrollee. Los mensajes fuera de la vista tienen un alto estimado (no se
+    // maquetan): al abrir un chat largo, «el final» se corre a medida que los
+    // de abajo toman su alto de verdad, y sin esto quedaba parado más arriba.
+    new ResizeObserver(() => { if (este.pegado) scroller.scrollTop = scroller.scrollHeight; }).observe(col);
     dibujarMensajes();
     relevar(celda, scroller);
     alFondo();

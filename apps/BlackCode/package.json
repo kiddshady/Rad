@@ -1,7 +1,7 @@
 {
   "name": "daimon",
   "productName": "BlackCode",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "private": true,
   "description": "BlackCode: an AI chat with several agents, each with its own provider, model, instructions and chats.",
   "author": "Kidd Shady · Umbrovex Systems",
@@ -10,11 +10,13 @@
     "start": "electron .",
     "icon": "node scripts/icon.mjs",
     "katex": "node scripts/vendor-katex.mjs",
+    "xterm": "node scripts/vendor-xterm.mjs",
     "pack": "electron-builder --win dir --publish never",
     "build": "electron-builder --win --publish never"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",
+    "@lydell/node-pty": "1.2.0-beta.14",
     "@rad/core": "*",
     "@rad/skin-mono": "*"
   },
@@ -43,7 +45,8 @@
       "package.json"
     ],
     "asarUnpack": [
-      "main/tools/code-search-worker.cjs"
+      "main/tools/code-search-worker.cjs",
+      "node_modules/@lydell/**/*"
     ],
     "win": {
       "target": [
@@ -58,6 +61,8 @@
     }
   },
   "devDependencies": {
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
     "katex": "0.18.1"
   }
 }

@@ -1058,6 +1058,57 @@ else {
     modal().querySelector('.rad-button').click();
     await closed();
 
+    // Los esfumados del canvas. Debajo del título no hay línea (la cabecera va
+    // sobre la misma hoja): lo que sube se esfuma, y solo cuando hay algo
+    // recortado de ese lado. La tira de tarjetas hace lo mismo de costado.
+    {
+      const px = (el, nombre) => parseFloat(getComputedStyle(el).getPropertyValue(nombre)) || 0;
+      const largo = Array.from({ length: 60 }, (_, i) => 'Paragraph number ' + i + ' of a long document, so that the canvas has to scroll.').join('\n\n');
+      await pedir([[
+        { name: 'canvas', args: { action: 'create', title: 'A long document to scroll', kind: 'document', content: largo } },
+        { name: 'canvas', args: { action: 'create', title: 'Another one with a long title', kind: 'document', content: 'x' } },
+        { name: 'canvas', args: { action: 'create', title: 'And a third one, also long', kind: 'document', content: 'x' } },
+        { name: 'canvas', args: { action: 'create', title: 'The fourth canvas of this chat', kind: 'document', content: largo } },
+      ]]);
+      await quieto();
+      const cuerpoC = panel.querySelector('.dm-canvas-cuerpo');
+      if (cuerpoC.hasAttribute('data-rad-line') || !cuerpoC.classList.contains('rad-scroll')) fail('canvas: el cuerpo sigue marcando una línea arriba, o no es un scroll con esfumado');
+      if (cuerpoC.scrollHeight < cuerpoC.clientHeight + 400) fail('canvas: el documento largo no hace scroll');
+      if (!cuerpoC.classList.contains('at-top') || px(cuerpoC, '--rad-fade-top') !== 0) fail('canvas: en reposo, arriba, ya hay esfumado debajo del título (' + px(cuerpoC, '--rad-fade-top') + ' px)');
+      if (!(px(cuerpoC, '--rad-fade-bottom') > 8)) fail('canvas: con texto recortado abajo no hay esfumado abajo');
+      const pasosArriba = new Set();
+      cuerpoC.scrollTop = 300;
+      for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 200;) { pasosArriba.add(Math.round(px(cuerpoC, '--rad-fade-top'))); await frame(); }
+      const fadeArriba = px(cuerpoC, '--rad-fade-top');
+      if (!(fadeArriba > 8) || cuerpoC.classList.contains('at-top')) fail('canvas: con el texto subido, debajo del título se corta al aire (esfumado de ' + fadeArriba + ' px)');
+      if (pasosArriba.size < 3) fail('canvas: el esfumado de arriba aparece de golpe (' + [...pasosArriba].join(', ') + ')');
+      if (!getComputedStyle(cuerpoC).maskImage.includes('linear-gradient')) fail('canvas: el cuerpo no tiene la máscara del esfumado');
+
+      // la tira: seis tarjetas no entran al lado del panel
+      const tira = barra.querySelector('.dm-canvas-tarjetas');
+      await sleep(dur('slow') + 500); // (la tira se corrió sola hasta la tarjeta del que quedó abierto)
+      if (tarjetasC().length !== 6 || !(tira.scrollWidth > tira.clientWidth + 40)) fail('canvas: la tira tiene ' + tarjetasC().length + ' tarjetas y ' + (tira.scrollWidth - tira.clientWidth) + ' px de más: no hay qué recortar');
+      // el canvas que quedó abierto es el último: su tarjeta se trajo a la vista
+      const activaR = tarjetasC().find((t) => t.hasAttribute('data-activa'))?.getBoundingClientRect();
+      const tiraR = tira.getBoundingClientRect();
+      if (!activaR || activaR.right > tiraR.right + 1 || activaR.left < tiraR.left - 1) fail('canvas: la tarjeta del canvas abierto quedó fuera de la vista de la tira');
+      if (tira.classList.contains('at-start') || !(px(tira, '--rad-fade-start') > 8)) fail('canvas: la tira, corrida, se corta al aire contra el panel izquierdo (esfumado de ' + px(tira, '--rad-fade-start') + ' px)');
+      if (!getComputedStyle(tira).maskImage.includes('to right')) fail('canvas: la tira no tiene la máscara de costado');
+      // la rueda la mueve, y al llegar a cada punta ese lado deja de esfumarse
+      const rueda = (dy) => { const e = new WheelEvent('wheel', { deltaY: dy, bubbles: true, cancelable: true }); tira.dispatchEvent(e); return e.defaultPrevented; };
+      const antesX = tira.scrollLeft;
+      const frenada = rueda(-90);
+      await frame();
+      if (!frenada || !(tira.scrollLeft < antesX)) fail('canvas: la rueda no mueve la tira de tarjetas (' + antesX + ' → ' + tira.scrollLeft + ', frenada ' + frenada + ')');
+      for (let i = 0; i < 30 && tira.scrollLeft > 0; i++) { rueda(-400); await frame(); }
+      await sleep(dur('base') + 120);
+      if (!tira.classList.contains('at-start') || px(tira, '--rad-fade-start') !== 0 || !(px(tira, '--rad-fade-end') > 8)) fail('canvas: con la tira al principio, el esfumado quedó en ' + px(tira, '--rad-fade-start') + ' / ' + px(tira, '--rad-fade-end') + ' px');
+      for (let i = 0; i < 30 && tira.scrollLeft < tira.scrollWidth - tira.clientWidth - 1; i++) { rueda(400); await frame(); }
+      await sleep(dur('base') + 120);
+      if (!tira.classList.contains('at-end') || px(tira, '--rad-fade-end') !== 0 || !(px(tira, '--rad-fade-start') > 8)) fail('canvas: con la tira al final, el esfumado quedó en ' + px(tira, '--rad-fade-start') + ' / ' + px(tira, '--rad-fade-end') + ' px');
+      data.canvasEsfumados = 'debajo del título ' + Math.round(fadeArriba) + ' px en ' + pasosArriba.size + ' pasos; la tira, ' + Math.round(px(tira, '--rad-fade-start')) + ' px del lado que recorta, y la mueve la rueda';
+    }
+
     // Cambiar de chat cierra el panel y vacía la barra: son de aquel chat.
     chatView.querySelector('[data-accion="nuevo-chat"]').click();
     await until(() => !abiertoC() && !barra.hasAttribute('data-con-tarjetas'), 3000);
@@ -1146,6 +1197,70 @@ else {
     await closed();
     await until(() => !hueco.hasAttribute('data-foto'), 3000);
     if (hueco.hasAttribute('data-foto')) fail('navegador: al cerrarse el modal la foto siguió tapando la página');
+
+    // Estirarlo: la manija del borde izquierdo lo agranda por ENCIMA de la
+    // conversación (no la empuja), entre el ancho de la casa y un techo que
+    // deja un pedazo de chat a la vista. El ancho dura la sesión.
+    {
+      const manija = nav.querySelector('.dm-nav-manija');
+      const anchoN = () => nav.getBoundingClientRect().width;
+      const fondo = () => parseFloat(getComputedStyle(nav, '::before').opacity);
+      const puntero = (tipo, x) => manija.dispatchEvent(new PointerEvent(tipo, { pointerId: 7, button: 0, buttons: tipo === 'pointerup' ? 0 : 1, clientX: x, clientY: 300, bubbles: true, cancelable: true }));
+      const casa = anchoN();
+      const hiloAntes = Math.round(thread().getBoundingClientRect().width);
+      const eR = escena.getBoundingClientRect();
+      if (!manija || manija.getAttribute('role') !== 'separator' || nav.hasAttribute('data-estirado') || fondo() !== 0) fail('navegador: la manija no está, o el panel arranca estirado (fondo ' + fondo() + ')');
+      const x0 = manija.getBoundingClientRect().left + 4;
+      puntero('pointerdown', x0);
+      if (!document.documentElement.classList.contains('dm-estirando')) fail('navegador: agarrar la manija no marca el arrastre');
+      const pasos = new Set();
+      for (let i = 1; i <= 8; i++) { puntero('pointermove', x0 - i * 25); await frame(); pasos.add(Math.round(anchoN())); }
+      await frame();
+      if (Math.abs(anchoN() - (casa + 200)) > 2 || pasos.size < 5) fail('navegador: arrastrar 200 px a la izquierda dejó el panel en ' + Math.round(anchoN()) + ' (la casa mide ' + Math.round(casa) + '), en ' + pasos.size + ' pasos');
+      if (Math.round(thread().getBoundingClientRect().width) !== hiloAntes) fail('navegador: estirarlo le cambió el ancho a la conversación (' + hiloAntes + ' → ' + Math.round(thread().getBoundingClientRect().width) + '): la empuja en vez de taparla');
+      if (hueco.getBoundingClientRect().width < casa + 150) fail('navegador: el hueco de la página no creció con el panel (' + Math.round(hueco.getBoundingClientRect().width) + ' px)');
+      // hasta el techo: queda chat a la vista
+      puntero('pointermove', x0 - 5000);
+      await frame(); await frame();
+      const asoma = nav.getBoundingClientRect().left - eR.left;
+      if (Math.abs(asoma - 120) > 2) fail('navegador: en el tope quedan ' + Math.round(asoma) + ' px de conversación a la vista, se esperaban 120');
+      puntero('pointerup', x0 - 5000);
+      await sleep(dur('base') + 120);
+      if (document.documentElement.classList.contains('dm-estirando') || !nav.hasAttribute('data-estirado')) fail('navegador: soltar la manija no terminó el arrastre, o el panel no quedó marcado como estirado');
+      if (fondo() < 0.99) fail('navegador: estirado sobre la conversación, el panel no tiene un fondo que tape (opacidad ' + fondo() + ')');
+      // lo que hay debajo es conversación, y lo que se toca es el panel
+      const nr = nav.getBoundingClientRect();
+      const tocado = document.elementFromPoint(nr.left + 40, nr.top + 20);
+      if (!nav.contains(tocado)) fail('navegador: estirado, en su borde izquierdo se toca ' + (tocado?.className || tocado?.tagName) + ' y no el panel');
+      if (!(thread().getBoundingClientRect().right > nr.left + 100)) fail('navegador: el panel estirado no quedó por encima de la conversación');
+      // con las flechas, desde el teclado
+      const tope = anchoN();
+      manija.focus();
+      key(manija, 'ArrowRight');
+      await frame();
+      if (Math.abs(anchoN() - (tope - 32)) > 2) fail('navegador: la flecha derecha sobre la manija no lo achicó un paso (' + Math.round(tope) + ' → ' + Math.round(anchoN()) + ')');
+      // cerrar y volver a abrir lo conserva
+      const guardado = anchoN();
+      botonNav.click();
+      await until(() => !escena.hasAttribute('data-panel'), 3000);
+      botonNav.click();
+      await until(() => nav.hasAttribute('data-abierto'), 3000);
+      await sleep(dur('base') + 160);
+      if (Math.abs(anchoN() - guardado) > 2) fail('navegador: al reabrirlo perdió el ancho arrastrado (' + Math.round(guardado) + ' → ' + Math.round(anchoN()) + ')');
+      // doble clic: vuelve al ancho de la casa, y vuelve andando
+      const vuelta = new Set();
+      manija.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 260;) { vuelta.add(Math.round(anchoN())); await frame(); }
+      await sleep(dur('base') + 120);
+      if (Math.abs(anchoN() - casa) > 1 || nav.hasAttribute('data-estirado') || nav.style.getPropertyValue('--dm-nav-w') || fondo() > 0.01) fail('navegador: el doble clic no lo devolvió al ancho de la casa (' + Math.round(anchoN()) + ' de ' + Math.round(casa) + ', fondo ' + fondo() + ')');
+      if (vuelta.size < 4) fail('navegador: volver al ancho de la casa fue de golpe (' + [...vuelta].join(', ') + ')');
+      // y nunca se achica por debajo de la casa
+      key(manija, 'ArrowRight');
+      await frame();
+      if (Math.abs(anchoN() - casa) > 1) fail('navegador: la manija lo achicó por debajo del ancho de la casa (' + Math.round(anchoN()) + ')');
+      manija.blur();
+      data.navegadorEstirado = 'de ' + Math.round(casa) + ' a ' + Math.round(tope) + ' px en ' + pasos.size + ' pasos, deja ' + Math.round(asoma) + ' px de chat a la vista, tapa sin empujar, y vuelve en ' + vuelta.size + ' pasos';
+    }
 
     // El hueco es uno solo: abrir un canvas cierra el navegador, y al revés.
     await corre({ name: 'canvas', args: { action: 'create', title: 'Beside the browser', kind: 'document', content: 'x' } });
@@ -1580,6 +1695,243 @@ else {
     datosM.ponerModoTools('manual');
     data.subagentes = 'dos a la vez con sus filas colgadas, lectura que no escribe, tarjeta que dice quién pide, y Kimi K3 elegido en Settings';
     await go('chat');
+  }
+
+  // 11i. La terminal: un panel con una shell de verdad (en el humo, cmd.exe y
+  // no la del usuario). Lo que se teclea corre, el cursor es un bloque del
+  // blanco de la app, comparte el hueco con los otros paneles, cerrarla no
+  // mata la shell, y la CSP de la app sigue entera (un error de consola, que
+  // es como se ve un estilo en línea bloqueado, hace fallar el humo).
+  {
+    const escena = chatView.querySelector('.dm-escena');
+    const term = chatView.querySelector('.dm-term');
+    const botonT = chatView.querySelector('[data-accion="terminal"]');
+    const nav = chatView.querySelector('.dm-nav');
+    const cuerpoT = term.querySelector('.dm-term-cuerpo');
+    const cualT = () => shown(term.querySelector('.dm-canvas-sub'));
+    const renglones = () => [...cuerpoT.querySelectorAll('.xterm-rows > div')].map((d) => d.textContent.replace(/ /g, ' ').trimEnd()).filter(Boolean);
+    const pantalla = () => renglones().join('\n');
+    const teclear = (texto) => window.rad.invoke('term:input', texto);
+    await until(() => !escena.hasAttribute('data-panel'), 3000);
+    if (!botonT || term.hasAttribute('data-abierto') || cuerpoT.querySelector('.xterm')) fail('terminal: arranca abierta, o xterm se cargó sin que nadie la abra');
+
+    botonT.click();
+    await until(() => cuerpoT.querySelector('.xterm-rows') && cualT() === 'cmd', 8000);
+    await sleep(dur('base') + 200);
+    if (!term.hasAttribute('data-abierto') || escena.getAttribute('data-panel') !== 'terminal' || botonT.getAttribute('aria-pressed') !== 'true') fail('terminal: su botón no la abrió');
+    if (cualT() !== 'cmd') fail('terminal: en el humo la shell tiene que ser cmd, y dice «' + cualT() + '»');
+    await until(() => />$/.test(renglones().at(-1) ?? ''), 6000);
+    // (una ruta larga se parte en dos renglones)
+    if (!/workspace>$/.test(renglones().slice(-2).join(''))) fail('terminal: la shell no abrió en la carpeta de trabajo de las tools: «' + renglones().slice(-2).join('') + '»');
+    // lo que se teclea corre
+    await teclear('echo %OS%-marca\r');
+    await until(() => pantalla().includes('Windows_NT-marca'), 6000);
+    if (!pantalla().includes('Windows_NT-marca')) fail('terminal: lo tecleado no corrió: ' + pantalla().slice(-200));
+    // xterm se ajusta a su caja
+    const sr = cuerpoT.querySelector('.xterm-screen').getBoundingClientRect();
+    if (sr.width > cuerpoT.clientWidth + 1 || sr.width < cuerpoT.clientWidth * 0.8 || sr.height > cuerpoT.clientHeight + 1 || sr.height < cuerpoT.clientHeight * 0.8) fail('terminal: xterm mide ' + Math.round(sr.width) + '×' + Math.round(sr.height) + ' en una caja de ' + cuerpoT.clientWidth + '×' + cuerpoT.clientHeight);
+    if (!getComputedStyle(cuerpoT.querySelector('.xterm-rows')).fontFamily.includes('Roboto Mono')) fail('terminal: no usa la fuente de código de la app: ' + getComputedStyle(cuerpoT.querySelector('.xterm-rows')).fontFamily);
+    // Los estilos que xterm arma a mano llegaron por hojas construidas (la CSP
+    // no deja pasar un <style> en línea): tres <dm-estilo>, ni un <style>.
+    const hojas = [...cuerpoT.querySelectorAll('dm-estilo')];
+    if (hojas.length !== 3 || cuerpoT.querySelector('style') || document.adoptedStyleSheets.length < 3 || !hojas.every((n) => getComputedStyle(n).display === 'none')) fail('terminal: xterm dejó ' + hojas.length + ' <dm-estilo> y ' + cuerpoT.querySelectorAll('style').length + ' <style>, con ' + document.adoptedStyleSheets.length + ' hojas construidas');
+    // El cursor: un bloque, del blanco de la app, con la letra en el color del
+    // fondo. (La ventana del humo no tiene el foco, así que xterm lo muestra en
+    // contorno: se le pone la clase del bloque para leer la regla de verdad.)
+    cuerpoT.querySelector('.xterm-helper-textarea').dispatchEvent(new FocusEvent('focus'));
+    await teclear('\r');
+    await until(() => cuerpoT.querySelector('.xterm-cursor'), 4000);
+    const cursor = cuerpoT.querySelector('.xterm-cursor');
+    const colorDe = (token) => { const s = document.createElement('i'); s.style.color = getComputedStyle(document.documentElement).getPropertyValue(token).trim(); document.body.append(s); const c = getComputedStyle(s).color; s.remove(); return c; };
+    if (!cursor) fail('terminal: no hay cursor');
+    else {
+      const teniaBloque = cursor.classList.contains('xterm-cursor-block');
+      cursor.classList.remove('xterm-cursor-outline', 'xterm-cursor-blink');
+      cursor.classList.add('xterm-cursor-block');
+      const cs = getComputedStyle(cursor);
+      const cr = cursor.getBoundingClientRect();
+      if (cs.backgroundColor !== colorDe('--rad-text-1') || cs.color !== colorDe('--rad-surface-0')) fail('terminal: el cursor de bloque es ' + cs.backgroundColor + ' con letra ' + cs.color + ', no el blanco de la app (' + colorDe('--rad-text-1') + ') con el fondo');
+      if (cr.width < 5 || cr.height < 12) fail('terminal: el cursor mide ' + Math.round(cr.width) + '×' + Math.round(cr.height) + ': no es un bloque');
+      data.terminalCursor = 'bloque de ' + Math.round(cr.width) + '×' + Math.round(cr.height) + ' px, ' + cs.backgroundColor + (teniaBloque ? '' : ' (en contorno sin el foco)');
+    }
+    // Un color de 24 bits: xterm lo ponía con un atributo style, que la CSP
+    // bloquea. (El prompt de cmd lo escribe la shell: $E es el escape.)
+    await teclear('prompt $E[38;2;10;200;120mrgb$G$E[0m\r');
+    await until(() => renglones().some((r) => r.startsWith('rgb>')), 6000);
+    const verde = [...cuerpoT.querySelectorAll('.xterm-rows span')].find((s) => s.textContent.startsWith('rgb>'));
+    if (!verde || getComputedStyle(verde).color !== 'rgb(10, 200, 120)') fail('terminal: un color de 24 bits no se pinta: ' + (verde ? getComputedStyle(verde).color : 'sin el prompt de prueba'));
+    // (lo que escribe la shell está en el idioma de Windows: se mira la cabecera del panel)
+    {
+      const cabeza = term.querySelector('header');
+      const textos = [cabeza.innerText, ...[...cabeza.querySelectorAll('[aria-label], [data-rad-tip]')].flatMap((n) => [n.getAttribute('aria-label') ?? '', n.getAttribute('data-rad-tip') ?? ''])];
+      if (textos.some((t) => CASTELLANO.test(t)) || term.getAttribute('aria-label') !== 'Terminal') fail('terminal: quedó texto en castellano en su cabecera: ' + textos.join(' · '));
+    }
+
+    // Con el foco adentro, las teclas son de la shell: no llegan a la app. Las
+    // de salir (Ctrl+T, Ctrl+B) sí.
+    const llegaron = [];
+    const oir = (e) => llegaron.push((e.ctrlKey ? 'ctrl+' : '') + e.key);
+    document.addEventListener('keydown', oir);
+    const adentro = cuerpoT.querySelector('.xterm-helper-textarea');
+    key(adentro, 'u', { ctrlKey: true });
+    key(adentro, 'Escape');
+    key(adentro, 'f', { ctrlKey: true });
+    if (llegaron.length) fail('terminal: con el foco en la shell, a la app le llegaron ' + llegaron.join(', '));
+    key(adentro, 't', { ctrlKey: true });
+    document.removeEventListener('keydown', oir);
+    await until(() => !term.hasAttribute('data-abierto'), 2000);
+    if (!llegaron.includes('ctrl+t') || term.hasAttribute('data-abierto')) fail('terminal: Ctrl+T desde adentro de la shell no la cerró (llegaron: ' + llegaron.join(', ') + ')');
+    await until(() => !escena.hasAttribute('data-panel'), 3000);
+
+    // Cerrar el panel no mata la shell: al reabrir está lo que quedó.
+    key(document.body, 't', { ctrlKey: true });
+    await until(() => term.hasAttribute('data-abierto'), 2000);
+    await sleep(dur('base') + 200);
+    if (!term.hasAttribute('data-abierto') || !pantalla().includes('Windows_NT-marca') || cualT() !== 'cmd') fail('terminal: Ctrl+T no la reabrió con lo que había quedado');
+    await teclear('echo sigue-%OS%\r');
+    await until(() => pantalla().includes('sigue-Windows_NT'), 6000);
+    if (!pantalla().includes('sigue-Windows_NT')) fail('terminal: después de cerrar y reabrir el panel la shell no contesta');
+
+    // El hueco es uno solo: el navegador la cierra, y ella cierra al navegador.
+    chatView.querySelector('[data-accion="navegador"]').click();
+    await until(() => nav.hasAttribute('data-abierto') && !term.hasAttribute('data-abierto'), 4000);
+    await sleep(dur('base') + 160);
+    if (term.hasAttribute('data-abierto') || escena.getAttribute('data-panel') !== 'browser') fail('terminal: abrir el navegador no la cerró (panel: ' + escena.getAttribute('data-panel') + ')');
+    botonT.click();
+    await until(() => term.hasAttribute('data-abierto') && !nav.hasAttribute('data-abierto'), 4000);
+    await sleep(dur('base') + 160);
+    if (nav.hasAttribute('data-abierto') || escena.getAttribute('data-panel') !== 'terminal') fail('terminal: abrirla no cerró el navegador (panel: ' + escena.getAttribute('data-panel') + ')');
+
+    // Reiniciar: pantalla limpia y una shell nueva.
+    term.querySelector('[data-accion="term-reiniciar"]').click();
+    await until(() => !pantalla().includes('Windows_NT-marca') && />$/.test(renglones().at(-1) ?? ''), 8000);
+    if (pantalla().includes('Windows_NT-marca') || renglones().some((r) => r.startsWith('rgb>'))) fail('terminal: reiniciar no dejó una shell nueva: ' + pantalla().slice(-160));
+    // Si la shell termina sola, se dice; y el botón la levanta de nuevo.
+    await teclear('exit\r');
+    await until(() => pantalla().includes('The shell ended (code 0)'), 6000);
+    await settle();
+    if (!pantalla().includes('The shell ended (code 0)') || cualT() !== 'ended') fail('terminal: salir de la shell no se avisa: «' + cualT() + '» / ' + pantalla().slice(-120));
+    term.querySelector('[data-accion="term-reiniciar"]').click();
+    await until(() => cualT() === 'cmd' && />$/.test(renglones().at(-1) ?? ''), 8000);
+    if (cualT() !== 'cmd') fail('terminal: después de terminar, el botón no levantó otra shell');
+    term.querySelector('[data-accion="term-cerrar"]').click();
+    await until(() => !escena.hasAttribute('data-panel'), 3000);
+    if (term.hasAttribute('data-abierto') || botonT.getAttribute('aria-pressed') !== 'false') fail('terminal: su botón de cerrar no la cerró');
+    data.terminal = 'cmd en la carpeta de las tools, teclear, color de 24 bits, ' + hojas.length + ' hojas construidas, teclas que no salen de la shell, Ctrl+T, turno con el navegador, reiniciar y terminar';
+  }
+
+  // 11j. Un chat largo no frena la app. Con cientos de mensajes, cada fila de
+  // tool que entraba dejaba la ventana congelada varios segundos: la lista
+  // hacía «viajar» a todos los mensajes, midiendo y animando de a uno, porque
+  // al corregirse el scroll parecía que se habían movido todos. Se cuentan los
+  // viajes de un turno con tools: tienen que ser los de las filas que entran.
+  {
+    const datosM = await import('/datos.js');
+    datosM.ponerModoTools('auto');
+    const agenteL = datosM.agenteActual();
+    const otro = datosM.crearChat(agenteL.id);
+    const largo = datosM.crearChat(agenteL.id);
+    const docL = await datosM.hilo(largo.id);
+    const mensajesL = [];
+    for (let i = 0; i < 120; i++) {
+      mensajesL.push({ id: 'lu' + i, rol: 'user', texto: 'Question number ' + i + '?' });
+      if (i % 3 === 0) mensajesL.push({ id: 'lt' + i, rol: 'tool', tool: 'fs_read', texto: 'notes-' + i + '.md', estado: 'ok', ms: 12, salida: 'line\n'.repeat(20) });
+      mensajesL.push({ id: 'la' + i, rol: 'assistant', texto: '## Section ' + i + '\n\nA paragraph long enough to wrap over a couple of lines in the column, with **bold** and `code`.\n\n- one\n- two\n\n```js\nconst x = ' + i + ';\n```', estado: 'ok', modelo: agenteL.modelo, tools: [] });
+    }
+    docL.set({ mensajes: mensajesL });
+    datosM.elegirChat(otro.id);
+    await settle();
+    datosM.elegirChat(largo.id);
+    await until(() => (thread()?.querySelector('.dm-col')?.childElementCount ?? 0) >= mensajesL.length, 8000);
+    await settle();
+    const col = thread().querySelector('.dm-col');
+    if (col.childElementCount < mensajesL.length) fail('chat largo: se pintaron ' + col.childElementCount + ' de ' + mensajesL.length + ' mensajes');
+    // lo que no está a la vista no se maqueta ni se pinta
+    if (getComputedStyle(col.firstElementChild).contentVisibility !== 'auto') fail('chat largo: los mensajes fuera de la vista se maquetan igual (content-visibility: ' + getComputedStyle(col.firstElementChild).contentVisibility + ')');
+    if (thread().scrollHeight - thread().clientHeight - thread().scrollTop > 4) fail('chat largo: no abrió parado en el final');
+    const animar = Element.prototype.animate;
+    let viajes = 0;
+    Element.prototype.animate = function contar(cuadros, ...resto) {
+      if (this.parentElement === col && String(cuadros?.[0]?.transform ?? '').startsWith('translate(')) viajes++;
+      return animar.call(this, cuadros, ...resto);
+    };
+    const guardadoAlPedir = [];
+    const ronda = [{ name: 'fs_read', args: { paths: ['no-such-a.md'] } }];
+    const t0L = performance.now();
+    await pedir([ronda, ronda, ronda]);
+    // Apenas entra la primera fila, el disco todavía no la tiene: el chat se
+    // guarda entero a lo sumo cada segundo y medio, no con cada tool.
+    await until(() => alive(col.querySelectorAll('.dm-tool')).some((t) => t.dataset.tool === 'fs_read' && !t.dataset.radKey.startsWith('lt')), 5000);
+    guardadoAlPedir.push(((await window.rad.store.read('chat-' + largo.id))?.mensajes ?? []).filter((m) => m.rol === 'tool' && !String(m.id).startsWith('lt')).length);
+    await until(() => !composer.querySelector('.rad-busy') && msgs().at(-1)?.dataset.estado === 'ok', 20000);
+    const tardo = Math.round(performance.now() - t0L);
+    Element.prototype.animate = animar;
+    await settle();
+    const alFinal = ((await window.rad.store.read('chat-' + largo.id))?.mensajes ?? []).filter((m) => m.rol === 'tool' && !String(m.id).startsWith('lt'));
+    if (viajes > 40) fail('chat largo: en un turno con tres tools viajaron ' + viajes + ' mensajes de ' + mensajesL.length + ': la lista está animando a todos');
+    if (guardadoAlPedir[0] !== 0) fail('chat largo: el chat entero se guardó apenas entró una fila de tool (' + guardadoAlPedir[0] + ' en el disco)');
+    if (alFinal.length !== 3 || alFinal.some((m) => m.estado === 'run')) fail('chat largo: al terminar el turno el disco tiene ' + alFinal.length + ' filas de tool nuevas, se esperaban 3 terminadas');
+    if (thread().scrollHeight - thread().clientHeight - thread().scrollTop > 4) fail('chat largo: después del turno no quedó parado en el final');
+    datosM.ponerModoTools('manual');
+    await datosM.borrarChat(largo.id);
+    await datosM.borrarChat(otro.id);
+    await settle();
+    data.chatLargo = mensajesL.length + ' mensajes: un turno con tres tools en ' + tardo + ' ms, ' + viajes + ' viajes';
+  }
+
+  // 11k. Lo mismo, visto en el núcleo. Las tres cosas que hacen que una lista
+  // larga no congele la ventana cuando se pone al día (reconcile):
+  //   - un cambio de scroll no es un movimiento: el viaje se mide contra el
+  //     contenedor, no contra la ventana;
+  //   - se mide todo ANTES de animar (intercalado es una maquetación por item);
+  //   - lo que está fuera de la ventana no viaja.
+  {
+    const { reconcile } = await import('/@core/list.js');
+    const caja = document.createElement('div');
+    Object.assign(caja.style, { position: 'fixed', left: '0', top: '60px', width: '240px', height: '200px', overflow: 'auto', overflowAnchor: 'none', opacity: '0.01', pointerEvents: 'none' });
+    const lista = document.createElement('div');
+    caja.append(lista);
+    document.body.append(caja);
+    const clave = (it) => it.id;
+    const crear = (it) => { const d = document.createElement('div'); d.style.height = '20px'; d.textContent = it.id; return d; };
+    let todos = Array.from({ length: 200 }, (_, i) => ({ id: 'k' + i }));
+    reconcile(lista, todos, { key: clave, create: crear });
+    const deViaje = (cuadros) => String(cuadros?.[0]?.transform ?? '').startsWith('translate(');
+    const viajan = () => [...lista.children].filter((el) => el.getAnimations().some((a) => deViaje(a.effect.getKeyframes())));
+
+    // El scroll cambia mientras la lista se pone al día (es lo que hace el
+    // navegador al insertarse una fila): nadie se movió, nadie viaja.
+    caja.scrollTop = 1000;
+    await frame();
+    let corrido = false;
+    todos = [...todos, { id: 'nuevo' }];
+    reconcile(lista, todos, { key: clave, create: crear, update: () => { if (!corrido) { corrido = true; caja.scrollTop = 900; } } });
+    if (!corrido || viajan().length) fail('listas: con un cambio de scroll durante la puesta al día viajaron ' + viajan().length + ' items que no se habían movido');
+
+    // Uno entra arriba de todo: los 200 se corren, pero se mide todo antes de
+    // animar y viajan solo los que caen en la ventana.
+    for (const el of lista.children) for (const a of el.getAnimations()) a.cancel();
+    caja.scrollTop = 0;
+    await frame();
+    const orden = [];
+    const medir = Element.prototype.getBoundingClientRect;
+    const animar = Element.prototype.animate;
+    Element.prototype.getBoundingClientRect = function contarMedida() { if (this.parentElement === lista) orden.push('m'); return medir.call(this); };
+    Element.prototype.animate = function contarViaje(cuadros, ...resto) { if (this.parentElement === lista && deViaje(cuadros)) orden.push('a'); return animar.call(this, cuadros, ...resto); };
+    try {
+      todos = [{ id: 'arriba' }, ...todos];
+      reconcile(lista, todos, { key: clave, create: crear });
+    } finally {
+      Element.prototype.getBoundingClientRect = medir;
+      Element.prototype.animate = animar;
+    }
+    const primera = orden.indexOf('a');
+    const viajes = orden.filter((x) => x === 'a').length;
+    if (primera < 0) fail('listas: al entrar un item arriba, los que se corrieron a la vista no viajaron');
+    else if (orden.slice(primera).includes('m')) fail('listas: se volvió a medir después de empezar a animar (' + orden.slice(primera).filter((x) => x === 'm').length + ' mediciones intercaladas): una maquetación por item');
+    if (viajes > 80) fail('listas: al entrar un item arriba de 200 viajaron ' + viajes + ': también los que están fuera de la ventana');
+    caja.remove();
+    data.listasLargas = '200 items: 0 viajes por un cambio de scroll, ' + viajes + ' al entrar uno arriba, medidos antes de animar';
   }
 
   // Cambiarle las tools a un agente que YA existía, desde su formulario.

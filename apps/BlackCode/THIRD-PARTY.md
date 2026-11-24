@@ -9,6 +9,8 @@ and under which license.
 | [KaTeX](https://katex.org) | `renderer/vendor/katex/` (module, mhchem extension, stylesheet) | MIT — © Khan Academy and other contributors |
 | KaTeX fonts | `renderer/vendor/katex/fonts/` | OFL-1.1 — © Khan Academy and other contributors |
 | [Roboto Mono](https://github.com/googlefonts/RobotoMono) | `@rad/fonts` | OFL-1.1 — © The Roboto Mono Project Authors |
+| [xterm.js](https://xtermjs.org) | `renderer/vendor/xterm/` (module, fit addon, stylesheet), modified | MIT — © The xterm.js authors, © Christopher Jeffrey |
+| [@lydell/node-pty](https://github.com/lydell/node-pty) | `node_modules/@lydell/` (with its prebuilt binaries) | MIT — © Christopher Jeffrey, © Daniel Imms, © Microsoft Corporation, © Simon Lydell |
 
 The tool icons in `renderer/iconos-tools.js` came with the tools from NeonCode.
 They are a mix: several paths are Feather's verbatim, others are modified or
@@ -18,6 +20,14 @@ original.
 `scripts/vendor-katex.mjs` (the version is in `renderer/vendor/katex/VERSION`,
 and its license text in `renderer/vendor/katex/LICENSE`). Only the `woff2`
 variant of each font is shipped.
+
+`renderer/vendor/xterm/` is xterm.js's own distribution, copied by
+`scripts/vendor-xterm.mjs` with two changes to its module so it works under
+this app's Content Security Policy (no inline styles): the `<style>` elements
+it fills by hand became `<dm-estilo>` elements, and the one place that set a
+`style` attribute now uses `style.setProperty`. The versions are in
+`renderer/vendor/xterm/VERSION` and the license text in
+`renderer/vendor/xterm/LICENSE`.
 
 Electron, Chromium and their third-party components ship their own notices
 inside the installer as `LICENSE.electron.txt` and `LICENSES.chromium.html`.

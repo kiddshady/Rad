@@ -1,5 +1,46 @@
 # Changelog
 
+## BlackCode 0.14.0 (2026-11-24) · núcleo 0.18.0
+
+- **Terminal.** Un panel nuevo al lado de la conversación con una shell de
+  verdad: PowerShell 7 con el profile del usuario (5.1 si no está instalado),
+  en la carpeta donde trabajan las tools. Se abre con su botón o con Ctrl+T.
+  El cursor es un bloque, del blanco de la app. Cerrar el panel no mata la
+  shell; se reinicia con su botón. Ctrl+C copia si hay algo marcado y Ctrl+V
+  pega. Viene de NeonCode 1.11.3 (`terminal.js`), con `@lydell/node-pty` y
+  xterm 6.
+- La terminal es del usuario: ninguna tool del agente llega a ella
+  (`main/terminal.cjs` dice por qué, y un test lo cuida).
+- xterm viaja adaptado a la CSP de la app en vez de aflojarla
+  (`scripts/vendor-xterm.mjs`): los `<style>` que llena a mano pasan a ser
+  hojas construidas y el color de 24 bits se pone por CSSOM.
+- **El navegador se estira.** Una manija en su borde izquierdo lo agranda por
+  encima de la conversación, sin empujarla, hasta dejar 120 px de chat a la
+  vista. Doble clic (o Home) vuelve al ancho de siempre; con las flechas se
+  mueve desde el teclado. El ancho dura la sesión. Como en NeonCode.
+- **Canvas.** Lo que sube por debajo del título ahora se esfuma (se cortaba al
+  aire). La tira de tarjetas se esfuma del lado que recorta, se mueve con la
+  rueda y trae sola a la vista la tarjeta del canvas que se abre.
+- **Los chats largos ya no frenan la app.** Medido con 700 mensajes:
+  - Cada fila de tool que entraba congelaba la ventana (una tarea de 7,5 s):
+    la lista hacía «viajar» a todos los mensajes. Era del núcleo (ver abajo).
+    Un turno con seis rondas de tools pasó de 17 s a 5,4 s, lo mismo que en
+    un chat corto.
+  - Los mensajes fuera de la vista no se maquetan ni se pintan
+    (`content-visibility`): teclear pasó de 25 ms a 5 ms por tecla, abrir el
+    chat de 310 ms a 100 ms, y el texto que llega vuelve a ir a 60 cuadros.
+  - El chat se guarda entero a lo sumo cada segundo y medio durante un turno,
+    no con cada tool: con cien capturas (30 MB) cada guardado frenaba al
+    proceso principal.
+- **Núcleo 0.18.0:**
+  - `reconcile` (listas): el viaje se mide contra el contenedor y no contra
+    la ventana (un cambio de scroll ya no parece un movimiento de todos), se
+    mide todo antes de animar (antes, una maquetación por fila) y lo que está
+    fuera de la ventana no viaja. `flip` también mide antes de animar.
+  - `.rad-scroll-x`: el esfumado del scroll, de costado (`at-start` /
+    `at-end`, `data-rad-line="start|end|both"`). `wireScroll` lo reconoce.
+- El humo de BlackCode pasa a tener 8 minutos por pasada.
+
 ## BlackCode 0.13.0 (2026-11-24)
 
 - **Subagentes.** Tool nueva, `delegate` (grupo Subagents): el agente le pasa

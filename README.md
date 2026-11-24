@@ -176,7 +176,10 @@ los demás se acomodan. El nuevo entra fundiéndose, después de que el que se
 iba casi no se ve. El primer llenado no es un cambio: aparece sin entrada.
 
 La entrada, la salida y el viaje los pone `reconcile`: las filas no llevan
-una animación de entrada propia en el CSS.
+una animación de entrada propia en el CSS. El viaje se mide contra el
+contenedor (un cambio de scroll no es un movimiento), se mide todo antes de
+animar, y lo que está fuera de la ventana no viaja: una lista de cientos de
+items no congela la ventana cuando entra uno.
 
 ## Controles
 
@@ -318,6 +321,11 @@ escenario con el velo suelto: lo compone opaco (el velo encima del mismo
 fondo de la ventana, corrido para que calce), y la vista lo hereda. El humo
 lo comprueba.
 
+Lo que scrollea de costado (una tira de fichas) lleva `.rad-scroll-x`: el
+mismo esfumado que `.rad-scroll`, del lado que recorta (`at-start` / `at-end`
+los pone `wireScroll`; `data-rad-line="start|end|both"` apaga el lado que ya
+tiene una línea).
+
 Si algo scrollea y tiene las esquinas redondeadas, su scrollbar lleva respiro
 para que la curva no corte el pulgar: `--rad-a-scroll-inset` en ese elemento
 (vale también para lo propio de una app: `.mi-panel { --rad-a-scroll-inset:
@@ -427,11 +435,15 @@ es por donde la instalada encuentra su actualización, y no se tocan.)
 La primera app hecha con Rad: un chat con IA donde se arman varios agentes,
 cada uno con su nombre, su proveedor y su modelo, sus instrucciones y sus
 propios chats, con los modelos de Anthropic y los de Venice. Un agente puede
-tener tools prendidas (archivos, comandos y jobs, código, SQLite, web, abrir cosas, mirar la pantalla, un canvas y un navegador al lado del chat, y una libreta de notas) y entonces actúa en la PC;
+tener tools prendidas (archivos, comandos y jobs, código, SQLite, web, abrir cosas, mirar la pantalla, un canvas y un navegador al lado del chat, una libreta de notas y subagentes) y entonces actúa en la PC;
 cómo están armadas, en `apps/BlackCode/docs/tools.md`. Las respuestas dibujan las
 fórmulas en LaTeX (KaTeX, con mhchem). A un mensaje se le adjuntan imágenes y
 archivos de texto con el botón +, pegando o soltándolos sobre la conversación
-(`renderer/adjuntos.js`). Las vistas van como pestañas en la
+(`renderer/adjuntos.js`). Al lado de la conversación hay además una terminal
+(Ctrl+T): una shell de verdad, PowerShell 7 con el profile del usuario, que es
+solo suya (ninguna tool del agente llega a ella: `main/terminal.cjs`). Viaja
+con xterm adaptado a la CSP de la app (`scripts/vendor-xterm.mjs`) y con
+`@lydell/node-pty`. Las vistas van como pestañas en la
 titlebar, sin rail ni nombre de la app. La interfaz está en inglés (el código
 y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
 

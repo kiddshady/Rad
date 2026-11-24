@@ -13,6 +13,8 @@
    custom property sin registrar no anima y el fade entraría de golpe. */
 @property --rad-fade-top { syntax: '<length>'; inherits: false; initial-value: 0px; }
 @property --rad-fade-bottom { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --rad-fade-start { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --rad-fade-end { syntax: '<length>'; inherits: false; initial-value: 0px; }
 
 @layer rad.reset {
   *, *::before, *::after { box-sizing: border-box; }
@@ -725,4 +727,19 @@
   }
   .rad-scroll.at-top, .rad-scroll[data-rad-line='top'], .rad-scroll[data-rad-line='both'] { --rad-fade-top: 0px; }
   .rad-scroll.at-bottom, .rad-scroll[data-rad-line='bottom'], .rad-scroll[data-rad-line='both'] { --rad-fade-bottom: 0px; }
+
+  /* Lo mismo para lo que scrollea de costado (una tira de fichas): at-start /
+     at-end, y data-rad-line="start|end|both" para el lado que ya tiene línea. */
+  .rad-scroll-x {
+    --rad-fade: var(--rad-space-5);
+    overflow-x: auto;
+    padding-inline: var(--rad-fade);
+    --rad-fade-start: var(--rad-fade);
+    --rad-fade-end: var(--rad-fade);
+    transition: --rad-fade-start var(--rad-dur-base) var(--rad-ease-out), --rad-fade-end var(--rad-dur-base) var(--rad-ease-out);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--rad-fade-start), #000 calc(100% - var(--rad-fade-end)), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 var(--rad-fade-start), #000 calc(100% - var(--rad-fade-end)), transparent 100%);
+  }
+  .rad-scroll-x.at-start, .rad-scroll-x[data-rad-line='start'], .rad-scroll-x[data-rad-line='both'] { --rad-fade-start: 0px; }
+  .rad-scroll-x.at-end, .rad-scroll-x[data-rad-line='end'], .rad-scroll-x[data-rad-line='both'] { --rad-fade-end: 0px; }
 }

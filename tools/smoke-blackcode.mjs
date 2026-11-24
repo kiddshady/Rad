@@ -59,8 +59,8 @@ function armarGuion(carpeta) {
 }
 // RAD_SMOKE_TIMEOUT (ms) lo estira y RAD_SMOKE_KEEP=1 deja la carpeta de datos
 // para mirarla: las dos son para depurar un guion que se cuelga.
-// (360 s desde la 0.13.0: con el bloque de subagentes la primera pasada pasa los cuatro minutos)
-const TIMEOUT_MS = Number(process.env.RAD_SMOKE_TIMEOUT) || 360000;
+// (480 s desde la 0.14.0: con la terminal, la manija y el chat largo la primera pasada ronda los cinco minutos)
+const TIMEOUT_MS = Number(process.env.RAD_SMOKE_TIMEOUT) || 480000;
 // Todas las llaves que escribe el guion en Ajustes llevan esta marca. No son
 // llaves: son textos con su forma, para comprobar que lo que se guarda no
 // queda en claro.

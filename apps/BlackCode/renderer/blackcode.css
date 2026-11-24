@@ -2,6 +2,9 @@
    ni un color ni una duración a mano, así una piel distinta lo viste sin
    tocar una línea. Las vistas viven sobre la hoja del escenario, que puede
    ser un velo: nada de acá cuenta con que una superficie tape. */
+/* La hoja de xterm (la terminal), en una subcapa: las reglas de esta capa le
+   ganan sin pelear la especificidad. */
+@import url('vendor/xterm/xterm.css') layer(app.vendor);
 @layer app {
   /* ---------- Páginas (Agentes, Ajustes) ---------- */
 
@@ -362,6 +365,17 @@
   /* Los mensajes. El del usuario va en una burbuja a la derecha; el del
      agente, suelto sobre la hoja, a todo el ancho de la columna. */
   .dm-msg { display: grid; min-width: 0; }
+  /* Lo que está fuera de la vista no se maqueta ni se pinta: en un chat de
+     cientos de mensajes, cada pedazo de texto que llega y cada tecla en el
+     campo remaquetaban la conversación entera. El alto de lo que todavía no
+     se vio es una estimación; una vez visto, el navegador recuerda el real
+     (`auto`). El margen deja pasar lo que un mensaje pinta fuera de su caja
+     (la sombra de la burbuja, el riel de un subagente, el anillo de foco). */
+  .dm-col > * {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 120px;
+    overflow-clip-margin: var(--rad-space-6);
+  }
   .dm-msg-cuerpo {
     min-width: 0;
     font-size: var(--rad-text-l);
@@ -783,7 +797,7 @@
   .dm-escena > .dm-conv { grid-area: 1 / 1; }
   .dm-escena[data-panel] > .dm-conv { padding-right: var(--dm-panel-w); }
 
-  .dm-canvas, .dm-nav {
+  .dm-canvas, .dm-nav, .dm-term {
     position: absolute;
     top: var(--rad-space-3);
     right: var(--rad-space-3);
@@ -791,6 +805,7 @@
     width: calc(var(--dm-panel-w) - var(--rad-space-3));
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
+    isolation: isolate;
     border-radius: var(--rad-radius-l);
     background: var(--rad-surface-1);
     box-shadow: var(--rad-shadow-2);
@@ -799,7 +814,7 @@
     visibility: hidden;
     transition: opacity var(--rad-dur-base) var(--rad-ease-in-out), transform var(--rad-dur-base) var(--rad-ease-in-out), visibility 0s linear var(--rad-dur-base);
   }
-  .dm-canvas[data-abierto], .dm-nav[data-abierto] {
+  .dm-canvas[data-abierto], .dm-nav[data-abierto], .dm-term[data-abierto] {
     opacity: 1;
     transform: none;
     visibility: visible;
@@ -871,8 +886,10 @@
     position: relative;
     display: flex;
     gap: var(--rad-space-2);
-    padding: var(--rad-space-1) var(--rad-space-6) var(--rad-space-2);
-    overflow-x: auto;
+    --rad-fade: var(--rad-space-6);
+    /* (al traer una tarjeta a la vista, que no quede debajo del esfumado) */
+    scroll-padding-inline: var(--rad-fade);
+    padding-block: var(--rad-space-1) var(--rad-space-2);
     scrollbar-width: none;
   }
   .dm-canvas-tarjetas::-webkit-scrollbar { display: none; }
@@ -902,10 +919,105 @@
   .dm-canvas-biblioteca + .dm-conv-tools { margin-left: 0; }
   .dm-nav-boton[aria-pressed='true'] { color: var(--rad-text-1); background: var(--rad-tint-press); }
 
+  /* ---------- La terminal ---------- */
+  /* El mismo panel que el canvas, en el mismo hueco: lo que cambia es lo de
+     adentro. xterm trae su hoja (vendor/xterm/xterm.css, en la subcapa
+     app.vendor: lo de acá le gana); la paleta se le pasa por JS al crearlo. */
+  .dm-nav-boton + .dm-term-boton, .dm-term-boton + .dm-canvas-biblioteca { margin-left: 0; }
+  .dm-term-boton { flex: none; align-self: center; margin-left: auto; }
+  .dm-term-boton[aria-pressed='true'] { color: var(--rad-text-1); background: var(--rad-tint-press); }
+  .dm-term-cuerpo {
+    min-height: 0;
+    min-width: 0;
+    padding: 0 var(--rad-space-1) var(--rad-space-3) var(--rad-space-4);
+    overflow: hidden; /* el que scrollea es xterm, no esto */
+  }
+  .dm-term-cuerpo .xterm { height: 100%; }
+  .dm-term-cuerpo .xterm-viewport { background-color: transparent !important; } /* el fondo lo pone el panel */
+  /* (el scroll ya no vive en el viewport, pero su overflow reservaba un canal vacío) */
+  .dm-term-cuerpo .xterm-viewport::-webkit-scrollbar { display: none; }
+  /* Lo marcado en la terminal se copia con Ctrl+C: es selección de xterm, no del documento. */
+  .dm-term-cuerpo .xterm-rows { user-select: none; }
+  /* La barra que xterm dibuja: la misma forma y el mismo ritmo que las del
+     resto de la app. El ancho lo escribe xterm en línea y no se toca; el borde
+     transparente deja el pulgar del grosor de las otras. */
+  .dm-term-cuerpo .xterm-scrollable-element > .scrollbar > .slider {
+    border: calc(var(--rad-scroll-size) / 4) solid transparent;
+    /* (xterm pone el color con el atajo `background`, que resetea el recorte) */
+    background-clip: content-box !important;
+    border-radius: var(--rad-radius-pill);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-term-cuerpo .xterm-scrollable-element > .scrollbar.visible { transition: opacity var(--rad-dur-base) var(--rad-ease-out); }
+  .dm-term-cuerpo .xterm-scrollable-element > .scrollbar.invisible.fade { transition: opacity var(--rad-dur-slow) var(--rad-ease-in-out); }
+
   /* ---------- El navegador ---------- */
   /* Sus dos renglones (pestañas y barra) y el hueco. La página NO es DOM: es
      una capa nativa que el proceso principal pinta sobre el hueco. */
-  .dm-nav { grid-template-rows: auto auto minmax(0, 1fr); }
+  .dm-nav {
+    grid-template-rows: auto auto minmax(0, 1fr);
+    /* El ancho arrastrado con la manija; sin él, el de la casa. */
+    width: var(--dm-nav-w, calc(var(--dm-panel-w) - var(--rad-space-3)));
+  }
+  /* El testigo del ancho de la casa (navegador.js lo mide): la misma cuenta. */
+  .dm-nav-casa {
+    position: absolute;
+    top: 0;
+    right: var(--rad-space-3);
+    width: calc(var(--dm-panel-w) - var(--rad-space-3));
+    height: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  /* Estirado, el panel queda ENCIMA de la conversación, y una superficie de
+     la piel puede ser un velo translúcido: se le pone un fondo que tape (el
+     mismo velo sobre el fondo opaco). Entra fundiéndose; en el ancho de la
+     casa no está, y el panel se ve igual que el canvas. */
+  .dm-nav::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: linear-gradient(var(--rad-surface-1), var(--rad-surface-1)), var(--rad-surface-0);
+    opacity: 0;
+    transition: opacity var(--rad-dur-base) var(--rad-ease-in-out);
+    pointer-events: none;
+  }
+  .dm-nav[data-estirado]::before { opacity: 1; }
+  /* La manija: una franja angosta sobre el borde izquierdo, con una marca corta
+     al medio. Se ve tenue en reposo (un borde que no anuncia que se arrastra no
+     lo arrastra nadie) y se enciende al acercarse y mientras se agarra. */
+  .dm-nav-manija {
+    position: absolute;
+    left: 0;
+    top: var(--rad-space-5);
+    bottom: var(--rad-space-5);
+    width: 10px;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    cursor: ew-resize;
+    touch-action: none;
+    border-radius: var(--rad-radius-s);
+    outline: none;
+  }
+  .dm-nav-manija span {
+    width: 2px;
+    height: 28px;
+    border-radius: var(--rad-radius-pill);
+    background: var(--rad-text-3);
+    opacity: 0.35;
+    transform: scaleY(0.6);
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-out), transform var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-nav-manija:hover span { opacity: 0.8; transform: none; }
+  .dm-nav-manija:focus-visible span,
+  .dm-estirando .dm-nav-manija span { opacity: 1; transform: none; background: var(--rad-text-1); }
+  /* Mientras se arrastra: el cursor no cambia al pasar por la conversación y
+     no se marca texto sin querer. */
+  .dm-estirando, .dm-estirando * { cursor: ew-resize !important; user-select: none !important; }
+
   .dm-nav-tira, .dm-nav-barra { display: flex; align-items: center; gap: var(--rad-space-1); min-width: 0; padding: var(--rad-space-2) var(--rad-space-2) 0; }
   .dm-nav-barra { padding-bottom: var(--rad-space-2); }
   .dm-nav-aire { flex: 1; }

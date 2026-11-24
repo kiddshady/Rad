@@ -210,6 +210,10 @@ function wire(rad, { llave }) {
   }
   // Al salir, lo que quedó corriendo en segundo plano se mata.
   require('electron').app.on('before-quit', () => herramientas.cerrar());
+  // La terminal del panel: una shell del USUARIO, que abre donde están
+  // trabajando las tools. Ninguna tool llega a ella (ver terminal.cjs). En el
+  // humo es una shell sin el profile de nadie.
+  require('./terminal.cjs').wire(rad, { getCwd: () => herramientas.getCwd(), deMentira: Boolean(taller) });
   const guardarCarpeta = () => {
     const carpeta = herramientas.getCwd();
     if (!taller && rad.store.read(DOC_TOOLS)?.carpeta !== carpeta) rad.store.write(DOC_TOOLS, { carpeta }).catch(() => {});
