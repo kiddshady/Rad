@@ -198,4 +198,27 @@ function adopt(oldDir, newDir) {
   return true;
 }
 
-module.exports = { Store, NAME, adopt };
+// Lo que una app cifró con safeStorage en su carpeta vieja no se lee desde la
+// nueva: Chromium cifra con una clave maestra que vive en el «Local State» de
+// la carpeta de usuario, y la nueva estrena la suya. Copiando ese archivo
+// ANTES de que Chromium lo cree (o sea, antes de app ready), la app nueva
+// arranca con la misma clave y lo cifrado se sigue leyendo. Solo si la nueva
+// todavía no tiene uno: nunca pisa una clave que ya está en uso.
+const LOCAL_STATE = 'Local State';
+function adoptSecrets(oldUserDir, newUserDir) {
+  const from = path.join(oldUserDir, LOCAL_STATE);
+  const to = path.join(newUserDir, LOCAL_STATE);
+  if (!fs.existsSync(from) || fs.existsSync(to)) return false;
+  fs.mkdirSync(newUserDir, { recursive: true });
+  const tmp = `${to}.adopt-${process.pid}`;
+  try {
+    fs.copyFileSync(from, tmp);
+    fs.renameSync(tmp, to);
+  } catch (err) {
+    fs.rmSync(tmp, { force: true });
+    throw err;
+  }
+  return true;
+}
+
+module.exports = { Store, NAME, adopt, adoptSecrets };

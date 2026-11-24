@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const { Store, adopt } = require(path.join(ROOT, 'packages', 'core', 'main', 'store.cjs'));
+const { Store, adopt, adoptSecrets } = require(path.join(ROOT, 'packages', 'core', 'main', 'store.cjs'));
 
 const failures = [];
 const check = (ok, msg) => { if (!ok) failures.push(msg); };
@@ -135,6 +135,19 @@ const onDisk = (dir, name) => {
   check(onDisk(now, 'ajustes').piel === 'glass', 'adoptar: pisó los datos nuevos con los viejos');
   const nada = path.join(base, 'Otra', 'data');
   check(adopt(path.join(base, 'NoExiste', 'data'), nada) === false && !fs.existsSync(nada), 'adoptar: sin carpeta vieja creó algo');
+
+  // La clave de lo cifrado (el «Local State» de la carpeta de usuario) viaja
+  // una sola vez, y nunca pisa la que ya tenga la carpeta nueva.
+  const vieja = path.join(base, 'Vieja');
+  const nueva = path.join(base, 'Nueva');
+  check(adoptSecrets(vieja, nueva) === false && !fs.existsSync(path.join(nueva, 'Local State')), 'adoptar la clave: sin clave vieja creó una');
+  fs.writeFileSync(path.join(vieja, 'Local State'), '{"os_crypt":"clave-vieja"}');
+  check(adoptSecrets(vieja, nueva) === true, 'adoptar la clave: no la trajo');
+  check(fs.readFileSync(path.join(nueva, 'Local State'), 'utf8') === '{"os_crypt":"clave-vieja"}', 'adoptar la clave: llegó distinta');
+  check(fs.readdirSync(nueva).sort().join() === 'Local State,data', `adoptar la clave: quedó algo más en la carpeta: ${fs.readdirSync(nueva).join(', ')}`);
+  fs.writeFileSync(path.join(nueva, 'Local State'), '{"os_crypt":"clave-nueva"}');
+  check(adoptSecrets(vieja, nueva) === false, 'adoptar la clave: volvió a traerla sobre una que ya estaba');
+  check(fs.readFileSync(path.join(nueva, 'Local State'), 'utf8') === '{"os_crypt":"clave-nueva"}', 'adoptar la clave: pisó la clave de la carpeta nueva');
 }
 
 // 9. Borrar un documento: se van el archivo y su .bak, leerlo da undefined,

@@ -20,7 +20,7 @@ const path = require('node:path');
 const { app, ipcMain, BrowserWindow } = require('electron');
 const protocol = require('./protocol.cjs');
 const { createWindow, wireWindowIpc } = require('./window.cjs');
-const { Store, adopt } = require('./store.cjs');
+const { Store, adopt, adoptSecrets } = require('./store.cjs');
 const smoke = require('./smoke.cjs');
 const updater = require('./updater.cjs');
 const contract = require('../contract/tokens.cjs');
@@ -95,6 +95,11 @@ function getStore() {
 // viejo (userData sale del productName). Se llama antes de tocar el store y
 // se puede dejar para siempre: solo copia si la carpeta nueva no existe.
 // Devuelve si adoptó. Con RAD_DATA no hace nada (los tests no tocan lo real).
+//
+// Con los datos viaja la clave con que safeStorage cifró lo que haya cifrado
+// la app (una llave de una API, por ejemplo): sin eso, los datos llegan pero
+// lo cifrado queda ilegible. Por eso se llama ANTES de app ready, arriba de
+// todo en el main: después, Chromium ya creó una clave nueva para la carpeta.
 function adoptData(formerName) {
   if (typeof formerName !== 'string' || !formerName.trim() || /[\/:*?"<>|]/.test(formerName)) {
     throw new Error(`[rad] adoptData: nombre de app inválido: ${JSON.stringify(formerName)}`);
@@ -102,7 +107,12 @@ function adoptData(formerName) {
   if (store) throw new Error('[rad] adoptData va antes del primer uso del store');
   if (process.env.RAD_DATA) return false;
   try {
-    return adopt(path.join(app.getPath('appData'), formerName, 'data'), path.join(app.getPath('userData'), 'data'));
+    const from = path.join(app.getPath('appData'), formerName);
+    const to = app.getPath('userData');
+    if (!adopt(path.join(from, 'data'), path.join(to, 'data'))) return false;
+    if (app.isReady()) console.warn('[rad:store] adoptData se llamó después de app ready: lo cifrado con safeStorage no se va a poder leer');
+    else adoptSecrets(from, to);
+    return true;
   } catch (err) {
     console.warn(`[rad:store] no se pudieron adoptar los datos de "${formerName}": ${err.message}`);
     return false;
