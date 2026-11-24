@@ -7,6 +7,16 @@
   blanco abajo) y el resplandor bajó a menos de la mitad. Combina mejor con la
   piel mono de Rad.
 - `tools/icon-kit.mjs` gana `gradientStops`, un degradé de varias paradas.
+- **`web_search` trae todos los resultados que se le piden.** Con Tavily se
+  pedían 5 y llegaba 1: la lista se cortaba en 2000 caracteres por renglones
+  enteros, y con fragmentos largos solo entraba el primero. Ahora entra en
+  4000 y el espacio se reparte: los fragmentos cortos van enteros y los largos
+  se recortan hasta que entren todos.
+- La lista dice de dónde salió (`Web results from Tavily:`) y cada resultado
+  lleva su fecha cuando el buscador la manda.
+- Un fragmento que es el código de la página y no su texto (pasó con una
+  documentación en Tavily) se cambia por `(no readable excerpt)`.
+- Los resultados de Brave salen sin sus etiquetas `<strong>`.
 
 ## BlackCode 0.12.2 (2026-11-24)
 

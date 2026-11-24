@@ -263,8 +263,16 @@ Venice) en cada pedido de un agente con tools.
   lee `chat.cjs`. De fábrica es DuckDuckGo: desde la 0.7.4 lee su
   página de resultados web (no es una API: si cambian el HTML deja de
   encontrar resultados, o pueden pedir una comprobación humana si se busca
-  mucho), con su API de respuestas instantáneas de segundo intento. Es el
-  único arreglo hecho sobre el código portado: sin él la tool no servía.
+  mucho), con su API de respuestas instantáneas de segundo intento.
+- La lista que devuelve `web_search` (desde la 0.12.3): un primer renglón que
+  dice de dónde salió (`Web results from Tavily:`) y uno por resultado, con la
+  fecha si el buscador la manda. Entra en 4000 caracteres repartiendo el
+  espacio: los fragmentos cortos van enteros y los largos se recortan. Antes
+  se cortaba en 2000 por renglones enteros, y con los fragmentos largos de
+  Tavily llegaba un solo resultado. Un fragmento que es el código de la página
+  (JSON o HTML) se cambia por `(no readable excerpt)`.
+- Esos dos (la búsqueda sin llave y la lista) son los únicos arreglos hechos
+  sobre el código portado de `web_search`.
 
 ## Defectos conocidos que vinieron con el código
 

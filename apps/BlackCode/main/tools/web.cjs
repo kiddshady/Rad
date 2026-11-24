@@ -383,7 +383,7 @@ async function wsTavily(query, count, key, signal) {
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  return (data.results || []).map((r) => ({ title: r.title, url: r.url, snippet: r.content })).slice(0, count);
+  return (data.results || []).map((r) => ({ title: r.title, url: r.url, snippet: r.content, date: r.published_date })).slice(0, count);
 }
 
 async function wsBrave(query, count, key, signal) {
@@ -391,7 +391,80 @@ async function wsBrave(query, count, key, signal) {
   const res = await fetch(url, { headers: { 'X-Subscription-Token': key, Accept: 'application/json' }, signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  return ((data.web && data.web.results) || []).map((r) => ({ title: r.title, url: r.url, snippet: r.description })).slice(0, count);
+  // Brave marca lo que coincide con <strong> y manda entidades: se pasa a texto.
+  return ((data.web && data.web.results) || []).map((r) => ({ title: textoDe(r.title), url: r.url, snippet: textoDe(r.description), date: r.page_age || r.age })).slice(0, count);
+}
+
+// La lista que lee el modelo. Arriba, de dónde salió; después un renglón por
+// resultado: [n] título (fecha, si vino) — fragmento (dirección).
+//
+// Hasta la 0.12.2 la lista se cortaba en 2000 caracteres por renglones
+// enteros, y cada fragmento iba como venía. Con los resúmenes cortos de
+// DuckDuckGo entraban todos; con los de Tavily, que son largos, entraba uno
+// solo: se pedían 5 y llegaba 1. Ahora el espacio se reparte: los fragmentos
+// cortos van enteros y los largos se recortan hasta que entren todos.
+const TOPE_LISTA = 4000;
+const TOPE_TITULO = 160;
+const SIN_FRAGMENTO = '(no readable excerpt)';
+
+function recortar(s, tope) {
+  if (s.length <= tope) return s;
+  if (tope < 8) return '';
+  const corte = s.slice(0, tope - 4);
+  const espacio = corte.lastIndexOf(' ');
+  return (espacio > tope * 0.6 ? corte.slice(0, espacio) : corte).trimEnd() + ' ...';
+}
+
+// Un fragmento que no es texto de la página sino su código: el buscador tomó
+// el JSON o el HTML con que la página se arma (pasó con la documentación de
+// Z.ai en Tavily). No le sirve al modelo y ocupa el lugar de los demás.
+function pareceVolcado(s) {
+  if (s.length < 60) return false;
+  const escapes = (s.match(/\\u00[0-9a-f]{2}/gi) || []).length;
+  const etiquetas = (s.match(/<\/?(script|style|link|meta|head)\b/gi) || []).length;
+  const claves = (s.match(/"[\w-]+":\s*["{[\d]/g) || []).length;
+  return escapes >= 2 || etiquetas >= 2 || claves >= 5;
+}
+
+function fechaDe(d) {
+  const s = String(d ?? '').trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const t = /\d{4}/.test(s) ? Date.parse(s) : NaN;
+  return Number.isNaN(t) ? s.slice(0, 30) : new Date(t).toISOString().slice(0, 10);
+}
+
+function listar(results, fuente) {
+  const cabeza = `Web results from ${fuente}:`;
+  const filas = results.map((r, i) => {
+    const titulo = recortar(String(r.title || '').replace(/\s+/g, ' ').trim(), TOPE_TITULO);
+    const fecha = fechaDe(r.date);
+    let snippet = String(r.snippet || '').replace(/\s+/g, ' ').trim();
+    if (pareceVolcado(snippet)) snippet = SIN_FRAGMENTO;
+    return { antes: `[${i + 1}] ${titulo}${fecha ? ` (${fecha})` : ''} — `, snippet, despues: ` (${r.url || ''})` };
+  });
+  // Lo que queda para los fragmentos, y el largo máximo con el que entran
+  // todos: los que miden menos no se tocan.
+  const fijo = cabeza.length + filas.reduce((n, f) => n + 1 + f.antes.length + f.despues.length, 0);
+  const libre = Math.max(0, TOPE_LISTA - fijo);
+  const entran = (tope) => filas.reduce((n, f) => n + Math.min(f.snippet.length, tope), 0) <= libre;
+  let tope = Math.max(...filas.map((f) => f.snippet.length));
+  if (!entran(tope)) {
+    let lo = 0;
+    let hi = tope;
+    while (lo < hi) {
+      const medio = (lo + hi + 1) >> 1;
+      if (entran(medio)) lo = medio; else hi = medio - 1;
+    }
+    tope = lo;
+  }
+  let body = cabeza;
+  for (const f of filas) {
+    const line = f.antes + recortar(f.snippet, tope) + f.despues;
+    // por si los títulos y las direcciones solos ya no entran
+    if (body.length + 1 + line.length <= TOPE_LISTA) body += '\n' + line;
+  }
+  return body === cabeza ? 'No web results found.' : body;
 }
 
 async function runWebSearch(run, { query, count } = {}) {
@@ -405,12 +478,15 @@ async function runWebSearch(run, { query, count } = {}) {
   const signal = AbortSignal.any([run.ac.signal, AbortSignal.timeout(8000)]);
   try {
     let results;
+    let fuente = 'DuckDuckGo';
     if (provider === 'tavily') {
       if (!key) return 'error: web search needs a Tavily API key (Settings)';
       results = await wsTavily(q, n, key, signal);
+      fuente = 'Tavily';
     } else if (provider === 'brave') {
       if (!key) return 'error: web search needs a Brave API key (Settings)';
       results = await wsBrave(q, n, key, signal);
+      fuente = 'Brave';
     } else {
       // Sin llave: los resultados web de DuckDuckGo y, si no trajeron nada, su
       // API de respuestas instantáneas. Si la búsqueda web no se pudo hacer y
@@ -422,6 +498,7 @@ async function runWebSearch(run, { query, count } = {}) {
         fallo = err;
       }
       if (!results?.length) {
+        fuente = 'DuckDuckGo Instant Answers';
         try { results = await wsDdg(q, n, signal); } catch (err) {
           if (signal.aborted) throw err;
           fallo ??= err;
@@ -430,13 +507,7 @@ async function runWebSearch(run, { query, count } = {}) {
       if (!results?.length && fallo) throw fallo;
     }
     if (!results?.length) return 'No web results found.';
-    // lista numerada capada a 2000 chars (mismo formato que Umbra)
-    let body = '';
-    results.forEach((r, i) => {
-      const line = `[${i + 1}] ${r.title || ''} — ${String(r.snippet || '').replace(/\s+/g, ' ')} (${r.url || ''})`;
-      if (body.length + line.length <= 2000) body += (body ? '\n' : '') + line;
-    });
-    return body || 'No web results found.';
+    return listar(results, fuente);
   } catch (err) {
     let msg = String(err?.message || err);
     if (key) msg = msg.split(key).join('***'); // jamás filtrar la key en un error

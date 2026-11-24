@@ -609,12 +609,13 @@ try {
     igual(requests[0].url, 'https://html.duckduckgo.com/html/?q=mate%20%26%20bombilla', 'web_search sin configurar busca primero en la web de DuckDuckGo');
     igual(requests[1].url, 'https://api.duckduckgo.com/?q=mate%20%26%20bombilla&format=json&no_html=1&no_redirect=1', 'web_search: el segundo intento va a la API instantánea');
     igual(out.split('\n'), [
+      'Web results from DuckDuckGo Instant Answers:',
       '[1] Mate — Infusión de yerba mate. (https://es.wikipedia.org/wiki/Mate)',
       '[2] Yerba mate — Yerba mate - La planta (https://duckduckgo.com/Yerba_mate)',
       '[3] Bombilla — Bombilla - El sorbete (https://duckduckgo.com/Bombilla)',
       '[4] Tereré — Tereré - Frío ()',
       '[5] Cuarto — Cuarto - d (https://duckduckgo.com/4)',
-    ], 'web_search: la lista numerada, cinco por defecto');
+    ], 'web_search: de dónde salió y la lista numerada, cinco por defecto');
     igual(run.filas, [{ ch: 'tool:activity', reqId: 'r1', kind: 'web_search', label: 'mate & bombilla' }], 'web_search avisa a la interfaz');
     check(requests[0].signal instanceof AbortSignal, 'web_search no lleva señal');
   }
@@ -622,7 +623,7 @@ try {
   {
     // cuántos: lo que pide el modelo, si no lo de los ajustes, entre 1 y 10
     const muchos = { RelatedTopics: Array.from({ length: 30 }, (_, i) => ({ Text: `T${i} - x`, FirstURL: `https://e.com/${i}` })) };
-    const cuantos = async (args) => { banco(() => ({ json: muchos })); return (await runners.web_search(hacerRun(), args)).split('\n').length; };
+    const cuantos = async (args) => { banco(() => ({ json: muchos })); return (await runners.web_search(hacerRun(), args)).split('\n').length - 1; };
     configurar({ webSearch: () => ({ provider: 'duckduckgo', maxResults: 3 }) });
     igual(await cuantos({ query: 'q' }), 3, 'web_search usa maxResults de los ajustes');
     igual(await cuantos({ query: 'q', count: 7 }), 7, 'web_search: count le gana a los ajustes');
@@ -638,11 +639,13 @@ try {
   {
     banco(() => ({ json: {} }));
     igual(await runners.web_search(hacerRun(), { query: 'nada' }), 'No web results found.', 'web_search sin resultados');
-    // la lista se corta en 2000 caracteres, por renglones enteros
+    // la lista entra en 4000 caracteres SIN perder resultados: se recortan los
+    // fragmentos, no se tiran renglones
     banco(() => ({ json: { RelatedTopics: Array.from({ length: 10 }, (_, i) => ({ Text: `T${i} - ${'x'.repeat(600)}`, FirstURL: 'https://e.com' })) } }));
     const out = await runners.web_search(hacerRun(), { query: 'largo', count: 10 });
-    check(out.length <= 2000 && out.split('\n').length === 3 && out.split('\n').every((l) => l.endsWith('(https://e.com)')),
-      `web_search no cortó la lista en 2000 caracteres: ${out.length} caracteres, ${out.split('\n').length} renglones`);
+    const renglones = out.split('\n').slice(1);
+    check(out.length <= 4000 && out.length > 3800 && renglones.length === 10 && renglones.every((l) => l.endsWith(' ... (https://e.com)')),
+      `web_search no repartió los 4000 caracteres entre los diez: ${out.length} caracteres, ${renglones.length} renglones`);
     banco(() => ({ status: 500 }));
     igual(await runners.web_search(hacerRun(), { query: 'q' }), 'error: web search failed: HTTP 500', 'web_search: un error del servidor');
   }
@@ -666,11 +669,12 @@ try {
     igual(requests[0].url, 'https://html.duckduckgo.com/html/?q=GLM-5.3%20news', 'web_search: a dónde va la búsqueda web');
     check(/BlackCode/.test(requests[0].headers['User-Agent'] ?? '') && requests[0].signal instanceof AbortSignal, 'web_search: la búsqueda web no se identifica o no lleva señal');
     igual(out.split('\n'), [
+      'Web results from DuckDuckGo:',
       '[1] GLM-5.3: Frontier Coding & more — Today we are releasing GLM-5.3 . It\'s new. (https://z.ai/blog/glm-5.3)',
       '[2] Directo — sin redirect (https://directo.example/pagina?a=1&b=2)',
       '[3] Tres —  (https://tres.example/)',
     ], 'web_search: título, resumen y dirección real de cada resultado, sin el aviso');
-    igual((await runners.web_search(hacerRun(), { query: 'q', count: 2 })).split('\n').length, 2, 'web_search: count también corta los resultados web');
+    igual((await runners.web_search(hacerRun(), { query: 'q', count: 2 })).split('\n').length, 3, 'web_search: count también corta los resultados web');
     igual(web.leerResultadosDdg('<a class="otra result__a x" href="https://a.example">A</a>', 5), [{ title: 'A', url: 'https://a.example/', snippet: '' }], 'leerResultadosDdg: la clase puede venir con otras');
     igual(web.leerResultadosDdg('<p>nada</p>', 5), [], 'leerResultadosDdg: una página sin resultados');
 
@@ -684,7 +688,7 @@ try {
     igual(await runners.web_search(hacerRun(), { query: 'q' }), 'error: web search failed: DuckDuckGo asked for a human check instead of answering', 'web_search: una búsqueda que no se pudo hacer no dice «sin resultados»');
     // …pero si la API instantánea sí tenía algo, sirve
     banco((url) => (url.startsWith('https://html.') ? { status: 503 } : { json: DDG }));
-    check((await runners.web_search(hacerRun(), { query: 'q' })).startsWith('[1] Mate'), 'web_search: con la búsqueda web caída no usó la API instantánea');
+    check((await runners.web_search(hacerRun(), { query: 'q' })).startsWith('Web results from DuckDuckGo Instant Answers:\n[1] Mate'), 'web_search: con la búsqueda web caída no usó la API instantánea');
     // un Stop corta sin ir al segundo intento
     const colgado = bancoColgado();
     const runS = hacerRun();
@@ -716,7 +720,7 @@ try {
     igual(pedidas, ['websearch'], 'web_search pide la llave «websearch»');
     igual([requests[0].url, requests[0].method], ['https://api.tavily.com/search', 'POST'], 'Tavily: a dónde va');
     igual(JSON.parse(requests[0].body), { api_key: LLAVE, query: 'q', max_results: 2, include_answer: false }, 'Tavily: el cuerpo');
-    igual(out, '[1] Uno — primero resultado (https://uno.example)\n[2] Dos — segundo (https://dos.example)', 'Tavily: los resultados');
+    igual(out, 'Web results from Tavily:\n[1] Uno — primero resultado (https://uno.example)\n[2] Dos — segundo (https://dos.example)', 'Tavily: los resultados');
     check(!out.includes(LLAVE), 'Tavily: la llave aparece en el resultado');
 
     // jamás filtrar la key en un error
@@ -729,7 +733,34 @@ try {
     const outB = await runners.web_search(hacerRun(), { query: 'a b', count: 4 });
     igual(reqB[0].url, 'https://api.search.brave.com/res/v1/web/search?q=a%20b&count=4', 'Brave: a dónde va');
     igual([reqB[0].headers['X-Subscription-Token'], reqB[0].headers.Accept], [LLAVE, 'application/json'], 'Brave: la llave va en el header');
-    igual(outB, '[1] B — de brave (https://b.example)', 'Brave: los resultados');
+    igual(outB, 'Web results from Brave:\n[1] B — de brave (https://b.example)', 'Brave: los resultados');
+
+    // Brave marca las coincidencias con etiquetas y manda la edad de la página
+    banco(() => ({ json: { web: { results: [{ title: 'Mate &amp; <strong>bombilla</strong>', url: 'https://m.example', description: 'La <strong>yerba</strong> mate &amp; el agua', page_age: '2026-11-20T08:30:00' }] } } }));
+    igual(await runners.web_search(hacerRun(), { query: 'q' }), 'Web results from Brave:\n[1] Mate & bombilla (2026-11-20) — La yerba mate & el agua (https://m.example)', 'Brave: sin etiquetas y con la fecha');
+
+    // Lo que pasó con Tavily de verdad: fragmentos largos. Se pidieron cinco y
+    // tienen que llegar los cinco, con el espacio repartido: el corto entero.
+    configurar({ webSearch: () => ({ provider: 'tavily', maxResults: 5 }) });
+    const frase = 'same base model as before and every gain comes from post-training ';
+    banco(() => ({ json: { results: [
+      { title: 'Hilo', url: 'https://news.example/1', content: frase.repeat(30), published_date: 'Mon, 23 Nov 2026 10:00:00 GMT' },
+      { title: 'Corto', url: 'https://news.example/2', content: 'un fragmento corto' },
+      { title: 'Docs', url: 'https://docs.example/3', content: '{"headHtml":"\\u003cscript src=\\"/a.js\\"\\u003e\\u003c/script\\u003e","favicon":"/f.ico","name":"Docs","theme":"mint","colors":{"primary":"#000"}} ' + 'x'.repeat(400) },
+      { title: 'Cuatro', url: 'https://news.example/4', content: frase.repeat(30) },
+      { title: 'Cinco', url: 'https://news.example/5', content: frase.repeat(30) },
+    ] } }));
+    const largos = (await runners.web_search(hacerRun(), { query: 'q', count: 5 })).split('\n');
+    igual(largos.length, 6, 'Tavily con fragmentos largos: llegan los cinco resultados');
+    igual(largos[0], 'Web results from Tavily:', 'Tavily: la lista dice de dónde salió');
+    check(largos.join('\n').length <= 4000 && largos.join('\n').length > 3500, `Tavily con fragmentos largos: la lista mide ${largos.join('\n').length}`);
+    check(largos[1].startsWith('[1] Hilo (2026-11-23) — same base model') && largos[1].endsWith(' ... (https://news.example/1)'), `Tavily: el primero no quedó recortado con su fecha: ${largos[1].slice(0, 60)} … ${largos[1].slice(-40)}`);
+    igual(largos[2], '[2] Corto — un fragmento corto (https://news.example/2)', 'Tavily: un fragmento corto va entero');
+    igual(largos[3], '[3] Docs — (no readable excerpt) (https://docs.example/3)', 'Tavily: un fragmento que es el código de la página no se le pasa al modelo');
+    check(Math.abs(largos[1].length - largos[4].length) < 12 && largos[4].length > 1000, `Tavily: el espacio no se repartió parejo: ${largos[1].length} y ${largos[4].length}`);
+    // código de verdad en un fragmento (una búsqueda de programación) no es un volcado
+    banco(() => ({ json: { results: [{ title: 'JS', url: 'https://js.example', content: 'Use const x = { a: 1 }; then call f(x) and <div> will render. Arrays work the same: [1, 2, 3].map((n) => n * 2).' }] } }));
+    check((await runners.web_search(hacerRun(), { query: 'q' })).includes('const x = { a: 1 }'), 'un fragmento con código se tomó por un volcado');
 
     // un proveedor que no se conoce cae a DuckDuckGo, y no manda la llave
     configurar({ webSearch: () => ({ provider: 'otro' }) });
