@@ -53,6 +53,20 @@ export function sdArc(x, y, r, from, to, halfWidth) {
   return Math.min(end(from), end(to)) - halfWidth;
 }
 
+/**
+ * Un segmento de trazo con las puntas redondas, de (ax, ay) a (bx, by).
+ * Varios que comparten una punta dan una esquina redonda (la unión de sus
+ * puntas), como un path con `stroke-linejoin: round`.
+ */
+export function sdSegment(x, y, ax, ay, bx, by, halfWidth) {
+  const px = x - ax;
+  const py = y - ay;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const t = Math.max(0, Math.min(1, (px * dx + py * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(px - dx * t, py - dy * t) - halfWidth;
+}
+
 /** Un degradé entre dos colores a lo largo de la recta que va de p0 a p1 (en fracción del lienzo). */
 export function gradient(c0, c1, p0, p1) {
   const dx = p1[0] - p0[0];

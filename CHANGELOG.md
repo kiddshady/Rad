@@ -1,5 +1,15 @@
 # Changelog
 
+## BlackCode 0.12.1 (2026-11-24)
+
+- **Ícono nuevo: el Cubo.** Un hexágono con sus tres aristas de adentro: un
+  cubo visto de punta. Fran lo eligió para el nombre nuevo; es la candidata 12
+  de la misma hoja en que había elegido el Radar, con el mismo oficio (el de
+  NTX: baldosa negra a sangre, tinta blanca de punta redonda, resplandor en
+  dos pasadas) y el mismo dibujo exacto en todos los tamaños, de 16 a 1024.
+- `tools/icon-kit.mjs` gana `sdSegment`: un segmento de trazo con las puntas
+  redondas; varios que comparten una punta dan una esquina redonda.
+
 ## BlackCode 0.12.0 (2026-11-24)
 
 - **Adjuntos en los mensajes.** Imágenes y archivos de texto, por tres
