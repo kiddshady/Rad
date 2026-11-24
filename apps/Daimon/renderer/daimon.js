@@ -2,6 +2,7 @@
 
 import { createShell } from '/@core/shell.js';
 import { hold } from '/@core/ready.js';
+import { wireUpdates } from '/@core/updates.js';
 import * as datos from './datos.js';
 import * as llave from './llave.js';
 import { montarChat } from './chat.js';
@@ -38,5 +39,8 @@ datos.on('agentes', ponerEstado);
 datos.on('modelos', ponerEstado);
 datos.on('seleccion', ponerEstado);
 datos.on('respuesta', ponerEstado);
+
+// El aviso de versión nueva (no baja nada solo, y no dice «estás al día»).
+wireUpdates({ name: 'Daimon' });
 
 release();

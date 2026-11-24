@@ -6,6 +6,7 @@ import { swapText } from '/@core/motion.js';
 import { toast } from '/@core/toast.js';
 import { setBusy } from '/@core/busy.js';
 import * as llave from './llave.js';
+import * as actualizacion from './actualizacion.js';
 import { h } from './piezas.js';
 
 const PROVEEDORES = [
@@ -126,7 +127,30 @@ function tarjetaLlave(p) {
   return tarjeta;
 }
 
-export function montarAjustes(el, { router }) {
+// Qué decir de las actualizaciones, y qué hace el botón en cada momento.
+const SIN_SOPORTE = {
+  dev: 'Updates only work in the installed app.',
+  portable: 'The portable version can’t update itself.',
+};
+function describirActualizacion(e) {
+  const buscar = 'Check for updates';
+  if (e.fase === 'buscando') return { texto: 'Checking for updates…', boton: buscar };
+  if (e.fase === 'al-dia') return { texto: `You’re on the latest version (${window.rad.app?.version ?? ''}).`, boton: buscar };
+  if (e.fase === 'disponible') return { texto: `Version ${e.version} is available.`, boton: 'Download', primario: true };
+  if (e.fase === 'bajando') return { texto: 'Downloading the update…', boton: 'Downloading…' };
+  if (e.fase === 'lista') return { texto: `Version ${e.version} is ready to install.`, boton: 'Restart and install', primario: true };
+  if (e.fase === 'error') {
+    const que = e.paso === 'bajar' ? 'The download failed' : 'Could not check for updates';
+    return { texto: e.mensaje ? `${que}: ${e.mensaje}` : `${que}.`, boton: buscar };
+  }
+  if (e.fase === 'sin-soporte') return { texto: SIN_SOPORTE[e.motivo] ?? 'Updates are turned off in this build.', boton: buscar };
+  return { texto: 'Check whether a newer version is out.', boton: buscar };
+}
+
+// «About»: de qué está hecha la app, y el botón para buscar una versión
+// nueva ahora (el núcleo ya busca solo; esto es para no esperarlo). Es un
+// solo botón que va cambiando de oficio: buscar, bajar, reiniciar.
+function tarjetaAcerca() {
   const datos = h('dl', 'dm-datos');
   const fila = (k, v) => datos.append(h('dt', '', {}, k), h('dd', 'rad-mono', {}, v));
   fila('Daimon', window.rad.app?.version ?? '');
@@ -134,10 +158,47 @@ export function montarAjustes(el, { router }) {
   fila('Skin', window.rad.skin?.name ?? '');
   fila('Providers', llave.simulado() ? 'Simulated (uses no API)' : PROVEEDORES.map((p) => p.nombre).join(' and '));
 
+  const rotulo = h('span', 'rad-swap');
+  const boton = h('button', 'rad-button', { type: 'button', 'data-accion': 'actualizar' }, rotulo);
+  const texto = h('span', 'dm-act-texto rad-swap');
+  // El porcentaje cambia varias veces por segundo: se escribe en su lugar,
+  // sin relevo (un relevo por cada número sería un parpadeo).
+  const pct = h('span', 'dm-act-pct rad-mono', { 'aria-hidden': 'true' });
+  const estado = h('p', 'dm-act-estado', { role: 'status' }, texto, pct);
+  const act = h('div', 'dm-act', {}, boton, estado);
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'acerca' }, h('h2', 'dm-tarjeta-nombre', {}, 'About'), datos, act);
+
+  const poner = () => {
+    const e = actualizacion.actual();
+    const d = describirActualizacion(e);
+    act.dataset.fase = e.fase;
+    swapText(texto, d.texto);
+    swapText(rotulo, d.boton);
+    if (e.fase === 'bajando') pct.textContent = `${e.porciento}%`;
+    const ocupado = e.fase === 'buscando' || e.fase === 'bajando';
+    boton.disabled = ocupado;
+    if (d.primario) boton.setAttribute('data-variant', 'primary');
+    else boton.removeAttribute('data-variant');
+    // La tarjeta trabaja mientras busca o baja.
+    setBusy(tarjeta, ocupado);
+  };
+  boton.addEventListener('click', () => {
+    const { fase } = actualizacion.actual();
+    if (fase === 'disponible') actualizacion.descargar();
+    else if (fase === 'lista') actualizacion.instalar();
+    else actualizacion.buscar();
+  });
+  poner();
+  actualizacion.on(poner);
+  return tarjeta;
+}
+
+export function montarAjustes(el, { router }) {
+
   el.append(h('div', 'dm-pagina', {},
     h('header', 'dm-pagina-cabeza', {}, h('div', '', {}, h('h1', '', {}, 'Settings'), h('p', '', {}, 'What Daimon needs to talk to the models.'))),
     ...PROVEEDORES.map(tarjetaLlave),
-    h('section', 'dm-tarjeta', {}, h('h2', 'dm-tarjeta-nombre', {}, 'About'), datos)));
+    tarjetaAcerca()));
 
   // Al abrir Ajustes se le pregunta a la API por cada llave guardada. Lo que
   // ya contestó (la acepta o la rechaza) no se vuelve a preguntar; lo que no

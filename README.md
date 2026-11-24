@@ -428,6 +428,8 @@ y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
   de modelos pedida a Venice, no escrita a mano.
 - Los datos son del store del núcleo: un documento con los agentes, otro con
   el índice de chats y uno por chat.
+- Se instala y se actualiza desde `kiddshady/daimon-releases`. En Settings,
+  About tiene un botón para buscar una versión nueva sin esperar al núcleo.
 - El ícono es provisorio.
 
 ### Publicar y actualizar
@@ -440,6 +442,7 @@ de la app, y el instalador se llama sin espacios.
 ```
 # subir la versión en apps/<app>/package.json, commitear y pushear, y después:
 GH_TOKEN=$(gh auth token) node tools/release.mjs apps/showcase --title "lo nuevo" --notes notas.md
+GH_TOKEN=$(gh auth token) node tools/release.mjs apps/Daimon --title "lo nuevo" --notes notas.md
 ```
 
 `release.mjs` compila local, verifica el trío (`latest.yml`, `.exe`,
@@ -447,6 +450,13 @@ GH_TOKEN=$(gh auth token) node tools/release.mjs apps/showcase --title "lo nuevo
 GitHub. En la app, `wireUpdates()` (de `/@core/updates.js`) pone el aviso: no
 baja nada solo, no dice "estás al día", e instala en silencio al tocar
 Reiniciar (o sola al cerrar).
+
+Para un botón «Buscar actualizaciones», `rad.updates.check()` devuelve qué
+encontró (no hay evento de «estás al día»): `{ supported: false, reason }`
+fuera de la app instalada (`'dev'`, `'portable'`, `'disabled'`, `'missing'`),
+o `{ supported: true, available, version, error }`. Con eso y los eventos
+(`rad.updates.on`), `download()` e `install()` se arma el resto; el de
+Daimon está en `apps/Daimon/renderer/actualizacion.js`.
 
 `node tools/test-update.mjs --exe "<la app instalada>" --expect <versión>`
 prueba la actualización de punta a punta sobre una versión instalada vieja.

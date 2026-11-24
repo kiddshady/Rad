@@ -104,6 +104,13 @@ try {
   const first = await run(1, data);
   if (first.ok) {
     const disk = checkDisk(data, first);
+    // Buscar una actualización: abierta desde el repo no hay updater; la
+    // empaquetada le pregunta a GitHub de verdad, y cualquiera de las tres
+    // respuestas vale (al día, hay una nueva, o no se pudo: sin red, o el
+    // repo de releases todavía sin esa versión).
+    const fase = first.script?.actualizacion;
+    const valen = EXE ? ['al-dia', 'disponible', 'error'] : ['sin-soporte'];
+    if (!valen.includes(fase)) disk.push(`buscar una actualización terminó en «${fase}» (${first.script?.actualizacionDice ?? ''}); ${EXE ? 'empaquetada' : 'desde el repo'} se esperaba: ${valen.join(', ')}`);
     if (disk.length) { first.ok = false; first.failures = disk; }
   }
   show(1, first);

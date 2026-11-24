@@ -1,5 +1,34 @@
 # Changelog
 
+## Daimon 0.3.0 (2026-11-23)
+
+- **Daimon se instala y se actualiza sola.** Tiene su repo de releases
+  (`kiddshady/daimon-releases`, con el OK de Fran) y el aviso de versión
+  nueva del núcleo: no baja nada sola, no dice «estás al día», e instala en
+  silencio al tocar Restart (o al cerrar). Hasta acá solo se podía abrir
+  desde el repo, con `npm run daimon`.
+- **About tiene un botón para buscar una actualización ahora** (pedido de
+  Fran: como el de NeonCode). Es un solo botón que cambia de oficio: buscar,
+  bajar la que encontró, y reiniciar para instalarla. Al lado dice qué pasó,
+  también cuando no hay nada («You’re on the latest version») y cuando no se
+  pudo buscar. Mientras busca o baja, la tarjeta muestra el anillo de carga;
+  el porcentaje de la descarga se escribe en su lugar, sin relevar el texto,
+  y el botón no cambia de ancho con el rótulo. Abierta desde el repo no hay
+  de dónde actualizar, y lo dice.
+- El humo recorre los estados dándole al módulo los eventos que mandaría el
+  núcleo (no se publica nada para probar), y contra la app empaquetada la
+  búsqueda le pregunta a GitHub de verdad.
+
+## @rad/core 0.14.0 (2026-11-23)
+
+- **`rad.updates.check()` dice qué encontró.** Devolvía la versión o
+  `null`, y con eso un botón «Buscar actualizaciones» no podía distinguir
+  «estás al día» de «acá no hay updater» ni de «no se pudo buscar». Ahora
+  devuelve `{ supported: false, reason }` fuera de la app instalada
+  (`'dev'`, `'portable'`, `'disabled'`, `'missing'`) o
+  `{ supported: true, available, version, error }`. Ninguna app usaba lo
+  que devolvía: el aviso de `wireUpdates()` va por eventos y no cambia.
+
 ## Daimon 0.2.0 (2026-11-23)
 
 - **La interfaz está en inglés.** Todo lo que se lee: las vistas, los

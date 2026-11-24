@@ -138,6 +138,16 @@
   }
   .dm-datos dt { color: var(--rad-text-3); }
   .dm-datos dd { margin: 0; color: var(--rad-text-1); }
+  /* Buscar una actualización: el botón y, al lado, lo que se encontró. El
+     botón cambia de rótulo (buscar, bajar, reiniciar) sin cambiar de ancho:
+     tiene el del rótulo más largo, y el texto va centrado. */
+  .dm-act { display: flex; align-items: center; gap: var(--rad-space-3); }
+  .dm-act .rad-button { flex: none; min-width: 11.5rem; justify-content: center; --rad-a-swap-align: center; }
+  .dm-act-estado { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--rad-space-2); font-size: var(--rad-text-s); color: var(--rad-text-2); }
+  .dm-act[data-fase='error'] .dm-act-estado { color: var(--rad-danger); }
+  .dm-act-texto { min-width: 0; overflow-wrap: anywhere; }
+  .dm-act-pct { flex: none; color: var(--rad-text-1); opacity: 0; transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out); }
+  .dm-act[data-fase='bajando'] .dm-act-pct { opacity: 1; }
   .dm-link {
     justify-self: start;
     color: var(--rad-text-1);

@@ -88,6 +88,12 @@ const SCENES = {
     await go('ajustes');
     llave.guardar('anthropic', 'sk-ant-api03-captura-de-daimon-no-es-una-llave-0000');
     await sleep(330);`,
+  about: `
+    await go('ajustes');
+    const act = await import('/actualizacion.js');
+    act.recibir({ state: 'available', version: '0.4.0' });
+    view('ajustes').querySelector('[data-tarjeta="acerca"]').scrollIntoView({ block: 'center' });
+    await sleep(900);`,
   'sin-llave': `
     await go('ajustes');
     await sleep(400);`,

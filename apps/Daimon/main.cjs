@@ -35,7 +35,7 @@ rad.start({
   lang: 'en',
   // El código y los datos, en Roboto Mono (viaja con Rad).
   fonts: { mono: 'roboto-mono' },
-  // Sin actualizaciones hasta que Daimon tenga su repo de releases: Fran
-  // todavía no decidió si el código es público.
-  updates: false,
+  // Se actualiza desde kiddshady/daimon-releases (build.publish del
+  // package.json). Solo la app instalada: abierta desde el repo no busca nada.
+  updates: true,
 });

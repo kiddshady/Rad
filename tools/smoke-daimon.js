@@ -619,6 +619,74 @@ else {
   if (shown(chatView.querySelector('.dm-agente-nombre')) !== 'Galen on call' || msgs().length !== 4) fail(`cambiar de agente desde el selector no trajo su chat (${msgs().length} mensajes a la vista)`);
 }
 
+// 12. About: el botón para buscar una actualización. Abierta desde el repo
+// no hay updater, y lo dice; en la app instalada le pregunta a GitHub. Los
+// demás estados (hay una versión, bajando, lista) se recorren dándole al
+// módulo los eventos que mandaría el núcleo: no se publica nada para probar.
+await go('ajustes');
+{
+  const act = await import('/actualizacion.js');
+  const about = view('ajustes').querySelector('[data-tarjeta="acerca"]');
+  const caja = about.querySelector('.dm-act');
+  const boton = about.querySelector('[data-accion="actualizar"]');
+  const rotulo = () => shown(boton.querySelector('.rad-swap'));
+  const texto = () => shown(caja.querySelector('.dm-act-texto'));
+  const ancho = () => r2(boton.getBoundingClientRect().width);
+  const anillo = () => [...about.querySelectorAll(':scope > .rad-busy')].find((r) => !r.hasAttribute('data-rad-leaving') && r.dataset.state !== 'closing');
+  about.scrollIntoView({ block: 'center' });
+  await sleep(150);
+  const anchos = [ancho()];
+  if (caja.dataset.fase !== 'quieta' || rotulo() !== 'Check for updates' || boton.disabled) fail(`About arranca con el botón en «${rotulo()}» (fase ${caja.dataset.fase})`);
+
+  boton.click();
+  await frame();
+  if (caja.dataset.fase !== 'buscando' || !boton.disabled || texto() === '') fail(`al tocar el botón no se puso a buscar: fase ${caja.dataset.fase}`);
+  await frame();
+  if (!anillo() || about.getAttribute('aria-busy') !== 'true') fail('mientras busca una actualización la tarjeta no muestra que trabaja (anillo de carga)');
+  const t0 = performance.now();
+  await until(() => caja.dataset.fase !== 'buscando', 15000);
+  const tardo = performance.now() - t0;
+  await settle();
+  const fase = caja.dataset.fase;
+  data.actualizacion = fase;
+  if (fase === 'buscando') fail('la búsqueda de una actualización no terminó');
+  if (tardo < 300) fail(`«buscando» duró ${Math.round(tardo)} ms: se ve como un parpadeo`);
+  if (fase === 'sin-soporte' && !texto().includes('installed app')) fail(`sin updater, About dice «${texto()}»`);
+  if (boton.disabled || (fase !== 'disponible' && rotulo() !== 'Check for updates')) fail(`después de buscar el botón quedó en «${rotulo()}» (deshabilitado: ${boton.disabled})`);
+  anchos.push(ancho());
+  data.actualizacionDice = texto();
+  await sleep(dur('slow') + 260);
+  if (about.querySelector(':scope > .rad-busy') || about.hasAttribute('aria-busy')) fail('el anillo de carga quedó en About después de buscar');
+
+  // Hay una versión nueva: el botón pasa a bajar.
+  act.recibir({ state: 'available', version: '9.9.9' });
+  await settle();
+  if (caja.dataset.fase !== 'disponible' || rotulo() !== 'Download' || boton.dataset.variant !== 'primary' || !texto().includes('9.9.9')) fail(`con una versión nueva About dice «${texto()}» y el botón «${rotulo()}»`);
+  anchos.push(ancho());
+  // Bajando: el porcentaje se escribe en su lugar, y la tarjeta trabaja.
+  act.recibir({ state: 'downloading', percent: 41.6 });
+  await settle();
+  const pct = caja.querySelector('.dm-act-pct');
+  if (caja.dataset.fase !== 'bajando' || !boton.disabled || pct.textContent !== '42%' || op(pct) !== 1) fail(`bajando, About muestra «${pct.textContent}» (opacidad ${r2(op(pct))}) con el botón ${boton.disabled ? 'apagado' : 'prendido'}`);
+  if (!anillo()) fail('mientras baja la actualización la tarjeta no muestra que trabaja');
+  const vivo = caja.querySelector('.dm-act-texto > :not(.rad-swap-out)');
+  act.recibir({ state: 'downloading', percent: 77.2 });
+  await frame();
+  if (pct.textContent !== '77%' || caja.querySelector('.dm-act-texto > :not(.rad-swap-out)') !== vivo || caja.querySelectorAll('.dm-act-texto > *').length !== 1) fail('cada avance de la descarga releva el texto en vez de cambiar solo el número');
+  anchos.push(ancho());
+  // Lista: el botón pasa a reiniciar. (No se toca: instalaría de verdad.)
+  act.recibir({ state: 'ready', version: '9.9.9' });
+  await settle();
+  if (caja.dataset.fase !== 'lista' || rotulo() !== 'Restart and install' || boton.disabled || op(pct) !== 0) fail(`con la versión bajada el botón dice «${rotulo()}»`);
+  anchos.push(ancho());
+  if (new Set(anchos).size !== 1) fail(`el botón de About cambia de ancho con el rótulo: ${anchos.join(' → ')}`);
+  const b = boton.getBoundingClientRect();
+  const etiqueta = boton.querySelector('.rad-swap > :not(.rad-swap-out)').getBoundingClientRect();
+  if (etiqueta.left < b.left || etiqueta.right > b.right) fail('el rótulo más largo del botón de About no entra en el botón');
+  enIngles('en About');
+  data.botonAbout = `${anchos[0]} px en los cinco estados`;
+}
+
 // Para la captura y para la pasada 2: de vuelta en el chat.
 await go('chat');
 window.rad.store.write('smoke', { pass: 1, chat: chatId, chatVenice, frenado: data.frenado });
