@@ -1,4 +1,4 @@
-// El ícono de Daimon, horneado desde el código: el «Radar».
+// El ícono de Nix, horneado desde el código: el «Radar».
 //
 // Dos aros cortados en lados opuestos y un punto en el centro: una presencia
 // detectada. Lo eligió Fran el 23/11/2026 entre diecisiete candidatas
@@ -12,7 +12,7 @@
 // a 1024, cada uno dibujado a su tamaño.
 //
 // Escribe build/icon.png (1024) y build/icon.ico (16 a 256). Para volver a
-// hornearlo: npm run icon -w daimon.
+// hornearlo: npm run icon -w nix.
 
 import fs from 'node:fs';
 import path from 'node:path';

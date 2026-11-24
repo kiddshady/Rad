@@ -23,7 +23,7 @@ const { safeStorage } = require('electron');
 const anthropic = require('./anthropic.cjs');
 const simulado = require('./simulado.cjs');
 
-const SIMULADO = process.env.DAIMON_PROVEEDOR === 'simulado';
+const SIMULADO = process.env.NIX_PROVEEDOR === 'simulado';
 
 // Lo único que se le pide a lo que se pega: un texto largo, sin espacios.
 // Si es o no una llave que sirve lo dice la API.
@@ -44,7 +44,7 @@ const PROVEEDORES = {
 
 const de = (proveedor) => {
   const p = PROVEEDORES[proveedor];
-  if (!p) throw new Error(`[daimon] proveedor desconocido: ${JSON.stringify(proveedor)}`);
+  if (!p) throw new Error(`[nix] proveedor desconocido: ${JSON.stringify(proveedor)}`);
   return p;
 };
 

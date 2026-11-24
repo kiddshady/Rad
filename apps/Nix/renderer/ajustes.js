@@ -21,7 +21,7 @@ const PROVEEDORES = [
   {
     id: 'venice',
     nombre: 'Venice',
-    texto: 'For agents that use Venice models. When you save the key, Daimon loads the current list of models.',
+    texto: 'For agents that use Venice models. When you save the key, Nix loads the current list of models.',
     ejemplo: 'Your Venice API key',
     sitio: 'https://venice.ai/settings/api',
     rotulo: 'Open the Venice API settings',
@@ -153,7 +153,7 @@ function describirActualizacion(e) {
 function tarjetaAcerca() {
   const datos = h('dl', 'dm-datos');
   const fila = (k, v) => datos.append(h('dt', '', {}, k), h('dd', 'rad-mono', {}, v));
-  fila('Daimon', window.rad.app?.version ?? '');
+  fila('Nix', window.rad.app?.version ?? '');
   fila('Rad core', window.rad.core?.version ?? '');
   fila('Skin', window.rad.skin?.name ?? '');
   fila('Providers', llave.simulado() ? 'Simulated (uses no API)' : PROVEEDORES.map((p) => p.nombre).join(' and '));
@@ -196,7 +196,7 @@ function tarjetaAcerca() {
 export function montarAjustes(el, { router }) {
 
   el.append(h('div', 'dm-pagina', {},
-    h('header', 'dm-pagina-cabeza', {}, h('div', '', {}, h('h1', '', {}, 'Settings'), h('p', '', {}, 'What Daimon needs to talk to the models.'))),
+    h('header', 'dm-pagina-cabeza', {}, h('div', '', {}, h('h1', '', {}, 'Settings'), h('p', '', {}, 'What Nix needs to talk to the models.'))),
     ...PROVEEDORES.map(tarjetaLlave),
     tarjetaAcerca()));
 

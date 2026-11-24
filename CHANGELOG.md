@@ -1,5 +1,37 @@
 # Changelog
 
+## Nix 0.5.0, antes Daimon (2026-11-23)
+
+- **La app pasa a llamarse Nix** (así se llamaba la gatita de Fran). Cambian
+  el nombre de la ventana, del ejecutable, del instalador y de los accesos
+  directos, los textos de la interfaz, la carpeta del repo (`apps/Nix`) y
+  los comandos (`npm run nix`, `smoke:nix`, `shots:nix`, `pack:nix`).
+- **Los datos vienen solos.** La carpeta de datos sale del nombre de la app,
+  así que Nix estrena una; la primera vez que abre copia de la de Daimon los
+  agentes, los chats y las dos llaves de las APIs, que se siguen leyendo sin
+  pegarlas de nuevo (lo nuevo del núcleo, abajo). La carpeta vieja no se toca.
+- **No cambian** el nombre del paquete (`daimon`), el `appId`
+  (`com.umbrovex.daimon`) ni el repo de releases
+  (`kiddshady/daimon-releases`): es por donde la Daimon instalada encuentra
+  esta versión y se actualiza a Nix sola.
+- El agente con que arranca una instalación nueva se llama Nix. El de una
+  instalación que ya existía no se toca: es un dato del usuario.
+
+## @rad/core 0.16.0 (2026-11-23)
+
+- **`rad.adoptData()` trae también lo cifrado.** Cuando una app cambia de
+  nombre, sus datos se copian de la carpeta vieja, pero lo que había cifrado
+  con `safeStorage` (una llave de una API) quedaba ilegible: Chromium cifra
+  con una clave maestra que vive en el «Local State» de la carpeta de
+  usuario, y la carpeta nueva estrenaba la suya. Ahora, al adoptar, se copia
+  también ese archivo, y la app arranca con la misma clave. Solo si la
+  carpeta nueva todavía no tiene uno (nunca pisa una clave en uso), y solo
+  sirve antes de `app ready`: `adoptData` va arriba de todo en el main, y
+  avisa por consola si se la llama tarde. Probado de punta a punta con el
+  núcleo de verdad: una app adopta los datos de otra y lee un secreto que la
+  otra cifró.
+
+
 ## Daimon 0.4.0 (2026-11-23)
 
 - **Las vistas pasan a la titlebar, como pestañas, y se va el rail** (pedido

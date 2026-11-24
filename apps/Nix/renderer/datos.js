@@ -1,4 +1,4 @@
-// Los datos de Daimon: agentes, chats y mensajes, y el ida y vuelta con el
+// Los datos de Nix: agentes, chats y mensajes, y el ida y vuelta con el
 // modelo. Las vistas no tocan el store ni el puente: piden acá y escuchan.
 //
 // Qué se guarda (con el store del núcleo):
@@ -53,7 +53,7 @@ export async function abrir() {
     chats.update((v) => { for (const c of v.lista) if (c.auto && c.titulo === 'Chat nuevo') c.titulo = TITULO_NUEVO; return v; });
   }
   // La primera vez hay un agente para empezar a escribir sin armar nada.
-  if (!agentes.get().lista.length) crearAgente({ nombre: 'Daimon', proveedor: PROVEEDOR_INICIAL, modelo: modeloInicial(PROVEEDOR_INICIAL), instrucciones: '' });
+  if (!agentes.get().lista.length) crearAgente({ nombre: 'Nix', proveedor: PROVEEDOR_INICIAL, modelo: modeloInicial(PROVEEDOR_INICIAL), instrucciones: '' });
   window.rad.on('chat:evento', alLlegar);
   // La lista de modelos de Venice llega después, cuando el main la trae.
   window.rad.on('chat:modelos', (nuevo) => { catalogo = nuevo; avisar('modelos'); });

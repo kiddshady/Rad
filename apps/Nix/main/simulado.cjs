@@ -1,7 +1,7 @@
 'use strict';
 
 // Un proveedor de mentira, para el humo y las capturas: contesta en streaming
-// sin tocar la red ni gastar un token. Se elige con DAIMON_PROVEEDOR=simulado.
+// sin tocar la red ni gastar un token. Se elige con NIX_PROVEEDOR=simulado.
 //
 // La respuesta trae de todo lo que el chat tiene que saber pintar (títulos,
 // negrita, lista, código, tabla) y repite lo que le llegó (proveedor, modelo,
@@ -31,7 +31,7 @@ function respuesta({ proveedor, modelo, instrucciones, mensajes }) {
   return [
     `## Simulated answer`,
     ``,
-    `I got your message: “${ultimo}”. This did **not** come from a model: it is Daimon’s test provider, which writes little by little so the text can be seen arriving.`,
+    `I got your message: “${ultimo}”. This did **not** come from a model: it is Nix’s test provider, which writes little by little so the text can be seen arriving.`,
     ``,
     `- model: \`${modelo}\``,
     `- instructions: ${instrucciones ? instrucciones.length : 0} characters`,
@@ -42,7 +42,7 @@ function respuesta({ proveedor, modelo, instrucciones, mensajes }) {
     ``,
     '```js',
     `const greet = (name) => \`hello, \${name}\`;`,
-    `console.log(greet('Daimon'));`,
+    `console.log(greet('Nix'));`,
     '```',
     ``,
     `| piece | status |`,

@@ -1,15 +1,15 @@
-// Humo de Daimon: arranca la app de verdad, la usa y mide lo que se ve. Dos
+// Humo de Nix: arranca la app de verdad, la usa y mide lo que se ve. Dos
 // pasadas sobre la misma carpeta de datos descartable (RAD_DATA):
-//   1. el guion completo (tools/smoke-daimon.js): crear un agente, crear un
+//   1. el guion completo (tools/smoke-nix.js): crear un agente, crear un
 //      chat, mandar un mensaje, ver llegar la respuesta de a poco, frenarla,
 //      renombrar y borrar un chat, guardar las llaves, y un agente de Venice;
-//   2. Daimon vuelve a abrir: los agentes, los chats, los mensajes y la llave
+//   2. Nix vuelve a abrir: los agentes, los chats, los mensajes y la llave
 //      tienen que estar como se dejaron.
-// Corre contra el proveedor simulado (DAIMON_PROVEEDOR=simulado): no toca la
+// Corre contra el proveedor simulado (NIX_PROVEEDOR=simulado): no toca la
 // red ni gasta un token. La llave que se guarda es de mentira, y al final se
 // revisa el disco: no puede aparecer en claro en ningún archivo.
 // Deja los informes y las capturas en .smoke/.
-// Uso: node tools/smoke-daimon.mjs [--exe <ruta>]
+// Uso: node tools/smoke-nix.mjs [--exe <ruta>]
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,7 +22,7 @@ const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const electron = require('electron');
 const SMOKE = path.join(ROOT, '.smoke');
-const SCRIPT = path.join(ROOT, 'tools', 'smoke-daimon.js');
+const SCRIPT = path.join(ROOT, 'tools', 'smoke-nix.js');
 const TIMEOUT_MS = 90000;
 // Todas las llaves que escribe el guion en Ajustes llevan esta marca. No son
 // llaves: son textos con su forma, para comprobar que lo que se guarda no
@@ -32,17 +32,17 @@ const MARCA_DE_LLAVE = 'no-es-una-llave';
 const exeArg = process.argv.indexOf('--exe');
 const EXE = exeArg > 0 ? path.resolve(process.argv[exeArg + 1]) : null;
 if (EXE && !fs.existsSync(EXE)) {
-  console.error(`smoke: no existe ${EXE} (¿falta npm run pack -w daimon?)`);
+  console.error(`smoke: no existe ${EXE} (¿falta npm run pack -w nix?)`);
   process.exit(1);
 }
 const TAG = EXE ? 'empaquetada-' : '';
-const command = EXE ? [EXE, []] : [electron, [path.join(ROOT, 'apps', 'Daimon')]];
+const command = EXE ? [EXE, []] : [electron, [path.join(ROOT, 'apps', 'Nix')]];
 
 fs.mkdirSync(SMOKE, { recursive: true });
 
 function run(pass, data) {
-  const out = path.join(SMOKE, `daimon-${TAG}${pass}.json`);
-  const shot = path.join(SMOKE, `daimon-${TAG}${pass}.png`);
+  const out = path.join(SMOKE, `nix-${TAG}${pass}.json`);
+  const shot = path.join(SMOKE, `nix-${TAG}${pass}.png`);
   fs.rmSync(out, { force: true });
   const env = {
     ...process.env,
@@ -51,13 +51,13 @@ function run(pass, data) {
     RAD_SMOKE_SCRIPT: SCRIPT,
     RAD_SMOKE_QUIT: 'close', // por el cierre normal: lo pendiente baja en before-quit
     RAD_DATA: data,
-    DAIMON_PROVEEDOR: 'simulado',
+    NIX_PROVEEDOR: 'simulado',
   };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.RAD_SKIN;
   return new Promise((resolve) => {
     const child = spawn(command[0], command[1], { env, stdio: 'inherit' });
-    const killer = setTimeout(() => { console.error(`smoke: daimon, pasada ${pass}: tiempo agotado, mato el proceso`); child.kill(); }, TIMEOUT_MS);
+    const killer = setTimeout(() => { console.error(`smoke: nix, pasada ${pass}: tiempo agotado, mato el proceso`); child.kill(); }, TIMEOUT_MS);
     child.on('exit', (code) => {
       clearTimeout(killer);
       if (!fs.existsSync(out)) return resolve({ ok: false, failures: [`la app salió (código ${code}) sin dejar informe`] });
@@ -71,10 +71,10 @@ function run(pass, data) {
 
 const show = (pass, report) => {
   if (report.ok) {
-    console.log(`smoke: daimon, pasada ${pass} ok  ventana ${report.size.width}x${report.size.height}, captura en ${report.shot}`);
+    console.log(`smoke: nix, pasada ${pass} ok  ventana ${report.size.width}x${report.size.height}, captura en ${report.shot}`);
     if (report.script) for (const [k, v] of Object.entries(report.script)) console.log(`  ${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`);
   } else {
-    console.error(`smoke: daimon, pasada ${pass} FALLA`);
+    console.error(`smoke: nix, pasada ${pass} FALLA`);
     for (const f of report.failures || []) console.error('  ' + f);
     if (report.script) for (const [k, v] of Object.entries(report.script)) console.error(`  (dato) ${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`);
   }
@@ -98,7 +98,7 @@ function checkDisk(data, report) {
   return failures;
 }
 
-const data = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-daimon-'));
+const data = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-nix-'));
 let ok = false;
 try {
   const first = await run(1, data);

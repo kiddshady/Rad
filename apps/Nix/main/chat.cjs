@@ -36,14 +36,14 @@ const ESPERA_MODELOS_MS = 8000;
 
 function limpiar(pedido) {
   const { id, proveedor = 'anthropic', modelo, instrucciones, mensajes } = pedido ?? {};
-  if (typeof id !== 'string' || !id) throw new Error('[daimon] el pedido no trae id');
-  if (!RESPONDER[proveedor]) throw new Error(`[daimon] proveedor desconocido: ${JSON.stringify(proveedor)}`);
-  if (typeof modelo !== 'string' || !modelo) throw new Error('[daimon] el pedido no trae modelo');
-  if (!Array.isArray(mensajes) || !mensajes.length) throw new Error('[daimon] el pedido no trae mensajes');
+  if (typeof id !== 'string' || !id) throw new Error('[nix] el pedido no trae id');
+  if (!RESPONDER[proveedor]) throw new Error(`[nix] proveedor desconocido: ${JSON.stringify(proveedor)}`);
+  if (typeof modelo !== 'string' || !modelo) throw new Error('[nix] el pedido no trae modelo');
+  if (!Array.isArray(mensajes) || !mensajes.length) throw new Error('[nix] el pedido no trae mensajes');
   const lista = mensajes
     .filter((m) => m && ROLES.has(m.rol) && typeof m.texto === 'string' && m.texto.trim())
     .map((m) => ({ rol: m.rol, texto: m.texto }));
-  if (!lista.length || lista[0].rol !== 'user') throw new Error('[daimon] el chat tiene que empezar con un mensaje del usuario');
+  if (!lista.length || lista[0].rol !== 'user') throw new Error('[nix] el chat tiene que empezar con un mensaje del usuario');
   return { id, proveedor, modelo, instrucciones: typeof instrucciones === 'string' ? instrucciones.trim() : '', mensajes: lista };
 }
 
@@ -79,7 +79,7 @@ function wire(rad, { llave }) {
         rad.send('chat:modelos', proveedores());
       }
     } catch (err) {
-      console.warn(`[daimon] no se pudo traer la lista de modelos de Venice: ${err.message}`);
+      console.warn(`[nix] no se pudo traer la lista de modelos de Venice: ${err.message}`);
     } finally {
       trayendo = false;
     }

@@ -20,7 +20,7 @@ packages/skin-classic   @rad/skin-classic: la piel neutral
 packages/skin-glass     @rad/skin-glass: la piel de vidrio
 packages/skin-mono      @rad/skin-mono: glass sin color (hereda de glass)
 apps/showcase           la vitrina: todos los tokens con la piel activa
-apps/Daimon             Daimon: un chat con IA y varios agentes (piel mono)
+apps/Nix             Nix: un chat con IA y varios agentes (piel mono)
 tools/                  verificadores, humo y capturas
 ```
 
@@ -384,19 +384,19 @@ sistema de traducciones.
 ```
 npm install
 npm run showcase   abre la vitrina
-npm run daimon     abre Daimon
+npm run nix     abre Nix
 npm run verify     el núcleo sin estilo y cada piel contra el contrato
-npm run test       el guardado y el proveedor de Daimon, con node pelado
-npm run smoke      abre la vitrina dos veces por piel y Daimon dos veces, mide lo que se ve y lo que sobrevive
+npm run test       el guardado y el proveedor de Nix, con node pelado
+npm run smoke      abre la vitrina dos veces por piel y Nix dos veces, mide lo que se ve y lo que sobrevive
 npm run check      verify + test + smoke
 npm run shots      capturas de la vitrina con una piel, para diseñarla
-npm run shots:daimon   capturas de Daimon con datos de mentira
+npm run shots:nix   capturas de Nix con datos de mentira
 ```
 
 El humo de cada app es su propio guion (`tools/smoke-showcase.js`,
-`tools/smoke-daimon.js`), que corre adentro de la página. El de Daimon usa un
+`tools/smoke-nix.js`), que corre adentro de la página. El de Nix usa un
 proveedor simulado (`DAIMON_PROVEEDOR=simulado`): contesta en streaming sin
-tocar la red. Y `test-daimon-provider` prueba los proveedores de verdad
+tocar la red. Y `test-nix-provider` prueba los proveedores de verdad
 (Anthropic y Venice) contra un servidor local que habla el protocolo de cada
 API. Ninguno gasta un token.
 
@@ -414,11 +414,15 @@ asar como dependencias normales.
 npm run pack         la vitrina sin instalador (dist/win-unpacked), para probar
 npm run smoke:pack   el humo entero contra la vitrina empaquetada
 npm run build        el instalador (dist/Rad-Setup-<versión>.exe)
-npm run pack:daimon         lo mismo para Daimon
-npm run smoke:pack:daimon   su humo contra la empaquetada
+npm run pack:nix         lo mismo para Nix
+npm run smoke:pack:nix   su humo contra la empaquetada
 ```
 
-## Daimon
+## Nix
+
+(Hasta la 0.4.0 se llamó Daimon. El paquete se sigue llamando `daimon`, su
+`appId` es `com.umbrovex.daimon` y publica en `kiddshady/daimon-releases`:
+es por donde la instalada encuentra su actualización, y no se tocan.)
 
 La primera app hecha con Rad: un chat con IA donde se arman varios agentes,
 cada uno con su nombre, su proveedor y su modelo, sus instrucciones y sus
@@ -430,7 +434,7 @@ y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
 - Las llaves de las APIs (una por proveedor) se pegan en Ajustes y se guardan
   cifradas con `safeStorage`, en documentos que el renderer no puede leer.
   Nunca quedan en claro.
-- La llamada al modelo va en el proceso principal (`apps/Daimon/main/`) y el
+- La llamada al modelo va en el proceso principal (`apps/Nix/main/`) y el
   texto llega al renderer de a poco por el puente. Anthropic va con su SDK;
   Venice, con `fetch` (su API es compatible con la de OpenAI) y con la lista
   de modelos pedida a Venice, no escrita a mano.
@@ -440,7 +444,7 @@ y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
   About tiene un botón para buscar una versión nueva sin esperar al núcleo.
 - El ícono es el «Radar»: dos aros cortados y un punto, con el oficio del de
   NTX (baldosa negra, tinta blanca, resplandor). Lo hornea
-  `apps/Daimon/scripts/icon.mjs`.
+  `apps/Nix/scripts/icon.mjs`.
 
 ### Publicar y actualizar
 
@@ -452,7 +456,7 @@ de la app, y el instalador se llama sin espacios.
 ```
 # subir la versión en apps/<app>/package.json, commitear y pushear, y después:
 GH_TOKEN=$(gh auth token) node tools/release.mjs apps/showcase --title "lo nuevo" --notes notas.md
-GH_TOKEN=$(gh auth token) node tools/release.mjs apps/Daimon --title "lo nuevo" --notes notas.md
+GH_TOKEN=$(gh auth token) node tools/release.mjs apps/Nix --title "lo nuevo" --notes notas.md
 ```
 
 `release.mjs` compila local, verifica el trío (`latest.yml`, `.exe`,
@@ -466,14 +470,14 @@ encontró (no hay evento de «estás al día»): `{ supported: false, reason }`
 fuera de la app instalada (`'dev'`, `'portable'`, `'disabled'`, `'missing'`),
 o `{ supported: true, available, version, error }`. Con eso y los eventos
 (`rad.updates.on`), `download()` e `install()` se arma el resto; el de
-Daimon está en `apps/Daimon/renderer/actualizacion.js`.
+Nix está en `apps/Nix/renderer/actualizacion.js`.
 
 `node tools/test-update.mjs --exe "<la app instalada>" --expect <versión>`
 prueba la actualización de punta a punta sobre una versión instalada vieja.
 
 El ícono se hornea desde el código con la baldosa estándar
 (`tools/icon-kit.mjs`; el de la vitrina en `apps/showcase/scripts/icon.mjs`;
-`rasterizeGlow` le suma un resplandor al dibujo, como el del ícono de Daimon), y
+`rasterizeGlow` le suma un resplandor al dibujo, como el del ícono de Nix), y
 `tools/icon-sheet.py` arma la hoja de control contra los íconos de las otras
 apps. En Windows la ventana usa el mismo `.ico` que el ejecutable.
 

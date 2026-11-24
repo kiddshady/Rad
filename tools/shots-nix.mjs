@@ -1,12 +1,12 @@
-// Capturas de Daimon, escena por escena, para mirarlo sin abrirlo.
+// Capturas de Nix, escena por escena, para mirarlo sin abrirlo.
 //
-//   node tools/shots-daimon.mjs              todas las escenas
-//   node tools/shots-daimon.mjs chat ajustes solo esas
+//   node tools/shots-nix.mjs              todas las escenas
+//   node tools/shots-nix.mjs chat ajustes solo esas
 //
-// Cada escena abre Daimon en modo humo (sin foco, con datos descartables y
+// Cada escena abre Nix en modo humo (sin foco, con datos descartables y
 // el proveedor simulado: no toca la red ni gasta un token), lo llena con
 // datos de mentira, corre su guion adentro de la página y saca la foto.
-// Quedan en .smoke/shots/daimon-<escena>.png. No reemplaza al humo: acá no
+// Quedan en .smoke/shots/nix-<escena>.png. No reemplaza al humo: acá no
 // se mide nada, solo se mira.
 
 import fs from 'node:fs';
@@ -30,8 +30,8 @@ const go = async (id) => { document.querySelector('.rad-tab[data-view="' + id + 
 const view = (id) => document.querySelector('.rad-view[data-view="' + id + '"]');
 const datos = await import('/datos.js');
 const llave = await import('/llave.js');
-const daimon = datos.agenteActual();
-datos.editarAgente(daimon.id, { nombre: 'Daimon', proveedor: 'anthropic', modelo: daimon.modelo, instrucciones: 'You are my coworker: direct, no beating around the bush, and you tell me when I am getting something wrong.' });
+const nix = datos.agenteActual();
+datos.editarAgente(nix.id, { nombre: 'Nix', proveedor: 'anthropic', modelo: nix.modelo, instrucciones: 'You are my coworker: direct, no beating around the bush, and you tell me when I am getting something wrong.' });
 const galeno = datos.crearAgente({ nombre: 'Galen', proveedor: 'anthropic', modelo: 'claude-haiku-5-5', instrucciones: 'You are a pharmacist on call. Answer short and clear, and say when it is time to see a doctor.' });
 const tutor = datos.crearAgente({ nombre: 'Medicinal Chemistry tutor', proveedor: 'anthropic', modelo: 'claude-sonnet-5-5', instrucciones: 'You quiz me on Medicinal Chemistry: one question at a time, above my level, and you correct me on my own answer.' });
 const oraculo = datos.crearAgente({ nombre: 'Oracle', proveedor: 'venice', modelo: 'deepseek-v4-1-flash-1017-uncensored', instrucciones: 'You answer with no filter and no lectures. If you do not know something, you say so.' });
@@ -47,21 +47,21 @@ const quietos = async () => { for (let i = 0; i < 200 && datos.algunoRespondiend
 const SCENES = {
   chat: `
     await charla(galeno, 'Ibuprofen and paracetamol', 'Can they be alternated?');
-    await charla(daimon, 'Study plan for the Biochemistry final', 'Put together a study plan for me.');
-    await charla(daimon, 'Names for the app', 'Give me some name ideas.');
-    const c = await charla(daimon, 'How an answer arrives', 'Can you show me what an answer looks like as it arrives?');
+    await charla(nix, 'Study plan for the Biochemistry final', 'Put together a study plan for me.');
+    await charla(nix, 'Names for the app', 'Give me some name ideas.');
+    const c = await charla(nix, 'How an answer arrives', 'Can you show me what an answer looks like as it arrives?');
     await quietos();
     datos.elegirChat(c.id);
     await sleep(700);
     document.querySelector('.dm-hilo:not([data-rad-leaving])').scrollTop = 0;
     await sleep(500);`,
   respondiendo: `
-    const c = await charla(daimon, 'How an answer arrives', 'Can you show me what an answer looks like as it arrives?');
+    const c = await charla(nix, 'How an answer arrives', 'Can you show me what an answer looks like as it arrives?');
     await sleep(1500);`,
   agentes: `
     await charla(galeno, 'Ibuprofen and paracetamol', 'Can they be alternated?');
-    await charla(daimon, 'Study plan for the Biochemistry final', 'Put together a study plan for me.');
-    await charla(daimon, 'Names for the app', 'Give me some name ideas.');
+    await charla(nix, 'Study plan for the Biochemistry final', 'Put together a study plan for me.');
+    await charla(nix, 'Names for the app', 'Give me some name ideas.');
     await quietos();
     await go('agentes');`,
   agente: `
@@ -76,8 +76,8 @@ const SCENES = {
     document.querySelector('.dm-hilo:not([data-rad-leaving])').scrollTop = 0;
     await sleep(500);`,
   ajustes: `
-    await llave.guardar('anthropic', 'sk-ant-api03-captura-de-daimon-no-es-una-llave-0000');
-    await llave.guardar('venice', 'venice-captura-de-daimon-no-es-una-llave-1111');
+    await llave.guardar('anthropic', 'sk-ant-api03-captura-de-nix-no-es-una-llave-0000');
+    await llave.guardar('venice', 'venice-captura-de-nix-no-es-una-llave-1111');
     await go('ajustes');
     await sleep(1400);`,
   'llave-rechazada': `
@@ -86,7 +86,7 @@ const SCENES = {
     await sleep(1400);`,
   'llave-comprobando': `
     await go('ajustes');
-    llave.guardar('anthropic', 'sk-ant-api03-captura-de-daimon-no-es-una-llave-0000');
+    llave.guardar('anthropic', 'sk-ant-api03-captura-de-nix-no-es-una-llave-0000');
     await sleep(330);`,
   about: `
     await go('ajustes');
@@ -108,19 +108,19 @@ if (unknown.length) {
 }
 
 fs.mkdirSync(OUT, { recursive: true });
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-daimon-shots-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-nix-shots-'));
 
 function shoot(scene) {
   const data = path.join(tmp, scene);
   const script = path.join(tmp, `${scene}.js`);
   const report = path.join(tmp, `${scene}.json`);
-  const shot = path.join(OUT, `daimon-${scene}.png`);
+  const shot = path.join(OUT, `nix-${scene}.png`);
   fs.writeFileSync(script, `${PRELUDE}\n${SCENES[scene]}\nreturn { failures: [], data: {} };`);
-  const env = { ...process.env, RAD_SMOKE: report, RAD_SMOKE_SHOT: shot, RAD_SMOKE_SCRIPT: script, RAD_DATA: data, DAIMON_PROVEEDOR: 'simulado' };
+  const env = { ...process.env, RAD_SMOKE: report, RAD_SMOKE_SHOT: shot, RAD_SMOKE_SCRIPT: script, RAD_DATA: data, NIX_PROVEEDOR: 'simulado' };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.RAD_SKIN;
   return new Promise((resolve) => {
-    const child = spawn(electron, [path.join(ROOT, 'apps', 'Daimon')], { env, stdio: 'inherit' });
+    const child = spawn(electron, [path.join(ROOT, 'apps', 'Nix')], { env, stdio: 'inherit' });
     const killer = setTimeout(() => child.kill(), 40000);
     child.on('exit', () => {
       clearTimeout(killer);

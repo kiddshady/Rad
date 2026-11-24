@@ -1,9 +1,9 @@
 {
   "name": "daimon",
-  "productName": "Daimon",
-  "version": "0.4.0",
+  "productName": "Nix",
+  "version": "0.5.0",
   "private": true,
-  "description": "Daimon: an AI chat with several agents, each with its own provider, model, instructions and chats.",
+  "description": "Nix: an AI chat with several agents, each with its own provider, model, instructions and chats.",
   "author": "Kidd Shady · Umbrovex Systems",
   "main": "main.cjs",
   "scripts": {
@@ -19,7 +19,7 @@
   },
   "build": {
     "appId": "com.umbrovex.daimon",
-    "productName": "Daimon",
+    "productName": "Nix",
     "copyright": "Copyright © 2026 Kidd Shady · Umbrovex Systems",
     "electronVersion": "44.10.1",
     "directories": {
@@ -48,7 +48,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "Daimon-Setup-${version}.${ext}"
+      "artifactName": "Nix-Setup-${version}.${ext}"
     }
   }
 }

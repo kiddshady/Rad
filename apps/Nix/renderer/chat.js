@@ -47,7 +47,7 @@ function relevar(celda, nuevo) {
 
 const NOTAS = {
   frenado: 'Stopped.',
-  cortado: 'Left unfinished: Daimon was closed while the answer was arriving.',
+  cortado: 'Left unfinished: Nix was closed while the answer was arriving.',
   largo: 'Cut off here: it reached the maximum length of an answer.',
   rechazo: 'The model declined to answer this.',
 };

@@ -1,4 +1,4 @@
-// Guion del humo de Daimon. Corre adentro de la página (con await), contra el
+// Guion del humo de Nix. Corre adentro de la página (con await), contra el
 // proveedor simulado, y mide lo que se ve. Devuelve { failures, data }.
 
 const failures = [];
@@ -53,19 +53,19 @@ const send = chatView.querySelector('.dm-enviar');
 const composer = chatView.querySelector('.dm-redactor');
 const statusRight = () => shown(document.querySelector('.rad-status-right'));
 
-const LLAVE = 'sk-ant-api03-humo-de-daimon-no-es-una-llave-0000';
+const LLAVE = 'sk-ant-api03-humo-de-nix-no-es-una-llave-0000';
 const INSTRUCCIONES = 'Answer like a pharmacist on call: short and clear.';
-const LLAVE_VENICE = 'venice-humo-de-daimon-no-es-una-llave-1111';
+const LLAVE_VENICE = 'venice-humo-de-nix-no-es-una-llave-1111';
 const PREGUNTA = 'Hi, what should I take for a headache?';
 const MODELO_LARGO = 'DeepSeek V4.1 Flash 1017 Uncensored';
 
-if (window.rad.skin.id !== 'mono') fail(`Daimon abrió con la piel ${window.rad.skin.id}, no con mono`);
+if (window.rad.skin.id !== 'mono') fail(`Nix abrió con la piel ${window.rad.skin.id}, no con mono`);
 
 // ---------- Segunda pasada: lo de la primera sigue ahí ----------
 const marker = await window.rad.store.read('smoke');
 if (marker?.pass === 1) {
   const agentes = (await window.rad.store.read('agentes'))?.lista ?? [];
-  if (agentes.map((a) => a.nombre).join() !== 'Daimon,Galen on call,Oracle') fail(`los agentes guardados son: ${agentes.map((a) => a.nombre).join()}`);
+  if (agentes.map((a) => a.nombre).join() !== 'Nix,Galen on call,Oracle') fail(`los agentes guardados son: ${agentes.map((a) => a.nombre).join()}`);
   // Vuelve a abrir donde se dejó: el agente y su chat.
   if (shown(chatView.querySelector('.dm-agente-nombre')) !== 'Galen on call') fail(`abrió con el agente «${shown(chatView.querySelector('.dm-agente-nombre'))}», se había dejado Galeno`);
   const fila = rows();
@@ -122,7 +122,7 @@ if (marker?.pass === 1) {
   if (((await window.rad.store.read('chats'))?.lista ?? []).length) fail('los chats del agente borrado quedaron en el índice');
   if (await window.rad.store.read(`chat-${marker.chatVenice}`) !== undefined) fail('el documento del chat del agente de Venice sigue ahí');
   await go('chat');
-  if (shown(chatView.querySelector('.dm-agente-nombre')) !== 'Daimon') fail('después de borrar el agente abierto no quedó elegido el otro');
+  if (shown(chatView.querySelector('.dm-agente-nombre')) !== 'Nix') fail('después de borrar el agente abierto no quedó elegido el otro');
   data.persistencia = `3 agentes (uno de Venice), el chat con 4 mensajes (la frenada con ${marker.frenado} caracteres), llaves: Anthropic ${llave.anthropic?.estado}, Venice ${llave.venice?.estado}`;
   window.rad.store.write('smoke', { pass: 2 });
   return { failures, data };
@@ -133,12 +133,12 @@ if (marker?.pass === 1) {
 // 0. Arranque: un agente para empezar, la vista de chat, sin chats, y sin el
 // aviso de la llave (el proveedor es el simulado).
 if (!document.querySelector('.rad-root').classList.contains('is-settled')) fail('la raíz no quedó asentada');
-if (shown(chatView.querySelector('.dm-agente-nombre')) !== 'Daimon') fail(`el agente inicial es «${shown(chatView.querySelector('.dm-agente-nombre'))}»`);
+if (shown(chatView.querySelector('.dm-agente-nombre')) !== 'Nix') fail(`el agente inicial es «${shown(chatView.querySelector('.dm-agente-nombre'))}»`);
 if (rows().length) fail('arrancó con chats');
 if (chatView.querySelector('.dm-aviso').hasAttribute('data-abierto')) fail('con el proveedor simulado aparece el aviso de la llave');
 if (!send.disabled) fail('el botón de enviar está habilitado con el campo vacío');
 
-// 0b. La interfaz está en inglés: lo de Daimon y lo que pone el núcleo (los
+// 0b. La interfaz está en inglés: lo de Nix y lo que pone el núcleo (los
 // botones de la ventana, los de un confirm). Lo que escribe el guion va en
 // inglés y sin acentos, así que cualquier acento o palabra castellana que
 // aparezca a la vista o en un rótulo es de la interfaz.
@@ -151,7 +151,7 @@ const enIngles = (donde) => {
   const malo = textos.flatMap((t) => t.split('\n')).find((t) => CASTELLANO.test(t));
   if (malo) fail(`${donde}: quedó texto en castellano en la interfaz: «${malo.trim().slice(0, 90)}»`);
 };
-if (window.rad.lang !== 'en' || document.documentElement.lang !== 'en') fail(`Daimon no arrancó en inglés: rad.lang "${window.rad.lang}", html lang "${document.documentElement.lang}"`);
+if (window.rad.lang !== 'en' || document.documentElement.lang !== 'en') fail(`Nix no arrancó en inglés: rad.lang "${window.rad.lang}", html lang "${document.documentElement.lang}"`);
 const ventana = [...document.querySelectorAll('.rad-winbtn')].map((b) => b.getAttribute('aria-label')).join(', ');
 if (ventana !== 'Minimize, Maximize, Close') fail(`los botones de la ventana dicen: ${ventana}`);
 const riel = [...document.querySelectorAll('.rad-tab')].map((b) => b.textContent.trim() || b.getAttribute('aria-label') || b.getAttribute('data-rad-tip')).join(', ');
@@ -164,7 +164,7 @@ enIngles('al arrancar');
   const tabs = [...document.querySelectorAll('.rad-titlebar > .rad-tabs > .rad-tab')];
   const stage = document.querySelector('.rad-stage').getBoundingClientRect();
   if (document.querySelector('.rad-rail') || tabs.length !== 3) fail(`las vistas no están en la titlebar (${tabs.length} pestañas, rail: ${Boolean(document.querySelector('.rad-rail'))})`);
-  if (document.querySelector('.rad-titlebar-title') || /Daimon/.test(document.querySelector('.rad-titlebar').textContent)) fail('la titlebar sigue mostrando el nombre de la app');
+  if (document.querySelector('.rad-titlebar-title') || /Nix/.test(document.querySelector('.rad-titlebar').textContent)) fail('la titlebar sigue mostrando el nombre de la app');
   if (tabs.length && Math.abs(tabs[0].getBoundingClientRect().left - stage.left) > 1) fail(`la primera pestaña empieza en ${r2(tabs[0].getBoundingClientRect().left)} y la hoja en ${r2(stage.left)}`);
   if (stage.width < window.innerWidth - 24) fail(`sin rail, la hoja mide ${r2(stage.width)} en una ventana de ${window.innerWidth}`);
   const activa = tabs.find((t) => t.getAttribute('aria-current') === 'page');
@@ -179,7 +179,7 @@ data.idioma = `${window.rad.lang}: ${ventana} · ${riel}`;
   await document.fonts.ready;
   const pila = getComputedStyle(document.documentElement).getPropertyValue('--rad-font-mono').trim();
   const caras = [...document.fonts].filter((f) => f.family.replace(/["']/g, '') === 'Roboto Mono');
-  if (!/^'?"?Roboto Mono/.test(pila)) fail(`la fuente mono de Daimon es ${pila}`);
+  if (!/^'?"?Roboto Mono/.test(pila)) fail(`la fuente mono de Nix es ${pila}`);
   if (!caras.some((f) => f.status === 'loaded')) fail(`Roboto Mono no cargó: ${caras.map((f) => f.status).join(', ') || 'no está declarada'}`);
   const ancho = (familia) => { const c = document.createElement('canvas').getContext('2d'); c.font = `13px ${familia}`; return c.measureText('0O1lI{}=>').width; };
   if (Math.abs(ancho("'Roboto Mono'") - ancho("'Cascadia Mono'")) < 0.5 && Math.abs(ancho("'Roboto Mono'") - ancho('monospace')) < 0.5) fail('Roboto Mono mide igual que las otras mono: no se está usando');
@@ -343,7 +343,7 @@ else {
     if (!md.textContent.includes('<b>fake bold</b>') || !msgs()[2].textContent.includes('<b>fake bold</b>')) fail('el HTML de un mensaje no quedó a la vista como texto');
     if (has('strong')?.textContent !== 'not') fail('la negrita no se armó');
     if (md.querySelectorAll('ul > li').length !== 4) fail(`la lista tiene ${md.querySelectorAll('ul > li').length} items`);
-    if (!has('.dm-codigo code')?.textContent.includes("console.log(greet('Daimon'));")) fail('el bloque de código no llegó entero');
+    if (!has('.dm-codigo code')?.textContent.includes("console.log(greet('Nix'));")) fail('el bloque de código no llegó entero');
     if (has('.dm-codigo-lang')?.textContent !== 'js') fail('el bloque de código no dice su lenguaje');
     if (md.querySelectorAll('.dm-tabla tbody tr').length !== 2 || has('.dm-tabla em')?.textContent !== 'works') fail('la tabla no se armó');
     if (/[*`#|]/.test(md.textContent.replace(has('.dm-codigo code').textContent, ''))) fail('quedaron marcas de markdown sin interpretar a la vista');
@@ -436,7 +436,7 @@ else {
 }
 
 // 10. La llave de Anthropic. Que esté guardada no quiere decir que sirva:
-// Daimon le pregunta a la API (acá a la simulada, que contesta según el texto
+// Nix le pregunta a la API (acá a la simulada, que contesta según el texto
 // de la llave) y dice lo que la API contestó, no lo que parece por cómo
 // empieza. Y la que guarda no queda a la vista ni al alcance del renderer.
 await go('ajustes');
@@ -492,8 +492,8 @@ if (aj.querySelector(':scope > .rad-busy') || aj.hasAttribute('aria-busy')) fail
 if (detalle.getBoundingClientRect().height > 1) fail('con la llave aceptada quedó abierto el renglón de lo que dijo la API');
 
 // La que le pasó a Fran: una llave «de usuario» (por cómo empieza) que la API
-// acepta. Sirve, y Daimon no puede decir otra cosa.
-await guardarLlave('sk-ant-usr01-humo-de-daimon-no-es-una-llave-0000');
+// acepta. Sirve, y Nix no puede decir otra cosa.
+await guardarLlave('sk-ant-usr01-humo-de-nix-no-es-una-llave-0000');
 if (estado.dataset.comprobacion !== 'aceptada' || estado.dataset.tono !== 'success' || /user key|rejects/.test(dice())) fail(`una llave de usuario que la API acepta figura como «${dice()}»`);
 
 // Una que no está atada a un workspace: la API la rechaza, y se ve el motivo

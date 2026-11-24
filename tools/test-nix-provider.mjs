@@ -1,9 +1,9 @@
-// Test del proveedor de Anthropic de Daimon (apps/Daimon/main/anthropic.cjs),
+// Test del proveedor de Anthropic de Nix (apps/Nix/main/anthropic.cjs),
 // con node pelado y SIN tocar la API: levanta un servidor local que habla el
 // mismo protocolo (eventos SSE de /v1/messages) y le apunta el SDK. No gasta
-// un token; lo que prueba es el uso que Daimon hace del SDK: qué manda, cómo
+// un token; lo que prueba es el uso que Nix hace del SDK: qué manda, cómo
 // lee el streaming, cómo frena y qué dice cuando algo falla.
-// Uso: node tools/test-daimon-provider.mjs
+// Uso: node tools/test-nix-provider.mjs
 
 import http from 'node:http';
 import path from 'node:path';
@@ -138,8 +138,8 @@ process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${server.address().port}`;
 process.env.VENICE_BASE_URL = `http://127.0.0.1:${server.address().port}`;
 delete process.env.ANTHROPIC_API_KEY;
 delete process.env.ANTHROPIC_AUTH_TOKEN;
-const { responder, comprobar, MODELOS, MODELO_INICIAL } = require(path.join(ROOT, 'apps', 'Daimon', 'main', 'anthropic.cjs'));
-const deVenice = require(path.join(ROOT, 'apps', 'Daimon', 'main', 'venice.cjs'));
+const { responder, comprobar, MODELOS, MODELO_INICIAL } = require(path.join(ROOT, 'apps', 'Nix', 'main', 'anthropic.cjs'));
+const deVenice = require(path.join(ROOT, 'apps', 'Nix', 'main', 'venice.cjs'));
 const KEY_VENICE = 'venice-prueba-del-proveedor-no-es-una-llave';
 
 const pedido = (modelo, extra = {}) => ({
@@ -353,8 +353,8 @@ const aVenice ={ con: deVenice.responder, key: KEY_VENICE };
 }
 
 if (failures.length) {
-  console.error(`test-daimon-provider: ${failures.length} falla(s)`);
+  console.error(`test-nix-provider: ${failures.length} falla(s)`);
   for (const f of failures) console.error('  ' + f);
   process.exit(1);
 }
-console.log('test-daimon-provider: ok (Anthropic y Venice: pedido, streaming, modelos, frenar, rechazo, largo, errores, comprobar la llave)');
+console.log('test-nix-provider: ok (Anthropic y Venice: pedido, streaming, modelos, frenar, rechazo, largo, errores, comprobar la llave)');

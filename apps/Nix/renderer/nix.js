@@ -1,4 +1,4 @@
-// Daimon: arma el shell del núcleo con sus tres vistas.
+// Nix: arma el shell del núcleo con sus tres vistas.
 
 import { createShell } from '/@core/shell.js';
 import { hold } from '/@core/ready.js';
@@ -45,6 +45,6 @@ datos.on('seleccion', ponerEstado);
 datos.on('respuesta', ponerEstado);
 
 // El aviso de versión nueva (no baja nada solo, y no dice «estás al día»).
-wireUpdates({ name: 'Daimon' });
+wireUpdates({ name: 'Nix' });
 
 release();
