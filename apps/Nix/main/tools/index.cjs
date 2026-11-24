@@ -22,6 +22,7 @@ const web = require('./web.cjs');
 const abrir = require('./abrir.cjs');
 const captura = require('./captura.cjs');
 const lienzo = require('./canvas.cjs');
+const navegador = require('./navegador.cjs');
 
 let listo = false;
 
@@ -32,6 +33,9 @@ let listo = false;
  *   trash(ruta)        manda algo a la Papelera (fs_delete)
  *   shell              { openPath, openExternal, showItemInFolder } (os_open)
  *   capturador, pantallas       el desktopCapturer y el screen de Electron (screen_capture)
+ *   ventana()                   la ventana principal, o null (el navegador pinta su página encima)
+ *   modeloVe(run)               ¿el modelo de esa corrida acepta imágenes? (la foto de browser_read)
+ *   abrirAfuera(url)            abre una dirección en el navegador del sistema
  *   titulosDeChats()            Map id → título de los chats (la biblioteca del canvas)
  *   avisar(canal, datos)        un aviso a la interfaz que no es de un turno (el agente borró un canvas)
  *   alProducir(run, imagenes)   run_code dejó imágenes: [{ name, dataUrl }]
@@ -39,7 +43,7 @@ let listo = false;
  *   getSecret(nombre)  el valor de un {{secret:NOMBRE}}, o null (http_request)
  *   webSearch()        { provider, maxResults } de la búsqueda web
  */
-function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, alProducir = null, getKey = null, getSecret = null, webSearch = null } = {}) {
+function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null } = {}) {
   archivos.configurar({ trash });
   web.configurar({ getKey, getSecret, webSearch });
   abrir.configurar({ shell });
@@ -51,11 +55,18 @@ function iniciar({ carpeta = null, trash = null, shell = null, capturador = null
   });
   codigo.configurar({ alProducir, ...(carpeta ? { workspace: () => path.join(carpeta, 'code-workspace') } : {}) });
   if (carpeta) datos.configurar({ dbPath: () => path.join(carpeta, 'agent.db') });
+  navegador.configurar({
+    ...(carpeta ? { carpeta } : {}),
+    ...(ventana ? { ventana } : {}),
+    ...(avisar ? { avisar } : {}),
+    ...(modeloVe ? { modeloVe } : {}),
+    ...(abrirAfuera ? { abrirAfuera } : {}),
+  });
   motor.configurar({ classifyOsTarget: abrir.classifyOsTarget });
   if (listo) return;
   motor.registrar({
     ...archivos.runners, ...comandos.runners, ...trabajos.runners, ...busqueda.runners,
-    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners,
+    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners,
   });
   listo = true;
 }
@@ -66,6 +77,7 @@ function cerrar() {
   try { trabajos.cerrarTodo(); } catch { /* ya no hay nada que matar */ }
   try { datos.cerrar(); } catch { /* ya estaba cerrada */ }
   try { lienzo.cerrar(); } catch { /* ya estaba cerrada */ }
+  try { navegador.cerrar(); } catch { /* nunca se abrió */ }
 }
 
 /** Lo que la interfaz necesita para ofrecer las tools de un agente. */
@@ -107,11 +119,29 @@ module.exports = {
     // …y los canvas que este chat tiene abiertos: su cuerpo no viaja en la
     // conversación, así que sin esta lista el modelo no sabe que existen
     const canvas = () => { try { return s.nombres.includes('canvas') ? lienzo.canvasBlock(opciones.convoId) : ''; } catch { return ''; } };
-    s.sistema = (instrucciones) => sistema(instrucciones, { trabajos: trabajosVivos(), canvas: canvas() });
+    // …y el navegador: los favoritos del usuario por nombre («abrí mi Moodle»
+    // anda sin que el modelo sepa la dirección) y la pestaña que tiene abierta
+    // (textos de NeonCode)
+    const delNavegador = () => {
+      if (!s.nombres.includes('browser_navigate')) return '';
+      try {
+        const lineas = [];
+        const fv = navegador.favoritosLista();
+        if (fv.length) {
+          const nombres = fv.slice(0, 30).map((f) => JSON.stringify(navegador.nombreFavorito(f).slice(0, 40)));
+          lineas.push(`The user's browser bookmarks (pass a name as browser_navigate's url to open it): ${nombres.join(', ')}${fv.length > 30 ? `, and ${fv.length - 30} more` : ''}.`);
+        }
+        const migaja = navegador.migaja();
+        if (migaja) lineas.push(migaja);
+        return lineas.join('\n');
+      } catch { return ''; }
+    };
+    s.sistema = (instrucciones) => sistema(instrucciones, { trabajos: trabajosVivos(), canvas: canvas(), navegador: delNavegador() });
     return s;
   },
-  // el canvas, para los canales que usa su panel
+  // el canvas y el navegador, para los canales que usan sus paneles
   canvas: lienzo,
+  navegador,
   argsDigest: motor.argsDigest,
   plegar: require('./guardas.cjs').foldToolRows,
   getCwd: base.getCwd,

@@ -29,6 +29,7 @@ encabezado de qué parte de NeonCode salió y qué se le adaptó.
 | `abrir.cjs` | `os_open`: abre un archivo, una carpeta o una URL como lo haría el usuario |
 | `captura.cjs` | `screen_capture`: una foto de un monitor o de una ventana, que el modelo ve |
 | `canvas.cjs`, `canvas-store.cjs` | `canvas`: documentos y código en el panel de al lado, y su base |
+| `navegador.cjs`, `browser/` | Las seis `browser_*` y el navegador que manejan (`agent-browser.cjs`), con su preload de sesión |
 | `index.cjs` | Arma todo y es lo único que conoce el chat |
 
 Los loops de cada proveedor están en `main/anthropic.cjs` y `main/venice.cjs`.
@@ -50,6 +51,7 @@ agente. La barra de estado repite la cuenta.
 | Code | `run_code` |
 | Databases | `db_query`, `sqlite_query` |
 | Web | `fetch`, `web_search`, `http_request` |
+| Browser | `browser_navigate`, `browser_read`, `browser_click`, `browser_type`, `browser_press`, `browser_upload` |
 | Desktop | `os_open` |
 | Screen | `screen_capture` |
 | Canvas | `canvas` |
@@ -150,6 +152,34 @@ volcarlo en el mensaje. Cómo está armado:
 - La interfaz está en `renderer/canvas.js`. Un documento se pinta con
   `markdown.js`; el código va sin resaltado.
 
+## El navegador
+
+Un navegador de verdad, en un panel, que comparten el usuario y el agente.
+
+- **La página es una capa nativa** (`WebContentsView`), no DOM ni `<webview>`
+  (una webview heredaría el preload de la app, con todo su IPC). El proceso
+  principal la pinta sobre el hueco que le deja el panel; el panel le manda
+  dónde está ese hueco (`browser:bounds`) cada vez que cambia.
+- **Como tapa todo**, la interfaz la apaga cuando pone algo encima («eclipse»,
+  en `renderer/navegador.js`) y deja una foto de la página. Sin eso la tarjeta
+  de permiso de una tool queda tapada y el turno colgado. También se apaga con
+  otra vista de la app al frente y al minimizar.
+- **Sin CDP para leer:** corre un script en cada frame de la página y arma un
+  texto con lo visible y la lista de lo accionable (`ref_N`). Paginado: 12.000
+  caracteres y 120 elementos por página.
+- **Las tools exigen el panel abierto:** si no lo está, se lo piden a la
+  interfaz (`browser:open`) y esperan hasta 3 segundos.
+- **Sesión propia** (`persist:nix-browser`), sin preload de la app, con
+  sandbox. Solo http y https (http, solo a direcciones locales o privadas).
+  Permisos negados, descargas canceladas, `alert`/`confirm`/`prompt`
+  neutralizados (un `alert` congelaba la pestaña).
+- **En el system prompt:** los favoritos por nombre y la pestaña que el
+  usuario tiene a la vista (título y dirección, no el contenido).
+- Pestañas y favoritos se guardan en `%APPDATA%\Nix\tools`
+  (`browser-pestanas.json`, `browser-favoritos.json`).
+- Con `screenshot: true`, `browser_read` le manda al modelo una foto de la
+  página, si el modelo ve (igual que `screen_capture`).
+
 ## Las imágenes
 
 Hay dos caminos, y no son el mismo:
@@ -202,7 +232,7 @@ Venice) en cada pedido de un agente con tools.
   `fs.cjs`, sin nada enchufado).
 - Mandar un mensaje a mitad del turno (steer).
 - Notepad, memoria, búsqueda en chats.
-- Subagentes, MCP, skills, navegador, tareas programadas.
+- Subagentes, MCP, skills, tareas programadas.
 - Dónde guardar secretos para `http_request` (`{{secret:NOMBRE}}`) y la llave
   de Tavily o Brave para `web_search`. Sin eso, un pedido con un secreto falla
   diciendo que no está, y la búsqueda usa DuckDuckGo: desde la 0.7.4 lee su
@@ -255,6 +285,15 @@ para arreglarlos de a uno, con su prueba:
   100 en la papelera).
 - Exportar un canvas saca los acentos del nombre del archivo («Título» sale
   `T_tulo.md`).
+- Las tools del navegador no miran el Stop: una espera de `wait_for` (10 s),
+  de carga (8 s) o del panel (3 s) sigue hasta terminar.
+- `browser_type` y `browser_upload` validan sus argumentos después de abrir el
+  panel: una llamada inválida igual lo abre.
+- `browser_navigate` con `tab` y `new_tab` juntos ignora `new_tab` sin decirlo.
+- Guardar un favorito no espera ni atrapa la escritura: si falla, contesta que
+  anduvo.
+- La capa del navegador y sus ventanas de login tienen el fondo de NeonCode
+  (`#0d0d11`), no el de la piel.
 
 ## Cómo se prueba
 
@@ -264,6 +303,9 @@ para arreglarlos de a uno, con su prueba:
   no tenían pruebas. La de capturas usa pantallas y ventanas de mentira.
 - `-canvas.mjs`: las de NeonCode más el cableado de Nix, sobre una base
   descartable.
+- `-browser.mjs`: las de NeonCode sobre un Electron de mentira (no abre
+  ninguna ventana), más los runners y los canales de Nix. Las que allá miraban
+  la interfaz de NeonCode no vinieron: la de Nix la prueba el humo.
 - `tools/test-nix-tools-loop.mjs`: los dos loops contra un servidor local que
   hace de las dos APIs. Mira qué pide cada ronda y qué vuelve, también las
   imágenes de una captura.

@@ -99,7 +99,32 @@ function wire(rad, { llave }) {
   // fuera del turno (el panel puede estar mirando otro chat).
   const paraElCanvas = {
     titulosDeChats: () => new Map((rad.store.read('chats')?.lista ?? []).map((c) => [c.id, c.titulo])),
-    avisar: (canal, datos) => { if (canal === 'canvas:deleted') rad.send('canvas:evento', { tipo: 'borrado', convoId: datos?.convoId ?? null, canvas: datos?.canvas ?? null }); },
+    avisar: (canal, datos) => {
+      if (canal === 'canvas:deleted') rad.send('canvas:evento', { tipo: 'borrado', convoId: datos?.convoId ?? null, canvas: datos?.canvas ?? null });
+      // lo del navegador va con su mismo nombre: browser:state, :open, :atajo
+      else if (String(canal).startsWith('browser:')) rad.send(canal, datos);
+    },
+  };
+  // El navegador pinta su página encima de la ventana principal: hay que
+  // saber cuál es (las ventanas de login que abre una página también son
+  // ventanas) y dormirle la capa cuando la ventana no se ve.
+  const electron = require('electron');
+  // las páginas eligen su tema oscuro
+  try { electron.nativeTheme.themeSource = 'dark'; } catch { /* sin nativeTheme: seguimos */ }
+  let principal = null;
+  const adoptar = (w) => {
+    if (principal || !w || w.isDestroyed()) return;
+    principal = w;
+    for (const ev of ['minimize', 'hide']) w.on(ev, () => { try { herramientas.navegador.dormir(); } catch { /* sin navegador abierto */ } });
+    for (const ev of ['restore', 'show']) w.on(ev, () => { try { herramientas.navegador.despertar(); } catch { /* sin navegador abierto */ } });
+    w.on('closed', () => { principal = null; });
+  };
+  adoptar(electron.BrowserWindow.getAllWindows()[0]);
+  electron.app.on('browser-window-created', (_e, w) => adoptar(w));
+  const paraElNavegador = {
+    ventana: () => (principal && !principal.isDestroyed() ? principal : null),
+    // la corrida sabe si su modelo ve (lo anota el pedido, más abajo)
+    modeloVe: (run) => run?.ve === true,
   };
   // run_code dejó imágenes: van a la fila de esa llamada, en el chat.
   const alProducir = (run, imagenes) => run.notify('tool:artifact', { images: imagenes });
@@ -111,6 +136,8 @@ function wire(rad, { llave }) {
       carpeta: taller,
       alProducir,
       ...paraElCanvas,
+      ...paraElNavegador,
+      abrirAfuera: (u) => anotar(`url ${u}`),
       trash: (ruta) => fs.promises.rename(ruta, path.join(taller, '.trash', `${Date.now()}-${path.basename(ruta)}`)),
       // y no miran la pantalla de nadie: capturan una de mentira
       ...simulado.pantallaDeMentira(),
@@ -127,7 +154,7 @@ function wire(rad, { llave }) {
     const carpeta = path.join(path.dirname(rad.store.dir), 'tools');
     fs.mkdirSync(carpeta, { recursive: true });
     const { desktopCapturer, screen } = require('electron');
-    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas });
+    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, abrirAfuera: (u) => shell.openExternal(u) });
     herramientas.setCwd(rad.store.read(DOC_TOOLS)?.carpeta);
   }
   // Al salir, lo que quedó corriendo en segundo plano se mata.
@@ -146,6 +173,20 @@ function wire(rad, { llave }) {
   }));
 
   rad.handle('chat:tools', () => herramientas.catalogo());
+
+  // ---------- El navegador ----------
+  // Los canales de su panel. Los cuerpos son los de NeonCode (navegador.cjs).
+  {
+    const nav = herramientas.navegador.ipc;
+    const canales = {
+      attach: 'attach', bounds: 'bounds', panel: 'panel', visible: 'visible', state: 'state', navigate: 'navigate',
+      'tab-new': 'tabNew', 'tab-go': 'tabGo', 'tab-close': 'tabClose',
+      back: 'back', forward: 'forward', reload: 'reload', stop: 'stop',
+      capture: 'capture', freeze: 'freeze', external: 'external',
+      'fav-list': 'favList', 'fav-toggle': 'favToggle', 'fav-remove': 'favRemove', 'fav-open': 'favOpen',
+    };
+    for (const [canal, fn] of Object.entries(canales)) rad.handle(`browser:${canal}`, async (arg) => (await nav[fn](arg)) ?? null);
+  }
 
   // ---------- El canvas ----------
   // Lo que usa su panel. A diferencia de la tool, estos canales no están
@@ -279,6 +320,8 @@ function wire(rad, { llave }) {
           });
         },
       });
+      // ¿este modelo acepta imágenes? Lo usa la foto de browser_read
+      sesion.run.ve = pedido.proveedor === 'anthropic' || elModelo?.vision === true;
       if (!sesion.activa) sesion = null;
     }
     const corrio = () => (sesion ? { tools: sesion.resumen(), agotado: sesion.run.stopped === 'maxrounds' } : {});

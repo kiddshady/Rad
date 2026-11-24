@@ -669,7 +669,7 @@
   .dm-escena > .dm-conv { grid-area: 1 / 1; }
   .dm-escena[data-panel] > .dm-conv { padding-right: var(--dm-panel-w); }
 
-  .dm-canvas {
+  .dm-canvas, .dm-nav {
     position: absolute;
     top: var(--rad-space-3);
     right: var(--rad-space-3);
@@ -685,7 +685,7 @@
     visibility: hidden;
     transition: opacity var(--rad-dur-base) var(--rad-ease-in-out), transform var(--rad-dur-base) var(--rad-ease-in-out), visibility 0s linear var(--rad-dur-base);
   }
-  .dm-canvas[data-abierto] {
+  .dm-canvas[data-abierto], .dm-nav[data-abierto] {
     opacity: 1;
     transform: none;
     visibility: visible;
@@ -781,9 +781,84 @@
   .dm-canvas-tarjeta[data-activa] { color: var(--rad-text-1); box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line-strong); }
   .dm-canvas-tarjeta-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* En la cabecera de la conversación: la biblioteca y, a su lado, las tools. */
+  /* En la cabecera de la conversación: el navegador, la biblioteca y las tools. */
+  .dm-nav-boton { flex: none; align-self: center; margin-left: auto; }
   .dm-canvas-biblioteca { flex: none; align-self: center; margin-left: auto; }
+  .dm-nav-boton + .dm-canvas-biblioteca { margin-left: 0; }
   .dm-canvas-biblioteca + .dm-conv-tools { margin-left: 0; }
+  .dm-nav-boton[aria-pressed='true'] { color: var(--rad-text-1); background: var(--rad-tint-press); }
+
+  /* ---------- El navegador ---------- */
+  /* Sus dos renglones (pestañas y barra) y el hueco. La página NO es DOM: es
+     una capa nativa que el proceso principal pinta sobre el hueco. */
+  .dm-nav { grid-template-rows: auto auto minmax(0, 1fr); }
+  .dm-nav-tira, .dm-nav-barra { display: flex; align-items: center; gap: var(--rad-space-1); min-width: 0; padding: var(--rad-space-2) var(--rad-space-2) 0; }
+  .dm-nav-barra { padding-bottom: var(--rad-space-2); }
+  .dm-nav-aire { flex: 1; }
+  .dm-nav-tabs { position: relative; display: flex; gap: var(--rad-space-1); min-width: 0; }
+  .dm-nav-tab {
+    flex: 0 1 180px;
+    min-width: 56px;
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-1);
+    min-height: calc(var(--rad-control-height) - 4px);
+    padding: 0 var(--rad-space-1) 0 var(--rad-space-3);
+    border-radius: var(--rad-radius-m);
+    color: var(--rad-text-3);
+    font-size: var(--rad-text-s);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+    animation: rad-fade-in var(--rad-dur-base) var(--rad-ease-out) both;
+  }
+  .dm-nav-tab:hover { background: var(--rad-tint-hover); color: var(--rad-text-2); }
+  .dm-nav-tab[aria-selected='true'] { background: var(--rad-surface-2); color: var(--rad-text-1); }
+  .dm-nav-tab-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
+  .dm-nav-tab[data-cargando] .dm-nav-tab-nombre { color: var(--rad-text-3); }
+  .dm-nav-tab-x { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: var(--rad-radius-s); color: var(--rad-text-3); transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-nav-tab-x:hover { background: var(--rad-tint-press); color: var(--rad-text-1); }
+  .dm-nav-tab-x .rad-icon { width: 12px; height: 12px; }
+  .dm-nav-direccion {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    min-height: calc(var(--rad-control-height) - 4px);
+    padding: 0 var(--rad-space-3);
+    border-radius: var(--rad-radius-pill);
+    background: color-mix(in srgb, var(--rad-surface-0) 62%, transparent);
+    box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line);
+    transition: box-shadow var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-nav-direccion:focus-within { box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line-strong); }
+  .dm-nav-candado { flex: none; width: 13px; height: 13px; color: var(--rad-text-3); opacity: 0; transition: opacity var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-nav-direccion[data-con-pagina] .dm-nav-candado { opacity: 1; }
+  .dm-nav-direccion[data-inseguro] .dm-nav-candado { color: var(--rad-danger); }
+  .dm-nav-url { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--rad-text-1); font: inherit; font-size: var(--rad-text-s); user-select: text; }
+  .dm-nav-url::placeholder { color: var(--rad-text-3); }
+  /* recargar y parar ocupan el mismo botón y se relevan */
+  .dm-nav-recargar { display: grid; }
+  .dm-nav-recargar > * { grid-area: 1 / 1; transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out); }
+  .dm-nav-recargar:not([data-cargando]) .dm-nav-ic-parar, .dm-nav-recargar[data-cargando] .dm-nav-ic-recargar { opacity: 0; }
+  .dm-nav [data-accion='nav-estrella'][aria-pressed='true'] { color: var(--rad-text-1); }
+  .dm-nav [data-accion='nav-estrella'][aria-pressed='true'] svg { fill: currentColor; }
+  /* El hueco. El radio es el de la capa nativa (12 px), no un token: tienen
+     que calzar. */
+  .dm-nav-hueco {
+    position: relative;
+    min-height: 0;
+    margin: 0 var(--rad-space-2) var(--rad-space-2);
+    border-radius: 12px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--rad-surface-0) 70%, transparent);
+    display: grid;
+    place-items: center;
+  }
+  .dm-nav-vacio { max-width: 34ch; padding: var(--rad-space-4); text-align: center; color: var(--rad-text-3); font-size: var(--rad-text-s); opacity: 0; transition: opacity var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-nav-hueco[data-vacio] .dm-nav-vacio { opacity: 1; }
+  /* La foto de la página, mientras la app tiene algo encima de la capa. */
+  .dm-nav-foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top left; opacity: 0; visibility: hidden; }
+  .dm-nav-hueco[data-foto] .dm-nav-foto { opacity: 1; visibility: visible; }
 
   /* La biblioteca: todos los canvas, también los de la papelera. */
   .rad-modal:has(.dm-biblio) { --rad-modal-width: 560px; }

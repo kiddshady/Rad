@@ -170,6 +170,19 @@ const SCENES = {
     await sleep(900);
     document.querySelector('[data-accion="canvas-biblioteca"]').click();
     await sleep(1200);`,
+  // El navegador. La página es una capa nativa que la captura de la ventana
+  // no trae: se le pide su foto y se la pone en el hueco (es lo que se ve).
+  navegador: `
+    datos.ponerModoTools('auto');
+    const c = datos.crearChat(nix.id);
+    await datos.enviar(c.id, 'TOOLS: ' + JSON.stringify([{ name: 'browser_navigate', args: { url: 'https://example.com' } }, { name: 'browser_read', args: {} }]));
+    await quietos();
+    datos.renombrarChat(c.id, 'A page to read');
+    await sleep(1800);
+    const foto = await window.rad.invoke('browser:freeze');
+    const hueco = document.querySelector('.dm-nav-hueco');
+    if (foto) { hueco.querySelector('.dm-nav-foto').src = foto; hueco.setAttribute('data-foto', ''); }
+    await sleep(500);`,
   'sin-llave': `
     await go('ajustes');
     await sleep(400);`,

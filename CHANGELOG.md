@@ -1,5 +1,40 @@
 # Changelog
 
+## Nix 0.9.0 (2026-11-24)
+
+- **Navegador.** Un navegador de verdad en un panel al lado de la
+  conversación (el botón del globo, o Ctrl+B). Es la MISMA pestaña la que usa
+  el usuario a mano y la que maneja el agente: lo que uno abre lo ve el otro.
+  Hasta cuatro pestañas, atrás, adelante, recargar, barra de direcciones (el
+  texto suelto se busca en DuckDuckGo), favoritos y «abrir en tu navegador».
+- **Seis tools para el agente** (grupo Browser): `browser_navigate`,
+  `browser_read`, `browser_click`, `browser_type`, `browser_press` y
+  `browser_upload`. Lee la página como texto más una lista de lo que se
+  puede accionar, numerado; actúa sobre un número y vuelve a leer. Si el
+  panel está cerrado, lo abre. El modelo sabe qué pestaña tiene el usuario a
+  la vista y sus favoritos por nombre («abrí mi Moodle»).
+- Es el navegador de NeonCode. Del lado main vino portado tal cual: sus 3000
+  líneas (`agent-browser.cjs`, con tres cambiadas), los runners, las pestañas
+  y favoritos guardados, y 504 comprobaciones. El panel se reescribió sobre
+  Rad.
+- **Sesión propia.** Las páginas viven en un perfil aparte del de la app
+  (`persist:nix-browser`): los inicios de sesión quedan ahí. Solo abre http y
+  https; niega cámara, micrófono, ubicación y notificaciones; cancela las
+  descargas; y las páginas no tienen acceso a nada de la app.
+- **La página no es parte de la interfaz:** es una capa nativa que se pinta
+  encima de la ventana. Por eso, cuando la app pone algo sobre ella (un menú,
+  un modal, la tarjeta de permiso de una tool) la capa se apaga y queda una
+  foto de la página en su lugar; y aparece recién cuando el panel terminó de
+  entrar.
+- El navegador y el canvas comparten el mismo lugar: abrir uno cierra el otro.
+- Lo que el agente teclea en una página no queda escrito en la fila del chat
+  (por ahí pasan contraseñas).
+- El humo lo prueba contra una página servida en la misma máquina, sin salir
+  a internet. `RAD_SMOKE_TRAZA=1` hace que una excepción del guion diga en qué
+  línea fue.
+- No vino: ensanchar el panel arrastrando, mandar una captura de la página al
+  chat (la app todavía no adjunta imágenes) ni descargas.
+
 ## Nix 0.8.0 (2026-11-24)
 
 - **Canvas.** Un panel al lado de la conversación donde el agente deja un

@@ -739,7 +739,7 @@ else {
   const form = modal();
   type(form.querySelector('[data-campo="nombre"]'), 'Toolsmith');
   const interruptores = [...form.querySelectorAll('[data-campo="tools"] input[role="switch"]')];
-  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,desktop,screen,canvas' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
+  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
   // un agente nuevo nace con todas prendidas: se le apaga la web
   for (const i of interruptores) if (i.dataset.grupo === 'web') i.click();
   enIngles('en el formulario con tools');
@@ -747,13 +747,13 @@ else {
   await closed();
   await settle();
   const herrero = cards().at(-1);
-  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Desktop, Screen, Canvas') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
-  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Desktop, Screen, Canvas') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Browser, Desktop, Screen, Canvas') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Browser, Desktop, Screen, Canvas') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
   herrero.querySelector('[data-accion="abrir"]').click();
   await sleep(dur('base') + 260);
   await until(() => statusRight().includes('Toolsmith'), 3000);
-  // todas (19) menos las tres de la web
-  if (!statusRight().endsWith('· 16 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
+  // todas (25) menos las tres de la web
+  if (!statusRight().endsWith('· 22 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
 
   // Escribir un archivo. En modo manual (el de fábrica) primero pide permiso:
   // la tarjeta dice qué va a correr y qué va a cambiar, y hasta que no se
@@ -921,17 +921,17 @@ else {
     const abrir = async () => { boton.click(); await until(() => menus().length > 0, 2000); await sleep(dur('base') + 60); };
     await abrir();
     const filasMenu = [...menus()[0].querySelectorAll('.rad-menu-item')].map((i) => i.textContent.trim());
-    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Desktop,Screen,Canvas,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
+    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
     await pick('Turn all off');
     if (dice() !== 'Tools: off' || boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· no tools')) fail(`apagar todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     await pick('Turn all on');
-    if (dice() !== '19 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 19 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
+    if (dice() !== '25 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 25 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     const marcadas = [...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].length;
-    if (marcadas !== 8) fail(`con todas prendidas el menú marca ${marcadas} grupos de 8`);
+    if (marcadas !== 9) fail(`con todas prendidas el menú marca ${marcadas} grupos de 9`);
     await pick('Web');
-    if (dice() !== '16 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
+    if (dice() !== '22 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
     // y las recibe el modelo: el pedido siguiente corre una de esas tools
     // (en modo manual, que es como quedó: pide permiso y se le da)
     await pedir([[{ name: 'fs_read', args: { paths: ['note.txt'] } }]]);
@@ -939,7 +939,7 @@ else {
     primary()?.click();
     await until(() => !composer.querySelector('.rad-busy') && ultimo()?.dataset.estado === 'ok' && cuenta() === '1 tool · 1 done', 20000);
     if (cuenta() !== '1 tool · 1 done') fail(`después de prender las tools desde la conversación, el contador dice «${cuenta()}»`);
-    data.toolsEnElChat = `${antes} → Tools: off → 19 tools → 16 tools`;
+    data.toolsEnElChat = `${antes} → Tools: off → 25 tools → 22 tools`;
   }
 
   // 11c. El canvas: el agente deja un documento en el panel de al lado, lo
@@ -1073,6 +1073,95 @@ else {
     if (datosM.sumarToolsNuevas(lista, ['a', 'b', 'c'], ['a', 'b', 'c']) !== null) fail('tools nuevas: sin tools nuevas igual cambió algo');
   }
 
+  // 11d. El navegador: el agente abre una página (servida en esta máquina),
+  // la lee, escribe en un campo, hace clic y sigue un link; el panel se abre
+  // solo, muestra lo que pasa y comparte el hueco con el canvas.
+  {
+    const datosM = await import('/datos.js');
+    datosM.ponerModoTools('auto');
+    const escena = chatView.querySelector('.dm-escena');
+    const nav = chatView.querySelector('.dm-nav');
+    const botonNav = chatView.querySelector('[data-accion="navegador"]');
+    const hueco = nav.querySelector('.dm-nav-hueco');
+    const estadoNav = () => window.rad.invoke('browser:state');
+    const lee = (name, n = -1) => fila(name, n)?.querySelector('.dm-tool-pre').textContent ?? '';
+    const quieto = async () => { await sleep(200); for (let i = 0; i < 600 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50); await settle(); };
+    const corre = async (...llamadas) => { await pedir([llamadas]); await quieto(); };
+    // (el canvas del chat anterior termina de soltar el hueco)
+    await until(() => !escena.hasAttribute('data-panel'), 2000);
+    if (nav.hasAttribute('data-abierto') || escena.hasAttribute('data-panel')) fail('navegador: arranca abierto');
+
+    // El agente navega: el panel se abre solo, porque sus tools lo necesitan a la vista.
+    await corre({ name: 'browser_navigate', args: { url: SMOKE_URL } }, { name: 'browser_read', args: {} });
+    if (!nav.hasAttribute('data-abierto') || escena.getAttribute('data-panel') !== 'browser' || botonNav.getAttribute('aria-pressed') !== 'true') fail('navegador: la tool no abrió el panel');
+    if (!lee('browser_navigate').startsWith('Opened ' + SMOKE_URL) || !lee('browser_navigate').includes('Smoke page')) fail('navegador: browser_navigate devolvió: ' + lee('browser_navigate').slice(0, 160));
+    const leido = lee('browser_read');
+    if (!leido.includes('Smoke page') || !leido.includes('nothing yet') || !leido.includes('--- page text ---')) fail('navegador: browser_read no trae el texto de la página: ' + leido.slice(0, 200));
+    const ref = (nombre) => new RegExp('\\[(ref_\\d+)\\][^\\n]*"' + nombre + '"').exec(leido)?.[1];
+    const [rCampo, rBoton, rLink] = [ref('Your name'), ref('Greet'), ref('Second page')];
+    if (!rCampo || !rBoton || !rLink) fail('navegador: browser_read no numeró el campo, el botón y el link: ' + [rCampo, rBoton, rLink].join(', ') + ' en ' + leido.slice(0, 400));
+    if (fila('browser_read')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'globe') fail('navegador: sus filas no llevan el ícono del navegador');
+    // la barra y la pestaña dicen dónde está
+    await until(() => nav.querySelector('.dm-nav-url').value.includes('127.0.0.1'), 3000);
+    const tabsN = () => alive(nav.querySelectorAll('.dm-nav-tab'));
+    if (!nav.querySelector('.dm-nav-url').value.includes('127.0.0.1') || tabsN().length !== 1 || !tabsN()[0].textContent.includes('Smoke page')) fail('navegador: la barra dice «' + nav.querySelector('.dm-nav-url').value + '» y la pestaña «' + tabsN()[0]?.textContent + '»');
+    // el hueco está adentro del panel, al lado de la conversación, y con tamaño
+    const hr = hueco.getBoundingClientRect();
+    if (hr.width < 250 || hr.height < 250 || hr.left < thread().getBoundingClientRect().right - 1) fail('navegador: el hueco de la página mide ' + Math.round(hr.width) + '×' + Math.round(hr.height) + ' o pisa la conversación');
+
+    // Escribe, hace clic y vuelve a leer: la página cambió.
+    await corre({ name: 'browser_type', args: { ref: rCampo, text: 'Fran' } }, { name: 'browser_click', args: { ref: rBoton } }, { name: 'browser_read', args: {} });
+    if (!lee('browser_read').includes('clicked: Fran')) fail('navegador: después de escribir y hacer clic la página dice: ' + (/clicked[^\n]*|nothing yet/.exec(lee('browser_read'))?.[0] ?? '(nada)') + ' · type: ' + lee('browser_type').slice(0, 80) + ' · click: ' + lee('browser_click').slice(0, 80));
+    // lo que se teclea no queda en la fila: pasan contraseñas por ahí
+    if (shown(fila('browser_type')?.querySelector('.dm-tool-que')).includes('Fran')) fail('navegador: la fila de browser_type muestra lo que se tecleó');
+
+    // Sigue un link: la tool dice que navegó, y la barra y la pestaña lo siguen.
+    await corre({ name: 'browser_click', args: { ref: rLink } }, { name: 'browser_read', args: {} });
+    if (!lee('browser_read').includes('You are on the second page.')) fail('navegador: el clic en el link no llevó a la segunda página: ' + lee('browser_click').slice(0, 160));
+    await until(() => tabsN()[0]?.textContent.includes('Second page'), 3000);
+    const st = await estadoNav();
+    if (!String(st?.url).endsWith('/second') || !st.canGoBack || !tabsN()[0]?.textContent.includes('Second page')) fail('navegador: el estado quedó en ' + st?.url + ' (atrás: ' + st?.canGoBack + '), pestaña «' + tabsN()[0]?.textContent + '»');
+
+    // El usuario lo usa a mano: es la misma pestaña. Atrás, y una pestaña nueva.
+    nav.querySelector('[data-accion="nav-atras"]').click();
+    for (let i = 0; i < 60 && !String((await estadoNav())?.url).endsWith('/'); i++) await sleep(50);
+    if (String((await estadoNav())?.url) !== SMOKE_URL) fail('navegador: Atrás no volvió a la primera página: ' + (await estadoNav())?.url);
+    nav.querySelector('[data-accion="nav-nueva"]').click();
+    await until(() => tabsN().length === 2, 3000);
+    if (tabsN().length !== 2 || tabsN()[1].getAttribute('aria-selected') !== 'true') fail('navegador: la pestaña nueva no quedó abierta y activa (' + tabsN().length + ' pestañas)');
+    if (!hueco.hasAttribute('data-vacio')) fail('navegador: una pestaña en blanco no muestra su texto de ayuda');
+    tabsN()[1].querySelector('.dm-nav-tab-x').click();
+    await until(() => tabsN().length === 1, 3000);
+    if (tabsN().length !== 1) fail('navegador: cerrar la pestaña dejó ' + tabsN().length);
+
+    // Eclipse: la página es una capa nativa que tapa todo. Cuando la app pone
+    // algo encima (un modal) la capa se apaga y queda una foto en su lugar.
+    await sleep(dur('base') + 200);
+    chatView.querySelector('[data-accion="canvas-biblioteca"]').click();
+    await until(() => modal(), 2000);
+    await until(() => hueco.hasAttribute('data-foto'), 3000);
+    const fotoN = hueco.querySelector('.dm-nav-foto');
+    if (!hueco.hasAttribute('data-foto') || !fotoN.src.startsWith('data:image/jpeg') || !(fotoN.naturalWidth > 100)) fail('navegador: con un modal encima no quedó la foto de la página (' + (fotoN.src || '').slice(0, 30) + ', ' + fotoN.naturalWidth + ' px)');
+    modal().querySelector('.rad-button').click();
+    await closed();
+    await until(() => !hueco.hasAttribute('data-foto'), 3000);
+    if (hueco.hasAttribute('data-foto')) fail('navegador: al cerrarse el modal la foto siguió tapando la página');
+
+    // El hueco es uno solo: abrir un canvas cierra el navegador, y al revés.
+    await corre({ name: 'canvas', args: { action: 'create', title: 'Beside the browser', kind: 'document', content: 'x' } });
+    if (nav.hasAttribute('data-abierto') || escena.getAttribute('data-panel') !== 'canvas' || !chatView.querySelector('.dm-canvas').hasAttribute('data-abierto')) fail('navegador: abrir un canvas no cerró el navegador');
+    botonNav.click();
+    await until(() => nav.hasAttribute('data-abierto') && !chatView.querySelector('.dm-canvas').hasAttribute('data-abierto'), 3000);
+    await sleep(dur('base') + 120);
+    if (escena.getAttribute('data-panel') !== 'browser' || chatView.querySelector('.dm-canvas').hasAttribute('data-abierto')) fail('navegador: abrir el navegador no cerró el canvas (panel: ' + escena.getAttribute('data-panel') + ')');
+    enIngles('con el navegador abierto');
+    botonNav.click();
+    await until(() => !escena.hasAttribute('data-panel'), 3000);
+    if (nav.hasAttribute('data-abierto') || escena.hasAttribute('data-panel')) fail('navegador: su botón no lo cerró');
+    datosM.ponerModoTools('manual');
+    data.navegador = 'el agente abrió ' + SMOKE_URL + ', leyó, escribió, hizo clic y siguió un link; atrás, pestañas, eclipse con foto de ' + fotoN.naturalWidth + ' px, y turno con el canvas';
+  }
+
   // Cambiarle las tools a un agente que YA existía, desde su formulario.
   {
     await go('agentes');
@@ -1083,7 +1172,7 @@ else {
     const guardar = async () => { primary().click(); await closed(); await settle(); };
     await editar();
     if (!sw('files')?.checked || !sw('screen')?.checked) fail('el formulario de un agente con todas las tools no las muestra prendidas');
-    for (const g of ['commands', 'code', 'data', 'web', 'desktop', 'canvas']) sw(g).click();
+    for (const g of ['commands', 'code', 'data', 'web', 'browser', 'desktop', 'canvas']) sw(g).click();
     await guardar();
     if (tarjeta() !== 'Tools: Files, Screen') fail(`apagarle grupos a un agente desde su formulario dejó la tarjeta en «${tarjeta()}»`);
     await editar();

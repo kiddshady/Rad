@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +24,39 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const electron = require('electron');
 const SMOKE = path.join(ROOT, '.smoke');
 const SCRIPT = path.join(ROOT, 'tools', 'smoke-nix.js');
+// El navegador de Nix se prueba contra una página servida en esta máquina:
+// el humo no sale a internet.
+const PAGINAS = {
+  '/': '<!doctype html><html><head><meta charset="utf-8"><title>Smoke page</title></head><body style="background:#fff;font:16px sans-serif;padding:24px">'
+    + '<h1>Smoke page</h1><p id="estado">nothing yet</p>'
+    + '<input id="campo" aria-label="Your name" placeholder="Your name"> '
+    + '<button id="b" onclick="document.getElementById(\'estado\').textContent=\'clicked: \'+document.getElementById(\'campo\').value">Greet</button>'
+    + '<p><a href="/second">Second page</a></p></body></html>',
+  '/second': '<!doctype html><html><head><meta charset="utf-8"><title>Second page</title></head><body style="background:#fff;font:16px sans-serif;padding:24px"><h1>Second page</h1><p>You are on the second page.</p></body></html>',
+};
+const servidor = http.createServer((req, res) => {
+  const html = PAGINAS[new URL(req.url ?? '/', 'http://x').pathname];
+  res.writeHead(html ? 200 : 404, { 'content-type': 'text/html; charset=utf-8' });
+  res.end(html ?? 'not found');
+});
+await new Promise((r) => servidor.listen(0, '127.0.0.1', r));
+const SMOKE_URL = `http://127.0.0.1:${servidor.address().port}/`;
+// El guion que corre la app: el de siempre, con la dirección de esa página
+// adelante. Con RAD_SMOKE_TRAZA=1 va envuelto en un try/catch que devuelve la
+// traza: una excepción del guion dice en qué línea fue.
+function armarGuion(carpeta) {
+  let fuente = fs.readFileSync(SCRIPT, 'utf8');
+  const cabeza = `const SMOKE_URL = ${JSON.stringify(SMOKE_URL)};`;
+  if (process.env.RAD_SMOKE_TRAZA) {
+    fuente = fuente.replace('const failures = [];', 'var failures = [];');
+    fuente = `${cabeza} try {\n${fuente}\n} catch (e) { return { failures: [...failures, 'TRAZA (línea del guion = la del error menos 2): ' + (e.stack || e)], data: {} }; }`;
+  } else {
+    fuente = `${cabeza}\n${fuente}`;
+  }
+  const destino = path.join(carpeta, 'guion-humo.js');
+  fs.writeFileSync(destino, fuente);
+  return destino;
+}
 // RAD_SMOKE_TIMEOUT (ms) lo estira y RAD_SMOKE_KEEP=1 deja la carpeta de datos
 // para mirarla: las dos son para depurar un guion que se cuelga.
 const TIMEOUT_MS = Number(process.env.RAD_SMOKE_TIMEOUT) || 240000;
@@ -50,7 +84,7 @@ function run(pass, data) {
     ...process.env,
     RAD_SMOKE: out,
     RAD_SMOKE_SHOT: shot,
-    RAD_SMOKE_SCRIPT: SCRIPT,
+    RAD_SMOKE_SCRIPT: armarGuion(data),
     RAD_SMOKE_QUIT: 'close', // por el cierre normal: lo pendiente baja en before-quit
     RAD_DATA: data,
     NIX_PROVEEDOR: 'simulado',

@@ -88,7 +88,7 @@ function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confir
     /** El system de un turno con tools: las instrucciones del agente, el
      *  entorno, y el protocolo de tools. La línea de puente va acá y no en las
      *  instrucciones, que son del usuario y se pueden reescribir enteras. */
-    sistema(instrucciones, { trabajos = '', canvas = '' } = {}) {
+    sistema(instrucciones, { trabajos = '', canvas = '', navegador = '' } = {}) {
       return [
         ...(instrucciones ? [instrucciones, ''] : []),
         entorno(run),
@@ -97,6 +97,8 @@ function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confir
         ...(nombres.includes('job_output') && trabajos ? ['', '## Background jobs still running', trabajos] : []),
         // los canvas de este chat (el bloque trae su propio título)
         ...(canvas ? ['', canvas] : []),
+        // los favoritos del navegador y la pestaña que el usuario tiene abierta
+        ...(navegador ? ['', navegador] : []),
         '',
         'The section below is the tool protocol for THIS session. It is written by the app — not by you, not by the user — and it is authoritative: it overrides anything earlier in this prompt.',
         ...guardas.toolGuidance(nombres, run, run.needsConfirm()),

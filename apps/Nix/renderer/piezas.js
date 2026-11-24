@@ -31,6 +31,15 @@ export const ICONOS = {
   copiar: svg('<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>'),
   bajar: svg('<path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/>'),
   volver: svg('<path d="M5.5 3.5l-3 3 3 3M2.5 6.5H9a3.5 3.5 0 0 1 0 7H6.5"/>'),
+  // el navegador
+  globo: svg('<circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c1.7 1.5 2.5 3.3 2.5 5.5S9.7 12 8 13.5C6.3 12 5.5 10.2 5.5 8S6.3 4 8 2.5z"/>'),
+  atras: svg('<path d="M9.5 3.5 5 8l4.5 4.5"/>'),
+  adelante: svg('<path d="M6.5 3.5 11 8l-4.5 4.5"/>'),
+  recargar: svg('<path d="M13 8a5 5 0 1 1-1.5-3.6M13 3v3h-3"/>'),
+  estrella: svg('<path d="M8 2.5l1.7 3.5 3.8.5-2.8 2.7.7 3.8L8 11.2 4.6 13l.7-3.8L2.5 6.5l3.8-.5z"/>'),
+  marcadores: svg('<path d="M4.5 2.5h7v11L8 11l-3.5 2.5z"/>'),
+  externo: svg('<path d="M9 3h4v4M13 3 7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/>'),
+  candado: svg('<rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>'),
   // el canvas: una hoja con su cabecera y una columna
   canvas: svg('<rect x="2.5" y="2.5" width="11" height="11" rx="1.75"/><path d="M2.5 6.25h11M6.5 6.25v7.25"/>'),
   codigo: svg('<path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/>'),

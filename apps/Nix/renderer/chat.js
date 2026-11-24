@@ -15,6 +15,7 @@ import { abrirAgente } from './agentes.js';
 import { filaTool, ponerTool, cuentaTools, abrirPermiso } from './tools.js';
 import { h, icono } from './piezas.js';
 import { montarCanvas } from './canvas.js';
+import { montarNavegador } from './navegador.js';
 
 // Los items que no son un chat ni un mensaje: el lugar vacío de cada lista.
 const VACIO = '_vacio';
@@ -119,11 +120,19 @@ export function montarChat(el, { router }) {
   // La escena: la conversación y, a su derecha, el panel que esté abierto
   // (el canvas). El panel empuja a la conversación; no la tapa.
   const escena = h('div', 'dm-escena');
-  const lienzo = montarCanvas({ escena });
+  // El hueco de la escena es uno solo: abrir un panel cierra el otro.
+  const turnos = {
+    pedir(quien) {
+      if (quien !== 'canvas') lienzo.cerrar({ rescatar: true });
+      if (quien !== 'browser') nav.cerrar();
+    },
+  };
+  const lienzo = montarCanvas({ escena, turnos });
+  const nav = montarNavegador({ escena, turnos, router });
   const conv = h('section', 'dm-conv', {},
-    h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, sub, lienzo.botonBiblioteca, botonTools),
+    h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, sub, nav.boton, lienzo.botonBiblioteca, botonTools),
     lienzo.barra, celda, aviso, h('div', 'dm-redactor-caja', {}, redactor));
-  escena.append(conv, lienzo.panel);
+  escena.append(conv, lienzo.panel, nav.panel);
 
   el.append(lado, escena);
 

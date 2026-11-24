@@ -37,9 +37,10 @@ const meta = (c) => [c.kind === 'code' ? (c.language || 'code') : 'document', c.
 /**
  * Arma el canvas adentro de la vista de chat.
  *   escena  el contenedor de la conversación y el panel (su marco)
+ *   turnos  { pedir(quien) }: cierra el otro panel antes de abrir este
  * Devuelve { panel, barra, botonBiblioteca, alCambiarDeChat() }.
  */
-export function montarCanvas({ escena }) {
+export function montarCanvas({ escena, turnos }) {
   let items = [];        // los canvas de este chat, livianos (sin contenido)
   let activo = null;     // el que está abierto, entero
   let editando = false;
@@ -152,6 +153,7 @@ export function montarCanvas({ escena }) {
   // ---------- Abrir y cerrar ----------
   let cerrando = null;
   function mostrar(c) {
+    turnos?.pedir('canvas'); // el hueco es uno solo: el navegador se cierra
     clearTimeout(cerrando);
     activo = c;
     llegado = null;
@@ -189,7 +191,8 @@ export function montarCanvas({ escena }) {
     clearTimeout(cerrando);
     cerrando = setTimeout(() => {
       if (abierto()) return;
-      escena.removeAttribute('data-panel');
+      // (si mientras tanto abrió el navegador, el hueco ya es de él)
+      if (escena.getAttribute('data-panel') === 'canvas') escena.removeAttribute('data-panel');
       activo = null;
       cuerpo._md = null;
       cuerpo.replaceChildren();
