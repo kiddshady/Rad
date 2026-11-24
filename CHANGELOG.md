@@ -1,5 +1,19 @@
 # Changelog
 
+## BlackCode 0.12.4 (2026-11-24)
+
+- **Los resultados de `web_search` salen limpios.** Un fragmento que traía el
+  HTML de la página escapado (`&lt;div class="page"&gt;`) o etiquetas sueltas
+  (`C<sub>max</sub>`) ahora llega como texto: sin entidades y sin etiquetas.
+  Lo que no es una etiqueta («a < b») no se toca.
+- **Fechas con Tavily.** Se le pide la fecha de publicación de cada resultado
+  (antes solo la mandaba en búsquedas de noticias) y va al lado del título.
+- **Solo lo reciente.** `web_search` gana un argumento, `recency` (día,
+  semana, mes o año), que cada buscador recibe a su manera: `time_range` en
+  Tavily, `freshness` en Brave, `df` en DuckDuckGo. La lista dice el plazo
+  («Web results from Tavily (past week):»). Con un plazo pedido, DuckDuckGo
+  no cae a sus respuestas instantáneas, que no tienen fecha.
+
 ## BlackCode 0.12.3 (2026-11-24)
 
 - **El ícono pasa a metal.** El Cubo es el mismo dibujo, pero el trazo ya no es

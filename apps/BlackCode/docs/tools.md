@@ -270,9 +270,19 @@ Venice) en cada pedido de un agente con tools.
   espacio: los fragmentos cortos van enteros y los largos se recortan. Antes
   se cortaba en 2000 por renglones enteros, y con los fragmentos largos de
   Tavily llegaba un solo resultado. Un fragmento que es el código de la página
-  (JSON o HTML) se cambia por `(no readable excerpt)`.
-- Esos dos (la búsqueda sin llave y la lista) son los únicos arreglos hechos
-  sobre el código portado de `web_search`.
+  (JSON o HTML) se cambia por `(no readable excerpt)`. Desde la 0.12.4 los
+  títulos y fragmentos pasan por `aTexto`: sin entidades y sin etiquetas de
+  HTML conocidas.
+- `recency` (0.12.4) es un argumento propio de BlackCode, no de NeonCode:
+  `day`, `week`, `month` o `year`. Viaja como `time_range` a Tavily, como
+  `freshness` a Brave y como `df` a DuckDuckGo. A Tavily además se le pide
+  `include_published_date` (una opción suya en beta: si rechaza el pedido con
+  un 400 o un 422, se reintenta sin ella). La definición de `web_search` en
+  `defs.cjs` está editada a mano: si se vuelven a generar las definiciones
+  desde NeonCode, hay que volver a ponerle `recency`.
+- Esos (la búsqueda sin llave, la lista y lo reciente) son los únicos cambios
+  hechos sobre el código portado de `web_search`. Ninguno se probó contra
+  Tavily ni Brave desde las pruebas: lo confirma Fran usándolos.
 
 ## Defectos conocidos que vinieron con el código
 

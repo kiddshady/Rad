@@ -719,7 +719,7 @@ try {
     const out = await runners.web_search(hacerRun(), { query: 'q' });
     igual(pedidas, ['websearch'], 'web_search pide la llave «websearch»');
     igual([requests[0].url, requests[0].method], ['https://api.tavily.com/search', 'POST'], 'Tavily: a dónde va');
-    igual(JSON.parse(requests[0].body), { api_key: LLAVE, query: 'q', max_results: 2, include_answer: false }, 'Tavily: el cuerpo');
+    igual(JSON.parse(requests[0].body), { api_key: LLAVE, query: 'q', max_results: 2, include_answer: false, include_published_date: true }, 'Tavily: el cuerpo');
     igual(out, 'Web results from Tavily:\n[1] Uno — primero resultado (https://uno.example)\n[2] Dos — segundo (https://dos.example)', 'Tavily: los resultados');
     check(!out.includes(LLAVE), 'Tavily: la llave aparece en el resultado');
 
@@ -761,6 +761,45 @@ try {
     // código de verdad en un fragmento (una búsqueda de programación) no es un volcado
     banco(() => ({ json: { results: [{ title: 'JS', url: 'https://js.example', content: 'Use const x = { a: 1 }; then call f(x) and <div> will render. Arrays work the same: [1, 2, 3].map((n) => n * 2).' }] } }));
     check((await runners.web_search(hacerRun(), { query: 'q' })).includes('const x = { a: 1 }'), 'un fragmento con código se tomó por un volcado');
+
+    // Fragmentos con HTML: el de la página escapado con entidades, y etiquetas
+    // sueltas adentro del texto. Y lo que NO es una etiqueta se queda.
+    banco(() => ({ json: { results: [
+      { title: 'ClinPGx &amp; <b>imatinib</b>', url: 'https://c.example', content: '&lt;div class="page"&gt;&lt;p&gt;Imatinib pathway&lt;/p&gt; Javascript Is Disabled!&lt;/div&gt;' },
+      { title: 'FDA label', url: 'https://f.example', content: 'Mean C<sub>max</sub> and AUC<sub>0-24</sub> rose; t<sup>1/2</sup> is 18&nbsp;h.<br>Dose if a < b and c > d.' },
+    ] } }));
+    igual((await runners.web_search(hacerRun(), { query: 'q' })).split('\n'), [
+      'Web results from Tavily:',
+      '[1] ClinPGx & imatinib — Imatinib pathway Javascript Is Disabled! (https://c.example)',
+      '[2] FDA label — Mean Cmax and AUC0-24 rose; t1/2 is 18 h. Dose if a < b and c > d. (https://f.example)',
+    ], 'web_search: los fragmentos salen sin entidades ni etiquetas');
+
+    // Solo lo reciente: cada buscador recibe el plazo a su manera, y la lista lo dice.
+    const reqT = banco(() => ({ json: { results: [{ title: 'N', url: 'https://n.example', content: 'nota', published_date: '2026-11-22T09:00:00Z' }] } }));
+    igual(await runners.web_search(hacerRun(), { query: 'q', count: 3, recency: 'Week' }), 'Web results from Tavily (past week):\n[1] N (2026-11-22) — nota (https://n.example)', 'Tavily: lo reciente y la fecha');
+    igual(JSON.parse(reqT[0].body), { api_key: LLAVE, query: 'q', max_results: 3, include_answer: false, include_published_date: true, time_range: 'week' }, 'Tavily: el plazo viaja como time_range');
+    const reqMal = banco(() => ({ json: { results: [] } }));
+    igual(await runners.web_search(hacerRun(), { query: 'q', recency: 'ayer' }), 'error: recency must be one of day, week, month, year (or omitted)', 'web_search: un plazo que no existe');
+    igual(await runners.web_search(hacerRun(), { query: 'q', recency: 'constructor' }), 'error: recency must be one of day, week, month, year (or omitted)', 'web_search: un plazo que no existe (2)');
+    igual(reqMal.length, 0, 'web_search: con un plazo que no existe no sale a la red');
+    // si Tavily rechaza el pedido por la opción de la fecha, la búsqueda sale igual
+    const reqR = banco((_u, _i, n) => (n === 0 ? { status: 400 } : { json: { results: [{ title: 'S', url: 'https://s.example', content: 'sin fecha' }] } }));
+    igual(await runners.web_search(hacerRun(), { query: 'q', recency: '' }), 'Web results from Tavily:\n[1] S — sin fecha (https://s.example)', 'Tavily: un 400 se reintenta sin pedir la fecha');
+    igual(reqR.map((r) => JSON.parse(r.body).include_published_date), [true, undefined], 'Tavily: el reintento va sin include_published_date');
+    banco(() => ({ status: 400 }));
+    igual(await runners.web_search(hacerRun(), { query: 'q' }), 'error: web search failed: HTTP 400', 'Tavily: si el reintento también falla, es un error');
+
+    configurar({ webSearch: () => ({ provider: 'brave', maxResults: 5 }) });
+    const reqF = banco(() => ({ json: { web: { results: [{ title: 'B', url: 'https://b.example', description: 'x', age: '2 days ago' }] } } }));
+    igual(await runners.web_search(hacerRun(), { query: 'q', recency: 'month' }), 'Web results from Brave (past month):\n[1] B (2 days ago) — x (https://b.example)', 'Brave: lo reciente, y una edad que no es una fecha va como viene');
+    igual(reqF[0].url, 'https://api.search.brave.com/res/v1/web/search?q=q&count=5&freshness=pm', 'Brave: el plazo viaja como freshness');
+
+    // DuckDuckGo: el plazo va en la búsqueda web, y si no trae nada NO se cae a
+    // las respuestas instantáneas, que no tienen fecha
+    configurar({ webSearch: () => ({ provider: 'duckduckgo', maxResults: 5 }) });
+    const reqDf = banco((url) => (url.startsWith('https://html.') ? { body: '<html><body>No results.</body></html>' } : { json: DDG }));
+    igual(await runners.web_search(hacerRun(), { query: 'q', recency: 'day' }), 'No web results found.', 'DuckDuckGo con plazo y sin resultados web: no usa las respuestas instantáneas');
+    igual(reqDf.map((r) => r.url), ['https://html.duckduckgo.com/html/?q=q&df=d'], 'DuckDuckGo: el plazo viaja como df');
 
     // un proveedor que no se conoce cae a DuckDuckGo, y no manda la llave
     configurar({ webSearch: () => ({ provider: 'otro' }) });

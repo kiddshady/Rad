@@ -361,8 +361,8 @@ function leerResultadosDdg(html, count) {
   }
   return out;
 }
-async function wsDdgWeb(query, count, signal) {
-  const res = await fetch(DDG_WEB + encodeURIComponent(query), {
+async function wsDdgWeb(query, count, signal, cuando = null) {
+  const res = await fetch(DDG_WEB + encodeURIComponent(query) + (cuando ? '&df=' + cuando.ddg : ''), {
     headers: { 'User-Agent': 'BlackCode/1.0 (local assistant)', Accept: 'text/html', 'Accept-Language': 'en-US,en;q=0.8' },
     signal,
   });
@@ -374,29 +374,41 @@ async function wsDdgWeb(query, count, signal) {
   return results;
 }
 
-async function wsTavily(query, count, key, signal) {
-  const res = await fetch('https://api.tavily.com/search', {
+async function wsTavily(query, count, key, signal, cuando = null) {
+  // include_published_date: la fecha de cada resultado (sin pedirla, Tavily
+  // solo la manda en las búsquedas de noticias). time_range: solo lo publicado
+  // en ese plazo.
+  const pedir = (conFecha) => fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ api_key: key, query, max_results: count, include_answer: false }),
+    body: JSON.stringify({
+      api_key: key, query, max_results: count, include_answer: false,
+      ...(conFecha ? { include_published_date: true } : {}),
+      ...(cuando ? { time_range: cuando.tavily } : {}),
+    }),
     signal,
   });
+  let res = await pedir(true);
+  // La fecha es una opción que Tavily tiene en beta: si rechaza el pedido por
+  // ella, la búsqueda sale igual, sin fechas.
+  if (res.status === 400 || res.status === 422) res = await pedir(false);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   return (data.results || []).map((r) => ({ title: r.title, url: r.url, snippet: r.content, date: r.published_date })).slice(0, count);
 }
 
-async function wsBrave(query, count, key, signal) {
-  const url = 'https://api.search.brave.com/res/v1/web/search?q=' + encodeURIComponent(query) + '&count=' + count;
+async function wsBrave(query, count, key, signal, cuando = null) {
+  const url = 'https://api.search.brave.com/res/v1/web/search?q=' + encodeURIComponent(query) + '&count=' + count + (cuando ? '&freshness=' + cuando.brave : '');
   const res = await fetch(url, { headers: { 'X-Subscription-Token': key, Accept: 'application/json' }, signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  // Brave marca lo que coincide con <strong> y manda entidades: se pasa a texto.
-  return ((data.web && data.web.results) || []).map((r) => ({ title: textoDe(r.title), url: r.url, snippet: textoDe(r.description), date: r.page_age || r.age })).slice(0, count);
+  // (Brave marca lo que coincide con <strong> y manda entidades: lo limpia la lista)
+  return ((data.web && data.web.results) || []).map((r) => ({ title: r.title, url: r.url, snippet: r.description, date: r.page_age || r.age })).slice(0, count);
 }
 
-// La lista que lee el modelo. Arriba, de dónde salió; después un renglón por
-// resultado: [n] título (fecha, si vino) — fragmento (dirección).
+// La lista que lee el modelo. Arriba, de dónde salió (y de cuándo, si se pidió
+// solo lo reciente); después un renglón por resultado:
+// [n] título (fecha, si vino) — fragmento (dirección).
 //
 // Hasta la 0.12.2 la lista se cortaba en 2000 caracteres por renglones
 // enteros, y cada fragmento iba como venía. Con los resúmenes cortos de
@@ -407,12 +419,57 @@ const TOPE_LISTA = 4000;
 const TOPE_TITULO = 160;
 const SIN_FRAGMENTO = '(no readable excerpt)';
 
+// «Solo lo reciente»: lo que el modelo pide con `recency`, en el idioma de
+// cada buscador, y cómo se lo cuenta la lista.
+const RECIENTE = {
+  day: { tavily: 'day', brave: 'pd', ddg: 'd', dice: 'past day' },
+  week: { tavily: 'week', brave: 'pw', ddg: 'w', dice: 'past week' },
+  month: { tavily: 'month', brave: 'pm', ddg: 'm', dice: 'past month' },
+  year: { tavily: 'year', brave: 'py', ddg: 'y', dice: 'past year' },
+};
+
 function recortar(s, tope) {
   if (s.length <= tope) return s;
   if (tope < 8) return '';
   const corte = s.slice(0, tope - 4);
   const espacio = corte.lastIndexOf(' ');
   return (espacio > tope * 0.6 ? corte.slice(0, espacio) : corte).trimEnd() + ' ...';
+}
+
+// Las entidades de HTML, a su carácter. Los buscadores a veces mandan el
+// fragmento con el HTML de la página escapado (&lt;div class="page"&gt;).
+// &amp; va al final: «&amp;lt;» es el texto «&lt;», no un «<».
+function sinEntidades(s) {
+  return String(s || '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0*39;|&apos;/gi, "'")
+    .replace(/&#[xX]([0-9a-fA-F]+);/g, (m0, h) => {
+      const n = parseInt(h, 16);
+      return Number.isFinite(n) && n > 0 && n <= 0x10FFFF ? String.fromCodePoint(n) : m0;
+    })
+    .replace(/&#(\d+);/g, (m0, n) => {
+      const c = Number(n);
+      return Number.isFinite(c) && c > 0 && c <= 0x10FFFF ? String.fromCodePoint(c) : m0;
+    })
+    .replace(/&amp;/gi, '&');
+}
+
+// Un título o un fragmento, a texto liso: sin entidades y sin las etiquetas
+// que hayan quedado (C<sub>max</sub> es «Cmax»). Solo se sacan etiquetas de
+// HTML conocidas: «a < b and c > d» no es una. Las de adentro de una palabra
+// se van sin dejar hueco; las de bloque dejan un espacio.
+const EN_LINEA = /<\/?(?:a|abbr|b|code|em|i|mark|small|span|strong|sub|sup|u)\b[^<>]*>/gi;
+const DE_BLOQUE = /<\/?(?:article|blockquote|body|br|button|dd|div|dl|dt|figure|footer|form|h[1-6]|head|header|hr|html|iframe|img|input|label|li|link|main|meta|nav|noscript|ol|p|pre|script|section|style|svg|table|tbody|td|th|thead|title|tr|ul)\b[^<>]*>/gi;
+function aTexto(s) {
+  return sinEntidades(s)
+    .replace(/<(script|style|noscript)\b[^<>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(EN_LINEA, '')
+    .replace(DE_BLOQUE, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // Un fragmento que no es texto de la página sino su código: el buscador tomó
@@ -434,13 +491,15 @@ function fechaDe(d) {
   return Number.isNaN(t) ? s.slice(0, 30) : new Date(t).toISOString().slice(0, 10);
 }
 
-function listar(results, fuente) {
-  const cabeza = `Web results from ${fuente}:`;
+function listar(results, fuente, cuando = null) {
+  const cabeza = `Web results from ${fuente}${cuando ? ` (${cuando.dice})` : ''}:`;
   const filas = results.map((r, i) => {
-    const titulo = recortar(String(r.title || '').replace(/\s+/g, ' ').trim(), TOPE_TITULO);
+    const titulo = recortar(aTexto(r.title), TOPE_TITULO);
     const fecha = fechaDe(r.date);
-    let snippet = String(r.snippet || '').replace(/\s+/g, ' ').trim();
-    if (pareceVolcado(snippet)) snippet = SIN_FRAGMENTO;
+    // ¿es un volcado? Se mira con las entidades ya resueltas y las etiquetas
+    // todavía puestas: son la pista.
+    const crudo = sinEntidades(r.snippet).replace(/\s+/g, ' ').trim();
+    const snippet = pareceVolcado(crudo) ? SIN_FRAGMENTO : aTexto(crudo);
     return { antes: `[${i + 1}] ${titulo}${fecha ? ` (${fecha})` : ''} — `, snippet, despues: ` (${r.url || ''})` };
   });
   // Lo que queda para los fragmentos, y el largo máximo con el que entran
@@ -467,9 +526,14 @@ function listar(results, fuente) {
   return body === cabeza ? 'No web results found.' : body;
 }
 
-async function runWebSearch(run, { query, count } = {}) {
+async function runWebSearch(run, { query, count, recency } = {}) {
   const q = String(query || '').trim();
   if (!q) return 'error: query is required';
+  // «solo lo reciente»: un plazo que no existe no corre nada (buscar sin él
+  // sería contestar otra pregunta)
+  const plazo = String(recency ?? '').trim().toLowerCase();
+  if (plazo && !Object.hasOwn(RECIENTE, plazo)) return 'error: recency must be one of day, week, month, year (or omitted)';
+  const cuando = plazo ? RECIENTE[plazo] : null;
   run.notify('tool:activity', { reqId: run.reqId, kind: 'web_search', label: q.slice(0, 60) });
   const cfgW = webSearchConfig();
   const n = Math.max(1, Math.min(10, Number(count) || Number(cfgW.maxResults) || 5));
@@ -481,11 +545,11 @@ async function runWebSearch(run, { query, count } = {}) {
     let fuente = 'DuckDuckGo';
     if (provider === 'tavily') {
       if (!key) return 'error: web search needs a Tavily API key (Settings)';
-      results = await wsTavily(q, n, key, signal);
+      results = await wsTavily(q, n, key, signal, cuando);
       fuente = 'Tavily';
     } else if (provider === 'brave') {
       if (!key) return 'error: web search needs a Brave API key (Settings)';
-      results = await wsBrave(q, n, key, signal);
+      results = await wsBrave(q, n, key, signal, cuando);
       fuente = 'Brave';
     } else {
       // Sin llave: los resultados web de DuckDuckGo y, si no trajeron nada, su
@@ -493,11 +557,13 @@ async function runWebSearch(run, { query, count } = {}) {
       // la otra tampoco trajo nada, es un error y se dice: «sin resultados»
       // sería afirmar algo que nadie comprobó.
       let fallo = null;
-      try { results = await wsDdgWeb(q, n, signal); } catch (err) {
+      try { results = await wsDdgWeb(q, n, signal, cuando); } catch (err) {
         if (signal.aborted) throw err;
         fallo = err;
       }
-      if (!results?.length) {
+      // (con un plazo pedido no: las respuestas instantáneas no tienen fecha,
+      // y pasarlas por recientes sería mentir)
+      if (!results?.length && !cuando) {
         fuente = 'DuckDuckGo Instant Answers';
         try { results = await wsDdg(q, n, signal); } catch (err) {
           if (signal.aborted) throw err;
@@ -507,7 +573,7 @@ async function runWebSearch(run, { query, count } = {}) {
       if (!results?.length && fallo) throw fallo;
     }
     if (!results?.length) return 'No web results found.';
-    return listar(results, fuente);
+    return listar(results, fuente, cuando);
   } catch (err) {
     let msg = String(err?.message || err);
     if (key) msg = msg.split(key).join('***'); // jamás filtrar la key en un error

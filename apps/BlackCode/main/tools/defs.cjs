@@ -214,12 +214,15 @@ const TOOL_DEFS = [{
   },
 }, {
   name: 'web_search',
-  description: 'Search the public web for current or factual information. Returns a numbered list of titles, snippets and URLs. Use fetch afterwards to read a full page from the results.',
+  description: 'Search the public web for current or factual information. Returns a numbered list of titles, snippets and URLs, with the publication date when the search provider reports one. Use fetch afterwards to read a full page from the results.',
   parameters: {
     type: 'object',
     properties: {
       query: { type: 'string', description: 'the search query' },
       count: { type: 'integer', description: 'how many results (1-10, default from Settings)' },
+      // (de BlackCode, no de NeonCode: la pidió un agente que buscaba noticias y
+      // recibía notas viejas sin saber de cuándo eran)
+      recency: { type: 'string', enum: ['day', 'week', 'month', 'year'], description: 'only results published in the last day, week, month or year. Use it for news and for anything where an old result would mislead; omit it otherwise.' },
     },
     required: ['query'],
   },
