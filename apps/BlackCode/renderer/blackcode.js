@@ -1,4 +1,4 @@
-// BlackCode: arma el shell del núcleo con sus tres vistas.
+// BlackCode: arma el shell del núcleo con sus cuatro vistas.
 
 import { createShell } from '/@core/shell.js';
 import { hold } from '/@core/ready.js';
@@ -7,6 +7,7 @@ import * as datos from './datos.js';
 import * as llave from './llave.js';
 import { montarChat } from './chat.js';
 import { montarAgentes } from './agentes.js';
+import { montarNotas } from './notas.js';
 import { montarAjustes } from './ajustes.js';
 import { ICONOS } from './piezas.js';
 
@@ -16,6 +17,7 @@ await Promise.all([datos.abrir(), llave.refrescar()]);
 
 const views = [
   { id: 'chat', label: 'Chat', icon: ICONOS.chat, scroll: false, mount: (el, router) => montarChat(el, { router }) },
+  { id: 'notas', label: 'Notes', icon: ICONOS.nota, scroll: false, mount: (el, router) => montarNotas(el, { router }) },
   { id: 'agentes', label: 'Agents', icon: ICONOS.agentes, mount: (el, router) => montarAgentes(el, { router }) },
   { id: 'ajustes', label: 'Settings', icon: ICONOS.ajustes, mount: (el, router) => montarAjustes(el, { router }) },
 ];

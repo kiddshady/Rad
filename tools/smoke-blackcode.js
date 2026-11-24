@@ -155,7 +155,7 @@ if (window.rad.lang !== 'en' || document.documentElement.lang !== 'en') fail(`Bl
 const ventana = [...document.querySelectorAll('.rad-winbtn')].map((b) => b.getAttribute('aria-label')).join(', ');
 if (ventana !== 'Minimize, Maximize, Close') fail(`los botones de la ventana dicen: ${ventana}`);
 const riel = [...document.querySelectorAll('.rad-tab')].map((b) => b.textContent.trim() || b.getAttribute('aria-label') || b.getAttribute('data-rad-tip')).join(', ');
-if (riel !== 'Chat, Agents, Settings') fail(`las vistas se llaman: ${riel}`);
+if (riel !== 'Chat, Notes, Agents, Settings') fail(`las vistas se llaman: ${riel}`);
 enIngles('al arrancar');
 // Las vistas van como pestañas en la titlebar, sin rail y sin el nombre de
 // la app: lo primero de la barra son las pestañas, alineadas con la hoja, y
@@ -163,7 +163,7 @@ enIngles('al arrancar');
 {
   const tabs = [...document.querySelectorAll('.rad-titlebar > .rad-tabs > .rad-tab')];
   const stage = document.querySelector('.rad-stage').getBoundingClientRect();
-  if (document.querySelector('.rad-rail') || tabs.length !== 3) fail(`las vistas no están en la titlebar (${tabs.length} pestañas, rail: ${Boolean(document.querySelector('.rad-rail'))})`);
+  if (document.querySelector('.rad-rail') || tabs.length !== 4) fail(`las vistas no están en la titlebar (${tabs.length} pestañas, rail: ${Boolean(document.querySelector('.rad-rail'))})`);
   if (document.querySelector('.rad-titlebar-title') || /BlackCode/.test(document.querySelector('.rad-titlebar').textContent)) fail('la titlebar sigue mostrando el nombre de la app');
   if (tabs.length && Math.abs(tabs[0].getBoundingClientRect().left - stage.left) > 1) fail(`la primera pestaña empieza en ${r2(tabs[0].getBoundingClientRect().left)} y la hoja en ${r2(stage.left)}`);
   if (stage.width < window.innerWidth - 24) fail(`sin rail, la hoja mide ${r2(stage.width)} en una ventana de ${window.innerWidth}`);
@@ -739,7 +739,7 @@ else {
   const form = modal();
   type(form.querySelector('[data-campo="nombre"]'), 'Toolsmith');
   const interruptores = [...form.querySelectorAll('[data-campo="tools"] input[role="switch"]')];
-  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
+  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas,notes' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
   // un agente nuevo nace con todas prendidas: se le apaga la web
   for (const i of interruptores) if (i.dataset.grupo === 'web') i.click();
   enIngles('en el formulario con tools');
@@ -747,13 +747,13 @@ else {
   await closed();
   await settle();
   const herrero = cards().at(-1);
-  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Browser, Desktop, Screen, Canvas') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
-  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Browser, Desktop, Screen, Canvas') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Browser, Desktop, Screen, Canvas, Notes') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Browser, Desktop, Screen, Canvas, Notes') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
   herrero.querySelector('[data-accion="abrir"]').click();
   await sleep(dur('base') + 260);
   await until(() => statusRight().includes('Toolsmith'), 3000);
-  // todas (25) menos las tres de la web
-  if (!statusRight().endsWith('· 22 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
+  // todas (27) menos las tres de la web
+  if (!statusRight().endsWith('· 24 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
 
   // Escribir un archivo. En modo manual (el de fábrica) primero pide permiso:
   // la tarjeta dice qué va a correr y qué va a cambiar, y hasta que no se
@@ -921,17 +921,17 @@ else {
     const abrir = async () => { boton.click(); await until(() => menus().length > 0, 2000); await sleep(dur('base') + 60); };
     await abrir();
     const filasMenu = [...menus()[0].querySelectorAll('.rad-menu-item')].map((i) => i.textContent.trim());
-    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
+    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Notes,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
     await pick('Turn all off');
     if (dice() !== 'Tools: off' || boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· no tools')) fail(`apagar todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     await pick('Turn all on');
-    if (dice() !== '25 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 25 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
+    if (dice() !== '27 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 27 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     const marcadas = [...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].length;
-    if (marcadas !== 9) fail(`con todas prendidas el menú marca ${marcadas} grupos de 9`);
+    if (marcadas !== 10) fail(`con todas prendidas el menú marca ${marcadas} grupos de 10`);
     await pick('Web');
-    if (dice() !== '22 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
+    if (dice() !== '24 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
     // y las recibe el modelo: el pedido siguiente corre una de esas tools
     // (en modo manual, que es como quedó: pide permiso y se le da)
     await pedir([[{ name: 'fs_read', args: { paths: ['note.txt'] } }]]);
@@ -939,7 +939,7 @@ else {
     primary()?.click();
     await until(() => !composer.querySelector('.rad-busy') && ultimo()?.dataset.estado === 'ok' && cuenta() === '1 tool · 1 done', 20000);
     if (cuenta() !== '1 tool · 1 done') fail(`después de prender las tools desde la conversación, el contador dice «${cuenta()}»`);
-    data.toolsEnElChat = `${antes} → Tools: off → 25 tools → 22 tools`;
+    data.toolsEnElChat = `${antes} → Tools: off → 27 tools → 24 tools`;
   }
 
   // 11c. El canvas: el agente deja un documento en el panel de al lado, lo
@@ -1162,6 +1162,129 @@ else {
     data.navegador = 'el agente abrió ' + SMOKE_URL + ', leyó, escribió, hizo clic y siguió un link; atrás, pestañas, eclipse con foto de ' + fotoN.naturalWidth + ' px, y turno con el canvas';
   }
 
+  // 11e. Las notas: el usuario escribe una y se guarda sola; el agente las lee,
+  // crea otra en una carpeta, corrige la abierta y borra; nadie le pisa el
+  // borrador a nadie. Con el store y las tools de verdad.
+  {
+    const datosM = await import('/datos.js');
+    datosM.ponerModoTools('auto');
+    await go('notas');
+    const v = view('notas');
+    const hoja = v.querySelector('.dm-notas-hoja');
+    const notasL = () => alive(v.querySelectorAll('.dm-notas-nota'));
+    const titulos = () => notasL().map((n) => n.querySelector('.dm-notas-nota-titulo').textContent);
+    const carpetasL = () => alive(v.querySelectorAll('.dm-notas-carpeta')).map((n) => n.querySelector('.dm-notas-carpeta-nombre').textContent);
+    const areaN = () => v.querySelector('.dm-notas-area');
+    const docN = () => v.querySelector('.dm-notas-doc');
+    const guardadoN = () => shown(v.querySelector('.dm-notas-guardado'));
+    const boton = (a) => v.querySelector('[data-accion="' + a + '"]');
+    const avisos = () => [...document.querySelectorAll('.rad-toast')].filter((n) => !n.hasAttribute('data-rad-leaving'));
+    const lee = (name, n = -1) => fila(name, n)?.querySelector('.dm-tool-pre').textContent ?? '';
+    const quieto = async () => { await sleep(200); for (let i = 0; i < 400 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50); await settle(); };
+    const corre = async (...llamadas) => { await pedir([llamadas]); await quieto(); };
+    if (notasL().length || hoja.hasAttribute('data-con-nota')) fail('notas: la libreta no arranca vacía');
+
+    // El usuario escribe una nota: se guarda sola y aparece en la lista con su
+    // primera línea de título.
+    boton('nota-nueva').click();
+    await settle();
+    if (!areaN()) fail('notas: «New note» no abrió el editor');
+    type(areaN(), '# Shopping\n\n- yerba\n- bread');
+    if (guardadoN() === 'Saved') fail('notas: dice «Saved» apenas se escribe, antes de guardar');
+    await until(() => guardadoN() === 'Saved' && notasL().length === 1, 5000);
+    if (titulos().join() !== 'Shopping' || !notasL()[0].textContent.includes('yerba bread')) fail('notas: la nota guardada figura como «' + notasL()[0]?.textContent + '»');
+    if (notasL()[0]?.getAttribute('aria-current') !== 'true') fail('notas: la nota abierta no queda marcada en la lista');
+    boton('nota-editar').click();
+    await until(() => !hoja.hasAttribute('data-editando'), 3000);
+    await settle();
+    if (docN()?.querySelector('.dm-titulo')?.textContent !== 'Shopping' || docN()?.querySelectorAll('li').length !== 2) fail('notas: al terminar de editar no se ve dibujada');
+
+    // El agente la lee con su tool…
+    await corre({ name: 'notepad', args: {} });
+    const leido = lee('notepad');
+    const idNota = /\(id: ([0-9a-f-]{36})/.exec(leido)?.[1];
+    if (!leido.includes('Shopping') || !leido.includes('- yerba') || !idNota) fail('notas: la tool notepad devolvió: ' + leido.slice(0, 200));
+    if (fila('notepad')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'notepad') fail('notas: la fila de la tool no lleva su ícono');
+    // …escribe otra, en una carpeta que no existía: aparece sola en la lista.
+    await corre({ name: 'notepad_write', args: { action: 'create', content: '# Ideas\n\nfrom the agent', folder: 'Work' } });
+    await until(() => titulos().includes('Ideas'), 4000);
+    if (!titulos().includes('Ideas') || carpetasL().join() !== 'Work,Unfiled') fail('notas: lo que creó el agente no apareció en la lista (notas: ' + titulos().join() + '; carpetas: ' + carpetasL().join() + ')');
+    // …y corrige la que está abierta: se vuelve a leer.
+    await corre({ name: 'notepad_write', args: { action: 'edit', id: idNota, edits: [{ old: '- bread', new: '- bread and butter' }] } });
+    await until(() => docN()?.textContent.includes('bread and butter'), 4000);
+    if (!docN()?.textContent.includes('bread and butter')) fail('notas: la corrección del agente no llegó a la nota abierta: ' + lee('notepad_write').slice(0, 160));
+
+    // El usuario está escribiendo y el agente reescribe esa nota: el borrador
+    // no se pisa. (Se sigue tecleando mientras el agente trabaja: cada tecla
+    // posterga el guardado, así que la nota sigue sin guardar cuando llega.)
+    boton('nota-editar').click();
+    await settle();
+    const mio = areaN().value + '\n- mine';
+    type(areaN(), mio);
+    let tecleando = true;
+    (async () => { while (tecleando) { if (areaN()) areaN().dispatchEvent(new Event('input', { bubbles: true })); await sleep(150); } })();
+    await corre({ name: 'notepad_write', args: { action: 'update', id: idNota, content: '# Shopping\n\nrewritten by the agent' } });
+    await until(() => avisos().some((n) => n.textContent.includes('changed elsewhere')), 3000);
+    const quedo = areaN()?.value;
+    tecleando = false;
+    if (quedo !== mio) fail('notas: el agente le pisó el borrador al usuario (quedó «' + String(quedo).slice(0, 80) + '»)');
+    if (!avisos().some((n) => n.textContent.includes('changed elsewhere'))) fail('notas: no se avisó que la nota cambió afuera mientras se editaba');
+    // al dejar de escribir se guarda la versión del usuario
+    await until(() => guardadoN() === 'Saved', 5000);
+    boton('nota-editar').click();
+    await until(() => !hoja.hasAttribute('data-editando'), 3000);
+    await corre({ name: 'notepad', args: { query: 'shopping' } });
+    if (!lee('notepad').includes('- mine') || lee('notepad').includes('rewritten by the agent')) fail('notas: después de guardar no quedó la versión del usuario: ' + lee('notepad').slice(0, 200));
+
+    // El agente borra la suya: va a la papelera, y el aviso la trae de vuelta.
+    const idIdeas = /--- Ideas \(id: ([0-9a-f-]{36})/.exec((await (async () => { await corre({ name: 'notepad', args: { query: 'ideas' } }); return lee('notepad'); })()))?.[1];
+    await corre({ name: 'notepad_write', args: { action: 'delete', id: idIdeas } });
+    await until(() => !titulos().includes('Ideas'), 4000);
+    const aviso = avisos().find((n) => n.textContent.includes('The agent deleted'));
+    if (titulos().includes('Ideas') || !aviso?.querySelector('.rad-toast-action')) fail('notas: el borrado del agente no sacó la nota de la lista o no ofrece restaurarla');
+    aviso?.querySelector('.rad-toast-action')?.click();
+    await until(() => titulos().includes('Ideas'), 4000);
+    if (!titulos().includes('Ideas')) fail('notas: Restore no trajo la nota de vuelta');
+
+    // Fijar, buscar, mover y plegar.
+    boton('nota-fijar').click();
+    await until(() => notasL().some((n) => n.hasAttribute('data-fijada')), 3000);
+    if (!notasL().find((n) => n.textContent.includes('Shopping'))?.hasAttribute('data-fijada')) fail('notas: fijar no marcó la nota');
+    const buscarN = v.querySelector('input[type="search"]');
+    type(buscarN, 'agent');
+    await settle();
+    if (titulos().join() !== 'Ideas') fail('notas: buscar «agent» dejó: ' + titulos().join());
+    type(buscarN, '');
+    await settle();
+    boton('nota-mover').click();
+    await until(() => menus().length > 0, 2000);
+    await pick('Work');
+    await until(() => shown(v.querySelector('.dm-notas-donde')) === 'Work', 3000);
+    if (shown(v.querySelector('.dm-notas-donde')) !== 'Work' || carpetasL().join() !== 'Work') fail('notas: mover la nota a una carpeta dejó «' + shown(v.querySelector('.dm-notas-donde')) + '» y las carpetas ' + carpetasL().join());
+    // fijada arriba, después por título
+    if (titulos().join() !== 'Shopping,Ideas') fail('notas: el orden en la carpeta es ' + titulos().join() + ' (la fijada va primero)');
+    v.querySelector('.dm-notas-carpeta-cabeza').click();
+    await settle();
+    if (notasL().length !== 0) fail('notas: plegar la carpeta no escondió sus notas');
+    v.querySelector('.dm-notas-carpeta-cabeza').click();
+    await settle();
+    enIngles('en las notas');
+
+    // Borrar desde acá es para siempre, y pregunta.
+    boton('nota-borrar').click();
+    await until(() => modal(), 2000);
+    if (!modal()?.textContent.includes('no trash here')) fail('notas: borrar no avisa que es para siempre');
+    primary().click();
+    await closed();
+    await until(() => titulos().join() === 'Ideas', 3000);
+    if (titulos().join() !== 'Ideas' || hoja.hasAttribute('data-con-nota')) fail('notas: después de borrar quedó: ' + titulos().join());
+    await corre({ name: 'notepad', args: { query: 'shopping' } });
+    if (!lee('notepad').startsWith('No notes matching')) fail('notas: la nota borrada por el usuario sigue en la libreta: ' + lee('notepad').slice(0, 120));
+    datosM.ponerModoTools('manual');
+    data.notas = 'escrita y guardada sola, leída y corregida por el agente, borrador protegido, papelera y restore, fijar, buscar, mover, plegar y borrar';
+    await go('chat');
+  }
+
   // Cambiarle las tools a un agente que YA existía, desde su formulario.
   {
     await go('agentes');
@@ -1172,7 +1295,7 @@ else {
     const guardar = async () => { primary().click(); await closed(); await settle(); };
     await editar();
     if (!sw('files')?.checked || !sw('screen')?.checked) fail('el formulario de un agente con todas las tools no las muestra prendidas');
-    for (const g of ['commands', 'code', 'data', 'web', 'browser', 'desktop', 'canvas']) sw(g).click();
+    for (const g of ['commands', 'code', 'data', 'web', 'browser', 'desktop', 'canvas', 'notes']) sw(g).click();
     await guardar();
     if (tarjeta() !== 'Tools: Files, Screen') fail(`apagarle grupos a un agente desde su formulario dejó la tarjeta en «${tarjeta()}»`);
     await editar();

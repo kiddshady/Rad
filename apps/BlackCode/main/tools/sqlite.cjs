@@ -94,8 +94,19 @@ function configurar(deps = {}) {
 //    mismos enteros y BLOB que all(). Los runners de este archivo no lo usan:
 //    lo usa el store del canvas (canvas-store.cjs), que abre su base con esta
 //    misma clase Database.
+//  - `db.transaction(fn)`: devuelve una función que corre `fn` entre un BEGIN
+//    y un COMMIT, le pasa sus argumentos y devuelve lo que `fn` devuelva; si
+//    `fn` tira, hace ROLLBACK y vuelve a tirar el mismo error. Llamada con una
+//    transacción ya abierta usa un SAVEPOINT, así la de adentro se deshace sola
+//    sin llevarse la de afuera. Una `fn` que devuelve una promesa es un
+//    TypeError, como allá: la transacción se cerraría antes de que termine.
+//    Tampoco la usan los runners de este archivo: la usa el store de las notas
+//    (notes-store.cjs), para mudar una nota a la papelera y de vuelta.
 //
 // Lo que NO iguala:
+//  - Las variantes `.deferred`, `.immediate` y `.exclusive` de la función que
+//    devuelve transaction(): acá el BEGIN es siempre el común (diferido), que
+//    es también el que usaba allá la función llamada a secas.
 //  - Es otro SQLite, compilado distinto. El de better-sqlite3 traía
 //    UPDATE/DELETE … LIMIT, soundex() y STAT4, y un LIKE que no matchea BLOBs;
 //    el de Node no. FTS5, JSON, RTREE, funciones matemáticas y de ventana están
@@ -287,6 +298,36 @@ class Database {
   exec(sql) { this.db.exec(sql); return this; }
 
   pragma(fuente) { this.db.exec(`PRAGMA ${fuente}`); }
+
+  /** Como en better-sqlite3: no corre nada todavía, devuelve la función que
+   *  corre `fn` adentro de una transacción. Todo o nada: si `fn` tira, lo que
+   *  haya escrito se deshace y el error sigue viaje. */
+  transaction(fn) {
+    if (typeof fn !== 'function') throw new TypeError('Expected first argument to be a function');
+    const db = this.db;
+    return function sqliteTransaction(...args) {
+      // con una ya abierta no se puede otro BEGIN: un SAVEPOINT, que se deshace
+      // solo sin tocar la de afuera
+      const anidada = db.isTransaction;
+      db.exec(anidada ? 'SAVEPOINT blackcode_tx' : 'BEGIN');
+      try {
+        const result = fn.apply(this, args);
+        if (result && typeof result.then === 'function') {
+          throw new TypeError('Transaction function cannot return a promise');
+        }
+        db.exec(anidada ? 'RELEASE blackcode_tx' : 'COMMIT');
+        return result;
+      } catch (err) {
+        // SQLite ya pudo haberla deshecho por su cuenta (un error de los que
+        // abortan la transacción entera): ahí no queda nada que deshacer
+        if (db.isTransaction) {
+          db.exec(anidada ? 'ROLLBACK TO blackcode_tx' : 'ROLLBACK');
+          if (anidada) db.exec('RELEASE blackcode_tx');
+        }
+        throw err;
+      }
+    };
+  }
 
   close() {
     if (this.db.isOpen) this.db.close();
@@ -491,7 +532,7 @@ const runners = {
 
 module.exports = { runners, configurar, cerrar };
 
-// El adaptador, para el store del canvas (canvas-store.cjs), que abre su propia
-// base con él. No enumerable: lo que este módulo ofrece a la app sigue siendo
+// El adaptador, para el store del canvas (canvas-store.cjs) y el de las notas
+// (notes-store.cjs), que abren cada uno su propia base con él. No enumerable: lo que este módulo ofrece a la app sigue siendo
 // lo de arriba, y `const { Database } = require('./sqlite.cjs')` anda igual.
 Object.defineProperty(module.exports, 'Database', { value: Database });

@@ -23,6 +23,7 @@ const abrir = require('./abrir.cjs');
 const captura = require('./captura.cjs');
 const lienzo = require('./canvas.cjs');
 const navegador = require('./navegador.cjs');
+const notas = require('./notas.cjs');
 
 let listo = false;
 
@@ -62,11 +63,15 @@ function iniciar({ carpeta = null, trash = null, shell = null, capturador = null
     ...(modeloVe ? { modeloVe } : {}),
     ...(abrirAfuera ? { abrirAfuera } : {}),
   });
+  notas.configurar({
+    ...(carpeta ? { dbPath: () => path.join(carpeta, 'notes.db') } : {}),
+    ...(avisar ? { broadcast: avisar } : {}),
+  });
   motor.configurar({ classifyOsTarget: abrir.classifyOsTarget });
   if (listo) return;
   motor.registrar({
     ...archivos.runners, ...comandos.runners, ...trabajos.runners, ...busqueda.runners,
-    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners,
+    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners,
   });
   listo = true;
 }
@@ -78,6 +83,7 @@ function cerrar() {
   try { datos.cerrar(); } catch { /* ya estaba cerrada */ }
   try { lienzo.cerrar(); } catch { /* ya estaba cerrada */ }
   try { navegador.cerrar(); } catch { /* nunca se abrió */ }
+  try { notas.cerrar(); } catch { /* ya estaba cerrada */ }
 }
 
 /** Lo que la interfaz necesita para ofrecer las tools de un agente. */
@@ -114,7 +120,11 @@ module.exports = {
   trabajosVivos,
   // la sesión de un turno, con los jobs vivos ya puestos en su system prompt
   crearSesion(opciones) {
-    const s = sesion.crear(opciones);
+    // Si la base de las notas no abrió, sus dos tools no se ofrecen: el modelo
+    // las pediría y fallarían siempre. (Se decide acá, antes del turno: que la
+    // lista de tools cambie a mitad de un turno lo rompe.)
+    const sinNotas = Array.isArray(opciones?.tools) && opciones.tools.some((n) => n === 'notepad' || n === 'notepad_write') && !notas.lista();
+    const s = sesion.crear(sinNotas ? { ...opciones, tools: opciones.tools.filter((n) => n !== 'notepad' && n !== 'notepad_write') } : opciones);
     const sistema = s.sistema;
     // …y los canvas que este chat tiene abiertos: su cuerpo no viaja en la
     // conversación, así que sin esta lista el modelo no sabe que existen
@@ -142,6 +152,7 @@ module.exports = {
   // el canvas y el navegador, para los canales que usan sus paneles
   canvas: lienzo,
   navegador,
+  notas,
   argsDigest: motor.argsDigest,
   plegar: require('./guardas.cjs').foldToolRows,
   getCwd: base.getCwd,

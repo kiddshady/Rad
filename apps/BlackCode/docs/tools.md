@@ -29,6 +29,7 @@ encabezado de qué parte de NeonCode salió y qué se le adaptó.
 | `abrir.cjs` | `os_open`: abre un archivo, una carpeta o una URL como lo haría el usuario |
 | `captura.cjs` | `screen_capture`: una foto de un monitor o de una ventana, que el modelo ve |
 | `canvas.cjs`, `canvas-store.cjs` | `canvas`: documentos y código en el panel de al lado, y su base |
+| `notas.cjs`, `notes-store.cjs` | `notepad` y `notepad_write`: la libreta del usuario, y su base |
 | `navegador.cjs`, `browser/` | Las seis `browser_*` y el navegador que manejan (`agent-browser.cjs`), con su preload de sesión |
 | `index.cjs` | Arma todo y es lo único que conoce el chat |
 
@@ -55,6 +56,7 @@ agente. La barra de estado repite la cuenta.
 | Desktop | `os_open` |
 | Screen | `screen_capture` |
 | Canvas | `canvas` |
+| Notes | `notepad`, `notepad_write` |
 
 La pantalla va sola en su grupo: es lo más privado que una tool puede mirar
 (lo que haya abierto, sin elegir qué), y se prende aparte de todo lo demás.
@@ -152,6 +154,26 @@ volcarlo en el mensaje. Cómo está armado:
 - La interfaz está en `renderer/canvas.js`. Un documento se pinta con
   `markdown.js`; el código va sin resaltado.
 
+## Las notas
+
+La libreta del usuario, que el agente lee y escribe.
+
+- **Dos tools y no una con `action`:** `notepad` solo lee (y por eso sus
+  rondas no se cobran y repetirla no cuenta como bucle); `notepad_write`
+  cambia cosas. Leer pide `query` porque la libreta crece sin techo.
+- **Una nota es su texto:** no hay columna de título. La primera línea es el
+  título, acá y en lo que lee el modelo.
+- **Base propia** (`notes.db`), con la papelera en una tabla aparte, para que
+  ninguna consulta «resucite» una nota borrada.
+- **Dos formas de borrar,** como en el canvas: el usuario borra del todo; el
+  agente manda a la papelera (7 días) y puede restaurar.
+- **No hay un bloque de notas en el system prompt:** el modelo se entera de lo
+  que hay llamando a `notepad`.
+- Si la base no abre, las dos tools no se ofrecen (se decide antes del turno).
+- Los canales de la vista (`notas:*`) están en `chat.cjs`; los cuerpos, en
+  `notas.cjs` (`ipc`). Cuando el agente escribe, la vista se entera por
+  `notas:evento`. La interfaz está en `renderer/notas.js`.
+
 ## El navegador
 
 Un navegador de verdad, en un panel, que comparten el usuario y el agente.
@@ -231,7 +253,7 @@ Venice) en cada pedido de un agente con tools.
 - El diario para deshacer lo que escribió una tool (los ganchos están en
   `fs.cjs`, sin nada enchufado).
 - Mandar un mensaje a mitad del turno (steer).
-- Notepad, memoria, búsqueda en chats.
+- Memoria, búsqueda en chats.
 - Subagentes, MCP, skills, tareas programadas.
 - Dónde guardar secretos para `http_request` (`{{secret:NOMBRE}}`) y la llave
   de Tavily o Brave para `web_search`. Sin eso, un pedido con un secreto falla
@@ -285,6 +307,13 @@ para arreglarlos de a uno, con su prueba:
   100 en la papelera).
 - Exportar un canvas saca los acentos del nombre del archivo («Título» sale
   `T_tulo.md`).
+- `notepad_write` con `move` y sin `folder` saca la nota de su carpeta en
+  silencio, en vez de dar un error.
+- La fecha de una nota que lee el modelo está en UTC: de noche puede figurar
+  con la de mañana.
+- `notepad` corta su respuesta a 12.000 caracteres y puede dejar notas sin su
+  id, y no ve más allá de las 500 más recientes.
+- Guardar o fijar una nota que ya no existe contesta que anduvo.
 - Las tools del navegador no miran el Stop: una espera de `wait_for` (10 s),
   de carga (8 s) o del panel (3 s) sigue hasta terminar.
 - `browser_type` y `browser_upload` validan sus argumentos después de abrir el
@@ -303,6 +332,7 @@ para arreglarlos de a uno, con su prueba:
   no tenían pruebas. La de capturas usa pantallas y ventanas de mentira.
 - `-canvas.mjs`: las de NeonCode más el cableado de BlackCode, sobre una base
   descartable.
+- `-notas.mjs`: las de NeonCode más el cableado, sobre una base descartable.
 - `-browser.mjs`: las de NeonCode sobre un Electron de mentira (no abre
   ninguna ventana), más los runners y los canales de BlackCode. Las que allá miraban
   la interfaz de NeonCode no vinieron: la de BlackCode la prueba el humo.

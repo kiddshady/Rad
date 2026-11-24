@@ -183,6 +183,20 @@ const SCENES = {
     const hueco = document.querySelector('.dm-nav-hueco');
     if (foto) { hueco.querySelector('.dm-nav-foto').src = foto; hueco.setAttribute('data-foto', ''); }
     await sleep(500);`,
+  // Las notas: carpetas, una fijada y una abierta, dibujada.
+  notas: `
+    const crear = (content, folderId = null) => window.rad.invoke('notas:crear', { content, folderId });
+    const fac = await window.rad.invoke('notas:carpeta-crear', 'University');
+    const casa = await window.rad.invoke('notas:carpeta-crear', 'Home');
+    const plan = await crear('# Biochemistry final\\n\\nUnits to review before the oral exam.\\n\\n- Glycolysis and its regulation\\n- Krebs cycle: $\\\\ce{Acetyl-CoA + 3NAD+ -> 2CO2 + 3NADH}$\\n- Oxidative phosphorylation\\n\\n## Books\\n\\n| Book | Chapters |\\n|---|---|\\n| Lehninger | 14 to 19 |\\n| Stryer | 16 to 18 |\\n\\n> Ask about the lab report on Monday.', fac.id);
+    await crear('Medicinal chemistry: questions for the tutor\\n\\nSAR of benzodiazepines.', fac.id);
+    await crear('# Shopping\\n\\n- yerba\\n- bread', casa.id);
+    await crear('Ideas for the app\\n\\nA notepad the agent can read.');
+    await window.rad.invoke('notas:fijar', { id: plan.id, pinned: true });
+    await go('notas');
+    await sleep(700);
+    [...view('notas').querySelectorAll('.dm-notas-nota')].find((n) => n.textContent.includes('Biochemistry')).click();
+    await sleep(1500);`,
   'sin-llave': `
     await go('ajustes');
     await sleep(400);`,

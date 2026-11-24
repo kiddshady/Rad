@@ -1,6 +1,6 @@
 'use strict';
 
-// Las tools que BlackCode le ofrece al modelo: nombre, para qué sirve y qué
+// Las tools que Nix le ofrece al modelo: nombre, para qué sirve y qué
 // argumentos lleva. De acá se derivan los DOS formatos (el de Anthropic y el
 // de OpenAI, que es el de Venice), así el schema vive una sola vez.
 //
@@ -8,12 +8,13 @@
 // escritas: cada descripción está afinada contra errores que los modelos
 // cometían de verdad, y el comentario que algunas llevan adentro cuenta cuál.
 // Por ahora: archivos y búsqueda, comandos y jobs, código, bases de datos,
-// web, el navegador, abrir cosas en el escritorio, mirar la pantalla, y el
-// canvas.
+// web, el navegador, abrir cosas en el escritorio, mirar la pantalla, el
+// canvas y las notas.
 
-// Lo que algunas definiciones nombran: cuántos días dura la papelera del
-// canvas, y las teclas que acepta browser_press.
+// Lo que algunas definiciones nombran: cuántos días duran la papelera del
+// canvas y la de las notas, y las teclas que acepta browser_press.
 const canvasStore = require('./canvas-store.cjs');
+const notesStore = require('./notes-store.cjs');
 const { TECLAS_VALIDAS } = require('./browser/agent-browser.cjs');
 
 const TOOL_DEFS = [{
@@ -388,6 +389,49 @@ const TOOL_DEFS = [{
     },
     required: ['action'],
   },
+}, {
+  name: 'notepad',
+  description:
+    "Read the user's own notepad — the notes they keep in BlackCode's Notepad panel, in folders. Use it when they refer to something they wrote down ('mis notas', 'lo que anoté sobre…', 'fijate en la libreta') or when a question would be settled by their own notes rather than by guessing. Pass `query` to search by meaning-bearing words (all of them must appear in the note; order does not matter); omit it to browse the most recent notes. Each note comes with its id. This tool only reads: to write, change or delete a note use `notepad_write`.",
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'words to look for across the notes. Omit to browse the most recent ones.' },
+      limit: { type: 'number', description: 'max notes to return, 1-50 (default 20).' },
+    },
+  },
+}, {
+  name: 'notepad_write',
+  description:
+    "Write in the user's notepad (the Notepad panel): create a note, change one, move it to a folder, or delete it. The notepad is THEIRS — write there only when they ask for it ('anotá…', 'agregalo a mis notas', 'borrá esa nota'), not to keep notes for yourself (that is `remember`) nor for long documents (that is `canvas`). "
+    + 'A note has no title field: its first line IS the title the panel shows, so start every new note with a short title line (e.g. "# Compras"). Notes are markdown. '
+    + 'Actions: "create" a new note from `content`, optionally in `folder`; "edit" changes PART of a note with exact { old, new } replacements — the normal way to change one, all-or-nothing, each `old` copied verbatim from what `notepad` returned and unique unless replace_all; "update" rewrites a note whole (only when you are really starting it over); "move" puts a note in `folder` ("" takes it out of its folder); "delete" sends a note to a trash for ' + notesStore.TRASH_DIAS + ' days, where the user can restore it from the app; "restore" brings back one you deleted. '
+    + 'Every action but create needs the note `id`: call `notepad` first to see the ids and the current text. Only "delete" the notes the user means — if more than one could match, ask which. '
+    + 'A `folder` that does not exist yet is created. After writing, say in a line what you did; do not paste the note back.',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['create', 'edit', 'update', 'move', 'delete', 'restore'], description: 'what to do with the note' },
+      id: { type: 'string', description: 'the note id, from `notepad` — required for every action except "create"' },
+      content: { type: 'string', description: 'the whole note in markdown, first line = its title. Required for "create" and "update".' },
+      folder: { type: 'string', description: 'folder NAME for "create" or "move" (created if missing). "" with "move" takes the note out of its folder.' },
+      edits: {
+        type: 'array',
+        description: 'for "edit": the replacements to apply, in order.',
+        items: {
+          type: 'object',
+          properties: {
+            old: { type: 'string', description: 'Exact text to find in the note, copied verbatim from what you read. Must match once.' },
+            new: { type: 'string', description: 'Text to put in its place. Use an empty string to delete the fragment.' },
+            replace_all: { type: 'boolean', description: 'Replace every occurrence of THIS fragment instead of requiring it to be unique (default false).' },
+          },
+          required: ['old', 'new'],
+        },
+      },
+      replace_all: { type: 'boolean', description: 'for "edit": replace every occurrence of each `old` instead of requiring it to be unique (default false).' },
+    },
+    required: ['action'],
+  },
 }];
 
 // Los grupos con que se prenden y se apagan en un agente.
@@ -403,6 +447,7 @@ const GRUPOS = [
   // sola en su grupo: la pantalla es lo más privado que una tool puede mirar
   { id: 'screen', nombre: 'Screen', tools: ['screen_capture'] },
   { id: 'canvas', nombre: 'Canvas', tools: ['canvas'] },
+  { id: 'notes', nombre: 'Notes', tools: ['notepad', 'notepad_write'] },
 ];
 
 const porNombre = new Map(TOOL_DEFS.map((t) => [t.name, t]));

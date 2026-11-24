@@ -1,5 +1,34 @@
 # Changelog
 
+## BlackCode 0.11.0 (2026-11-24)
+
+- **Notas.** Una vista nueva (la pestaña Notes) con la libreta del usuario,
+  que el agente también puede leer y escribir. Es el notepad de NeonCode: el
+  store y las dos tools (`notepad` para leer y buscar, `notepad_write` para
+  crear, corregir, mover, borrar y restaurar) vinieron portados tal cual, con
+  sus pruebas y 150 más (260 comprobaciones); la vista se reescribió sobre Rad.
+- Una nota es markdown y nada más: su primera línea es el título. Hay carpetas
+  planas y un grupo «Unfiled»; las fijadas van arriba; un buscador filtra por
+  contenido.
+- **Se guarda sola**, un rato después de la última tecla. Los guardados van
+  en fila (dos seguidos no duplican la nota) y antes de abrir otra o de irse a
+  otra vista se espera al pendiente: no se pierde la última frase.
+- **Nadie le pisa el borrador a nadie.** Si el agente cambia la nota abierta y
+  no hay cambios sin guardar, se vuelve a leer; si los hay, queda el borrador
+  y se avisa.
+- Lo que borra el usuario se va del todo (y lo dice antes); lo que borra el
+  agente queda una semana en la papelera y el aviso lo trae de vuelta.
+- La nota se LEE dibujada (el markdown de la app, con fórmulas) y se EDITA
+  como texto. En NeonCode era un editor que hacía las dos cosas a la vez
+  (Milkdown), que no vino; tampoco arrastrar una nota a una carpeta, la
+  selección múltiple ni «Clear all».
+- El adaptador de SQLite ganó `transaction`, que el store de las notas usa
+  para que mandar a la papelera, restaurar y borrar una carpeta sean todo o
+  nada.
+- Las notas viven en `%APPDATA%\BlackCode\tools\notes.db`, una base propia.
+  Son 27 tools en 10 grupos; los agentes que tenían todas reciben solas las
+  dos nuevas.
+
 ## BlackCode 0.10.0, antes Nix (2026-11-24) · núcleo 0.17.0
 
 - **La app pasa a llamarse BlackCode.** Fran quería un nombre más genérico y

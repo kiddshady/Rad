@@ -877,6 +877,101 @@
   /* sin nada que decir no ocupa lugar (un relevo vacío deja su celda) */
   .dm-biblio-vacio:not(:has(> :not(.rad-swap-out):not(:empty))) { display: none; }
 
+  /* ---------- El notepad ---------- */
+  .dm-notas { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 0; }
+  .dm-notas-lado { padding-bottom: 0; }
+  .dm-notas-acciones { display: flex; gap: var(--rad-space-2); }
+  .dm-notas-nueva { flex: 1; justify-content: flex-start; padding-inline: var(--rad-space-3); }
+  .dm-notas-lista { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; padding: var(--rad-space-1) 0 var(--rad-space-3); --rad-a-scroll-inset: var(--rad-space-1); }
+  .dm-notas-vacia { padding: 0 var(--rad-space-3) var(--rad-space-3); color: var(--rad-text-3); font-size: var(--rad-text-s); }
+  .dm-notas-vacia:not(:has(> :not(.rad-swap-out):not(:empty))) { display: none; }
+
+  .dm-notas-carpeta { display: flex; align-items: center; gap: var(--rad-space-1); min-width: 0; margin-top: var(--rad-space-2); }
+  .dm-notas-carpeta:first-child { margin-top: 0; }
+  .dm-notas-carpeta-cabeza {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    min-height: calc(var(--rad-control-height) - 6px);
+    padding: 0 var(--rad-space-2);
+    border-radius: var(--rad-radius-m);
+    color: var(--rad-text-3);
+    font-size: var(--rad-text-xs);
+    font-weight: var(--rad-weight-strong);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: start;
+    transition: color var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-notas-carpeta-cabeza:hover { color: var(--rad-text-2); background: var(--rad-tint-hover); }
+  .dm-notas-carpeta-cabeza .rad-icon { width: 14px; height: 14px; }
+  .dm-notas-carpeta-chevron { transition: transform var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-notas-carpeta[data-plegada] .dm-notas-carpeta-chevron { transform: rotate(-90deg); }
+  .dm-notas-carpeta-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dm-notas-carpeta-cuenta { font-family: var(--rad-font-mono); font-weight: var(--rad-weight-regular); letter-spacing: 0; }
+  .dm-notas-carpeta-mas { opacity: 0; transition: opacity var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-notas-carpeta:hover .dm-notas-carpeta-mas, .dm-notas-carpeta-mas:focus-visible, .dm-notas-carpeta-mas[aria-expanded='true'] { opacity: 1; }
+
+  .dm-notas-nota {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    padding: var(--rad-space-2) var(--rad-space-3);
+    border-radius: var(--rad-radius-m);
+    text-align: start;
+    color: var(--rad-text-2);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-notas-nota[data-adentro] { margin-left: var(--rad-space-3); }
+  .dm-notas-nota:hover { background: var(--rad-tint-hover); }
+  .dm-notas-nota[aria-current='true'] { background: var(--rad-surface-2); box-shadow: var(--rad-shadow-1); color: var(--rad-text-1); }
+  .dm-notas-nota-arriba { display: flex; align-items: center; gap: var(--rad-space-2); min-width: 0; }
+  .dm-notas-nota-titulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rad-text-1); font-weight: var(--rad-weight-strong); }
+  .dm-notas-nota-pin { flex: none; width: 12px; height: 12px; color: var(--rad-text-3); opacity: 0; transition: opacity var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-notas-nota[data-fijada] .dm-notas-nota-pin { opacity: 1; }
+  .dm-notas-nota-fecha { flex: none; font-size: var(--rad-text-xs); color: var(--rad-text-3); }
+  .dm-notas-nota-resumen { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--rad-text-s); color: var(--rad-text-3); }
+  .dm-notas-nota-resumen:empty { display: none; }
+
+  /* La hoja: la nota abierta, o el hueco cuando no hay ninguna. */
+  .dm-notas-hoja { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; }
+  .dm-notas-cabeza {
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    min-width: 0;
+    padding: var(--rad-space-3) var(--rad-space-4) var(--rad-space-2) var(--rad-space-6);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--rad-dur-base) var(--rad-ease-in-out), visibility 0s linear var(--rad-dur-base);
+  }
+  .dm-notas-hoja[data-con-nota] .dm-notas-cabeza { opacity: 1; visibility: visible; transition: opacity var(--rad-dur-base) var(--rad-ease-in-out), visibility 0s; }
+  .dm-notas-icono { color: var(--rad-text-3); }
+  .dm-notas-donde { color: var(--rad-text-2); font-size: var(--rad-text-s); }
+  .dm-notas-guardado { flex: 1; min-width: 0; color: var(--rad-text-3); font-size: var(--rad-text-xs); }
+  .dm-notas [data-accion='nota-fijar'][aria-pressed='true'] { color: var(--rad-text-1); }
+  .dm-notas [data-accion='nota-fijar'][aria-pressed='true'] svg { fill: currentColor; }
+  .dm-notas-cuerpo { min-height: 0; padding: var(--rad-space-2) var(--rad-space-6) var(--rad-space-5); }
+  .dm-notas-cuerpo > * { animation: rad-fade-in var(--rad-dur-base) var(--rad-ease-out) both; }
+  .dm-notas-doc { max-width: 76ch; user-select: text; }
+  .dm-notas-hoja[data-editando] .dm-notas-cuerpo { display: grid; }
+  .dm-notas-area { resize: none; height: 100%; min-height: 0; max-width: 90ch; line-height: 1.6; }
+  .dm-notas-hueco {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: var(--rad-space-6);
+    text-align: center;
+    color: var(--rad-text-3);
+    font-size: var(--rad-text-s);
+    pointer-events: none;
+    transition: opacity var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .dm-notas-hoja[data-con-nota] .dm-notas-hueco { opacity: 0; }
+
   /* Fórmulas (KaTeX). La de bloque va centrada y, si no entra, se desplaza
      ella sola: nunca ensancha el mensaje. Hasta que KaTeX carga, o si no pudo
      leerla, se ve su texto en la mono. */

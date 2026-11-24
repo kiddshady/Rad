@@ -101,6 +101,9 @@ function wire(rad, { llave }) {
     titulosDeChats: () => new Map((rad.store.read('chats')?.lista ?? []).map((c) => [c.id, c.titulo])),
     avisar: (canal, datos) => {
       if (canal === 'canvas:deleted') rad.send('canvas:evento', { tipo: 'borrado', convoId: datos?.convoId ?? null, canvas: datos?.canvas ?? null });
+      // el agente cambió o borró una nota: el panel de notas se pone al día
+      else if (canal === 'notes:changed') rad.send('notas:evento', { tipo: 'cambio' });
+      else if (canal === 'notes:deleted') rad.send('notas:evento', { tipo: 'borrada', id: datos?.id ?? null, title: datos?.title ?? '' });
       // lo del navegador va con su mismo nombre: browser:state, :open, :atajo
       else if (String(canal).startsWith('browser:')) rad.send(canal, datos);
     },
@@ -173,6 +176,24 @@ function wire(rad, { llave }) {
   }));
 
   rad.handle('chat:tools', () => herramientas.catalogo());
+
+  // ---------- Las notas ----------
+  // Los canales de su vista. Los cuerpos son los de NeonCode (notas.cjs): cada
+  // uno ataja sus errores y contesta un valor que la vista puede leer.
+  {
+    const n = herramientas.notas.ipc;
+    rad.handle('notas:lista', () => n.list());
+    rad.handle('notas:crear', (que) => n.create(que ?? {}));
+    rad.handle('notas:guardar', (que) => n.update(que ?? {}));
+    rad.handle('notas:borrar', (id) => n.remove(id));
+    rad.handle('notas:fijar', (que) => n.pin(que ?? {}));
+    rad.handle('notas:mover', (que) => n.setFolder(que ?? {}));
+    rad.handle('notas:restaurar', (id) => n.restore(id));
+    rad.handle('notas:carpetas', () => n.foldersList());
+    rad.handle('notas:carpeta-crear', (nombre) => n.foldersCreate(nombre));
+    rad.handle('notas:carpeta-renombrar', (que) => n.foldersRename(que ?? {}));
+    rad.handle('notas:carpeta-borrar', (id) => n.foldersDelete(id));
+  }
 
   // ---------- El navegador ----------
   // Los canales de su panel. Los cuerpos son los de NeonCode (navegador.cjs).
