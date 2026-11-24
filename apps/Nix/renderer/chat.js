@@ -14,6 +14,7 @@ import { pintar } from './markdown.js';
 import { abrirAgente } from './agentes.js';
 import { filaTool, ponerTool, cuentaTools, abrirPermiso } from './tools.js';
 import { h, icono } from './piezas.js';
+import { montarCanvas } from './canvas.js';
 
 // Los items que no son un chat ni un mensaje: el lugar vacío de cada lista.
 const VACIO = '_vacio';
@@ -115,11 +116,16 @@ export function montarChat(el, { router }) {
   const boton = h('button', 'rad-iconbutton dm-enviar', { type: 'submit', 'data-modo': 'enviar', 'data-rad-tip-side': 'top' },
     h('span', 'dm-enviar-iconos', {}, icono('enviar', 'dm-ic-enviar'), icono('frenar', 'dm-ic-frenar')));
   const redactor = h('form', 'dm-redactor', {}, area, boton);
+  // La escena: la conversación y, a su derecha, el panel que esté abierto
+  // (el canvas). El panel empuja a la conversación; no la tapa.
+  const escena = h('div', 'dm-escena');
+  const lienzo = montarCanvas({ escena });
   const conv = h('section', 'dm-conv', {},
-    h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, sub, botonTools),
-    celda, aviso, h('div', 'dm-redactor-caja', {}, redactor));
+    h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, sub, lienzo.botonBiblioteca, botonTools),
+    lienzo.barra, celda, aviso, h('div', 'dm-redactor-caja', {}, redactor));
+  escena.append(conv, lienzo.panel);
 
-  el.append(lado, conv);
+  el.append(lado, escena);
 
   // ---------- La lista de chats ----------
   const acciones = (id) => {
@@ -359,6 +365,9 @@ export function montarChat(el, { router }) {
 
   datos.on('agentes', () => { ponerCabeza(); ponerAviso(); dibujarMensajes(); });
   datos.on('modelos', ponerCabeza);
+  datos.on('seleccion', () => lienzo.alCambiarDeChat());
+  datos.on('chats', () => lienzo.alCambiarDeChat());
+  lienzo.alCambiarDeChat();
   datos.on('chats', () => { ponerCabeza(); dibujarLista(); });
   datos.on('seleccion', () => { ponerCabeza(); ponerAviso(); dibujarLista(); mostrarHilo(); ponerRedactor(); });
   datos.on('mensajes', ({ chat }) => { if (hilo?.chatId === chat) dibujarMensajes(); });

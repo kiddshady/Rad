@@ -146,6 +146,30 @@ const SCENES = {
     await quietos();
     datos.elegirChat(c.id);
     await sleep(1500);`,
+  // El canvas: un documento abierto al lado de la conversación, y uno de código.
+  canvas: `
+    datos.ponerModoTools('auto');
+    const c = datos.crearChat(nix.id);
+    await datos.enviar(c.id, 'TOOLS: ' + JSON.stringify([{ name: 'canvas', args: { action: 'create', title: 'sum.js', kind: 'code', language: 'js', content: "// Michaelis–Menten\\nexport function rate(vmax, km, s) {\\n  return (vmax * s) / (km + s);\\n}\\n\\nfor (const s of [0.5, 1, 2, 5, 10]) {\\n  console.log(s, rate(100, 2, s).toFixed(1));\\n}" } }, { name: 'canvas', args: { action: 'create', title: 'Study plan', kind: 'document', content: "# Study plan: Biochemistry final\\n\\nThree weeks, two units per day.\\n\\n## Week 1\\n\\n- Glycolysis and its regulation\\n- Krebs cycle: $\\\\ce{Acetyl-CoA + 3NAD+ -> 2CO2 + 3NADH}$\\n- Oxidative phosphorylation\\n\\n## Week 2\\n\\n| Day | Topic | Hours |\\n|---|---|---|\\n| Mon | Lipids | 3 |\\n| Tue | Amino acids | 4 |\\n\\n> Review the enzymes list every night." } }]));
+    await quietos();
+    datos.renombrarChat(c.id, 'Plan for the final');
+    await sleep(1500);`,
+  'canvas-codigo': `
+    datos.ponerModoTools('auto');
+    const c = datos.crearChat(nix.id);
+    await datos.enviar(c.id, 'TOOLS: ' + JSON.stringify([{ name: 'canvas', args: { action: 'create', title: 'Study plan', kind: 'document', content: '# Plan' } }, { name: 'canvas', args: { action: 'create', title: 'rate.js', kind: 'code', language: 'js', content: "// Michaelis–Menten\\nexport function rate(vmax, km, s) {\\n  return (vmax * s) / (km + s);\\n}\\n\\nfor (const s of [0.5, 1, 2, 5, 10]) {\\n  console.log(s, rate(100, 2, s).toFixed(1));\\n}" } }]));
+    await quietos();
+    datos.renombrarChat(c.id, 'Enzyme kinetics');
+    await sleep(1500);`,
+  'canvas-biblioteca': `
+    datos.ponerModoTools('auto');
+    const c = datos.crearChat(nix.id);
+    await datos.enviar(c.id, 'TOOLS: ' + JSON.stringify([{ name: 'canvas', args: { action: 'create', title: 'Study plan', kind: 'document', content: '# Plan' } }, { name: 'canvas', args: { action: 'create', title: 'rate.js', kind: 'code', language: 'js', content: 'x' } }, { name: 'canvas', args: { action: 'create', title: 'Old notes', kind: 'document', content: 'old' } }]));
+    await quietos();
+    datos.renombrarChat(c.id, 'Enzyme kinetics');
+    await sleep(900);
+    document.querySelector('[data-accion="canvas-biblioteca"]').click();
+    await sleep(1200);`,
   'sin-llave': `
     await go('ajustes');
     await sleep(400);`,

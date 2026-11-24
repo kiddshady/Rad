@@ -445,7 +445,7 @@ else {
   if (caja.querySelector('.dm-formula-abierta') || caja.querySelectorAll('.dm-formula-bloque').length !== 3) fail('fórmulas: el bloque no se dibujó al cerrarse');
   if (todas()[0] !== primera) fail('fórmulas: al llegar más texto se rehicieron las que ya estaban');
   // no ensancha la conversación, y nada que frenó la CSP rompió el dibujo
-  if (thread().scrollWidth > thread().clientWidth + 1) fail('fórmulas: una fórmula ensanchó la conversación');
+  if (thread().scrollWidth > Math.round(thread().getBoundingClientRect().width) + 1) fail('fórmulas: una fórmula ensanchó la conversación');
   const alto = Math.round(bloque.getBoundingClientRect().height);
   if (alto < 18 || alto > 90) fail('fórmulas: el bloque mide ' + alto + ' px de alto');
   document.removeEventListener('securitypolicyviolation', alViolar);
@@ -739,7 +739,7 @@ else {
   const form = modal();
   type(form.querySelector('[data-campo="nombre"]'), 'Toolsmith');
   const interruptores = [...form.querySelectorAll('[data-campo="tools"] input[role="switch"]')];
-  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,desktop,screen' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
+  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,desktop,screen,canvas' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
   // un agente nuevo nace con todas prendidas: se le apaga la web
   for (const i of interruptores) if (i.dataset.grupo === 'web') i.click();
   enIngles('en el formulario con tools');
@@ -747,13 +747,13 @@ else {
   await closed();
   await settle();
   const herrero = cards().at(-1);
-  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Desktop, Screen') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
-  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Desktop, Screen') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Desktop, Screen, Canvas') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Desktop, Screen, Canvas') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
   herrero.querySelector('[data-accion="abrir"]').click();
   await sleep(dur('base') + 260);
   await until(() => statusRight().includes('Toolsmith'), 3000);
-  // todas menos las tres de la web
-  if (!statusRight().endsWith('· 15 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
+  // todas (19) menos las tres de la web
+  if (!statusRight().endsWith('· 16 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
 
   // Escribir un archivo. En modo manual (el de fábrica) primero pide permiso:
   // la tarjeta dice qué va a correr y qué va a cambiar, y hasta que no se
@@ -921,17 +921,17 @@ else {
     const abrir = async () => { boton.click(); await until(() => menus().length > 0, 2000); await sleep(dur('base') + 60); };
     await abrir();
     const filasMenu = [...menus()[0].querySelectorAll('.rad-menu-item')].map((i) => i.textContent.trim());
-    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Desktop,Screen,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
+    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Desktop,Screen,Canvas,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
     await pick('Turn all off');
     if (dice() !== 'Tools: off' || boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· no tools')) fail(`apagar todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     await pick('Turn all on');
-    if (dice() !== '18 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 18 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
+    if (dice() !== '19 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 19 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     const marcadas = [...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].length;
-    if (marcadas !== 7) fail(`con todas prendidas el menú marca ${marcadas} grupos de 7`);
+    if (marcadas !== 8) fail(`con todas prendidas el menú marca ${marcadas} grupos de 8`);
     await pick('Web');
-    if (dice() !== '15 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
+    if (dice() !== '16 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
     // y las recibe el modelo: el pedido siguiente corre una de esas tools
     // (en modo manual, que es como quedó: pide permiso y se le da)
     await pedir([[{ name: 'fs_read', args: { paths: ['note.txt'] } }]]);
@@ -939,7 +939,138 @@ else {
     primary()?.click();
     await until(() => !composer.querySelector('.rad-busy') && ultimo()?.dataset.estado === 'ok' && cuenta() === '1 tool · 1 done', 20000);
     if (cuenta() !== '1 tool · 1 done') fail(`después de prender las tools desde la conversación, el contador dice «${cuenta()}»`);
-    data.toolsEnElChat = `${antes} → Tools: off → 18 tools → 15 tools`;
+    data.toolsEnElChat = `${antes} → Tools: off → 19 tools → 16 tools`;
+  }
+
+  // 11c. El canvas: el agente deja un documento en el panel de al lado, lo
+  // corrige por fragmentos, el usuario lo edita a mano, y nadie le pisa el
+  // borrador a nadie. Con el motor y el store de verdad.
+  {
+    const datosM = await import('/datos.js');
+    datosM.ponerModoTools('auto');
+    const escena = chatView.querySelector('.dm-escena');
+    const panel = chatView.querySelector('.dm-canvas');
+    const barra = chatView.querySelector('.dm-canvas-barra');
+    const tarjetasC = () => alive(barra.querySelectorAll('.dm-canvas-tarjeta'));
+    const tituloC = () => shown(panel.querySelector('.dm-canvas-titulo'));
+    const subC = () => shown(panel.querySelector('.dm-canvas-sub'));
+    const abiertoC = () => panel.hasAttribute('data-abierto');
+    const boton = (a) => panel.querySelector('[data-accion="canvas-' + a + '"]');
+    const area = () => panel.querySelector('.dm-canvas-area');
+    const avisos = () => [...document.querySelectorAll('.rad-toast')].filter((n) => !n.hasAttribute('data-rad-leaving'));
+    const quieto = async () => { await sleep(200); for (let i = 0; i < 400 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50); await settle(); };
+    const corre = async (args) => { await pedir([[{ name: 'canvas', args }]]); await quieto(); };
+
+    const anchoSin = Math.round(thread().getBoundingClientRect().width);
+    if (abiertoC() || escena.hasAttribute('data-panel') || barra.hasAttribute('data-con-tarjetas')) fail('canvas: un chat sin canvas arranca con el panel o la barra a la vista');
+    await corre({ action: 'create', title: 'Study plan', kind: 'document', content: '# Plan\n\n- one\n- two\n\nEnergy: $E = mc^2$' });
+    if (!abiertoC() || tituloC() !== 'Study plan' || subC() !== 'document') fail('canvas: al crearlo el agente, el panel quedó ' + (abiertoC() ? 'abierto' : 'cerrado') + ' con «' + tituloC() + '» / «' + subC() + '»');
+    const doc = () => panel.querySelector('.dm-canvas-doc');
+    if (doc()?.querySelector('.dm-titulo')?.textContent !== 'Plan' || doc()?.querySelectorAll('li').length !== 2 || !doc()?.querySelector('.dm-formula')) fail('canvas: el documento no se pintó como markdown (título, lista y fórmula)');
+    if (tarjetasC().length !== 1 || !tarjetasC()[0].hasAttribute('data-activa') || !barra.hasAttribute('data-con-tarjetas')) fail('canvas: la barra no muestra la tarjeta del canvas abierto: ' + tarjetasC().length + ' tarjetas, activa ' + tarjetasC()[0]?.hasAttribute('data-activa') + ', barra ' + barra.hasAttribute('data-con-tarjetas') + ', todas ' + barra.querySelectorAll('.dm-canvas-tarjeta').length);
+    if (fila('canvas')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'grid') fail('canvas: su fila no lleva el ícono del canvas');
+    // el panel empuja a la conversación, no la tapa
+    const pr = panel.getBoundingClientRect();
+    const tr = thread().getBoundingClientRect();
+    if (!(Math.round(thread().getBoundingClientRect().width) < anchoSin - 250) || pr.left < tr.right - 1 || pr.right > escena.getBoundingClientRect().right + 1) fail('canvas: el panel tapa la conversación (hilo ' + Math.round(tr.left) + '–' + Math.round(tr.right) + ', panel ' + Math.round(pr.left) + '–' + Math.round(pr.right) + ')');
+    const anchoCon = Math.round(thread().getBoundingClientRect().width);
+    const idC = tarjetasC()[0].dataset.radKey;
+
+    // El agente lo corrige por fragmentos: sube la versión y cambia solo eso.
+    await corre({ action: 'edit', id: idC, edits: [{ old: '- two', new: '- two and a half' }] });
+    if (subC() !== 'document · v2' || doc()?.querySelectorAll('li')[1]?.textContent !== 'two and a half') fail('canvas: la edición del agente dejó «' + subC() + '» y «' + doc()?.querySelectorAll('li')[1]?.textContent + '»');
+
+    // El usuario lo edita a mano y guarda.
+    boton('editar').click();
+    await settle();
+    if (!panel.hasAttribute('data-editando') || !area()?.value.includes('two and a half')) fail('canvas: Edit no abrió el texto del canvas');
+    type(area(), area().value + '\n- three');
+    boton('guardar').click();
+    await until(() => !panel.hasAttribute('data-editando'), 3000);
+    await settle();
+    if (subC() !== 'document · v3' || doc()?.querySelectorAll('li').length !== 3) fail('canvas: guardar la edición del usuario dejó «' + subC() + '» con ' + doc()?.querySelectorAll('li').length + ' items');
+
+    // El usuario está editando y el agente reescribe ESE canvas: el borrador
+    // no se pisa, y se avisa.
+    boton('editar').click();
+    await settle();
+    type(area(), 'MY DRAFT');
+    await corre({ action: 'update', id: idC, content: 'Replaced by the agent.' });
+    if (!panel.hasAttribute('data-editando') || area()?.value !== 'MY DRAFT') fail('canvas: el agente le pisó el borrador al usuario (quedó «' + area()?.value + '»)');
+    if (!avisos().some((n) => n.textContent.includes('while you were editing'))) fail('canvas: no se avisó que el agente cambió el canvas que se estaba editando');
+    // Cancelar con cambios pregunta; descartar muestra lo del agente.
+    boton('cancelar').click();
+    await until(() => modal(), 2000);
+    if (!modal()?.textContent.includes('Discard')) fail('canvas: salir de editar con cambios no pregunta');
+    primary().click();
+    await closed();
+    await settle();
+    if (panel.hasAttribute('data-editando') || !doc()?.textContent.includes('Replaced by the agent.')) fail('canvas: después de descartar no se ve la versión del agente');
+
+    // Cerrar suelta el hueco; abrir desde la tarjeta lo vuelve a reservar de UN
+    // paso: lo que se mueve es el panel, no el ancho de la conversación.
+    boton('cerrar').click();
+    await until(() => !escena.hasAttribute('data-panel'), 2000);
+    if (abiertoC() || Math.round(thread().getBoundingClientRect().width) !== anchoSin) fail('canvas: cerrar no devolvió el ancho a la conversación (' + Math.round(thread().getBoundingClientRect().width) + ' de ' + anchoSin + ')');
+    const anchos = new Set();
+    const viajes = new Set();
+    let opMin = 1;
+    tarjetasC()[0].click();
+    for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 260;) {
+      anchos.add(Math.round(thread().getBoundingClientRect().width));
+      viajes.add(getComputedStyle(panel).transform);
+      if (abiertoC()) opMin = Math.min(opMin, op(panel));
+      await frame();
+    }
+    if (anchos.size > 2 || !anchos.has(anchoCon)) fail('canvas: al abrirse, la conversación pasó por ' + anchos.size + ' anchos (' + [...anchos].join(', ') + '): el hueco se anima en vez de reservarse de un paso');
+    if (viajes.size < 3 || opMin > 0.9 || op(panel) < 0.99) fail('canvas: el panel no entra moviéndose (' + viajes.size + ' posiciones, opacidad mínima ' + r2(opMin) + ', final ' + r2(op(panel)) + ')');
+
+    // Un canvas de código: con su lenguaje y sus números de línea.
+    await corre({ action: 'create', title: 'sum.js', kind: 'code', language: 'js', content: 'const a = 1;\nconst b = 2;\nconsole.log(a + b);' });
+    if (tituloC() !== 'sum.js' || subC() !== 'js' || panel.querySelector('.dm-canvas-numeros')?.textContent !== '1\n2\n3' || !panel.querySelector('.dm-canvas-codigo code')?.textContent.includes('console.log(a + b);')) fail('canvas: el de código no muestra su lenguaje, sus números o su texto');
+    if (tarjetasC().length !== 2) fail('canvas: la barra tiene ' + tarjetasC().length + ' tarjetas, se esperaban 2');
+
+    // Exportar (en el humo va a una carpeta de la corrida, sin diálogo).
+    boton('exportar').click();
+    await until(() => avisos().some((n) => n.textContent.startsWith('Saved to')), 3000);
+    const guardado = avisos().find((n) => n.textContent.startsWith('Saved to'))?.textContent ?? '';
+    if (!guardado.endsWith('sum.js')) fail('canvas: exportar dijo «' + guardado + '»');
+
+    // El agente borra el primero: va a la papelera, y el aviso lo trae de vuelta.
+    await corre({ action: 'delete', id: idC });
+    if (tarjetasC().length !== 1) fail('canvas: después de que el agente borró uno, la barra tiene ' + tarjetasC().length);
+    const aviso = avisos().find((n) => n.textContent.includes('The agent deleted'));
+    if (!aviso?.querySelector('.rad-toast-action')) fail('canvas: el borrado del agente no ofrece restaurar');
+    aviso?.querySelector('.rad-toast-action')?.click();
+    await until(() => tarjetasC().length === 2, 3000);
+    if (tarjetasC().length !== 2) fail('canvas: Restore no trajo el canvas de vuelta');
+
+    // La biblioteca: todos, con buscador.
+    chatView.querySelector('[data-accion="canvas-biblioteca"]').click();
+    await until(() => modal(), 2000);
+    await settle();
+    const filasB = () => alive(modal().querySelectorAll('.dm-biblio-fila'));
+    if (filasB().length !== 2) fail('canvas: la biblioteca muestra ' + filasB().length + ' canvas, se esperaban 2');
+    type(modal().querySelector('input[type="search"]'), 'study');
+    await settle();
+    if (filasB().length !== 1 || !filasB()[0].textContent.includes('Study plan')) fail('canvas: buscar «study» en la biblioteca dejó ' + filasB().length + ' filas');
+    enIngles('en la biblioteca del canvas');
+    modal().querySelector('.rad-button').click();
+    await closed();
+
+    // Cambiar de chat cierra el panel y vacía la barra: son de aquel chat.
+    chatView.querySelector('[data-accion="nuevo-chat"]').click();
+    await until(() => !abiertoC() && !barra.hasAttribute('data-con-tarjetas'), 3000);
+    if (abiertoC() || barra.hasAttribute('data-con-tarjetas')) fail('canvas: al cambiar de chat el panel o la barra siguieron a la vista');
+    datosM.ponerModoTools('manual');
+    data.canvas = 'creado, editado por el agente y a mano (v3), borrador protegido, ' + anchos.size + ' anchos y ' + viajes.size + ' posiciones al abrirse, código, exportado, papelera y biblioteca';
+
+    // Quien tenía todas las tools recibe las nuevas; quien eligió algunas, no.
+    const antes = ['a', 'b'];
+    const lista = [{ id: '1', tools: ['a', 'b'] }, { id: '2', tools: ['a'] }, { id: '3', tools: [] }];
+    const nueva = datosM.sumarToolsNuevas(lista, antes, ['a', 'b', 'c']);
+    if (!nueva || nueva[0].tools.join() !== 'a,b,c' || nueva[1].tools.join() !== 'a' || nueva[2].tools.length) fail('tools nuevas: ' + JSON.stringify(nueva));
+    if (datosM.sumarToolsNuevas(lista, ['a', 'b', 'c'], ['a', 'b', 'c']) !== null) fail('tools nuevas: sin tools nuevas igual cambió algo');
   }
 
   // Cambiarle las tools a un agente que YA existía, desde su formulario.
@@ -952,7 +1083,7 @@ else {
     const guardar = async () => { primary().click(); await closed(); await settle(); };
     await editar();
     if (!sw('files')?.checked || !sw('screen')?.checked) fail('el formulario de un agente con todas las tools no las muestra prendidas');
-    for (const g of ['commands', 'code', 'data', 'web', 'desktop']) sw(g).click();
+    for (const g of ['commands', 'code', 'data', 'web', 'desktop', 'canvas']) sw(g).click();
     await guardar();
     if (tarjeta() !== 'Tools: Files, Screen') fail(`apagarle grupos a un agente desde su formulario dejó la tarjeta en «${tarjeta()}»`);
     await editar();

@@ -28,6 +28,7 @@ encabezado de qué parte de NeonCode salió y qué se le adaptó.
 | `web.cjs` | `fetch`, `web_search`, `http_request` |
 | `abrir.cjs` | `os_open`: abre un archivo, una carpeta o una URL como lo haría el usuario |
 | `captura.cjs` | `screen_capture`: una foto de un monitor o de una ventana, que el modelo ve |
+| `canvas.cjs`, `canvas-store.cjs` | `canvas`: documentos y código en el panel de al lado, y su base |
 | `index.cjs` | Arma todo y es lo único que conoce el chat |
 
 Los loops de cada proveedor están en `main/anthropic.cjs` y `main/venice.cjs`.
@@ -51,6 +52,7 @@ agente. La barra de estado repite la cuenta.
 | Web | `fetch`, `web_search`, `http_request` |
 | Desktop | `os_open` |
 | Screen | `screen_capture` |
+| Canvas | `canvas` |
 
 La pantalla va sola en su grupo: es lo más privado que una tool puede mirar
 (lo que haya abierto, sin elegir qué), y se prende aparte de todo lo demás.
@@ -126,6 +128,28 @@ Los jobs viven fuera de los turnos: sobreviven al turno y al chat que los
 arrancó (hasta 8 a la vez), el system prompt de cada turno lista los que siguen
 vivos, y al cerrar la app se matan todos, con su árbol de procesos.
 
+## El canvas
+
+El agente deja ahí lo largo (un documento, un archivo de código) en vez de
+volcarlo en el mensaje. Cómo está armado:
+
+- **El cuerpo no viaja en la conversación.** El modelo sabe qué canvas tiene
+  este chat por un bloque de su system prompt (`## Open canvases`, solo título,
+  id y versión) y lee el contenido con `read`. El bloque se arma al empezar el
+  turno, no en cada ronda.
+- **Edición por fragmentos.** `edit` usa el mismo motor que `fs_edit`; `update`
+  reemplaza todo y queda para cuando hace falta. La tarjeta de permiso de
+  `edit`, `update` y `delete` muestra el cambio.
+- **Su base es propia** (`canvas.db`, al lado de `agent.db`), porque con
+  `db_query` el modelo puede hacer lo que quiera con la otra.
+- **Dos formas de borrar.** El usuario borra del todo. El agente manda a una
+  papelera que dura 7 días (en modo automático nadie aprobó ese borrado).
+- **Los canales del panel** (`canvas:lista`, `:todos`, `:abrir`, `:guardar`,
+  `:borrar`, `:restaurar`, `:exportar`, `:huerfanos`) están en `chat.cjs` y no
+  se acotan a un chat: la biblioteca muestra los de todos. La tool sí.
+- La interfaz está en `renderer/canvas.js`. Un documento se pinta con
+  `markdown.js`; el código va sin resaltado.
+
 ## Las imágenes
 
 Hay dos caminos, y no son el mismo:
@@ -177,7 +201,7 @@ Venice) en cada pedido de un agente con tools.
 - El diario para deshacer lo que escribió una tool (los ganchos están en
   `fs.cjs`, sin nada enchufado).
 - Mandar un mensaje a mitad del turno (steer).
-- Canvas, notepad, memoria, búsqueda en chats.
+- Notepad, memoria, búsqueda en chats.
 - Subagentes, MCP, skills, navegador, tareas programadas.
 - Dónde guardar secretos para `http_request` (`{{secret:NOMBRE}}`) y la llave
   de Tavily o Brave para `web_search`. Sin eso, un pedido con un secreto falla
@@ -220,6 +244,17 @@ para arreglarlos de a uno, con su prueba:
   frenar: una consulta larga congela la app hasta que termina.
 - `screen_capture` de una ventana puede informar un alto algo menor que el de
   la ventana (Windows no cuenta la barra de título en la miniatura).
+- El bloque `## Open canvases` del system prompt le dice al modelo que revise
+  con `read` y después `update` con el contenido entero, cuando la tool y su
+  guía mandan a `edit` por fragmentos.
+- Un canvas suelto (de un chat borrado) se puede leer y editar desde cualquier
+  chat, aunque el texto de `list` diga que solo andan los del chat.
+- La papelera del canvas se purga solo al abrir la base: con la app abierta
+  más de una semana, lo vencido sigue restaurable.
+- Las listas del canvas cortan en silencio (50 por chat, 300 en la biblioteca,
+  100 en la papelera).
+- Exportar un canvas saca los acentos del nombre del archivo («Título» sale
+  `T_tulo.md`).
 
 ## Cómo se prueba
 
@@ -227,6 +262,8 @@ para arreglarlos de a uno, con su prueba:
   pruebas de NeonCode de cada familia, corriendo contra los módulos de Nix.
 - `-code.mjs`, `-sqlite.mjs`, `-captura.mjs`: nuevas, porque allá esas tools
   no tenían pruebas. La de capturas usa pantallas y ventanas de mentira.
+- `-canvas.mjs`: las de NeonCode más el cableado de Nix, sobre una base
+  descartable.
 - `tools/test-nix-tools-loop.mjs`: los dos loops contra un servidor local que
   hace de las dos APIs. Mira qué pide cada ronda y qué vuelve, también las
   imágenes de una captura.

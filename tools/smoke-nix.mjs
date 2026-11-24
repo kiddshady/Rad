@@ -104,6 +104,9 @@ function checkDisk(data, report) {
   // os_open, en el humo, anota lo que habría abierto en vez de abrirlo.
   if (!/^open .*note\.txt$/m.test(leer('.opened.log') ?? '')) failures.push(`os_open no pidió abrir note.txt: ${JSON.stringify(leer('.opened.log'))}`);
   if (!fs.existsSync(path.join(taller, 'agent.db'))) failures.push('la base propia del agente no quedó en el disco');
+  // el canvas: su base, y el archivo que exportó el guion
+  if (!fs.existsSync(path.join(taller, 'canvas.db'))) failures.push('la base de los canvas no quedó en el disco');
+  if (leer(path.join('exports', 'sum.js')) !== 'const a = 1;\nconst b = 2;\nconsole.log(a + b);') failures.push(`el canvas exportado quedó como ${JSON.stringify(leer(path.join('exports', 'sum.js')))}`);
   if (!fs.existsSync(path.join(taller, 'code-workspace', 'out.txt'))) failures.push('run_code no dejó su archivo en el taller');
   const borrado = report.script?.chatBorrado;
   if (!borrado) failures.push('el guion no dijo qué chat borró');

@@ -1,5 +1,38 @@
 # Changelog
 
+## Nix 0.8.0 (2026-11-24)
+
+- **Canvas.** Un panel al lado de la conversación donde el agente deja un
+  documento largo o un archivo de código, en vez de volcarlo en el mensaje.
+  Es el canvas de NeonCode: la tool (`canvas`: create, read, edit, update,
+  delete, list) y su store vinieron portados tal cual, con sus 116 pruebas y
+  105 más; el panel, la barra de tarjetas y la biblioteca se reescribieron
+  sobre Rad con sus mismas reglas.
+- El agente corrige un canvas **por fragmentos** (`edit`), sin reescribirlo
+  entero, y cada cambio sube su versión. Un documento se pinta con el markdown
+  de la app (fórmulas incluidas); el código, con sus números de línea.
+- Se edita a mano (Edit, Ctrl+S para guardar), se copia, se exporta a un
+  archivo y se borra. **Nadie le pisa el borrador a nadie:** si el agente
+  reescribe el canvas que se está editando, el borrador queda y se avisa; y
+  un borrador sin guardar vuelve solo si el panel se cerró al cambiar de chat.
+- Lo que borra el usuario se va del todo; lo que borra el agente queda una
+  semana en la papelera, y se restaura desde el aviso o desde la biblioteca
+  (el botón de la cabecera: todos los canvas de todos los chats, con
+  buscador). Borrar un chat no borra sus canvas: quedan sueltos ahí.
+- El panel **empuja** a la conversación, no la tapa (52 % del ancho, entre 320
+  y 560 px). El hueco se reserva de un paso y lo que se mueve es el panel, con
+  transform y opacidad: la conversación no se remaqueta en cada cuadro (el
+  humo lo mide: dos anchos, no veinte).
+- El cuerpo de un canvas no viaja en la conversación: el agente sabe cuáles
+  hay por un bloque en su system prompt y los lee con la tool.
+- **Quien tenía todas las tools recibe las nuevas.** Al sumar un grupo (ahora
+  Canvas), el agente que tenía todas las de antes lo recibe prendido; el que
+  había apagado alguna no cambia.
+- Una tool que la app suma lleva su ícono desde antes (el del canvas ya
+  estaba). Los canvas se guardan en `%APPDATA%\Nix\tools\canvas.db`.
+- No vino: resaltado de sintaxis en el código (la app todavía no lo tiene en
+  ningún lado) ni historial de versiones (allá tampoco había).
+
 ## Nix 0.7.4 (2026-11-24)
 
 - **LaTeX en las respuestas.** Las fórmulas se dibujan con KaTeX: en bloque

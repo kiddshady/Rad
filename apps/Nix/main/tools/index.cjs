@@ -21,6 +21,7 @@ const datos = require('./sqlite.cjs');
 const web = require('./web.cjs');
 const abrir = require('./abrir.cjs');
 const captura = require('./captura.cjs');
+const lienzo = require('./canvas.cjs');
 
 let listo = false;
 
@@ -31,23 +32,30 @@ let listo = false;
  *   trash(ruta)        manda algo a la Papelera (fs_delete)
  *   shell              { openPath, openExternal, showItemInFolder } (os_open)
  *   capturador, pantallas       el desktopCapturer y el screen de Electron (screen_capture)
+ *   titulosDeChats()            Map id → título de los chats (la biblioteca del canvas)
+ *   avisar(canal, datos)        un aviso a la interfaz que no es de un turno (el agente borró un canvas)
  *   alProducir(run, imagenes)   run_code dejó imágenes: [{ name, dataUrl }]
  *   getKey(nombre)     una llave guardada, o null (web_search con Tavily o Brave)
  *   getSecret(nombre)  el valor de un {{secret:NOMBRE}}, o null (http_request)
  *   webSearch()        { provider, maxResults } de la búsqueda web
  */
-function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, alProducir = null, getKey = null, getSecret = null, webSearch = null } = {}) {
+function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, alProducir = null, getKey = null, getSecret = null, webSearch = null } = {}) {
   archivos.configurar({ trash });
   web.configurar({ getKey, getSecret, webSearch });
   abrir.configurar({ shell });
   captura.configurar({ capturador, pantallas, jobs: trabajos.jobs });
+  lienzo.configurar({
+    ...(carpeta ? { dbPath: () => path.join(carpeta, 'canvas.db') } : {}),
+    ...(titulosDeChats ? { titulosDeChats } : {}),
+    ...(avisar ? { broadcast: avisar } : {}),
+  });
   codigo.configurar({ alProducir, ...(carpeta ? { workspace: () => path.join(carpeta, 'code-workspace') } : {}) });
   if (carpeta) datos.configurar({ dbPath: () => path.join(carpeta, 'agent.db') });
   motor.configurar({ classifyOsTarget: abrir.classifyOsTarget });
   if (listo) return;
   motor.registrar({
     ...archivos.runners, ...comandos.runners, ...trabajos.runners, ...busqueda.runners,
-    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners,
+    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners,
   });
   listo = true;
 }
@@ -57,6 +65,7 @@ function iniciar({ carpeta = null, trash = null, shell = null, capturador = null
 function cerrar() {
   try { trabajos.cerrarTodo(); } catch { /* ya no hay nada que matar */ }
   try { datos.cerrar(); } catch { /* ya estaba cerrada */ }
+  try { lienzo.cerrar(); } catch { /* ya estaba cerrada */ }
 }
 
 /** Lo que la interfaz necesita para ofrecer las tools de un agente. */
@@ -69,9 +78,13 @@ function catalogo() {
 }
 
 /** Lo que muestra la tarjeta de confirmación de una llamada: para escribir,
- *  editar o borrar un archivo, qué va a cambiar. Para el resto, nada. */
+ *  editar o borrar un archivo, o para cambiar o borrar un canvas, qué va a
+ *  cambiar. Para el resto, nada. */
 async function vistaPrevia(run, name, args) {
-  try { return await archivos.preview(run, name, args); } catch { return null; }
+  try {
+    if (name === 'canvas') return ['edit', 'update', 'delete'].includes(args?.action) ? lienzo.canvasPreview(args) : null;
+    return await archivos.preview(run, name, args);
+  } catch { return null; }
 }
 
 /** Los jobs que siguen vivos, para el system prompt: sobreviven al turno y al
@@ -91,9 +104,14 @@ module.exports = {
   crearSesion(opciones) {
     const s = sesion.crear(opciones);
     const sistema = s.sistema;
-    s.sistema = (instrucciones) => sistema(instrucciones, { trabajos: trabajosVivos() });
+    // …y los canvas que este chat tiene abiertos: su cuerpo no viaja en la
+    // conversación, así que sin esta lista el modelo no sabe que existen
+    const canvas = () => { try { return s.nombres.includes('canvas') ? lienzo.canvasBlock(opciones.convoId) : ''; } catch { return ''; } };
+    s.sistema = (instrucciones) => sistema(instrucciones, { trabajos: trabajosVivos(), canvas: canvas() });
     return s;
   },
+  // el canvas, para los canales que usa su panel
+  canvas: lienzo,
   argsDigest: motor.argsDigest,
   plegar: require('./guardas.cjs').foldToolRows,
   getCwd: base.getCwd,

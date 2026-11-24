@@ -65,6 +65,15 @@ export async function abrir() {
   if (chats.get().lista.some((c) => c.auto && c.titulo === 'Chat nuevo')) {
     chats.update((v) => { for (const c of v.lista) if (c.auto && c.titulo === 'Chat nuevo') c.titulo = TITULO_NUEVO; return v; });
   }
+  // La app sumó tools desde la última vez: el agente que las tenía todas las
+  // sigue teniendo todas.
+  {
+    const todas = todasLasTools();
+    const conocidas = Array.isArray(ui.get().toolsConocidas) ? ui.get().toolsConocidas : TOOLS_HASTA_0_7_4;
+    const lista = sumarToolsNuevas(agentes.get().lista, conocidas, todas);
+    if (lista) agentes.update((v) => { v.lista = lista; return v; });
+    if (lista || !Array.isArray(ui.get().toolsConocidas) || conocidas.length !== todas.length) ui.patch({ toolsConocidas: todas });
+  }
   // La primera vez hay un agente para empezar a escribir sin armar nada.
   if (!agentes.get().lista.length) crearAgente({ nombre: 'Nix', proveedor: PROVEEDOR_INICIAL, modelo: modeloInicial(PROVEEDOR_INICIAL), instrucciones: '', tools: todasLasTools() });
   window.rad.on('chat:evento', alLlegar);
@@ -98,6 +107,28 @@ export const gruposDe = (a) => herramientas.grupos.filter((g) => g.tools.some((t
 /** Todas las tools que hay. Un agente nuevo nace con todas prendidas (Fran lo
  *  pidió el 24/11/2026: apagadas de fábrica, no las encontraba). */
 export const todasLasTools = () => herramientas.grupos.flatMap((g) => g.tools);
+// Las tools que había antes de que la app anotara cuáles conoce (0.7.4).
+const TOOLS_HASTA_0_7_4 = ['fs_read', 'fs_write', 'fs_edit', 'fs_delete', 'code_search', 'shell_exec', 'cmd_exec', 'job_start', 'job_output', 'job_kill',
+  'run_code', 'db_query', 'sqlite_query', 'fetch', 'web_search', 'http_request', 'os_open', 'screen_capture'];
+/**
+ * Cuando la app suma tools, el agente que tenía TODAS las de antes recibe las
+ * nuevas: quien eligió «todo» sigue teniendo todo, sin volver a prenderlo. El
+ * que tenía algunas apagadas no cambia (las eligió así).
+ * Devuelve la lista de agentes nueva, o null si no hay nada que cambiar.
+ */
+export function sumarToolsNuevas(lista, conocidas, todas) {
+  const nuevas = todas.filter((t) => !conocidas.includes(t));
+  const deAntes = conocidas.filter((t) => todas.includes(t));
+  if (!nuevas.length || !deAntes.length) return null;
+  let cambio = false;
+  const out = lista.map((a) => {
+    const suyas = toolsDe(a);
+    if (!deAntes.every((t) => suyas.includes(t))) return a;
+    cambio = true;
+    return { ...a, tools: [...new Set([...suyas, ...nuevas])] };
+  });
+  return cambio ? out : null;
+}
 /** Cuántas tools viajan de verdad en un pedido de ese agente: las que tiene
  *  prendidas, o ninguna si su modelo no las acepta. */
 export const toolsQueViajan = (a) => (a && modeloConTools(a.proveedor, a.modelo) ? toolsDe(a).length : 0);
@@ -155,6 +186,7 @@ export async function borrarAgente(id) {
   avisar('agentes');
   avisar('chats');
   avisar('seleccion');
+  window.rad.invoke('canvas:huerfanos', suyos.map((c) => c.id)).catch(() => {});
   await Promise.all(suyos.map((c) => removeDoc(`chat-${c.id}`)));
   return true;
 }
@@ -227,6 +259,8 @@ export async function borrarChat(id) {
   avisar('chats');
   avisar('seleccion');
   avisar('respuesta', { chat: id });
+  // sus canvas no se borran con el chat: quedan sueltos, en la biblioteca
+  window.rad.invoke('canvas:huerfanos', [id]).catch(() => {});
   await removeDoc(`chat-${id}`);
 }
 
@@ -360,6 +394,9 @@ function alLlegar(ev) {
     if (fila && Array.isArray(ev.imagenes)) fila.imagenes = ev.imagenes.map(({ name, dataUrl }) => ({ name, dataUrl }));
     r.doc.set(r.doc.get());
     avisar('mensajes', { chat: chatId });
+  } else if (ev.tipo === 'canvas') {
+    // el agente creó o cambió un canvas: lo muestra el panel (canvas.js)
+    avisar('canvas', { chat: chatId, canvas: ev.canvas });
   } else if (ev.tipo === 'confirmar') {
     r.confirmacion = { callId: ev.callId, name: ev.name, label: ev.label, args: ev.args ?? {}, vista: ev.vista ?? null };
     avisar('confirmar', { chat: chatId });

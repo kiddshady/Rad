@@ -17,6 +17,7 @@
 //     tipo 'tool'      { callId, kind, label }             se pidió una tool
 //     tipo 'tool-fin'  { callId, status, ms, out, outCut } cómo terminó
 //     tipo 'tool-imagenes' { callId, imagenes }            dejó imágenes: [{ name, dataUrl }]
+//     tipo 'canvas'    { canvas }                          el agente creó o cambió un canvas
 //     tipo 'confirmar' { callId, name, label, args, vista } pide permiso;
 //                      se contesta con rad.invoke('chat:confirmar', { callId, permitir, confiar, chat })
 //   y 'fin' y 'error' llevan `tools`: lo que corrió en el turno.
@@ -93,6 +94,13 @@ function wire(rad, { llave }) {
   // y lo que «borran» va a una papelera que es otra carpeta ahí mismo.
   // Tampoco abren nada: os_open anota lo que habría abierto.
   const taller = llave.SIMULADO && process.env.RAD_DATA ? path.join(process.env.RAD_DATA, 'workspace') : null;
+  // El canvas: los títulos de los chats (para su biblioteca) salen del
+  // documento que guarda la interfaz, y cuando el agente borra uno se avisa
+  // fuera del turno (el panel puede estar mirando otro chat).
+  const paraElCanvas = {
+    titulosDeChats: () => new Map((rad.store.read('chats')?.lista ?? []).map((c) => [c.id, c.titulo])),
+    avisar: (canal, datos) => { if (canal === 'canvas:deleted') rad.send('canvas:evento', { tipo: 'borrado', convoId: datos?.convoId ?? null, canvas: datos?.canvas ?? null }); },
+  };
   // run_code dejó imágenes: van a la fila de esa llamada, en el chat.
   const alProducir = (run, imagenes) => run.notify('tool:artifact', { images: imagenes });
   if (taller) {
@@ -102,6 +110,7 @@ function wire(rad, { llave }) {
     herramientas.iniciar({
       carpeta: taller,
       alProducir,
+      ...paraElCanvas,
       trash: (ruta) => fs.promises.rename(ruta, path.join(taller, '.trash', `${Date.now()}-${path.basename(ruta)}`)),
       // y no miran la pantalla de nadie: capturan una de mentira
       ...simulado.pantallaDeMentira(),
@@ -118,7 +127,7 @@ function wire(rad, { llave }) {
     const carpeta = path.join(path.dirname(rad.store.dir), 'tools');
     fs.mkdirSync(carpeta, { recursive: true });
     const { desktopCapturer, screen } = require('electron');
-    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen });
+    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas });
     herramientas.setCwd(rad.store.read(DOC_TOOLS)?.carpeta);
   }
   // Al salir, lo que quedó corriendo en segundo plano se mata.
@@ -137,6 +146,43 @@ function wire(rad, { llave }) {
   }));
 
   rad.handle('chat:tools', () => herramientas.catalogo());
+
+  // ---------- El canvas ----------
+  // Lo que usa su panel. A diferencia de la tool, estos canales no están
+  // acotados a un chat: la biblioteca muestra los de todos.
+  const lienzo = herramientas.canvas;
+  rad.handle('canvas:lista', (chat) => (chat ? lienzo.store.listByConversation(String(chat)) : []));
+  rad.handle('canvas:todos', () => lienzo.listarTodos());
+  rad.handle('canvas:abrir', (id) => lienzo.store.get(String(id ?? '')) ?? null);
+  rad.handle('canvas:guardar', (cambio) => lienzo.guardar(cambio ?? {}) ?? null);
+  rad.handle('canvas:borrar', (que) => lienzo.store.remove(String(que?.id ?? ''), que?.convoId ?? null));
+  rad.handle('canvas:restaurar', (id) => lienzo.store.restore(String(id ?? '')) ?? null);
+  // Se borró un chat: sus canvas quedan sueltos, en la biblioteca.
+  rad.handle('canvas:huerfanos', (chats) => { for (const c of Array.isArray(chats) ? chats : []) lienzo.store.orphanConversation(String(c)); return { ok: true }; });
+  rad.handle('canvas:exportar', async (c) => {
+    let nombre = lienzo.nombreDeExport({ title: c?.title, kind: c?.kind, language: c?.language });
+    // un canvas que ya se llama «sum.js» no sale como «sum.js.js»
+    const ext = path.extname(nombre);
+    if (ext && nombre.slice(0, -ext.length).toLowerCase().endsWith(ext.toLowerCase())) nombre = nombre.slice(0, -ext.length);
+    try {
+      let destino;
+      if (taller) {
+        // en el humo no se abre un diálogo: va a una carpeta de la corrida
+        destino = path.join(taller, 'exports', nombre);
+        fs.mkdirSync(path.dirname(destino), { recursive: true });
+      } else {
+        const { dialog, BrowserWindow } = require('electron');
+        const ventana = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+        const r = await dialog.showSaveDialog(ventana, { title: 'Export canvas', defaultPath: nombre });
+        if (r.canceled || !r.filePath) return { ok: false, canceled: true };
+        destino = r.filePath;
+      }
+      await fs.promises.writeFile(destino, String(c?.content ?? ''), 'utf8');
+      return { ok: true, path: destino };
+    } catch (err) {
+      return { ok: false, error: String(err?.message || err) };
+    }
+  });
   rad.handle('chat:confirmar', (respuesta) => {
     const { callId, permitir, confiar, chat } = respuesta ?? {};
     const resolver = pendientes.get(callId);
@@ -213,6 +259,7 @@ function wire(rad, { llave }) {
           const callId = datos.callId ?? this._callId;
           if (canal === 'tool:activity') avisar('tool', { callId, kind: datos.kind, label: datos.label });
           else if (canal === 'tool:result') avisar('tool-fin', { callId, status: datos.status, ms: datos.ms, out: datos.out, outCut: datos.outCut });
+          else if (canal === 'canvas:opened') avisar('canvas', { canvas: datos.canvas });
           else if (canal === 'tool:artifact') avisar('tool-imagenes', { callId, imagenes: (datos.images || []).slice(0, IMAGENES_MAX) });
         },
         // La tarjeta: se le manda a la interfaz qué se va a correr (y, si es

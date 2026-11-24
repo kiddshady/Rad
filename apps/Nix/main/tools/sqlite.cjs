@@ -90,6 +90,10 @@ function configurar(deps = {}) {
 //  - La apertura: `fileMustExist` (node:sqlite crea el archivo si no está),
 //    el error por carpeta inexistente, los 5 s de busy_timeout por defecto, el
 //    modo defensivo y que cerrar dos veces no tire.
+//  - `stmt.get()`: la primera fila, o undefined si no hay ninguna, con los
+//    mismos enteros y BLOB que all(). Los runners de este archivo no lo usan:
+//    lo usa el store del canvas (canvas-store.cjs), que abre su base con esta
+//    misma clase Database.
 //
 // Lo que NO iguala:
 //  - Es otro SQLite, compilado distinto. El de better-sqlite3 traía
@@ -172,6 +176,17 @@ function traducir(err) {
   return err;
 }
 
+/** Deja una fila como la devolvía better-sqlite3: los enteros como Number y
+ *  los BLOB como Buffer. La cambia en el lugar y la devuelve. */
+function comoAlla(row) {
+  for (const k of Object.keys(row)) {
+    const v = row[k];
+    if (typeof v === 'bigint') row[k] = Number(v);
+    else if (v instanceof Uint8Array) row[k] = Buffer.from(v.buffer, v.byteOffset, v.byteLength);
+  }
+  return row;
+}
+
 class Sentencia {
   constructor(base, stmt, fuente) {
     this.base = base;
@@ -215,14 +230,16 @@ class Sentencia {
     this.stmt.setReadBigInts(true);
     let rows;
     try { rows = this.stmt.all(...p); } catch (err) { throw traducir(err); }
-    for (const row of rows) {
-      for (const k of Object.keys(row)) {
-        const v = row[k];
-        if (typeof v === 'bigint') row[k] = Number(v);
-        else if (v instanceof Uint8Array) row[k] = Buffer.from(v.buffer, v.byteOffset, v.byteLength);
-      }
-    }
+    for (const row of rows) comoAlla(row);
     return rows;
+  }
+
+  get(...args) {
+    const p = this.ligar(args);
+    this.stmt.setReadBigInts(true);
+    let row;
+    try { row = this.stmt.get(...p); } catch (err) { throw traducir(err); }
+    return row === undefined ? undefined : comoAlla(row);
   }
 
   run(...args) {
@@ -473,3 +490,8 @@ const runners = {
 };
 
 module.exports = { runners, configurar, cerrar };
+
+// El adaptador, para el store del canvas (canvas-store.cjs), que abre su propia
+// base con él. No enumerable: lo que este módulo ofrece a la app sigue siendo
+// lo de arriba, y `const { Database } = require('./sqlite.cjs')` anda igual.
+Object.defineProperty(module.exports, 'Database', { value: Database });

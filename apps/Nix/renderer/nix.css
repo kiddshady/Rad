@@ -288,7 +288,7 @@
   /* La conversación. */
   .dm-conv {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
     min-width: 0;
     min-height: 0;
   }
@@ -653,6 +653,154 @@
     border-radius: var(--rad-radius-s);
     animation: rad-fade-in var(--rad-dur-slow) var(--rad-ease-out) both;
   }
+
+  /* ---------- La escena y el canvas ---------- */
+  /* La conversación y, a su derecha, el panel que esté abierto. El hueco del
+     panel se reserva de UN paso (sin transición): lo que se ve moverse es el
+     panel, con transform y opacidad. Animar el ancho remaquetaría la
+     conversación en cada cuadro. */
+  .dm-escena {
+    position: relative;
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    --dm-panel-w: clamp(320px, 52%, 560px);
+  }
+  .dm-escena > .dm-conv { grid-area: 1 / 1; }
+  .dm-escena[data-panel] > .dm-conv { padding-right: var(--dm-panel-w); }
+
+  .dm-canvas {
+    position: absolute;
+    top: var(--rad-space-3);
+    right: var(--rad-space-3);
+    bottom: var(--rad-space-3);
+    width: calc(var(--dm-panel-w) - var(--rad-space-3));
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    border-radius: var(--rad-radius-l);
+    background: var(--rad-surface-1);
+    box-shadow: var(--rad-shadow-2);
+    opacity: 0;
+    transform: translateX(28px);
+    visibility: hidden;
+    transition: opacity var(--rad-dur-base) var(--rad-ease-in-out), transform var(--rad-dur-base) var(--rad-ease-in-out), visibility 0s linear var(--rad-dur-base);
+  }
+  .dm-canvas[data-abierto] {
+    opacity: 1;
+    transform: none;
+    visibility: visible;
+    transition: opacity var(--rad-dur-base) var(--rad-ease-out), transform var(--rad-dur-base) var(--rad-ease-out), visibility 0s;
+  }
+  .dm-canvas-cabeza {
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    min-width: 0;
+    padding: var(--rad-space-2) var(--rad-space-2) var(--rad-space-2) var(--rad-space-4);
+  }
+  .dm-canvas-icono { color: var(--rad-text-3); }
+  .dm-canvas-nombre { flex: 1; min-width: 0; display: grid; }
+  .dm-canvas-titulo { font-family: var(--rad-font-display); font-size: var(--rad-text-m); font-weight: var(--rad-weight-strong); color: var(--rad-text-1); }
+  .dm-canvas-sub { font-size: var(--rad-text-xs); color: var(--rad-text-3); }
+  .dm-canvas-titulo.rad-swap, .dm-canvas-sub.rad-swap { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+  .dm-canvas-titulo > *, .dm-canvas-sub > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Los botones de leer y los de editar ocupan el mismo lugar y se relevan. */
+  .dm-canvas-acciones {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-1);
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out), visibility 0s;
+  }
+  .dm-canvas-acciones-edicion { position: absolute; right: var(--rad-space-2); gap: var(--rad-space-2); }
+  .dm-canvas:not([data-editando]) .dm-canvas-acciones-edicion,
+  .dm-canvas[data-editando] .dm-canvas-acciones:not(.dm-canvas-acciones-edicion) {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out), visibility 0s linear var(--rad-dur-fast);
+  }
+
+  .dm-canvas-cuerpo {
+    min-height: 0;
+    padding: var(--rad-space-2) var(--rad-space-4) var(--rad-space-4);
+    --rad-a-scroll-inset: var(--rad-space-2);
+  }
+  .dm-canvas-cuerpo > * { animation: rad-fade-in var(--rad-dur-base) var(--rad-ease-out) both; }
+  .dm-canvas-doc { user-select: text; }
+  .dm-canvas-codigo {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--rad-space-3);
+    margin: 0;
+    font-size: var(--rad-text-s);
+    line-height: 1.6;
+    white-space: pre;
+    user-select: text;
+  }
+  .dm-canvas-codigo code { overflow-x: auto; padding-bottom: var(--rad-space-2); background: none; }
+  .dm-canvas-numeros { color: var(--rad-text-3); text-align: right; user-select: none; }
+  .dm-canvas-cuerpo[data-modo='edicion'] { display: grid; padding-top: var(--rad-space-1); }
+  .dm-canvas-area { resize: none; height: 100%; min-height: 0; font-size: var(--rad-text-s); line-height: 1.6; white-space: pre; }
+
+  /* La barra de tarjetas: los canvas de este chat. Sin ninguno no ocupa
+     lugar; se despliega con la primera. */
+  .dm-canvas-barra {
+    display: grid;
+    grid-template-rows: 0fr;
+    min-width: 0;
+    transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .dm-canvas-barra[data-con-tarjetas] { grid-template-rows: 1fr; }
+  .dm-canvas-barra-in { min-height: 0; overflow: hidden; }
+  .dm-canvas-tarjetas {
+    position: relative;
+    display: flex;
+    gap: var(--rad-space-2);
+    padding: var(--rad-space-1) var(--rad-space-6) var(--rad-space-2);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .dm-canvas-tarjetas::-webkit-scrollbar { display: none; }
+  .dm-canvas-tarjeta {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    max-width: 220px;
+    min-height: calc(var(--rad-control-height) - 6px);
+    padding: 0 var(--rad-space-3) 0 var(--rad-space-2);
+    border-radius: var(--rad-radius-pill);
+    background: var(--rad-surface-2);
+    color: var(--rad-text-2);
+    font-size: var(--rad-text-s);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out);
+    animation: rad-fade-in var(--rad-dur-base) var(--rad-ease-out) both;
+  }
+  .dm-canvas-tarjeta:hover { background: var(--rad-surface-3); color: var(--rad-text-1); }
+  .dm-canvas-tarjeta[data-activa] { color: var(--rad-text-1); box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line-strong); }
+  .dm-canvas-tarjeta-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* En la cabecera de la conversación: la biblioteca y, a su lado, las tools. */
+  .dm-canvas-biblioteca { flex: none; align-self: center; margin-left: auto; }
+  .dm-canvas-biblioteca + .dm-conv-tools { margin-left: 0; }
+
+  /* La biblioteca: todos los canvas, también los de la papelera. */
+  .rad-modal:has(.dm-biblio) { --rad-modal-width: 560px; }
+  .dm-biblio { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-3); min-width: 0; }
+  .dm-biblio-lista { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-1); max-height: 46vh; min-height: 120px; align-content: start; --rad-a-scroll-inset: var(--rad-space-1); }
+  .dm-biblio-fila { display: flex; align-items: center; gap: var(--rad-space-1); min-width: 0; border-radius: var(--rad-radius-m); transition: background-color var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-biblio-fila:hover { background: var(--rad-tint-hover); }
+  .dm-biblio-fila [hidden] { display: none; }
+  .dm-biblio-abrir { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--rad-space-3); padding: var(--rad-space-2) var(--rad-space-3); border-radius: var(--rad-radius-m); text-align: start; color: var(--rad-text-2); }
+  .dm-biblio-abrir:disabled { cursor: default; }
+  .dm-biblio-textos { min-width: 0; display: grid; }
+  .dm-biblio-nombre { color: var(--rad-text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dm-biblio-detalle { font-size: var(--rad-text-xs); color: var(--rad-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dm-biblio-fila[data-papelera] .dm-biblio-nombre { color: var(--rad-text-3); text-decoration: line-through; }
+  .dm-biblio-vacio { color: var(--rad-text-3); font-size: var(--rad-text-s); }
+  /* sin nada que decir no ocupa lugar (un relevo vacío deja su celda) */
+  .dm-biblio-vacio:not(:has(> :not(.rad-swap-out):not(:empty))) { display: none; }
 
   /* Fórmulas (KaTeX). La de bloque va centrada y, si no entra, se desplaza
      ella sola: nunca ensancha el mensaje. Hasta que KaTeX carga, o si no pudo

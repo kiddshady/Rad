@@ -27,6 +27,14 @@ export const ICONOS = {
   tacho: svg('<path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.5 9h6l.5-9"/>'),
   chevron: svg('<path d="M4.5 6.5 8 10l3.5-3.5"/>'),
   llave: svg('<circle cx="5.25" cy="10.75" r="2.75"/><path d="M7.3 8.7l6.2-6.2M11 5l2 2M9.2 6.8l1.6 1.6"/>'),
+  cerrar: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
+  copiar: svg('<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>'),
+  bajar: svg('<path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/>'),
+  volver: svg('<path d="M5.5 3.5l-3 3 3 3M2.5 6.5H9a3.5 3.5 0 0 1 0 7H6.5"/>'),
+  // el canvas: una hoja con su cabecera y una columna
+  canvas: svg('<rect x="2.5" y="2.5" width="11" height="11" rx="1.75"/><path d="M2.5 6.25h11M6.5 6.25v7.25"/>'),
+  codigo: svg('<path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/>'),
+  biblioteca: svg('<path d="M3 2.75v10.5M6 4.75v8.5M9 3.5v9.75l4-1-1.75-9z"/>'),
   // una tool: una llave fija
   tool: svg('<path d="M10.2 2.6a3.4 3.4 0 0 0-3 4.9L2.6 12.1a1 1 0 0 0 0 1.4l.1.1a1 1 0 0 0 1.4 0l4.6-4.6a3.4 3.4 0 0 0 4.8-3.7l-2 2-1.9-.5-.5-1.9 2-2a3.4 3.4 0 0 0-.9-.3z"/>'),
 };

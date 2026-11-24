@@ -8,7 +8,10 @@
 // escritas: cada descripción está afinada contra errores que los modelos
 // cometían de verdad, y el comentario que algunas llevan adentro cuenta cuál.
 // Por ahora: archivos y búsqueda, comandos y jobs, código, bases de datos,
-// web, abrir cosas en el escritorio, y mirar la pantalla.
+// web, abrir cosas en el escritorio, mirar la pantalla, y el canvas.
+
+// la descripción del canvas dice cuántos días dura su papelera
+const canvasStore = require('./canvas-store.cjs');
 
 const TOOL_DEFS = [{
   name: 'fs_read',
@@ -261,6 +264,44 @@ const TOOL_DEFS = [{
     },
     required: [],
   },
+}, {
+  name: 'canvas',
+  description:
+    'Open a document or code file in the side canvas the user reads next to the chat. Use it for substantial, self-contained content worth keeping, copying or revising (long documents, essays, reports, structured notes, or source code) instead of dumping it inline in the message. '
+    + 'Actions: "create" opens a new canvas; "list" shows the canvases already open in this conversation with their ids; "read" returns a canvas\'s full current content by id; "edit" changes PART of a canvas; "update" replaces a canvas whole; "delete" removes a canvas by id. '
+    + '"list" covers this chat only; pass scope "all" to list the whole canvas library (every chat, including deleted ones) with ids. '
+    + '"delete" works on any canvas of the library, not only this chat\'s. Only "delete" when the user asks for it, and only the canvases they mean — if more than one could match, list first and ask. A deleted canvas goes to a trash for ' + canvasStore.TRASH_DIAS + ' days and the user can restore it from the app. '
+    + 'A canvas\'s content is NOT kept in the chat history, so to revise one you wrote in an earlier turn you must "read" it first to see what it says now. '
+    + 'Then use "edit" with a list of exact { old, new } replacements — that is the normal way to revise a canvas, and it is all-or-nothing: each `old` must appear exactly once and if any of them is not found the canvas is left untouched and you are told which one failed. '
+    + 'Only use "update" when you are genuinely rewriting the whole thing from scratch; re-emitting a long document just to change a few lines is how paragraphs go missing. '
+    + 'After create/edit/update succeed, write a brief reply about the canvas; do NOT repeat its content in the message.',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['create', 'read', 'edit', 'update', 'delete', 'list'], description: 'create a new canvas; read an existing canvas\'s content by id; edit part of one; replace one whole; delete one; or list this conversation\'s canvases' },
+      id: { type: 'string', description: 'canvas id — required for "read", "edit", "update" and "delete"' },
+      scope: { type: 'string', enum: ['chat', 'all'], description: 'for "list": "chat" (default) lists this conversation\'s canvases; "all" lists the whole canvas library.' },
+      title: { type: 'string', description: 'short title for the canvas (defaults to "Untitled"). With "edit"/"update" it renames the canvas.' },
+      kind: { type: 'string', enum: ['document', 'code'], description: 'document = prose/markdown; code = a source file (default: document)' },
+      language: { type: 'string', description: 'for kind "code": the language, e.g. "python", "javascript", "sql"' },
+      content: { type: 'string', description: 'the full canvas content — markdown for documents, source code for code. Required for "create" and "update" (replaces the whole canvas); omit for "read"/"list"/"edit".' },
+      edits: {
+        type: 'array',
+        description: 'for "edit": the replacements to apply, in order.',
+        items: {
+          type: 'object',
+          properties: {
+            old: { type: 'string', description: 'Exact text to find in the canvas, copied verbatim from what you read. Must match once.' },
+            new: { type: 'string', description: 'Text to put in its place. Use an empty string to delete the fragment.' },
+            replace_all: { type: 'boolean', description: 'Replace every occurrence of THIS fragment instead of requiring it to be unique (default false). Overrides the call-level replace_all.' },
+          },
+          required: ['old', 'new'],
+        },
+      },
+      replace_all: { type: 'boolean', description: 'for "edit": replace every occurrence of each `old` instead of requiring it to be unique (default false). Can also be set per edit.' },
+    },
+    required: ['action'],
+  },
 }];
 
 // Los grupos con que se prenden y se apagan en un agente.
@@ -273,6 +314,7 @@ const GRUPOS = [
   { id: 'desktop', nombre: 'Desktop', tools: ['os_open'] },
   // sola en su grupo: la pantalla es lo más privado que una tool puede mirar
   { id: 'screen', nombre: 'Screen', tools: ['screen_capture'] },
+  { id: 'canvas', nombre: 'Canvas', tools: ['canvas'] },
 ];
 
 const porNombre = new Map(TOOL_DEFS.map((t) => [t.name, t]));
