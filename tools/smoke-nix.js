@@ -813,6 +813,63 @@ else {
   preguntar.click();
   await settle();
   if (tarjetaTools.dataset.modo !== 'manual') fail('el modo manual no volvió');
+  // Las tools también se prenden desde la conversación: el botón de la
+  // cabecera dice cuántas lleva el agente y su menú las cambia por grupo.
+  {
+    await go('chat');
+    const boton = chatView.querySelector('[data-accion="tools"]');
+    const dice = () => shown(boton.querySelector('.dm-conv-tools-texto'));
+    const antes = dice();
+    const abrir = async () => { boton.click(); await until(() => menus().length > 0, 2000); await sleep(dur('base') + 60); };
+    await abrir();
+    const filasMenu = [...menus()[0].querySelectorAll('.rad-menu-item')].map((i) => i.textContent.trim());
+    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Desktop,Screen,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
+    await pick('Turn all off');
+    if (dice() !== 'Tools: off' || boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· no tools')) fail(`apagar todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
+    await abrir();
+    await pick('Turn all on');
+    if (dice() !== '18 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 18 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
+    await abrir();
+    const marcadas = [...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].length;
+    if (marcadas !== 7) fail(`con todas prendidas el menú marca ${marcadas} grupos de 7`);
+    await pick('Web');
+    if (dice() !== '15 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
+    // y las recibe el modelo: el pedido siguiente corre una de esas tools
+    // (en modo manual, que es como quedó: pide permiso y se le da)
+    await pedir([[{ name: 'fs_read', args: { paths: ['note.txt'] } }]]);
+    await until(() => permiso(), 5000);
+    primary()?.click();
+    await until(() => !composer.querySelector('.rad-busy') && ultimo()?.dataset.estado === 'ok' && cuenta() === '1 tool · 1 done', 20000);
+    if (cuenta() !== '1 tool · 1 done') fail(`después de prender las tools desde la conversación, el contador dice «${cuenta()}»`);
+    data.toolsEnElChat = `${antes} → Tools: off → 18 tools → 15 tools`;
+  }
+
+  // Prenderle tools a un agente que YA existía, desde su formulario: es lo que
+  // hace quien tiene agentes de antes de que hubiera tools.
+  {
+    await go('agentes');
+    const primera = () => cards()[0];
+    const nombreDe = shown(primera().querySelector('.dm-tarjeta-nombre')) || primera().textContent.slice(0, 20);
+    primera().querySelector('[data-accion="editar"]').click();
+    await frame();
+    await sleep(dur('base') + 200);
+    const sw = (g) => modal().querySelector('[data-campo="tools"] input[data-grupo="' + g + '"]');
+    if (!sw('files') || sw('files').checked) fail(`editar un agente sin tools: el interruptor de Files ${sw('files') ? 'ya estaba prendido' : 'no está'}`);
+    sw('files').click();
+    sw('screen').click();
+    primary().click();
+    await closed();
+    await settle();
+    if (shown(primera().querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Screen') fail(`prenderle tools a «${nombreDe}» desde su formulario dejó la tarjeta en «${shown(primera().querySelector('.dm-tarjeta-tools'))}»`);
+    primera().querySelector('[data-accion="editar"]').click();
+    await frame();
+    await sleep(dur('base') + 200);
+    if (!sw('files').checked || !sw('screen').checked || sw('commands').checked) fail('el formulario no recuerda las tools que se le prendieron al agente');
+    modal().querySelector('.rad-button:not([data-variant])')?.click();
+    await closed();
+    data.toolsAlEditar = shown(primera().querySelector('.dm-tarjeta-tools'));
+  }
+
   data.tools = `Toolsmith: ${tools().length} filas en el último chat; permiso, rechazo, dos rondas, confianza por chat, código, base propia, un job, dos capturas, argumentos malos y modo automático`;
 
   // El agente de prueba se va, con sus chats, y vuelve a quedar Galen abierto

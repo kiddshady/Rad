@@ -95,6 +95,20 @@ export const modeloConTools = (prov, id) => modelosDe(prov).find((m) => m.id ===
 export const toolsDe = (a) => (Array.isArray(a?.tools) ? a.tools : []);
 /** Los grupos que un agente tiene prendidos enteros o en parte, por nombre. */
 export const gruposDe = (a) => herramientas.grupos.filter((g) => g.tools.some((t) => toolsDe(a).includes(t))).map((g) => g.nombre);
+/** Cuántas tools viajan de verdad en un pedido de ese agente: las que tiene
+ *  prendidas, o ninguna si su modelo no las acepta. */
+export const toolsQueViajan = (a) => (a && modeloConTools(a.proveedor, a.modelo) ? toolsDe(a).length : 0);
+/** Cambia las tools de un agente sin tocar nada más (el menú de la conversación). */
+export function ponerTools(id, tools) {
+  const validas = new Set(herramientas.grupos.flatMap((g) => g.tools));
+  agentes.update((v) => {
+    const a = v.lista.find((x) => x.id === id);
+    if (a) a.tools = [...new Set(tools)].filter((t) => validas.has(t));
+    return v;
+  });
+  avisar('agentes');
+}
+
 /** 'manual' pregunta antes de cada llamada; 'auto' no pregunta nunca. */
 export const modoTools = () => (ui.get().modoTools === 'auto' ? 'auto' : 'manual');
 export function ponerModoTools(modo) {

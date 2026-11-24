@@ -131,6 +131,15 @@ const SCENES = {
     const hilo = document.querySelector('.dm-hilo:not([data-rad-leaving])');
     hilo.scrollTop = hilo.scrollHeight;
     await sleep(600);`,
+  // El botón de tools de la conversación, con su menú abierto.
+  'menu-tools': `
+    const c = await charla(nix, 'Names for the app', 'Give me some name ideas.');
+    await quietos();
+    datos.elegirChat(c.id);
+    datos.ponerTools(nix.id, ['fs_read', 'fs_write', 'fs_edit', 'fs_delete', 'code_search', 'run_code']);
+    await sleep(700);
+    document.querySelector('[data-accion="tools"]').click();
+    await sleep(900);`,
   'sin-llave': `
     await go('ajustes');
     await sleep(400);`,

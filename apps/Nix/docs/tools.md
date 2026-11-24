@@ -36,7 +36,10 @@ documentación de cada API.
 
 ## Los grupos
 
-Las tools se prenden por grupo, en el formulario de cada agente:
+Las tools se prenden por grupo y por agente, y nacen todas apagadas. Hay dos
+lugares para hacerlo: el botón de arriba a la derecha de la conversación (dice
+cuántas lleva el agente y su menú cambia cada grupo) y el formulario del
+agente. La barra de estado repite la cuenta.
 
 | Grupo | Tools |
 |---|---|

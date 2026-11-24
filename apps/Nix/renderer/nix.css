@@ -304,6 +304,20 @@
     font-size: var(--rad-text-l);
     font-weight: var(--rad-weight-strong);
   }
+  /* Las tools del agente: a la derecha de la cabecera. Apagadas, en el gris
+     de lo secundario; prendidas, en el color del texto. */
+  .dm-conv-tools {
+    flex: none;
+    align-self: center;
+    margin-left: auto;
+    gap: var(--rad-space-2);
+    color: var(--rad-text-3);
+    font-size: var(--rad-text-s);
+    transition: color var(--rad-dur-base) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-conv-tools[data-prendidas] { color: var(--rad-text-1); }
+  .dm-conv-tools-texto { white-space: nowrap; }
+
   /* Si no entran los dos, se achican los dos: ninguno empuja al otro afuera. */
   .dm-conv-sub { font-size: var(--rad-text-s); color: var(--rad-text-3); }
 

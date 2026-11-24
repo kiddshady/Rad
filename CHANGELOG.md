@@ -1,5 +1,20 @@
 # Changelog
 
+## Nix 0.7.2 (2026-11-24)
+
+- **Las tools se prenden desde la conversación.** Arriba a la derecha del
+  chat hay un botón que dice cuántas tools lleva el agente («6 tools», o
+  «Tools: off») y abre un menú con los siete grupos, para prender y apagar
+  cada uno, todos o ninguno. El cambio vale desde el mensaje siguiente.
+  Con la 0.7.1 Fran vio «no tools» en sus dos agentes: tenían todos los
+  grupos apagados, que es como nacen, y el único interruptor estaba al final
+  del formulario del agente, que hay que scrollear para verlo.
+- Se comprobó contra la lista pública de Venice que «GLM 5.3 Flash
+  Uncensored» declara que acepta tools (y casi todos los demás también): no
+  era el modelo.
+- El humo prende y apaga tools desde ese menú y manda un pedido que las usa, y
+  le prende tools desde el formulario a un agente que ya existía.
+
 ## Nix 0.7.1 (2026-11-24)
 
 - **La barra de estado dice cuántas tools lleva el agente** («· 15 tools», o

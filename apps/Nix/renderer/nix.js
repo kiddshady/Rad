@@ -36,7 +36,7 @@ const shell = createShell({
 // desde el chat, si el modelo las tiene o no.
 const ponerEstado = () => {
   const a = datos.agenteActual();
-  const n = datos.modeloConTools(a.proveedor, a.modelo) ? datos.toolsDe(a).length : 0;
+  const n = datos.toolsQueViajan(a);
   const tools = n ? `${n} tool${n === 1 ? '' : 's'}` : 'no tools';
   shell.status.set('right', datos.algunoRespondiendo() ? 'Answering…' : `${a.nombre} · ${datos.modeloDe(a)} · ${tools}`);
 };

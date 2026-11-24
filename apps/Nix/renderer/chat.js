@@ -78,6 +78,31 @@ export function montarChat(el, { router }) {
   // ---------- La conversación ----------
   const titulo = h('h2', 'dm-conv-titulo rad-swap');
   const sub = h('span', 'dm-conv-sub rad-swap');
+  // Las tools del agente, a la vista y a un clic: nacen apagadas, y con el
+  // interruptor solo en el formulario del agente no había forma de enterarse,
+  // desde el chat, de que el modelo no las tenía.
+  const toolsTexto = h('span', 'dm-conv-tools-texto rad-swap');
+  const botonTools = h('button', 'rad-button dm-conv-tools', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'tools', 'data-rad-tip': 'What this agent can do on this PC', 'data-rad-tip-side': 'bottom' }, icono('tool'), toolsTexto);
+  menuButton(botonTools, () => {
+    const a = datos.agenteActual();
+    const tiene = new Set(datos.toolsDe(a));
+    const grupos = datos.gruposTools();
+    return [
+      ...(datos.modeloConTools(a.proveedor, a.modelo) ? [] : [{ id: 'sin-soporte', label: 'This model does not accept tools', disabled: true }, { separator: true }]),
+      ...grupos.map((g) => {
+        const prendido = g.tools.some((t) => tiene.has(t));
+        return {
+          id: g.id,
+          label: g.nombre,
+          checked: prendido,
+          onSelect: () => datos.ponerTools(a.id, prendido ? [...tiene].filter((t) => !g.tools.includes(t)) : [...tiene, ...g.tools]),
+        };
+      }),
+      { separator: true },
+      { id: 'todas', label: 'Turn all on', onSelect: () => datos.ponerTools(a.id, grupos.flatMap((g) => g.tools)) },
+      { id: 'ninguna', label: 'Turn all off', onSelect: () => datos.ponerTools(a.id, []) },
+    ];
+  }, { align: 'end' });
   const celda = h('div', 'dm-hilo-celda');
 
   const irAjustes = h('button', 'rad-button', { type: 'button', 'data-accion': 'ir-ajustes' }, 'Go to Settings');
@@ -91,7 +116,7 @@ export function montarChat(el, { router }) {
     h('span', 'dm-enviar-iconos', {}, icono('enviar', 'dm-ic-enviar'), icono('frenar', 'dm-ic-frenar')));
   const redactor = h('form', 'dm-redactor', {}, area, boton);
   const conv = h('section', 'dm-conv', {},
-    h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, sub),
+    h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, sub, botonTools),
     celda, aviso, h('div', 'dm-redactor-caja', {}, redactor));
 
   el.append(lado, conv);
@@ -320,6 +345,9 @@ export function montarChat(el, { router }) {
     selector.setAttribute('aria-label', `Agent: ${a.nombre}`);
     swapText(titulo, c?.titulo ?? 'New chat');
     swapText(sub, `${a.nombre} · ${datos.modeloDe(a)}`);
+    const n = datos.toolsQueViajan(a);
+    swapText(toolsTexto, n ? `${n} tool${n === 1 ? '' : 's'}` : datos.modeloConTools(a.proveedor, a.modelo) ? 'Tools: off' : 'Tools: not supported');
+    botonTools.toggleAttribute('data-prendidas', n > 0);
   };
   // El aviso es por el agente que está abierto: le falta la llave de SU proveedor.
   const ponerAviso = () => {
