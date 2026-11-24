@@ -1,5 +1,14 @@
 # Changelog
 
+## BlackCode 0.14.2 (2026-11-24)
+
+- **Ícono nuevo: la «Red hexagonal».** Seis agentes en los vértices de un
+  hexágono, todos conectados al núcleo. Fran la eligió entre las variantes que
+  armó con otro agente (`S:\mockups\daimon\variantes-hex-red.html`), y entre
+  tres maneras de pintarla: quedó en el metal que ya tenía el ícono, con el
+  núcleo blanco. Reemplaza al «Cubo». Es de líneas finas: en los tamaños
+  chicos ningún trazo baja de un píxel ni un nodo de dos.
+
 ## BlackCode 0.14.1 (2026-11-24)
 
 - **El navegador ya no cambia de color al estirarlo.** Estirado llevaba un

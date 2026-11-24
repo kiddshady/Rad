@@ -458,11 +458,14 @@ y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
   el índice de chats y uno por chat.
 - Se instala y se actualiza desde `kiddshady/daimon-releases`. En Settings,
   About tiene un botón para buscar una versión nueva sin esperar al núcleo.
-- El ícono es el «Cubo»: un hexágono con sus tres aristas de adentro, un cubo
-  visto de punta, sobre baldosa negra, con el trazo en el degradé metálico del
-  hexágono de UmbroSys y un resplandor suave (hasta la 0.12.2 era blanco, con
-  el resplandor de NTX). Lo hornea `apps/BlackCode/scripts/icon.mjs`. Hasta la
-  0.12.0 fue el «Radar».
+- El ícono es la «Red hexagonal»: seis agentes en los vértices de un
+  hexágono, todos conectados al núcleo, sobre baldosa negra, en el degradé
+  metálico del hexágono de UmbroSys, con el núcleo blanco y un resplandor
+  suave. Fran la eligió entre las variantes de
+  `S:\mockups\daimon\variantes-hex-red.html`. Lo hornea
+  `apps/BlackCode/scripts/icon.mjs` (con `--hoja <dir>` deja las variantes de
+  color para compararlas en chico). Hasta la 0.14.1 fue el «Cubo» y hasta la
+  0.12.0, el «Radar».
 
 ### Publicar y actualizar
 
