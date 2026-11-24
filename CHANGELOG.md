@@ -1,5 +1,26 @@
 # Changelog
 
+## BlackCode 0.15.0 (2026-11-24)
+
+- **Memoria.** Lo que la app recuerda del usuario de un chat a otro, y de un
+  agente a otro. Vista nueva, Memory, con dos partes:
+  - «About you»: un texto corto que va siempre al contexto de cada chat. Se
+    guarda solo.
+  - La lista: recuerdos de una línea que anotan los agentes (tool `remember`)
+    o el usuario a mano. Cada uno puede llevar un detalle más largo, que no
+    ocupa contexto: el agente lo lee cuando lo necesita (tool `recall`, que
+    también busca por palabras).
+- La ve el agente que tiene prendido su grupo Memory (en el menú de tools de
+  la conversación), también si su modelo no acepta tools. Los que tenían todas
+  las tools lo reciben prendido. Lo que hay en la memoria viaja al proveedor
+  de ese agente con cada mensaje.
+- Viene de la memoria de NeonCode 1.11.3, sin su recuerdo automático por
+  similitud ni su modelo de embeddings: acá el agente ve la lista entera y
+  decide qué leer. Tres cosas se hicieron distinto: pasado el tope quedan
+  afuera las entradas más viejas (y se avisa), no se anota dos veces lo
+  mismo, y el agente no puede borrar ni cambiar lo anotado.
+- Son 30 tools en 12 grupos.
+
 ## BlackCode 0.14.2 (2026-11-24)
 
 - **Ícono nuevo: la «Red hexagonal».** Seis agentes en los vértices de un

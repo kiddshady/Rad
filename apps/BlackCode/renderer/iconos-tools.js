@@ -39,6 +39,8 @@ const PATHS = {
   grid: "M5 3.5h4a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a1.5 1.5 0 0 1-1.5-1.5v-4a1.5 1.5 0 0 1 1.5-1.5zM15 3.5h4a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a1.5 1.5 0 0 1-1.5-1.5v-4a1.5 1.5 0 0 1 1.5-1.5zM5 13.5h4a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a1.5 1.5 0 0 1-1.5-1.5v-4a1.5 1.5 0 0 1 1.5-1.5zM15 13.5h4a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a1.5 1.5 0 0 1-1.5-1.5v-4a1.5 1.5 0 0 1 1.5-1.5z",
   plug: "M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z",
   sparkle: "M10 3c0 3.9 3.1 7 7 7-3.9 0-7 3.1-7 7 0-3.9-3.1-7-7-7 3.9 0 7-3.1 7-7zM17.5 14.5c0 1.7 1.3 3 3 3-1.7 0-3 1.3-3 3 0-1.7-1.3-3-3-3 1.7 0 3-1.3 3-3z",
+  // la memoria: un chip (el de NeonCode)
+  memory: "M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3M7 6h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z",
   delegate: "M12 3a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M12 8v3M12 11c-4 0-6 1.5-6 5M12 11c4 0 6 1.5 6 5M6 16a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M18 16a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5",
 };
 
@@ -60,6 +62,7 @@ const DE_TOOL = {
   chat_search: 'bubble', rag_search: 'library', schedule: 'clock',
   skill: 'sparkle', create_skill: 'sparkle', list_skills: 'sparkle',
   mcp: 'plug', delegate: 'delegate',
+  remember: 'memory', recall: 'memory',
 };
 
 /** El nombre del ícono de una tool, o null si no tiene uno propio. */

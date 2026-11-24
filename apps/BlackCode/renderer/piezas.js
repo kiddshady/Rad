@@ -36,6 +36,8 @@ export const ICONOS = {
   carpeta: svg('<path d="M2.5 5A1.5 1.5 0 0 1 4 3.5h2.4L8 5h4a1.5 1.5 0 0 1 1.5 1.5v5A1.5 1.5 0 0 1 12 13H4a1.5 1.5 0 0 1-1.5-1.5z"/>'),
   carpetaMas: svg('<path d="M2.5 5A1.5 1.5 0 0 1 4 3.5h2.4L8 5h4a1.5 1.5 0 0 1 1.5 1.5v5A1.5 1.5 0 0 1 12 13H4a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M8 7.5v3.5M6.25 9.25h3.5"/>'),
   pin: svg('<path d="M6 2.5h4l-.6 4 2.1 2.1V10h-7V8.6l2.1-2.1zM8 10v3.5"/>'),
+  // la memoria: un chip
+  memoria: svg('<rect x="4.5" y="4.5" width="7" height="7" rx="1.25"/><path d="M6.5 2.5v2M9.5 2.5v2M6.5 11.5v2M9.5 11.5v2M2.5 6.5h2M2.5 9.5h2M11.5 6.5h2M11.5 9.5h2"/>'),
   // el navegador
   globo: svg('<circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c1.7 1.5 2.5 3.3 2.5 5.5S9.7 12 8 13.5C6.3 12 5.5 10.2 5.5 8S6.3 4 8 2.5z"/>'),
   atras: svg('<path d="M9.5 3.5 5 8l4.5 4.5"/>'),

@@ -155,7 +155,7 @@ if (window.rad.lang !== 'en' || document.documentElement.lang !== 'en') fail(`Bl
 const ventana = [...document.querySelectorAll('.rad-winbtn')].map((b) => b.getAttribute('aria-label')).join(', ');
 if (ventana !== 'Minimize, Maximize, Close') fail(`los botones de la ventana dicen: ${ventana}`);
 const riel = [...document.querySelectorAll('.rad-tab')].map((b) => b.textContent.trim() || b.getAttribute('aria-label') || b.getAttribute('data-rad-tip')).join(', ');
-if (riel !== 'Chat, Notes, Agents, Settings') fail(`las vistas se llaman: ${riel}`);
+if (riel !== 'Chat, Notes, Memory, Agents, Settings') fail(`las vistas se llaman: ${riel}`);
 enIngles('al arrancar');
 // Las vistas van como pestañas en la titlebar, sin rail y sin el nombre de
 // la app: lo primero de la barra son las pestañas, alineadas con la hoja, y
@@ -163,7 +163,7 @@ enIngles('al arrancar');
 {
   const tabs = [...document.querySelectorAll('.rad-titlebar > .rad-tabs > .rad-tab')];
   const stage = document.querySelector('.rad-stage').getBoundingClientRect();
-  if (document.querySelector('.rad-rail') || tabs.length !== 4) fail(`las vistas no están en la titlebar (${tabs.length} pestañas, rail: ${Boolean(document.querySelector('.rad-rail'))})`);
+  if (document.querySelector('.rad-rail') || tabs.length !== 5) fail(`las vistas no están en la titlebar (${tabs.length} pestañas, rail: ${Boolean(document.querySelector('.rad-rail'))})`);
   if (document.querySelector('.rad-titlebar-title') || /BlackCode/.test(document.querySelector('.rad-titlebar').textContent)) fail('la titlebar sigue mostrando el nombre de la app');
   if (tabs.length && Math.abs(tabs[0].getBoundingClientRect().left - stage.left) > 1) fail(`la primera pestaña empieza en ${r2(tabs[0].getBoundingClientRect().left)} y la hoja en ${r2(stage.left)}`);
   if (stage.width < window.innerWidth - 24) fail(`sin rail, la hoja mide ${r2(stage.width)} en una ventana de ${window.innerWidth}`);
@@ -739,7 +739,7 @@ else {
   const form = modal();
   type(form.querySelector('[data-campo="nombre"]'), 'Toolsmith');
   const interruptores = [...form.querySelectorAll('[data-campo="tools"] input[role="switch"]')];
-  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas,notes,subagents' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
+  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas,notes,subagents,memory' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
   // un agente nuevo nace con todas prendidas: se le apaga la web
   for (const i of interruptores) if (i.dataset.grupo === 'web') i.click();
   enIngles('en el formulario con tools');
@@ -747,13 +747,13 @@ else {
   await closed();
   await settle();
   const herrero = cards().at(-1);
-  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Browser, Desktop, Screen, Canvas, Notes, Subagents') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
-  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Browser, Desktop, Screen, Canvas, Notes, Subagents') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Browser, Desktop, Screen, Canvas, Notes, Subagents, Memory') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Browser, Desktop, Screen, Canvas, Notes, Subagents, Memory') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
   herrero.querySelector('[data-accion="abrir"]').click();
   await sleep(dur('base') + 260);
   await until(() => statusRight().includes('Toolsmith'), 3000);
-  // todas (28) menos las tres de la web
-  if (!statusRight().endsWith('· 25 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
+  // todas (30) menos las tres de la web
+  if (!statusRight().endsWith('· 27 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
 
   // Escribir un archivo. En modo manual (el de fábrica) primero pide permiso:
   // la tarjeta dice qué va a correr y qué va a cambiar, y hasta que no se
@@ -921,17 +921,17 @@ else {
     const abrir = async () => { boton.click(); await until(() => menus().length > 0, 2000); await sleep(dur('base') + 60); };
     await abrir();
     const filasMenu = [...menus()[0].querySelectorAll('.rad-menu-item')].map((i) => i.textContent.trim());
-    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Notes,Subagents,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
+    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Notes,Subagents,Memory,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
     await pick('Turn all off');
     if (dice() !== 'Tools: off' || boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· no tools')) fail(`apagar todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     await pick('Turn all on');
-    if (dice() !== '28 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 28 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
+    if (dice() !== '30 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 30 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     const marcadas = [...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].length;
-    if (marcadas !== 11) fail(`con todas prendidas el menú marca ${marcadas} grupos de 11`);
+    if (marcadas !== 12) fail(`con todas prendidas el menú marca ${marcadas} grupos de 12`);
     await pick('Web');
-    if (dice() !== '25 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
+    if (dice() !== '27 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
     // y las recibe el modelo: el pedido siguiente corre una de esas tools
     // (en modo manual, que es como quedó: pide permiso y se le da)
     await pedir([[{ name: 'fs_read', args: { paths: ['note.txt'] } }]]);
@@ -939,7 +939,7 @@ else {
     primary()?.click();
     await until(() => !composer.querySelector('.rad-busy') && ultimo()?.dataset.estado === 'ok' && cuenta() === '1 tool · 1 done', 20000);
     if (cuenta() !== '1 tool · 1 done') fail(`después de prender las tools desde la conversación, el contador dice «${cuenta()}»`);
-    data.toolsEnElChat = `${antes} → Tools: off → 28 tools → 25 tools`;
+    data.toolsEnElChat = `${antes} → Tools: off → 30 tools → 27 tools`;
   }
 
   // 11c. El canvas: el agente deja un documento en el panel de al lado, lo
@@ -1959,6 +1959,151 @@ else {
     data.listasLargas = '200 items: 0 viajes por un cambio de scroll, ' + viajes + ' al entrar uno arriba, medidos antes de animar';
   }
 
+  // 11l. La memoria: lo que la app recuerda del usuario de un chat a otro. El
+  // texto fijo («About you») y la lista se editan en su vista; el agente anota
+  // con `remember` y lee con `recall`; y lo que hay llega al system del agente
+  // que tiene prendido su grupo Memory, también si su modelo no acepta tools.
+  // El proveedor de mentira dice qué memoria le llegó.
+  {
+    const datosM = await import('/datos.js');
+    datosM.ponerModoTools('auto');
+    const mem = () => window.rad.invoke('memoria:leer');
+    const filasM = () => alive(view('memoria').querySelectorAll('.dm-memoria-fila'));
+    const hechos = () => filasM().map((f) => f.querySelector('.dm-memoria-hecho').textContent);
+    const listo2 = async () => { await sleep(200); for (let i = 0; i < 400 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50); await settle(); };
+    const eco = () => ultimo()?.textContent ?? '';
+    if ((await mem()).entradas.length || (await mem()).core) fail('memoria: no arranca vacía');
+    // el renderer no puede leer el documento de la memoria: solo por sus canales
+    let leyo = false;
+    try { await window.rad.store.read('_memoria'); leyo = true; } catch { /* es lo esperado */ }
+    if (leyo) fail('memoria: la interfaz pudo leer el documento reservado de la memoria');
+
+    // La vista: vacía, y lo dice.
+    await go('memoria');
+    const vista = view('memoria');
+    const areaCore = vista.querySelector('[data-campo="core"]');
+    const cuentaCore = () => shown(vista.querySelector('[data-tarjeta="core"] .dm-memoria-cuenta'));
+    const guardadoM = () => shown(vista.querySelector('.dm-memoria-guardado'));
+    if (!vista.querySelector('.dm-memoria-vacia')?.textContent.includes('Nothing remembered yet') || filasM().length) fail('memoria: la vista vacía no lo dice');
+    enIngles('en la vista Memory');
+
+    // «About you» se guarda solo, y dice que guardó.
+    type(areaCore, 'I am the smoke user.\nAnswer briefly.');
+    if (!cuentaCore().startsWith('36 of 4000 characters')) fail('memoria: el contador del texto fijo dice «' + cuentaCore() + '»');
+    await until(() => guardadoM() === 'Saved', 4000);
+    if (guardadoM() !== 'Saved' || (await mem()).core !== 'I am the smoke user.\nAnswer briefly.') fail('memoria: el texto fijo no se guardó solo («' + guardadoM() + '», en el main: ' + JSON.stringify((await mem()).core) + ')');
+
+    // Agregar a mano: una línea, con su detalle.
+    vista.querySelector('[data-accion="memoria-nueva"]').click();
+    await until(() => modal(), 2000);
+    primary().click();
+    await frame();
+    if (!modal()?.querySelector('.rad-field[data-invalid]')) fail('memoria: se puede guardar un recuerdo vacío');
+    type(modal().querySelector('[data-campo="hecho"]'), 'Has a cat named Miso');
+    type(modal().querySelector('[data-campo="detalle"]'), 'Miso is three years old and hates the vacuum cleaner.');
+    primary().click();
+    await closed();
+    await until(() => filasM().length === 1, 3000);
+    if (hechos().join() !== 'Has a cat named Miso' || !filasM()[0].hasAttribute('data-con-detalle') || !filasM()[0].textContent.includes('added by you')) fail('memoria: el recuerdo agregado a mano no aparece bien: ' + filasM()[0]?.textContent);
+
+    // El agente anota y lee, por el motor de verdad.
+    await go('chat');
+    chatView.querySelector('[data-accion="nuevo-chat"]').click();
+    await settle();
+    await pedir([[{ name: 'remember', args: { fact: 'Uses PowerShell 7' } }, { name: 'remember', args: { fact: 'uses powershell 7.' } }, { name: 'recall', args: { id: 'm1' } }, { name: 'recall', args: { query: 'powershell' } }, { name: 'remember', args: { fact: 'Never forgets this', core: true } }]]);
+    await listo2();
+    const sale = (name, n) => fila(name, n)?.querySelector('.dm-tool-pre').textContent ?? '';
+    if (sale('remember', 0) !== 'saved to memory as m2') fail('memoria: remember devolvió «' + sale('remember', 0) + '»');
+    if (sale('remember', 1) !== 'already in memory as m2 — nothing saved') fail('memoria: anotar lo mismo dos veces devolvió «' + sale('remember', 1) + '»');
+    if (!sale('recall', 0).startsWith('m1 — Has a cat named Miso') || !sale('recall', 0).includes('hates the vacuum cleaner')) fail('memoria: recall por id no trajo el detalle: ' + sale('recall', 0).slice(0, 120));
+    if (!sale('recall', 1).includes('(m2) Uses PowerShell 7')) fail('memoria: recall con query no encontró lo anotado: ' + sale('recall', 1).slice(0, 120));
+    if (sale('remember', 2) !== 'saved to core memory (always in context)') fail('memoria: remember con core devolvió «' + sale('remember', 2) + '»');
+    if (fila('remember')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'memory' || shown(fila('remember', 0)?.querySelector('.dm-tool-que')) !== 'Uses PowerShell 7') fail('memoria: la fila de remember no lleva su ícono o no dice qué anotó');
+    const estadoM = await mem();
+    if (estadoM.entradas.map((e) => e.id + ':' + e.de).join() !== 'm1:user,m2:agent' || estadoM.core !== 'I am the smoke user.\nAnswer briefly.\n- Never forgets this\n') fail('memoria: después del turno quedó ' + JSON.stringify(estadoM.entradas.map((e) => e.id + ':' + e.de)) + ' y el Core ' + JSON.stringify(estadoM.core));
+
+    // En el turno siguiente la memoria está en el system: el Core y las dos líneas.
+    type(area, 'What do you know about me?');
+    key(area, 'Enter');
+    await listo2();
+    if (!eco().includes('memory: core yes, 2 entries')) fail('memoria: al modelo no le llegó la memoria en el turno siguiente: ' + (/memory:[^\n]*/.exec(eco())?.[0] ?? '(sin renglón de memoria)'));
+
+    // La vista se puso al día sola con lo que anotó el agente, y el texto fijo
+    // trae su línea (el usuario no lo estaba editando).
+    await go('memoria');
+    await until(() => filasM().length === 2, 3000);
+    if (hechos().join(' | ') !== 'Uses PowerShell 7 | Has a cat named Miso' || !filasM()[0].textContent.includes('noted by an agent')) fail('memoria: la lista no muestra lo que anotó el agente, lo más nuevo arriba: ' + hechos().join(' | '));
+    if (areaCore.value !== 'I am the smoke user.\nAnswer briefly.\n- Never forgets this\n') fail('memoria: el texto fijo no trae la línea que agregó el agente: ' + JSON.stringify(areaCore.value));
+    // El usuario edita el texto mientras un agente le agrega otra línea: no se pisan.
+    type(areaCore, 'I am the smoke user, edited.\n- Never forgets this\n');
+    await window.rad.invoke('memoria:core', { texto: (await mem()).core + '- Added behind your back\n', base: (await mem()).core });
+    await until(() => guardadoM() === 'Saved', 4000);
+    await settle();
+    const coreFinal = (await mem()).core;
+    if (coreFinal !== 'I am the smoke user, edited.\n- Never forgets this\n- Added behind your back\n' || areaCore.value !== coreFinal) fail('memoria: editar el texto mientras otro le agregaba una línea perdió algo: ' + JSON.stringify(coreFinal) + ' / a la vista ' + JSON.stringify(areaCore.value));
+
+    // Buscar, cambiar y borrar.
+    type(vista.querySelector('[data-campo="buscar"]'), 'miso');
+    await settle();
+    if (hechos().join() !== 'Has a cat named Miso') fail('memoria: buscar «miso» dejó ' + hechos().join(' | '));
+    type(vista.querySelector('[data-campo="buscar"]'), 'vacuum');
+    await settle();
+    if (hechos().join() !== 'Has a cat named Miso') fail('memoria: la búsqueda no mira el detalle');
+    type(vista.querySelector('[data-campo="buscar"]'), '');
+    await settle();
+    filasM()[1].querySelector('[data-accion="memoria-editar"]').click();
+    await until(() => modal(), 2000);
+    if (modal().querySelector('[data-campo="hecho"]').value !== 'Has a cat named Miso' || !modal().querySelector('[data-campo="detalle"]').value.includes('vacuum')) fail('memoria: el formulario no trae el recuerdo que se va a cambiar');
+    type(modal().querySelector('[data-campo="hecho"]'), 'Has a cat named Miso and a dog named Udon');
+    primary().click();
+    await closed();
+    await until(() => hechos().includes('Has a cat named Miso and a dog named Udon'), 3000);
+    if (!hechos().includes('Has a cat named Miso and a dog named Udon')) fail('memoria: cambiar un recuerdo no se ve en la lista');
+    filasM()[0].querySelector('[data-accion="memoria-borrar"]').click();
+    await until(() => modal(), 2000);
+    if (!modal().textContent.includes('Uses PowerShell 7')) fail('memoria: borrar no dice qué va a borrar');
+    primary().click();
+    await closed();
+    await until(() => filasM().length === 1, 3000);
+    if ((await mem()).entradas.map((e) => e.id).join() !== 'm1') fail('memoria: borrar dejó ' + JSON.stringify((await mem()).entradas.map((e) => e.id)));
+    const pieLista = shown(vista.querySelector('[data-tarjeta="recuerdos"] .dm-memoria-cuenta'));
+    if (!/^1 entry · \d+ of 8000 characters in context/.test(pieLista)) fail('memoria: el pie de la lista dice «' + pieLista + '»');
+
+    // Con el grupo Memory apagado, el agente no la ve: ni en el system ni como tools.
+    await go('chat');
+    const agenteM = datosM.agenteActual();
+    const susTools = datosM.toolsDe(agenteM);
+    datosM.ponerTools(agenteM.id, susTools.filter((t) => t !== 'remember' && t !== 'recall'));
+    await settle();
+    type(area, 'And now?');
+    key(area, 'Enter');
+    await listo2();
+    if (eco().includes('memory:')) fail('memoria: con el grupo Memory apagado igual le llegó la memoria: ' + /memory:[^\n]*/.exec(eco())?.[0]);
+    datosM.ponerTools(agenteM.id, susTools);
+    await settle();
+    // Un modelo que no acepta tools también la ve, si tiene el grupo prendido.
+    const sinTools = datosM.crearAgente({ nombre: 'No tools model', proveedor: 'venice', modelo: 'venice-uncensored-1-2', instrucciones: 'Short.', tools: datosM.todasLasTools() });
+    const chatST = datosM.crearChat(sinTools.id);
+    await settle();
+    await datosM.enviar(chatST.id, 'Who am I?');
+    await listo2();
+    if (!eco().includes('memory: core yes, 1 entry')) fail('memoria: a un modelo sin tools no le llegó la memoria: ' + (/memory:[^\n]*|The Venice key[^\n]*/.exec(eco())?.[0] ?? eco().slice(0, 120)));
+    await datosM.borrarAgente(sinTools.id);
+    datosM.elegirAgente(agenteM.id);
+    await settle();
+
+    // Queda como estaba: vacía (las pruebas que siguen cuentan los renglones de
+    // la respuesta de mentira, y la pasada 2 no espera memoria).
+    await window.rad.invoke('memoria:borrar', 'm1');
+    await window.rad.invoke('memoria:core', { texto: '', base: (await mem()).core });
+    await go('memoria');
+    await until(() => filasM().length === 0 && areaCore.value === '', 3000);
+    if (filasM().length || areaCore.value !== '' || !vista.querySelector('.dm-memoria-vacia')) fail('memoria: vaciarla no dejó la vista vacía');
+    await go('chat');
+    datosM.ponerModoTools('manual');
+    data.memoria = 'texto fijo guardado solo, agregar a mano con detalle, remember (y repetido), recall por id y por palabras, core, la memoria en el system del turno siguiente, la carrera del texto fijo, buscar, cambiar, borrar, grupo apagado y modelo sin tools';
+  }
+
   // Cambiarle las tools a un agente que YA existía, desde su formulario.
   {
     await go('agentes');
@@ -1969,7 +2114,7 @@ else {
     const guardar = async () => { primary().click(); await closed(); await settle(); };
     await editar();
     if (!sw('files')?.checked || !sw('screen')?.checked) fail('el formulario de un agente con todas las tools no las muestra prendidas');
-    for (const g of ['commands', 'code', 'data', 'web', 'browser', 'desktop', 'canvas', 'notes', 'subagents']) sw(g).click();
+    for (const g of ['commands', 'code', 'data', 'web', 'browser', 'desktop', 'canvas', 'notes', 'subagents', 'memory']) sw(g).click();
     await guardar();
     if (tarjeta() !== 'Tools: Files, Screen') fail(`apagarle grupos a un agente desde su formulario dejó la tarjeta en «${tarjeta()}»`);
     await editar();

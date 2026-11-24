@@ -132,6 +132,9 @@ export function sumarToolsNuevas(lista, conocidas, todas) {
   });
   return cambio ? out : null;
 }
+/** ¿Ese agente ve la memoria de la app? Es su grupo Memory: prendido, además
+ *  de poder anotar y leer, la tiene en su contexto. */
+export const conMemoria = (a) => toolsDe(a).some((t) => t === 'remember' || t === 'recall');
 /** Cuántas tools viajan de verdad en un pedido de ese agente: las que tiene
  *  prendidas, o ninguna si su modelo no las acepta. */
 export const toolsQueViajan = (a) => (a && modeloConTools(a.proveedor, a.modelo) ? toolsDe(a).length : 0);
@@ -398,6 +401,9 @@ export async function enviar(chatId, texto, adjuntos = null) {
     await window.rad.invoke('chat:enviar', {
       id: pedido, chat: chatId, proveedor: a.proveedor, modelo: a.modelo, instrucciones: a.instrucciones, mensajes: historial,
       tools, modo: modoTools(),
+      // la memoria de la app: la ve el agente que tiene prendido su grupo
+      // Memory, también si su modelo no acepta tools
+      memoria: conMemoria(a),
     });
   } catch {
     terminar(chatId, 'error', 'The request could not be sent.');

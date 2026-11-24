@@ -435,11 +435,14 @@ es por donde la instalada encuentra su actualización, y no se tocan.)
 La primera app hecha con Rad: un chat con IA donde se arman varios agentes,
 cada uno con su nombre, su proveedor y su modelo, sus instrucciones y sus
 propios chats, con los modelos de Anthropic y los de Venice. Un agente puede
-tener tools prendidas (archivos, comandos y jobs, código, SQLite, web, abrir cosas, mirar la pantalla, un canvas y un navegador al lado del chat, una libreta de notas y subagentes) y entonces actúa en la PC;
+tener tools prendidas (archivos, comandos y jobs, código, SQLite, web, abrir cosas, mirar la pantalla, un canvas y un navegador al lado del chat, una libreta de notas, subagentes y memoria) y entonces actúa en la PC;
 cómo están armadas, en `apps/BlackCode/docs/tools.md`. Las respuestas dibujan las
 fórmulas en LaTeX (KaTeX, con mhchem). A un mensaje se le adjuntan imágenes y
 archivos de texto con el botón +, pegando o soltándolos sobre la conversación
-(`renderer/adjuntos.js`). Al lado de la conversación hay además una terminal
+(`renderer/adjuntos.js`). La vista Memory guarda lo que la app recuerda del
+usuario de un chat a otro: un texto fijo que va siempre al contexto y una lista
+de recuerdos de una línea que anotan los agentes (`main/memoria.cjs`), sin
+embeddings. Al lado de la conversación hay además una terminal
 (Ctrl+T): una shell de verdad, PowerShell 7 con el profile del usuario, que es
 solo suya (ninguna tool del agente llega a ella: `main/terminal.cjs`). Viaja
 con xterm adaptado a la CSP de la app (`scripts/vendor-xterm.mjs`) y con

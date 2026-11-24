@@ -1086,6 +1086,41 @@
   .dm-nav-foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top left; opacity: 0; visibility: hidden; }
   .dm-nav-hueco[data-foto] .dm-nav-foto { opacity: 1; visibility: visible; }
 
+  /* ---------- La memoria ---------- */
+  /* Una página como Agents y Settings: el texto fijo arriba y la lista abajo. */
+  .dm-memoria-core { resize: vertical; min-height: 132px; line-height: 1.55; }
+  .dm-memoria-pie { display: flex; align-items: baseline; justify-content: space-between; gap: var(--rad-space-3); min-height: 1.5em; }
+  .dm-memoria-cuenta { font-size: var(--rad-text-xs); color: var(--rad-text-3); transition: color var(--rad-dur-fast) var(--rad-ease-out); }
+  /* pasado del tope: lo que sobra no entra al contexto */
+  .dm-tarjeta[data-pasado] .dm-memoria-cuenta { color: var(--rad-danger); }
+  .dm-memoria-guardado { font-size: var(--rad-text-xs); color: var(--rad-text-3); }
+  .dm-memoria-barra { display: flex; align-items: center; gap: var(--rad-space-2); }
+  .dm-memoria-buscar { flex: 1; min-width: 0; }
+  .dm-memoria-lista { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-1); }
+  .dm-memoria-fila {
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-1);
+    min-width: 0;
+    padding: var(--rad-space-2) var(--rad-space-1) var(--rad-space-2) var(--rad-space-3);
+    border-radius: var(--rad-radius-m);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-memoria-fila:hover { background: var(--rad-tint-hover); }
+  .dm-memoria-textos { flex: 1; min-width: 0; display: grid; gap: calc(var(--rad-space-1) / 2); }
+  .dm-memoria-hecho { color: var(--rad-text-1); overflow-wrap: anywhere; user-select: text; }
+  .dm-memoria-de { font-size: var(--rad-text-xs); color: var(--rad-text-3); }
+  .dm-memoria-vacia { padding: var(--rad-space-2) var(--rad-space-3); color: var(--rad-text-3); font-size: var(--rad-text-s); }
+  /* El aviso de que la lista ya no entra entera: se despliega cuando hace falta. */
+  .dm-memoria-aviso { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-memoria-aviso[data-abierto] { grid-template-rows: 1fr; }
+  .dm-memoria-aviso-in { min-height: 0; overflow: hidden; opacity: 0; transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out); }
+  .dm-memoria-aviso[data-abierto] .dm-memoria-aviso-in { opacity: 1; transition-delay: calc(var(--rad-dur-fast) / 2); }
+  /* El formulario de un recuerdo. */
+  .rad-modal:has(.dm-memoria-form) { --rad-modal-width: 520px; }
+  .dm-memoria-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-3); min-width: 0; }
+  .dm-memoria-detalle { resize: vertical; min-height: 120px; line-height: 1.55; }
+
   /* La biblioteca: todos los canvas, también los de la papelera. */
   .rad-modal:has(.dm-biblio) { --rad-modal-width: 560px; }
   .dm-biblio { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-3); min-width: 0; }

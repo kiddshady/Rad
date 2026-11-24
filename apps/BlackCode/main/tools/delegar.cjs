@@ -129,6 +129,8 @@ async function correrSubagente(padre, { brief, i, n, padreCall, destino, access 
       confirm: (name, args, callId) => enFila(padre, () => padre.confirm(name, args, callId, { sub: n > 1 ? i + 1 : true })),
     });
     sesion.run.ve = destino.ve === true;
+    // lo que la app recuerda del usuario: el hijo es una copia del agente
+    sesion.run.memoria = padre.memoria ?? '';
     // el texto del hijo no sale a ningún lado: se junta por rondas, y la última
     // es el informe
     const cerrar = sesion.cerrarRonda;

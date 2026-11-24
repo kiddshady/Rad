@@ -81,7 +81,10 @@ And something that is not chemistry:
 
 It costs $5 and then $10: that is money, not math.`;
 
-function respuesta({ proveedor, modelo, instrucciones, mensajes }) {
+function respuesta({ proveedor, modelo, instrucciones, mensajes }, system = '') {
+  // la memoria que le llegó, si le llegó (el humo lo lee)
+  const conCore = /^## Core memory$/m.test(system);
+  const recuerdos = (system.match(/^- \(m\d+\)/gm) ?? []).length;
   const ultimo = mensajes.at(-1)?.texto ?? '';
   if (ultimo.startsWith('MATH')) return FORMULAS;
   return [
@@ -93,6 +96,8 @@ function respuesta({ proveedor, modelo, instrucciones, mensajes }) {
     `- instructions: ${instrucciones ? instrucciones.length : 0} characters`,
     `- messages in the request: ${mensajes.length}`,
     `- provider: ${proveedor}`,
+    // (solo si hay algo: una memoria vacía no suma un renglón, que el humo los cuenta)
+    ...(conCore || recuerdos ? [`- memory: core ${conCore ? 'yes' : 'no'}, ${recuerdos} ${recuerdos === 1 ? 'entry' : 'entries'}`] : []),
     // (solo si el último mensaje las trae: el humo cuenta estos renglones)
     ...(mensajes.at(-1)?.imagenes?.length ? [`- images in the last message: ${mensajes.at(-1).imagenes.length}`] : []),
     ``,
@@ -164,7 +169,8 @@ async function responder(pedido, { signal, onTexto, onPensando, sesion = null })
   if (sesion?.activa && guion(pedido)) return conTools(pedido, { signal, onTexto, onPensando, sesion });
   onPensando();
   await dormir(PENSAR_MS, signal);
-  const texto = respuesta(pedido);
+  // el system que le llegaría a un modelo de verdad (lo arman igual anthropic.cjs y venice.cjs)
+  const texto = respuesta(pedido, sesion?.activa ? sesion.sistema(pedido.instrucciones) : pedido.instrucciones);
   let salida = 0;
   for (let i = 0; i < texto.length && !signal.aborted; i += TROZO) {
     const trozo = texto.slice(i, i + TROZO);

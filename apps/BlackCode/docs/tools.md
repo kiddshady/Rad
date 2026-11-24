@@ -31,6 +31,7 @@ encabezado de qué parte de NeonCode salió y qué se le adaptó.
 | `canvas.cjs`, `canvas-store.cjs` | `canvas`: documentos y código en el panel de al lado, y su base |
 | `notas.cjs`, `notes-store.cjs` | `notepad` y `notepad_write`: la libreta del usuario, y su base |
 | `delegar.cjs` | `delegate`: los subagentes |
+| `memoria.cjs` | `remember` y `recall`: la memoria (la memoria en sí es `main/memoria.cjs`) |
 | `navegador.cjs`, `browser/` | Las seis `browser_*` y el navegador que manejan (`agent-browser.cjs`), con su preload de sesión |
 | `index.cjs` | Arma todo y es lo único que conoce el chat |
 
@@ -59,6 +60,7 @@ agente. La barra de estado repite la cuenta.
 | Canvas | `canvas` |
 | Notes | `notepad`, `notepad_write` |
 | Subagents | `delegate` |
+| Memory | `remember`, `recall` |
 
 La pantalla va sola en su grupo: es lo más privado que una tool puede mirar
 (lo que haya abierto, sin elegir qué), y se prende aparte de todo lo demás.
@@ -292,6 +294,42 @@ hijo leyó se queda en el hijo. Viene de NeonCode 1.11.3 (`runDelegate`,
   corridas sin ventana, el deshacer del turno. El uso de tokens del hijo no se
   suma al del turno: solo figura en el informe.
 
+## La memoria
+
+Desde la 0.15.0. Lo que la app recuerda del usuario de un chat a otro, y de un
+agente a otro: es UNA para toda la app. Está en `main/memoria.cjs` (no en
+`main/tools/`: también la ven los agentes sin ninguna tool) y sus dos tools,
+en `main/tools/memoria.cjs`. Viene de la memoria de NeonCode 1.11.3, sin su
+recuerdo automático por similitud (embeddings): acá el agente ve la lista y
+decide qué leer.
+
+- **Dos cosas.** El Core («About you» en la vista): un texto corto del
+  usuario, que entra ENTERO al contexto (tope 4000 caracteres). Y la lista:
+  recuerdos de UNA línea (tope 300), cada uno con un `detalle` opcional que NO
+  entra al contexto. La lista entra entera, como un índice (tope 8000).
+- **Las tools.** `remember({ fact, detail?, core? })` anota (con `core: true`,
+  una línea al final del Core: raro). `recall({ id | query })` lee el detalle
+  de una entrada o busca por palabras en todas; es de lectura (no gasta
+  presupuesto). El agente no edita ni borra: eso es del usuario, en la vista.
+  Un subagente no tiene `remember` (no está escuchando al usuario).
+- **Quién la ve.** El agente que tiene prendido su grupo Memory. Prendido,
+  además de las tools, su system lleva el bloque (`## Core memory` y
+  `## Memory`, con los títulos de NeonCode), antes del protocolo de tools. Con
+  un modelo que no acepta tools, el bloque va con las instrucciones. Lo decide
+  `conMemoria` en `renderer/datos.js` y lo arma `chat.cjs`, una vez por turno.
+  El contenido viaja al proveedor de ese agente: la vista lo dice.
+- **Pasado el tope** quedan afuera las entradas MÁS VIEJAS, el bloque dice
+  cuántas, `remember` se lo avisa al agente y la vista al usuario. (En NeonCode
+  quedaba afuera lo más nuevo, sin aviso: lo tapaba el recuerdo por similitud.)
+- **No se anota dos veces lo mismo** (sin mirar mayúsculas ni el punto final).
+- **Dónde se guarda.** En el documento `_memoria` del store del núcleo, que la
+  interfaz no puede leer: el único que escribe es el proceso principal, y la
+  vista pide cada cambio por su canal (`memoria:leer|core|agregar|editar|borrar`;
+  el aviso es `memoria:evento`). La lista se cambia de a una entrada. El Core
+  es un texto y se guarda entero: va con la `base` con la que se abrió, y lo
+  que un agente le agregó mientras tanto se conserva (el cuidado de NeonCode).
+- **No vino:** el recuerdo por similitud, los embeddings y su motor local.
+
 ## La terminal del panel no es una tool
 
 Desde la 0.14.0 hay una terminal al lado de la conversación (`main/terminal.cjs`,
@@ -307,7 +345,7 @@ shell del panel abre donde están parados los agentes.
 - El diario para deshacer lo que escribió una tool (los ganchos están en
   `fs.cjs`, sin nada enchufado).
 - Mandar un mensaje a mitad del turno (steer).
-- Memoria, búsqueda en chats.
+- Búsqueda en chats.
 - MCP, skills, tareas programadas.
 - Dónde guardar secretos para `http_request` (`{{secret:NOMBRE}}`): un pedido
   con un secreto falla diciendo que no está.

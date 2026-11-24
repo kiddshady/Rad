@@ -183,6 +183,12 @@ const SCENES = {
     const hueco = document.querySelector('.dm-nav-hueco');
     if (foto) { hueco.querySelector('.dm-nav-foto').src = foto; hueco.setAttribute('data-foto', ''); }
     await sleep(500);`,
+  // La memoria: el texto fijo y la lista, con una entrada con detalle.
+  memoria: `
+    await window.rad.invoke('memoria:core', { texto: 'I study pharmacy and build my own desktop apps.\\nAnswer short and direct, and tell me when I am getting something wrong.', base: '' });
+    for (const [hecho, detalle] of [['Uses PowerShell 7 with a profile of their own', ''], ['Is building a chat app with several agents', 'It runs on a framework of their own. The agents have tools, a canvas, a browser and a terminal.'], ['Has the Biochemistry final in December: an oral exam', ''], ['Prefers dark interfaces, with every change animated', '']]) await window.rad.invoke('memoria:agregar', { hecho, detalle });
+    await go('memoria');
+    await sleep(900);`,
   // La terminal: la shell del panel (en las capturas, cmd y no la del usuario).
   terminal: `
     await charla(blackcode, 'Names for the app', 'Give me some name ideas.');

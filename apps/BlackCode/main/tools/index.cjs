@@ -25,6 +25,7 @@ const lienzo = require('./canvas.cjs');
 const navegador = require('./navegador.cjs');
 const notas = require('./notas.cjs');
 const delegar = require('./delegar.cjs');
+const memoria = require('./memoria.cjs');
 
 let listo = false;
 
@@ -46,8 +47,9 @@ let listo = false;
  *   webSearch()        { provider, maxResults } de la búsqueda web
  *   subagentes         { destino(run), responder(pedido, opciones) }: con qué
  *                      modelo corre un hijo de `delegate` y cómo se lo llama
+ *   memoria            la memoria de la app (main/memoria.cjs): remember y recall
  */
-function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null } = {}) {
+function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null } = {}) {
   archivos.configurar({ trash });
   web.configurar({ getKey, getSecret, webSearch });
   abrir.configurar({ shell });
@@ -70,13 +72,14 @@ function iniciar({ carpeta = null, trash = null, shell = null, capturador = null
     ...(carpeta ? { dbPath: () => path.join(carpeta, 'notes.db') } : {}),
     ...(avisar ? { broadcast: avisar } : {}),
   });
+  if (memoriaApp) memoria.configurar({ memoria: memoriaApp });
   motor.configurar({ classifyOsTarget: abrir.classifyOsTarget });
   // el hijo de `delegate` es una sesión como la de cualquier turno
   delegar.configurar({ crearSesion: (opciones) => module.exports.crearSesion(opciones), ...(subagentes ?? {}) });
   if (listo) return;
   motor.registrar({
     ...archivos.runners, ...comandos.runners, ...trabajos.runners, ...busqueda.runners,
-    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners, ...delegar.runners,
+    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners, ...delegar.runners, ...memoria.runners,
   });
   listo = true;
 }
@@ -129,7 +132,9 @@ module.exports = {
     // las pediría y fallarían siempre. (Se decide acá, antes del turno: que la
     // lista de tools cambie a mitad de un turno lo rompe.)
     const sinNotas = Array.isArray(opciones?.tools) && opciones.tools.some((n) => n === 'notepad' || n === 'notepad_write') && !notas.lista();
-    const s = sesion.crear(sinNotas ? { ...opciones, tools: opciones.tools.filter((n) => n !== 'notepad' && n !== 'notepad_write') } : opciones);
+    // (lo mismo con la memoria, si la app no la configuró)
+    const fuera = new Set([...(sinNotas ? ['notepad', 'notepad_write'] : []), ...(memoria.lista() ? [] : ['remember', 'recall'])]);
+    const s = sesion.crear(fuera.size && Array.isArray(opciones?.tools) ? { ...opciones, tools: opciones.tools.filter((n) => !fuera.has(n)) } : opciones);
     const sistema = s.sistema;
     // …y los canvas que este chat tiene abiertos: su cuerpo no viaja en la
     // conversación, así que sin esta lista el modelo no sabe que existen
@@ -151,7 +156,9 @@ module.exports = {
         return lineas.join('\n');
       } catch { return ''; }
     };
-    s.sistema = (instrucciones) => sistema(instrucciones, { trabajos: trabajosVivos(), canvas: canvas(), navegador: delNavegador() });
+    // …y lo que la app recuerda del usuario: el texto lo deja en la corrida
+    // quien arma el turno (chat.cjs), una vez, al empezar
+    s.sistema = (instrucciones) => sistema(instrucciones, { trabajos: trabajosVivos(), canvas: canvas(), navegador: delNavegador(), memoria: typeof s.run.memoria === 'string' ? s.run.memoria : '' });
     return s;
   },
   // el canvas y el navegador, para los canales que usan sus paneles

@@ -93,7 +93,7 @@ function activeToolNames(run) {
 // `screen_capture` y `job_output` también son lectura: mirar la pantalla no la
 // cambia, y leer la salida de un job tampoco cambia el job.
 const READ_ROUND_TOOLS = new Set(['fs_read', 'code_search', 'chat_search', 'rag_search',
-  'notepad', 'list_skills', 'web_search', 'fetch', 'browser_read', 'screen_capture', 'job_output']);
+  'notepad', 'recall', 'list_skills', 'web_search', 'fetch', 'browser_read', 'screen_capture', 'job_output']);
 
 // Las del browser que CAMBIAN la pestaña (todas menos browser_read). Ver el
 // filtro de subagentes en paralelo en activeToolNames.
@@ -189,6 +189,7 @@ function argsDigest(name, args) {
     case 'sqlite_query': return cut(`${base(a.db)} · ${a.sql}`, 70);
     case 'db_query': return cut(a.sql);
     case 'remember': return cut(a.fact);
+    case 'recall': return cut(a.id || a.query);
     case 'schedule':
       if (a.action === 'list') return 'list';
       if (a.action === 'delete') return cut(`delete ${a.id || ''}`.trim());
@@ -266,7 +267,7 @@ const failedOut = (out, name) => {
 // `action`). En los tres, equivocarse hacia adentro sería bloquear una escritura
 // legítima porque devolvió dos veces la misma confirmación.
 const IDEMPOTENT_TOOLS = new Set([
-  'fs_read', 'web_search', 'chat_search', 'rag_search', 'code_search', 'notepad', 'fetch', 'list_skills',
+  'fs_read', 'web_search', 'chat_search', 'rag_search', 'code_search', 'notepad', 'recall', 'fetch', 'list_skills',
 ]);
 
 const THRASH = {

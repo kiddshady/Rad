@@ -461,6 +461,34 @@ const TOOL_DEFS = [{
       },
     },
   },
+}, {
+  // La memoria (main/memoria.cjs). `remember` viene de NeonCode 1.11.3; allá
+  // decía que lo anotado «se muestra solo cuando viene al caso» (su recuerdo
+  // por similitud). Acá no hay tal cosa: lo anotado entra a la lista que el
+  // agente ve en cada chat, y el `detail` se lee con `recall`.
+  name: 'remember',
+  description: 'Save one concise lasting fact about the user to persistent memory. It joins the Memory list that every agent in this app sees at the start of each chat, so write it as ONE short self-contained line. '
+    + 'Add `detail` only when there is more worth keeping than fits in that line (the steps of a procedure, the decisions behind a project): the detail is NOT in context, it is read on demand with `recall`. '
+    + 'Pass core:true ONLY for defining facts that must never be missed (who the user is, hard preferences, key projects) — core memory is small and costs context every single turn.',
+  parameters: {
+    type: 'object',
+    properties: {
+      fact: { type: 'string', description: 'The fact to remember, a single short line.' },
+      detail: { type: 'string', description: 'Optional longer text behind the fact, a few paragraphs at most. Not in context: read it with `recall`.' },
+      core: { type: 'boolean', description: 'true = save to CORE memory (always in context, keep it rare). Default false = the Memory list.' },
+    },
+    required: ['fact'],
+  },
+}, {
+  name: 'recall',
+  description: 'Read your memory beyond the one-line list in your context. Pass `id` (like "m3") to read the detail behind an entry marked [+]; pass `query` to search every entry and its detail by words, including the older ones the list no longer shows. Read-only.',
+  parameters: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', description: 'The id of one entry, as shown in parentheses in the Memory list (e.g. "m3").' },
+      query: { type: 'string', description: 'Words to look for across every entry and its detail. All of them must appear.' },
+    },
+  },
 }];
 
 // Los grupos con que se prenden y se apagan en un agente.
@@ -479,6 +507,9 @@ const GRUPOS = [
   { id: 'notes', nombre: 'Notes', tools: ['notepad', 'notepad_write'] },
   // otro agente trabajando por encargo de este
   { id: 'subagents', nombre: 'Subagents', tools: ['delegate'] },
+  // La memoria. Prendido, el agente además la VE: su Core y su lista van en
+  // el system (también con un modelo que no acepta tools). Ver chat.cjs.
+  { id: 'memory', nombre: 'Memory', tools: ['remember', 'recall'] },
 ];
 
 const porNombre = new Map(TOOL_DEFS.map((t) => [t.name, t]));

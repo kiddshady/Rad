@@ -64,7 +64,7 @@ const IMAGENES_MAX = 4;
 const ESPERA_MODELOS_MS = 8000;
 
 function limpiar(pedido) {
-  const { id, chat = '', proveedor = 'anthropic', modelo, instrucciones, mensajes, tools = [], modo = 'manual' } = pedido ?? {};
+  const { id, chat = '', proveedor = 'anthropic', modelo, instrucciones, mensajes, tools = [], modo = 'manual', memoria = false } = pedido ?? {};
   if (typeof id !== 'string' || !id) throw new Error('[blackcode] el pedido no trae id');
   if (!RESPONDER[proveedor]) throw new Error(`[blackcode] proveedor desconocido: ${JSON.stringify(proveedor)}`);
   if (typeof modelo !== 'string' || !modelo) throw new Error('[blackcode] el pedido no trae modelo');
@@ -92,6 +92,8 @@ function limpiar(pedido) {
     mensajes: lista,
     tools: Array.isArray(tools) ? tools.filter((t) => typeof t === 'string') : [],
     modo: modo === 'auto' ? 'auto' : 'manual',
+    // ¿este agente ve la memoria de la app? (lo decide la interfaz: su grupo Memory)
+    memoria: memoria === true,
   };
 }
 
@@ -105,6 +107,16 @@ function wire(rad, { llave }) {
   // y lo que «borran» va a una papelera que es otra carpeta ahí mismo.
   // Tampoco abren nada: os_open anota lo que habría abierto.
   const taller = llave.SIMULADO && process.env.RAD_DATA ? path.join(process.env.RAD_DATA, 'workspace') : null;
+  // La memoria: lo que la app recuerda del usuario de un chat a otro. Vive en
+  // un documento que la interfaz no puede leer (empieza con _): el único que
+  // lo escribe es este proceso, y la vista Memory pide cada cambio por su canal.
+  const DOC_MEMORIA = '_memoria';
+  const memoria = require('./memoria.cjs').crear({
+    leer: () => rad.store.read(DOC_MEMORIA),
+    escribir: (doc) => { rad.store.write(DOC_MEMORIA, doc).catch(() => {}); },
+    alCambiar: () => rad.send('memoria:evento', {}),
+  });
+  const paraLaMemoria = { memoria };
   // El canvas: los títulos de los chats (para su biblioteca) salen del
   // documento que guarda la interfaz, y cuando el agente borra uno se avisa
   // fuera del turno (el panel puede estar mirando otro chat).
@@ -187,7 +199,7 @@ function wire(rad, { llave }) {
       ...paraElCanvas,
       ...paraElNavegador,
       ...paraLaBusqueda,
-      ...paraLosSubagentes,
+      ...paraLosSubagentes, ...paraLaMemoria,
       abrirAfuera: (u) => anotar(`url ${u}`),
       trash: (ruta) => fs.promises.rename(ruta, path.join(taller, '.trash', `${Date.now()}-${path.basename(ruta)}`)),
       // y no miran la pantalla de nadie: capturan una de mentira
@@ -205,7 +217,7 @@ function wire(rad, { llave }) {
     const carpeta = path.join(path.dirname(rad.store.dir), 'tools');
     fs.mkdirSync(carpeta, { recursive: true });
     const { desktopCapturer, screen } = require('electron');
-    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, ...paraLosSubagentes, abrirAfuera: (u) => shell.openExternal(u) });
+    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, ...paraLosSubagentes, ...paraLaMemoria, abrirAfuera: (u) => shell.openExternal(u) });
     herramientas.setCwd(rad.store.read(DOC_TOOLS)?.carpeta);
   }
   // Al salir, lo que quedó corriendo en segundo plano se mata.
@@ -246,6 +258,15 @@ function wire(rad, { llave }) {
     rad.handle('notas:carpeta-renombrar', (que) => n.foldersRename(que ?? {}));
     rad.handle('notas:carpeta-borrar', (id) => n.foldersDelete(id));
   }
+
+  // ---------- La memoria ----------
+  // Los canales de su vista. La lista se cambia de a una entrada; el Core es
+  // un texto y viaja con la `base` con la que se abrió (ver memoria.cjs).
+  rad.handle('memoria:leer', () => memoria.estado());
+  rad.handle('memoria:core', (que) => memoria.ponerCore(que?.texto, que?.base));
+  rad.handle('memoria:agregar', (que) => memoria.agregar({ hecho: que?.hecho, detalle: que?.detalle, de: 'user' }));
+  rad.handle('memoria:editar', (que) => memoria.editar(String(que?.id ?? ''), { hecho: que?.hecho, detalle: que?.detalle }));
+  rad.handle('memoria:borrar', (id) => memoria.borrar(String(id ?? '')));
 
   // ---------- El navegador ----------
   // Los canales de su panel. Los cuerpos son los de NeonCode (navegador.cjs).
@@ -417,6 +438,15 @@ function wire(rad, { llave }) {
         sesion.run.etiquetaSubagente = d.mismo ? 'the same model as you' : `running on ${d.modelo || '(no model chosen)'} via ${d.nombre}`;
       }
       if (!sesion.activa) sesion = null;
+    }
+    // La memoria, si el agente la tiene prendida: su Core y su lista van en el
+    // system. Se arma UNA vez, al empezar el turno (lo que el agente anote en
+    // este turno ya lo sabe: lo acaba de escribir). Con tools, la lleva la
+    // corrida; sin tools (un modelo que no las acepta), va con las instrucciones.
+    if (pedido.memoria) {
+      const bloque = memoria.bloque({ recall: sesion?.nombres.includes('recall') === true, remember: sesion?.nombres.includes('remember') === true });
+      if (sesion) sesion.run.memoria = bloque;
+      else if (bloque) pedido.instrucciones = [pedido.instrucciones, bloque].filter(Boolean).join('\n\n');
     }
     const corrio = () => (sesion ? { tools: sesion.resumen(), agotado: sesion.run.stopped === 'maxrounds' } : {});
 
