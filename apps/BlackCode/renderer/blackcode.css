@@ -932,6 +932,12 @@
     padding: 0 var(--rad-space-1) var(--rad-space-3) var(--rad-space-4);
     overflow: hidden; /* el que scrollea es xterm, no esto */
   }
+  /* xterm se ajusta al ancho de la caja donde se abre, y la mide con su
+     padding incluido: por eso va en una caja propia, sin padding (con el del
+     cuerpo se pasaba de ancho y el texto quedaba debajo de la barra). El aire
+     entre la última letra y la barra lo pone terminal.js, que le deja una
+     columna libre. */
+  .dm-term-xterm { height: 100%; min-width: 0; }
   .dm-term-cuerpo .xterm { height: 100%; }
   .dm-term-cuerpo .xterm-viewport { background-color: transparent !important; } /* el fondo lo pone el panel */
   /* (el scroll ya no vive en el viewport, pero su overflow reservaba un canal vacío) */
@@ -969,22 +975,16 @@
     visibility: hidden;
     pointer-events: none;
   }
-  /* Estirado, el panel queda ENCIMA de la conversación, y una superficie de
-     la piel puede ser un velo translúcido: se le pone un fondo que tape (el
-     mismo velo sobre el fondo opaco). Entra fundiéndose; en el ancho de la
-     casa no está, y el panel se ve igual que el canvas. */
-  .dm-nav::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    background: linear-gradient(var(--rad-surface-1), var(--rad-surface-1)), var(--rad-surface-0);
-    opacity: 0;
-    transition: opacity var(--rad-dur-base) var(--rad-ease-in-out);
-    pointer-events: none;
-  }
-  .dm-nav[data-estirado]::before { opacity: 1; }
+  /* Estirado, el panel queda ENCIMA de la conversación, y es vidrio: una
+     superficie de la piel puede ser un velo, y el texto de abajo se vería a
+     través. No se le pone un fondo que tape (cambiaría de color al estirarlo:
+     dejaría de ser el vidrio del canvas y la terminal). Se recorta la
+     conversación donde el panel la pisa (navegador.js pone cuánto): debajo
+     queda la hoja, como en el ancho de la casa. Solo recorta el lado derecho;
+     los otros tres van holgados para no cortar nada de la conversación. */
+  .dm-escena > .dm-conv { clip-path: inset(-100vh var(--dm-conv-corte, 0px) -100vh -100vw); }
+  /* Al abrir y al cerrar, el recorte entra y sale con el panel. */
+  .dm-escena[data-relevo] > .dm-conv { transition: clip-path var(--rad-dur-base) var(--rad-ease-in-out); }
   /* La manija: una franja angosta sobre el borde izquierdo, con una marca corta
      al medio. Se ve tenue en reposo (un borde que no anuncia que se arrastra no
      lo arrastra nadie) y se enciende al acercarse y mientras se agarra. */

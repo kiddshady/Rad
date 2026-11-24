@@ -1,5 +1,18 @@
 # Changelog
 
+## BlackCode 0.14.1 (2026-11-24)
+
+- **El navegador ya no cambia de color al estirarlo.** Estirado llevaba un
+  fondo opaco para tapar la conversación, y pasaba de vidrio gris a casi
+  negro. Ahora es el mismo vidrio que en el ancho de siempre (y que el canvas
+  y la terminal): lo que se hace es recortar la conversación donde el panel
+  la pisa (`clip-path`, que no remaqueta), así debajo queda la hoja. Al abrir
+  y al cerrar, el recorte entra y sale con el panel.
+- **En la terminal el texto ya no toca la barra de scroll.** xterm se medía
+  contra una caja con padding y se pasaba de ancho: el texto quedaba debajo
+  de la barra. Ahora se abre en una caja sin padding y deja una columna de
+  aire antes de la barra.
+
 ## BlackCode 0.14.0 (2026-11-24) · núcleo 0.18.0
 
 - **Terminal.** Un panel nuevo al lado de la conversación con una shell de

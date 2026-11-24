@@ -21,7 +21,8 @@
 // a la vez. Es el único de los tres que se puede ESTIRAR (la manija de su
 // borde izquierdo): adentro hay una página ajena con su propio layout, y en el
 // ancho de la casa media web se va al modo teléfono. Lo que crece no empuja a
-// la conversación: la tapa.
+// la conversación: queda por encima. Y como el panel es vidrio (lo de abajo se
+// vería a través), la conversación se RECORTA donde el panel la pisa.
 
 import { menuButton } from '/@core/menu.js';
 import { reconcile } from '/@core/list.js';
@@ -171,7 +172,26 @@ export function montarNavegador({ escena, turnos, router }) {
     else panel.style.removeProperty('--dm-nav-w');
     panel.toggleAttribute('data-estirado', ancho > 0);
     manija.setAttribute('aria-valuenow', String(Math.round(anchoAhora())));
+    recortar();
     mandarBounds();
+  }
+  // El panel es vidrio: estirado sobre la conversación, el texto de abajo se
+  // vería a través. En vez de ponerle un fondo que tape (así nació, y al
+  // estirarlo cambiaba de color: dejaba de ser el vidrio de los otros paneles),
+  // se recorta la conversación donde el panel la pisa. Debajo queda la hoja,
+  // igual que en el ancho de la casa. Recortar no remaqueta nada.
+  // `relevo`: al abrir y al cerrar, el recorte entra y sale andando, junto con
+  // el panel; mientras se arrastra va pegado al borde, sin transición.
+  let finRelevo = null;
+  function recortar({ relevo = false } = {}) {
+    const pisa = abierto() && ancho > 0;
+    const corte = pisa ? Math.round(escena.getBoundingClientRect().right - casaEl.getBoundingClientRect().right + ancho) : 0;
+    if (relevo) {
+      escena.setAttribute('data-relevo', '');
+      clearTimeout(finRelevo);
+      finRelevo = setTimeout(() => escena.removeAttribute('data-relevo'), ms('dur-base') + 60);
+    }
+    escena.style.setProperty('--dm-conv-corte', `${corte}px`);
   }
   // La ventana cambió de tamaño: el ancho arrastrado se vuelve a encajar entre
   // el piso y el techo, que cambiaron con ella.
@@ -305,6 +325,7 @@ export function montarNavegador({ escena, turnos, router }) {
     panel.removeAttribute('aria-hidden');
     panel.inert = false;
     boton.setAttribute('aria-pressed', 'true');
+    recortar({ relevo: true });
     listo = false;
     const st = await pedir('browser:attach').catch((err) => ({ open: false, error: String(err?.message || err) }));
     if (st?.open === false) {
@@ -336,6 +357,7 @@ export function montarNavegador({ escena, turnos, router }) {
     panel.setAttribute('aria-hidden', 'true');
     panel.inert = true;
     boton.setAttribute('aria-pressed', 'false');
+    recortar({ relevo: true });
     hueco.removeAttribute('data-foto');
     clearTimeout(cerrando);
     cerrando = setTimeout(() => {

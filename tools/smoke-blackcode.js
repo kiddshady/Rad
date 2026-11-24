@@ -1204,12 +1204,17 @@ else {
     {
       const manija = nav.querySelector('.dm-nav-manija');
       const anchoN = () => nav.getBoundingClientRect().width;
-      const fondo = () => parseFloat(getComputedStyle(nav, '::before').opacity);
+      // cómo se pinta el panel (su fondo y si tiene algo detrás), y cuánto se le recorta a la conversación
+      const pinta = () => { const cs = getComputedStyle(nav); const b = getComputedStyle(nav, '::before'); return [cs.backgroundColor, cs.backgroundImage, b.content, b.backgroundColor].join(' | '); };
+      const corte = () => parseFloat(escena.style.getPropertyValue('--dm-conv-corte')) || 0;
+      const conv = chatView.querySelector('.dm-conv');
+      const debajo = (x, y) => { nav.style.pointerEvents = 'none'; const el = document.elementFromPoint(x, y); nav.style.pointerEvents = ''; return el; };
       const puntero = (tipo, x) => manija.dispatchEvent(new PointerEvent(tipo, { pointerId: 7, button: 0, buttons: tipo === 'pointerup' ? 0 : 1, clientX: x, clientY: 300, bubbles: true, cancelable: true }));
       const casa = anchoN();
       const hiloAntes = Math.round(thread().getBoundingClientRect().width);
       const eR = escena.getBoundingClientRect();
-      if (!manija || manija.getAttribute('role') !== 'separator' || nav.hasAttribute('data-estirado') || fondo() !== 0) fail('navegador: la manija no está, o el panel arranca estirado (fondo ' + fondo() + ')');
+      if (!manija || manija.getAttribute('role') !== 'separator' || nav.hasAttribute('data-estirado') || corte() !== 0) fail('navegador: la manija no está, o el panel arranca estirado (recorte ' + corte() + ')');
+      const pintaCasa = pinta();
       const x0 = manija.getBoundingClientRect().left + 4;
       puntero('pointerdown', x0);
       if (!document.documentElement.classList.contains('dm-estirando')) fail('navegador: agarrar la manija no marca el arrastre');
@@ -1227,7 +1232,19 @@ else {
       puntero('pointerup', x0 - 5000);
       await sleep(dur('base') + 120);
       if (document.documentElement.classList.contains('dm-estirando') || !nav.hasAttribute('data-estirado')) fail('navegador: soltar la manija no terminó el arrastre, o el panel no quedó marcado como estirado');
-      if (fondo() < 0.99) fail('navegador: estirado sobre la conversación, el panel no tiene un fondo que tape (opacidad ' + fondo() + ')');
+      // Estirado es el MISMO vidrio que en el ancho de la casa: no cambia de
+      // color (Fran lo vio pasar de gris a casi negro: tenía un fondo que
+      // tapaba). Lo que cambia es la conversación, que se recorta donde el
+      // panel la pisa; si no, se vería a través.
+      if (pinta() !== pintaCasa) fail('navegador: al estirarlo el panel cambió de fondo: ' + pinta() + ' (en el ancho de la casa: ' + pintaCasa + ')');
+      {
+        const r = nav.getBoundingClientRect();
+        if (Math.abs(corte() - (eR.right - r.left)) > 1 || !getComputedStyle(conv).clipPath.includes(Math.round(corte()) + 'px')) fail('navegador: la conversación se recorta ' + corte() + ' px y el panel la pisa ' + Math.round(eR.right - r.left) + ' (clip-path: ' + getComputedStyle(conv).clipPath + ')');
+        const abajo = debajo(r.left + 60, r.top + r.height / 2);
+        if (conv.contains(abajo)) fail('navegador: debajo del panel estirado sigue pintada la conversación (' + (abajo.className || abajo.tagName) + '): se ve a través del vidrio');
+        const alLado = document.elementFromPoint(r.left - 30, r.top + r.height / 2);
+        if (!conv.contains(alLado)) fail('navegador: el recorte se comió también la conversación que queda a la vista (' + (alLado?.className || alLado?.tagName) + ')');
+      }
       // lo que hay debajo es conversación, y lo que se toca es el panel
       const nr = nav.getBoundingClientRect();
       const tocado = document.elementFromPoint(nr.left + 40, nr.top + 20);
@@ -1243,23 +1260,25 @@ else {
       const guardado = anchoN();
       botonNav.click();
       await until(() => !escena.hasAttribute('data-panel'), 3000);
+      if (corte() !== 0) fail('navegador: cerrado, la conversación sigue recortada (' + corte() + ' px)');
       botonNav.click();
       await until(() => nav.hasAttribute('data-abierto'), 3000);
       await sleep(dur('base') + 160);
+      if (Math.abs(corte() - (eR.right - nav.getBoundingClientRect().left)) > 1) fail('navegador: al reabrirlo estirado, la conversación no se volvió a recortar (' + corte() + ' px)');
       if (Math.abs(anchoN() - guardado) > 2) fail('navegador: al reabrirlo perdió el ancho arrastrado (' + Math.round(guardado) + ' → ' + Math.round(anchoN()) + ')');
       // doble clic: vuelve al ancho de la casa, y vuelve andando
       const vuelta = new Set();
       manija.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
       for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 260;) { vuelta.add(Math.round(anchoN())); await frame(); }
       await sleep(dur('base') + 120);
-      if (Math.abs(anchoN() - casa) > 1 || nav.hasAttribute('data-estirado') || nav.style.getPropertyValue('--dm-nav-w') || fondo() > 0.01) fail('navegador: el doble clic no lo devolvió al ancho de la casa (' + Math.round(anchoN()) + ' de ' + Math.round(casa) + ', fondo ' + fondo() + ')');
+      if (Math.abs(anchoN() - casa) > 1 || nav.hasAttribute('data-estirado') || nav.style.getPropertyValue('--dm-nav-w') || corte() !== 0 || pinta() !== pintaCasa) fail('navegador: el doble clic no lo devolvió al ancho de la casa (' + Math.round(anchoN()) + ' de ' + Math.round(casa) + ', recorte ' + corte() + ')');
       if (vuelta.size < 4) fail('navegador: volver al ancho de la casa fue de golpe (' + [...vuelta].join(', ') + ')');
       // y nunca se achica por debajo de la casa
       key(manija, 'ArrowRight');
       await frame();
       if (Math.abs(anchoN() - casa) > 1) fail('navegador: la manija lo achicó por debajo del ancho de la casa (' + Math.round(anchoN()) + ')');
       manija.blur();
-      data.navegadorEstirado = 'de ' + Math.round(casa) + ' a ' + Math.round(tope) + ' px en ' + pasos.size + ' pasos, deja ' + Math.round(asoma) + ' px de chat a la vista, tapa sin empujar, y vuelve en ' + vuelta.size + ' pasos';
+      data.navegadorEstirado = 'de ' + Math.round(casa) + ' a ' + Math.round(tope) + ' px en ' + pasos.size + ' pasos, deja ' + Math.round(asoma) + ' px de chat a la vista, mismo vidrio, recorta sin empujar, y vuelve en ' + vuelta.size + ' pasos';
     }
 
     // El hueco es uno solo: abrir un canvas cierra el navegador, y al revés.
@@ -1730,6 +1749,12 @@ else {
     // xterm se ajusta a su caja
     const sr = cuerpoT.querySelector('.xterm-screen').getBoundingClientRect();
     if (sr.width > cuerpoT.clientWidth + 1 || sr.width < cuerpoT.clientWidth * 0.8 || sr.height > cuerpoT.clientHeight + 1 || sr.height < cuerpoT.clientHeight * 0.8) fail('terminal: xterm mide ' + Math.round(sr.width) + '×' + Math.round(sr.height) + ' en una caja de ' + cuerpoT.clientWidth + '×' + cuerpoT.clientHeight);
+    // el texto no llega a la barra de scroll (Fran lo vio pegado: xterm se medía contra una caja con padding)
+    const filasR = cuerpoT.querySelector('.xterm-rows').getBoundingClientRect();
+    const barraR = cuerpoT.querySelector('.xterm-scrollable-element > .scrollbar.vertical')?.getBoundingClientRect();
+    const aire = barraR ? Math.round(barraR.left - filasR.right) : null;
+    if (aire === null || aire < 6 || barraR.right > cuerpoT.getBoundingClientRect().right + 1) fail('terminal: entre la última columna y la barra de scroll hay ' + aire + ' px (columnas hasta ' + Math.round(filasR.right) + ', barra desde ' + Math.round(barraR?.left) + ')');
+    data.terminalAire = aire + ' px entre el texto y la barra';
     if (!getComputedStyle(cuerpoT.querySelector('.xterm-rows')).fontFamily.includes('Roboto Mono')) fail('terminal: no usa la fuente de código de la app: ' + getComputedStyle(cuerpoT.querySelector('.xterm-rows')).fontFamily);
     // Los estilos que xterm arma a mano llegaron por hojas construidas (la CSP
     // no deja pasar un <style> en línea): tres <dm-estilo>, ni un <style>.

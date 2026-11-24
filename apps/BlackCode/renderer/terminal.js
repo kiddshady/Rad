@@ -118,7 +118,9 @@ export function montarTerminal({ escena, turnos, router }) {
   const bCerrar = ib('term-cerrar', 'cerrar', 'Close');
   // Sin esfumado: se comería el renglón de arriba, y en una terminal ese
   // renglón es el que se está leyendo.
-  const cuerpo = h('div', 'dm-term-cuerpo');
+  // (xterm se abre en `caja`, que no tiene padding: ver el CSS)
+  const caja = h('div', 'dm-term-xterm');
+  const cuerpo = h('div', 'dm-term-cuerpo', {}, caja);
   const panel = h('aside', 'dm-term', { 'aria-label': 'Terminal', 'aria-hidden': 'true' },
     h('header', 'dm-canvas-cabeza', { 'data-rad-chrome': '' },
       icono('terminal', 'dm-canvas-icono'),
@@ -180,13 +182,13 @@ export function montarTerminal({ escena, turnos, router }) {
       });
       fit = new FitAddon();
       nuevo.loadAddon(fit);
-      nuevo.open(cuerpo);
+      nuevo.open(caja);
       term = nuevo;
       // lo que se teclea va derecho a la shell; acá no se interpreta nada
       term.onData((d) => { pedir('term:input', d); });
       term.attachCustomKeyEventHandler(alTeclear);
       // El panel cambia de medida con la ventana: un observador lo cubre todo.
-      new ResizeObserver(() => ajustar()).observe(cuerpo);
+      new ResizeObserver(() => ajustar()).observe(caja);
       window.rad.on('term:data', (d) => term.write(d));
       window.rad.on('term:exit', (ev) => {
         viva = false;
@@ -201,9 +203,15 @@ export function montarTerminal({ escena, turnos, router }) {
   function ajustar() {
     if (!term || !fit || !abierto()) return;
     // con el panel cerrado el cuerpo mide 0, y ConPTY se cae con 0 filas
-    const r = cuerpo.getBoundingClientRect();
+    const r = caja.getBoundingClientRect();
     if (r.width < 20 || r.height < 20) return;
-    try { fit.fit(); } catch { return; }
+    // Una columna menos de las que entran: es el aire entre la última letra y
+    // la barra de scroll, que xterm dibuja pegada al texto.
+    let d = null;
+    try { d = fit.proposeDimensions(); } catch { return; }
+    if (!d || !Number.isFinite(d.cols) || !Number.isFinite(d.rows)) return;
+    const cols = Math.max(2, d.cols - 1);
+    if (cols !== term.cols || d.rows !== term.rows) term.resize(cols, d.rows);
     if (viva) pedir('term:resize', { cols: term.cols, rows: term.rows });
   }
 
