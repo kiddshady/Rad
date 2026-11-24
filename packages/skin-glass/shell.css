@@ -18,6 +18,37 @@
   font-size: var(--rad-text-xs);
   color: var(--rad-text-3);
 }
+/* Sin el nombre, lo primero de la barra se alinea con el canto de la hoja. */
+.rad-titlebar[data-untitled] { padding-left: var(--rad-space-2); }
+.rad-titlebar[data-untitled] .rad-titlebar-sub { margin-left: 0; }
+
+/* Las pestañas de vistas. La activa es una gota de vidrio, como el indicador
+   del rail; las demás son el ícono suelto sobre el telón. */
+.rad-tabs { gap: 2px; }
+.rad-titlebar:not([data-untitled]) .rad-tabs { margin-left: var(--rad-space-4); }
+.rad-tab {
+  padding-inline: var(--rad-space-2);
+  border-radius: var(--rad-radius-m);
+  color: var(--rad-text-2);
+  font-size: var(--rad-text-m);
+  transition:
+    color var(--rad-dur-fast) var(--rad-ease-out),
+    background-color var(--rad-dur-base) var(--rad-ease-in-out),
+    box-shadow var(--rad-dur-base) var(--rad-ease-in-out);
+}
+.rad-tab:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
+.rad-tab:active { background-color: var(--rad-tint-press); }
+.rad-tab[aria-current='page'] {
+  color: var(--rad-text-1);
+  background-color: var(--rad-surface-3);
+  box-shadow: var(--skin-rim), 0 4px 14px #00000038;
+}
+.rad-tab .rad-icon { transition: color var(--rad-dur-fast) var(--rad-ease-out); }
+.rad-tab[aria-current='page'] .rad-icon { color: var(--rad-accent); }
+/* El aire entre el ícono y el rótulo va adentro de la caja que se pliega:
+   plegada, la pestaña mide lo que el ícono. */
+.rad-tab:not([data-plain]) .rad-tab-text { padding-inline-start: var(--rad-space-2); }
+.rad-tab-text { padding-inline-end: var(--rad-space-1); font-weight: var(--rad-weight-strong); }
 /* Los botones de ventana: lo que se pinta es la pastilla (::before), no el
    botón entero, que llega hasta el canto de la ventana. */
 .rad-winbtn {

@@ -35,6 +35,11 @@ rad.handle('sistema:info', () => ({
   datos: rad.store.dir,
 }));
 
+// Dónde van las vistas: en el rail (lo de siempre) o como pestañas en la
+// titlebar. RAD_SHOWCASE_NAV=titlebar lo cambia, para ver y probar ese modo
+// con cada piel (el humo lo usa en su segunda pasada).
+rad.handle('vitrina:nav', () => (process.env.RAD_SHOWCASE_NAV === 'titlebar' ? 'titlebar' : 'rail'));
+
 rad.handle('pieles:listar', () => Object.values(SKINS).map((s) => ({
   id: s.id,
   name: s.name,

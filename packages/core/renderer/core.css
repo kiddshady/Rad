@@ -138,7 +138,6 @@
     grid-area: title;
     display: flex;
     align-items: center;
-    justify-content: space-between;
     min-width: 0;
     -webkit-app-region: drag;
   }
@@ -148,11 +147,55 @@
     min-width: 0;
   }
   .rad-titlebar-title, .rad-titlebar-sub { white-space: nowrap; }
+  /* Los botones van contra el borde, haya lo que haya antes (el nombre
+     solo, o el nombre y las pestañas). */
   .rad-winbtns {
     display: flex;
     align-self: stretch;
+    margin-inline-start: auto;
     -webkit-app-region: no-drag;
   }
+
+  /* Las vistas como pestañas, adentro de la titlebar (nav: 'titlebar'). De
+     lo que ocupan no se arrastra la ventana; el resto de la barra, sí.
+     La activa despliega su rótulo a lo ancho (0fr → 1fr) y las demás lo
+     tienen plegado: el ancho no se anima a mano, lo acomoda la grilla. */
+  .rad-tabs {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    -webkit-app-region: no-drag;
+  }
+  .rad-tab {
+    --rad-a-tab-height: calc(var(--rad-control-height) - var(--rad-space-1));
+    display: flex;
+    align-items: center;
+    flex: none;
+    height: var(--rad-a-tab-height);
+    min-width: var(--rad-a-tab-height);
+    justify-content: center;
+  }
+  .rad-tab-label {
+    display: grid;
+    grid-template-columns: 0fr;
+    min-width: 0;
+    transition: grid-template-columns var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .rad-tab-label > span {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out);
+  }
+  .rad-tab[aria-current='page'] .rad-tab-label,
+  .rad-tab[data-plain] .rad-tab-label { grid-template-columns: 1fr; }
+  .rad-tab[aria-current='page'] .rad-tab-label > span,
+  .rad-tab[data-plain] .rad-tab-label > span { opacity: 1; }
+  /* El rótulo que entra espera a que la caja haya empezado a abrirse. */
+  .rad-tab[aria-current='page'] .rad-tab-label > span { transition-delay: var(--rad-dur-fast); }
+  .rad-tab-text { display: block; }
   /* Los botones de ventana. El botón entero (del alto de la titlebar y pegado
      al borde) es lo que recibe el click: con la ventana maximizada, tirar el
      mouse a la esquina sigue cerrando. Lo que se ve es una pastilla más

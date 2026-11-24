@@ -13,6 +13,15 @@
 //   });
 //   shell.router.go('inicio');
 //   shell.status.set('left', 'Listo');
+//
+// Las vistas se eligen en un rail a la izquierda (lo de siempre) o en
+// pestañas adentro de la titlebar, que le dejan todo el ancho al escenario:
+//
+//   createShell({ …, nav: 'titlebar' })   // 'rail' (por defecto) | 'titlebar' | 'none'
+//   createShell({ …, title: false })      // sin el nombre de la app en la titlebar
+//
+// En las pestañas, la vista activa muestra su rótulo y las demás solo el
+// ícono, con el rótulo en el tooltip. Una vista sin ícono lo muestra siempre.
 
 import { createRouter } from './router.js';
 import { swapText } from './motion.js';
@@ -36,11 +45,18 @@ function h(tag, className, attrs = {}) {
 function titlebar({ title, subtitle }) {
   const bar = h('header', 'rad-titlebar', { 'data-rad-chrome': '' });
   const head = h('div', 'rad-titlebar-head');
-  const name = h('span', 'rad-titlebar-title');
-  name.textContent = title ?? document.title;
+  // title: false saca el nombre: la titlebar arranca con lo que siga (las
+  // pestañas, si las hay). El subtítulo queda, por si la app lo usa.
+  if (title === false) {
+    bar.setAttribute('data-untitled', '');
+  } else {
+    const name = h('span', 'rad-titlebar-title');
+    name.textContent = title ?? document.title;
+    head.append(name);
+  }
   const sub = h('span', 'rad-titlebar-sub rad-swap');
   if (subtitle) swapText(sub, subtitle);
-  head.append(name, sub);
+  head.append(sub);
 
   const btns = h('div', 'rad-winbtns');
   const btn = (action, label, html, extra = '') => {
@@ -69,7 +85,61 @@ function titlebar({ title, subtitle }) {
   window.rad?.window.onMaximizedChange?.(setMax);
 
   bar.append(head, btns);
-  return { el: bar, setSubtitle: (text) => swapText(sub, text) };
+  return { el: bar, buttons: btns, setSubtitle: (text) => swapText(sub, text) };
+}
+
+// Las vistas como pestañas, para la titlebar. La activa despliega su rótulo;
+// las demás quedan en el ícono y dicen su nombre en el tooltip.
+function tabs({ views, router }) {
+  const nav = h('nav', 'rad-tabs', { 'aria-label': t.views });
+  const items = new Map();
+  for (const v of views) {
+    const label = v.label ?? v.id;
+    const item = h('button', 'rad-tab', { type: 'button', 'data-view': v.id, 'data-rad-tip-side': 'bottom' });
+    if (v.icon) {
+      const icon = h('span', 'rad-icon');
+      icon.innerHTML = v.icon;
+      item.append(icon);
+    } else {
+      item.setAttribute('data-plain', ''); // sin ícono, el rótulo va siempre
+    }
+    // El rótulo va en una caja que se pliega a lo ancho (0fr → 1fr). Entre
+    // la caja y el texto hay un recorte sin relleno: el aire que le ponga la
+    // piel va en el texto (.rad-tab-text), así plegada no mide nada.
+    const box = h('span', 'rad-tab-label');
+    const clip = h('span');
+    const text = h('span', 'rad-tab-text');
+    text.textContent = label;
+    clip.append(text);
+    box.append(clip);
+    item.append(box);
+    item.addEventListener('click', () => router.go(v.id));
+    nav.append(item);
+    items.set(v.id, { item, label, plain: !v.icon });
+  }
+
+  // Flechas a los lados recorren las pestañas con el teclado.
+  nav.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const list = [...items.values()].map((x) => x.item);
+    const i = list.indexOf(document.activeElement);
+    if (i < 0) return;
+    e.preventDefault();
+    list[(i + (e.key === 'ArrowRight' ? 1 : list.length - 1)) % list.length].focus();
+  });
+
+  const mark = () => {
+    for (const [id, { item, label, plain }] of items) {
+      const current = id === router.current;
+      if (current) item.setAttribute('aria-current', 'page');
+      else item.removeAttribute('aria-current');
+      // El tooltip dice lo que el rótulo plegado no muestra.
+      if (current || plain) item.removeAttribute('data-rad-tip');
+      else item.setAttribute('data-rad-tip', label);
+    }
+  };
+  router.on('change', mark);
+  return { el: nav, mark };
 }
 
 function rail({ views, router }) {
@@ -143,10 +213,16 @@ function statusbar() {
   };
 }
 
-export function createShell({ root, title, subtitle, views = [], initial, rail: withRail = true, statusbar: withStatus = true }) {
+const NAVS = ['rail', 'titlebar', 'none'];
+
+export function createShell({ root, title, subtitle, views = [], initial, nav, rail: withRail = true, statusbar: withStatus = true }) {
   if (!root) throw new Error('[rad] createShell necesita root: el .rad-root de la app');
+  // `rail: false` es la forma vieja de decir nav: 'none'.
+  const mode = nav ?? (withRail ? 'rail' : 'none');
+  if (!NAVS.includes(mode)) throw new Error(`[rad] createShell: nav desconocido: ${JSON.stringify(mode)} (hay: ${NAVS.join(', ')})`);
   const shell = h('div', 'rad-shell');
-  shell.toggleAttribute('data-rail', withRail);
+  shell.dataset.nav = mode;
+  shell.toggleAttribute('data-rail', mode === 'rail');
   shell.toggleAttribute('data-statusbar', withStatus);
 
   const tb = titlebar({ title, subtitle });
@@ -155,9 +231,12 @@ export function createShell({ root, title, subtitle, views = [], initial, rail: 
 
   shell.append(tb.el);
   let railPart = null;
-  if (withRail) {
+  if (mode === 'rail') {
     railPart = rail({ views, router });
     shell.append(railPart.el);
+  } else if (mode === 'titlebar') {
+    railPart = tabs({ views, router });
+    tb.el.insertBefore(railPart.el, tb.buttons);
   }
   shell.append(stage);
   const status = withStatus ? statusbar() : null;

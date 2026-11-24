@@ -40,8 +40,9 @@
   box-shadow: inset 0 1px 0 #ffffff, 0 0 12px #ffffff4d;
 }
 
-/* Lo activo del rail y de los botones de ícono, sin teñir. */
-.rad-rail-item[aria-current='page'] .rad-icon { color: var(--rad-accent-strong); }
+/* Lo activo del rail, de las pestañas y de los botones de ícono, sin teñir. */
+.rad-rail-item[aria-current='page'] .rad-icon,
+.rad-tab[aria-current='page'] .rad-icon { color: var(--rad-accent-strong); }
 .rad-iconbutton[aria-pressed='true'] {
   color: var(--rad-accent-strong);
   background-color: var(--skin-lit);

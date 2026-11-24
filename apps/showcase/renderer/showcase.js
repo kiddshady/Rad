@@ -358,6 +358,8 @@ const shell = createShell({
   root: document.querySelector('.rad-root'),
   title: 'Rad',
   subtitle: skin.toLowerCase(),
+  // En el rail o en pestañas adentro de la titlebar (RAD_SHOWCASE_NAV).
+  nav: (await window.rad?.invoke('vitrina:nav')) ?? 'rail',
   views,
 });
 

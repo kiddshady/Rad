@@ -8,7 +8,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Un cuadro, con tope: si la ventana deja de pintar, el guion no se cuelga.
 const frame = () => new Promise((r) => { requestAnimationFrame(r); setTimeout(r, 50); });
 const view = (id) => document.querySelector(`.rad-view[data-view="${id}"]`);
-const item = (id) => document.querySelector(`.rad-rail-item[data-view="${id}"]`);
+const item = (id) => document.querySelector(`.rad-rail-item[data-view="${id}"], .rad-tab[data-view="${id}"]`);
 const op = (el) => parseFloat(getComputedStyle(el).opacity);
 const z = (el) => parseInt(getComputedStyle(el).zIndex, 10) || 0;
 const visible = () => [...document.querySelectorAll('.rad-view')].filter((v) => v.dataset.state !== 'hidden').map((v) => v.dataset.view);
@@ -48,6 +48,62 @@ if (marker?.pass === 1) {
   if (!getComputedStyle(code2).fontFamily.startsWith('"Roboto Mono"')) fail(`la titlebar no usa la mono elegida: ${getComputedStyle(code2).fontFamily}`);
   if (![...document.fonts].some((f) => f.family.replace(/["']/g, '') === 'Roboto Mono' && f.status === 'loaded')) fail('la mono elegida no estaba cargada al entrar');
   data.monoElegida = mono2;
+
+  // Esta pasada corre con las vistas como pestañas en la titlebar
+  // (nav: 'titlebar'): no hay rail, el escenario gana ese ancho, la pestaña
+  // activa muestra su rótulo y las demás solo el ícono, con el rótulo en el
+  // tooltip. Al cambiar, el rótulo se despliega de a poco.
+  {
+    const shellEl = document.querySelector('.rad-shell');
+    const tabsEl = document.querySelector('.rad-titlebar > .rad-tabs');
+    const tabs = [...document.querySelectorAll('.rad-tab')];
+    const labelW = (tab) => tab.querySelector('.rad-tab-label').getBoundingClientRect().width;
+    const labelOp = (tab) => op(tab.querySelector('.rad-tab-label > span'));
+    const current = () => tabs.filter((t) => t.getAttribute('aria-current') === 'page');
+    if (shellEl.dataset.nav !== 'titlebar' || !tabsEl) fail(`la vitrina no armó las pestañas en la titlebar (nav "${shellEl.dataset.nav}")`);
+    if (document.querySelector('.rad-rail')) fail('con las pestañas en la titlebar quedó además el rail');
+    if (tabs.length !== document.querySelectorAll('.rad-view, .rad-tab').length - document.querySelectorAll('.rad-view').length || tabs.length < 5) fail(`hay ${tabs.length} pestañas`);
+    const stageBox = document.querySelector('.rad-stage').getBoundingClientRect();
+    if (stageBox.left > 24) fail(`sin rail, el escenario sigue empezando en ${r2(stageBox.left)}`);
+    if (!document.querySelector('.rad-titlebar-title') || tabsEl.getBoundingClientRect().left <= document.querySelector('.rad-titlebar-head').getBoundingClientRect().right) fail('las pestañas no van después del nombre de la app');
+    if (getComputedStyle(tabsEl).webkitAppRegion !== 'no-drag' || getComputedStyle(document.querySelector('.rad-titlebar')).webkitAppRegion !== 'drag') fail('las pestañas tienen que quedar fuera de la zona de arrastre de la titlebar, y el resto adentro');
+    const winBox = document.querySelector('.rad-winbtns').getBoundingClientRect();
+    if (Math.abs(window.innerWidth - winBox.right) > 0.5 || tabs.at(-1).getBoundingClientRect().right > winBox.left) fail('los botones de la ventana no quedaron contra el borde, o las pestañas los pisan');
+
+    const now = current();
+    if (now.length !== 1) fail(`hay ${now.length} pestañas marcadas como activas`);
+    else {
+      const active = now[0];
+      if (labelW(active) < 12 || labelOp(active) !== 1) fail(`la pestaña activa no muestra su rótulo (ancho ${r2(labelW(active))}, opacidad ${labelOp(active)})`);
+      if (active.hasAttribute('data-rad-tip')) fail('la pestaña activa, que ya muestra su rótulo, lo repite en un tooltip');
+      const rest = tabs.filter((t) => t !== active);
+      const open = rest.find((t) => labelW(t) > 0.5 || labelOp(t) !== 0);
+      if (open) fail(`una pestaña inactiva deja ver su rótulo: «${open.textContent}» mide ${r2(labelW(open))} px`);
+      const untipped = rest.find((t) => t.getAttribute('data-rad-tip') !== t.textContent);
+      if (untipped) fail(`la pestaña «${untipped.textContent}» no dice su nombre en el tooltip`);
+      const widths = new Set(rest.map((t) => r2(t.getBoundingClientRect().width)));
+      if (widths.size !== 1) fail(`las pestañas plegadas no miden lo mismo: ${[...widths].join(', ')}`);
+
+      // Cambiar de pestaña: el rótulo nuevo se despliega de a poco y el
+      // viejo se pliega; al terminar, la vista y la statusbar acompañan.
+      const target = rest[1];
+      const final = [];
+      target.click();
+      for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 120;) { await frame(); final.push(labelW(target)); }
+      await sleep(dur('base') + dur('fast') + 160);
+      const full = labelW(target);
+      if (!final.some((w) => w > 1 && w < full - 1)) fail(`el rótulo de la pestaña apareció de golpe: ${final.slice(0, 8).map(r2).join(' → ')} → ${r2(full)}`);
+      if (target.getAttribute('aria-current') !== 'page' || labelOp(target) !== 1 || labelW(active) > 0.5) fail('después de cambiar, la pestaña nueva no quedó desplegada o la vieja no se plegó');
+      if (visible().join() !== target.dataset.view) fail(`la pestaña «${target.dataset.view}» no trajo su vista: se ve ${visible().join()}`);
+      const left = document.querySelector('.rad-status-left > :not(.rad-swap-out)')?.textContent;
+      if (left !== target.textContent) fail(`la statusbar dice "${left}" con la pestaña «${target.textContent}»`);
+      // Las flechas recorren las pestañas.
+      target.focus();
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+      if (document.activeElement !== tabs[(tabs.indexOf(target) + 1) % tabs.length]) fail('la flecha derecha no pasó el foco a la pestaña siguiente');
+      data.pestanas = `${tabs.length} en la titlebar; plegada ${[...widths][0]} px, «${target.textContent}» desplegada ${r2(target.getBoundingClientRect().width)} px (${final.filter((_, i) => i % 3 === 0).map((w) => Math.round(w)).join(' → ')})`;
+    }
+  }
   // Esta pasada arranca sin RAD_SKIN: la piel es la que se eligió en la 1.
   data.piel = window.rad.skin.id;
   window.rad.store.write('smoke', { pass: 2 });

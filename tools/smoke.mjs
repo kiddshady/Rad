@@ -91,9 +91,10 @@ async function smokeSkin(skin) {
     show(skin, 1, first);
     if (!first.ok) return false;
 
-    // La segunda, con la mono elegida por la app en vez de la de la piel, y
+    // La segunda, con la mono elegida por la app en vez de la de la piel, con
+    // las vistas como pestañas en la titlebar en vez de en el rail, y
     // SIN RAD_SKIN: la vitrina tiene que abrir con la piel que se guardó.
-    const second = await run(skin, 2, data, { RAD_SHOWCASE_MONO: 'roboto-mono' });
+    const second = await run(skin, 2, data, { RAD_SHOWCASE_MONO: 'roboto-mono', RAD_SHOWCASE_NAV: 'titlebar' });
     const b = second.bounds || {};
     if (second.ok && (b.x !== MOVE.x || b.y !== MOVE.y || b.width !== MOVE.width || b.height !== MOVE.height)) {
       second.ok = false;
