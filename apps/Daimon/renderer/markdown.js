@@ -237,21 +237,21 @@ async function copiar(boton, code) {
   const rotulo = boton.firstElementChild;
   try {
     await navigator.clipboard.writeText(code.textContent);
-    swapText(rotulo, 'Copiado');
+    swapText(rotulo, 'Copied');
     clearTimeout(boton._volver);
-    boton._volver = setTimeout(() => swapText(rotulo, 'Copiar'), 1600);
+    boton._volver = setTimeout(() => swapText(rotulo, 'Copy'), 1600);
   } catch {
-    toast({ text: 'No se pudo copiar', kind: 'danger' });
+    toast({ text: 'Could not copy', kind: 'danger' });
   }
 }
 
 function codigo(b) {
   const caja = h('figure', 'dm-codigo');
   const lang = h('span', 'dm-codigo-lang');
-  lang.textContent = b.lang || 'texto';
+  lang.textContent = b.lang || 'text';
   const rotulo = h('span', 'rad-swap');
   const boton = h('button', 'dm-codigo-copiar', { type: 'button' }, rotulo);
-  swapText(rotulo, 'Copiar');
+  swapText(rotulo, 'Copy');
   const code = document.createElement('code');
   code.textContent = b.texto;
   boton.addEventListener('click', () => copiar(boton, code));
@@ -293,7 +293,7 @@ function retocar(nodo, b) {
     return true;
   }
   if (b.tipo === 'codigo') {
-    nodo.querySelector('.dm-codigo-lang').textContent = b.lang || 'texto';
+    nodo.querySelector('.dm-codigo-lang').textContent = b.lang || 'text';
     nodo.querySelector('code').textContent = b.texto;
     return true;
   }

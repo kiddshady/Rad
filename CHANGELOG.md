@@ -1,5 +1,54 @@
 # Changelog
 
+## Daimon 0.2.0 (2026-11-23)
+
+- **La interfaz está en inglés.** Todo lo que se lee: las vistas, los
+  formularios, los menús, los avisos, los errores de los dos proveedores y
+  las notas de los modelos, y también lo que pone el núcleo (los botones de
+  la ventana, los de un confirm), con `lang: 'en'`. El código y los
+  comentarios siguen en castellano. Un chat todavía sin nombre que se había
+  guardado como «Chat nuevo» pasa a «New chat», y la lista de modelos de
+  Venice guardada (que traía las notas en castellano) se vuelve a pedir.
+- **La fuente de código es Roboto Mono**, la que viaja con Rad: bloques de
+  código, ids de modelos, datos. Antes quedaba la Cascadia de la piel.
+- **El selector de agente dice solo el nombre**, como un select (pedido de
+  Fran, como en Umbra). Antes llevaba debajo el proveedor y el modelo, y un
+  modelo de nombre largo («Venice · DeepSeek V4.1 Flash 1017 Uncensored») se
+  salía del botón y de la columna. Con qué modelo habla el agente lo dicen
+  la cabecera de la conversación y la barra de estado.
+- **Un modelo de nombre largo ya no tapa el chevron del select** (el arreglo
+  es del núcleo, abajo). Además el formulario del agente es más ancho: los
+  modelos de Venice se distinguen por el final del nombre, así que tienen
+  que verse enteros.
+- Los textos que no entran se cortan con puntos suspensivos en vez de salirse
+  de su caja: el título de un chat en la lista (se metía debajo del botón de
+  acciones), el de la conversación y su subtítulo, y el nombre y el modelo de
+  la tarjeta de un agente. Era el mismo defecto del select.
+- El humo comprueba que no quede texto en castellano a la vista ni en los
+  rótulos (lo que escribe el guion va en inglés y sin acentos), que la mono
+  sea Roboto Mono cargada de verdad, que el selector diga solo el nombre y
+  que ningún texto largo se salga de su caja. Cada prueba nueva se vio
+  fallar con el código roto.
+
+## @rad/core 0.13.0 · Rad 0.13.0 (2026-11-23)
+
+- **Idioma de los textos del núcleo:** `rad.start({ lang: 'en' })`. El
+  núcleo pone pocos textos por su cuenta (los botones de la ventana, los de
+  un `confirm`, el aviso de actualización, el placeholder de un select),
+  pero una app en inglés no podía mostrarlos en castellano. Sin `lang`
+  salen en castellano, como siempre. El renderer lo ve en `rad.lang`, el
+  núcleo lo pone en el `lang` del documento, y los textos viven en
+  `renderer/strings.js`. Un idioma que no existe frena el arranque.
+- **Select: una etiqueta que no entra ya no tapa el chevron.** La celda del
+  texto se achicaba con el botón, pero el texto (que no parte renglón) medía
+  entero y se salía de la celda, por encima del chevron. Ahora se corta con
+  puntos suspensivos, el chevron queda en su lugar, y el botón muestra la
+  etiqueta entera en su tooltip (solo cuando está cortada). Fran lo vio en
+  Daimon con un modelo de Venice de nombre largo.
+- La vitrina (0.13.0) suma en Controles un select en un campo angosto, y el
+  humo mide que la etiqueta se corte, que no llegue al chevron y que el
+  tooltip la traiga entera; falla con el CSS de antes.
+
 ## Daimon 0.1.1 (2026-11-23)
 
 - **La llave de Anthropic se comprueba contra la API, no se adivina.** La

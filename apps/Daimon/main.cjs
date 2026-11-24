@@ -31,6 +31,10 @@ rad.start({
     title: 'Daimon',
     icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
   },
+  // La interfaz está en inglés: los textos que pone el núcleo, también.
+  lang: 'en',
+  // El código y los datos, en Roboto Mono (viaja con Rad).
+  fonts: { mono: 'roboto-mono' },
   // Sin actualizaciones hasta que Daimon tenga su repo de releases: Fran
   // todavía no decidió si el código es público.
   updates: false,

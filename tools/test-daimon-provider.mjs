@@ -229,10 +229,10 @@ const correr = async (p, { abortAfter, con = responder, key = KEY } = {}) => {
 {
   mode = '401';
   const a = await correr(pedido('claude-opus-5-5'));
-  check(a.err?.message.startsWith('La llave no es válida'), `401: el error dice «${a.err?.message}»`);
+  check(a.err?.message.startsWith('The key is invalid'), `401: el error dice «${a.err?.message}»`);
   mode = '400';
   const b = await correr(pedido('claude-opus-5-5'));
-  check(b.err?.message.startsWith('La API rechazó el pedido') && b.err.message.includes('not scoped to a workspace'), `400: el error dice «${b.err?.message}»`);
+  check(b.err?.message.startsWith('The API rejected the request') && b.err.message.includes('not scoped to a workspace'), `400: el error dice «${b.err?.message}»`);
   check(![a.err?.message, b.err?.message].some((m) => m?.includes(KEY)), 'errores: el mensaje trae la llave');
 }
 
@@ -315,16 +315,16 @@ const aVenice ={ con: deVenice.responder, key: KEY_VENICE };
 {
   mode = '401';
   const a = await correr(pedido('alfa-2'), aVenice);
-  check(a.err?.message.startsWith('La llave de Venice no es válida'), `venice 401: «${a.err?.message}»`);
+  check(a.err?.message.startsWith('The Venice key is invalid'), `venice 401: «${a.err?.message}»`);
   mode = '402';
   const b = await correr(pedido('alfa-2'), aVenice);
-  check(b.err?.message === 'No queda saldo en la cuenta de Venice.', `venice 402: «${b.err?.message}»`);
+  check(b.err?.message === 'The Venice account has no balance left.', `venice 402: «${b.err?.message}»`);
   mode = '400';
   const c = await correr(pedido('alfa-2'), aVenice);
-  check(c.err?.message === 'Venice rechazó el pedido: Invalid model', `venice 400: «${c.err?.message}»`);
+  check(c.err?.message === 'Venice rejected the request: Invalid model', `venice 400: «${c.err?.message}»`);
   mode = 'roto';
   const d = await correr(pedido('alfa-2'), aVenice);
-  check(d.err?.message === 'Venice cortó la respuesta: se cayó el modelo' && d.textos.length === TROZOS.length, `venice, error a mitad: «${d.err?.message}» con ${d.textos.length} pedazos`);
+  check(d.err?.message === 'Venice cut the answer short: se cayó el modelo' && d.textos.length === TROZOS.length, `venice, error a mitad: «${d.err?.message}» con ${d.textos.length} pedazos`);
   check(![a, b, c, d].some((x) => x.err?.message.includes(KEY_VENICE)), 'venice: un mensaje de error trae la llave');
 }
 
@@ -335,7 +335,7 @@ const aVenice ={ con: deVenice.responder, key: KEY_VENICE };
   const m = await deVenice.modelos({ key: KEY_VENICE });
   check(m.lista.map((x) => x.id).join() === 'alfa-2,alfa-10,zeta-9', `venice, modelos: ${m.lista.map((x) => x.id).join()}`);
   check(m.inicial === 'alfa-2', `venice, modelos: el inicial es ${m.inicial}`);
-  check(m.lista[0].nota === 'privado, sin retención · 128k de contexto' && m.lista[2].nota === 'anonimizado · 1M de contexto', `venice, modelos: las notas son «${m.lista[0].nota}» y «${m.lista[2].nota}»`);
+  check(m.lista[0].nota === 'private, no retention · 128k context' && m.lista[2].nota === 'anonymized · 1M context', `venice, modelos: las notas son «${m.lista[0].nota}» y «${m.lista[2].nota}»`);
   check(seen.at(-1).url === '/models?type=text', `venice, modelos: pidió ${seen.at(-1).url}`);
 }
 
@@ -344,9 +344,9 @@ const aVenice ={ con: deVenice.responder, key: KEY_VENICE };
   server.close();
   server.closeAllConnections();
   const c = await correr(pedido('claude-haiku-5-5'));
-  check(c.err?.message.startsWith('No se pudo conectar con Anthropic'), `sin red: el error dice «${c.err?.message}»`);
+  check(c.err?.message.startsWith('Could not connect to Anthropic'), `sin red: el error dice «${c.err?.message}»`);
   const v = await correr(pedido('alfa-2'), aVenice);
-  check(v.err?.message.startsWith('No se pudo conectar con Venice'), `venice, sin red: el error dice «${v.err?.message}»`);
+  check(v.err?.message.startsWith('Could not connect to Venice'), `venice, sin red: el error dice «${v.err?.message}»`);
   // Sin conexión, de una llave no se sabe nada: no es un rechazo.
   const k = await comprobar(KEY);
   check(k.fase === 'sin-comprobar' && k.motivo === 'conexion', `comprobar sin red: ${JSON.stringify(k)}`);

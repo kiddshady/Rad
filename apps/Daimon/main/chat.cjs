@@ -29,6 +29,9 @@ const ROLES = new Set(['user', 'assistant']);
 // cada arranque: se vuelve a pedir si tiene más de unas horas.
 const DOC_VENICE = '_venice_modelos';
 const VENCE_MS = 6 * 60 * 60 * 1000;
+// Las notas de cada modelo se guardan ya escritas. Si cambia cómo se
+// escriben (hasta la 0.1.1 iban en castellano), lo guardado se vuelve a pedir.
+const FORMATO_VENICE = 2;
 const ESPERA_MODELOS_MS = 8000;
 
 function limpiar(pedido) {
@@ -67,12 +70,12 @@ function wire(rad, { llave }) {
     const key = llave.leer(rad.store, 'venice');
     if (!key) return;
     const guardado = rad.store.read(DOC_VENICE);
-    if (!forzar && guardado?.lista?.length && Date.now() - (guardado.cuando ?? 0) < VENCE_MS) return;
+    if (!forzar && guardado?.lista?.length && guardado.formato === FORMATO_VENICE && Date.now() - (guardado.cuando ?? 0) < VENCE_MS) return;
     trayendo = true;
     try {
       const nuevo = await venice.modelos({ key, signal: AbortSignal.timeout(ESPERA_MODELOS_MS) });
       if (nuevo.lista.length) {
-        await rad.store.write(DOC_VENICE, { ...nuevo, cuando: Date.now() });
+        await rad.store.write(DOC_VENICE, { ...nuevo, formato: FORMATO_VENICE, cuando: Date.now() });
         rad.send('chat:modelos', proveedores());
       }
     } catch (err) {
@@ -106,7 +109,7 @@ function wire(rad, { llave }) {
       const key = llave.leer(rad.store, pedido.proveedor);
       trabajo = key
         ? RESPONDER[pedido.proveedor](pedido, { ...opciones, key })
-        : Promise.reject(new Error(`Falta la llave de ${NOMBRES[pedido.proveedor]}. Pegala en Ajustes y probá de nuevo.`));
+        : Promise.reject(new Error(`The ${NOMBRES[pedido.proveedor]} key is missing. Paste it in Settings and try again.`));
     }
 
     // No se espera acá: el invoke vuelve enseguida y lo demás llega por eventos.

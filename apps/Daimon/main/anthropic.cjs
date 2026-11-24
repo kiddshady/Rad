@@ -24,10 +24,10 @@ const Anthropic = require('@anthropic-ai/sdk');
 
 // Los modelos vigentes (noviembre de 2026). `respaldo`: si acepta fallbacks.
 const MODELOS = [
-  { id: 'claude-opus-5-5', nombre: 'Claude Opus 5.5', nota: 'el más capaz de la línea Opus', esfuerzo: 'medium', respaldo: true },
-  { id: 'claude-sonnet-5-5', nombre: 'Claude Sonnet 5.5', nota: 'rápido y más barato', esfuerzo: 'medium', respaldo: true },
-  { id: 'claude-haiku-5-5', nombre: 'Claude Haiku 5.5', nota: 'el más rápido y el más barato', esfuerzo: 'medium', respaldo: false },
-  { id: 'claude-fable-5-2', nombre: 'Claude Fable 5.2', nota: 'el más capaz, y el más caro', esfuerzo: 'high', respaldo: true },
+  { id: 'claude-opus-5-5', nombre: 'Claude Opus 5.5', nota: 'the most capable of the Opus line', esfuerzo: 'medium', respaldo: true },
+  { id: 'claude-sonnet-5-5', nombre: 'Claude Sonnet 5.5', nota: 'fast and cheaper', esfuerzo: 'medium', respaldo: true },
+  { id: 'claude-haiku-5-5', nombre: 'Claude Haiku 5.5', nota: 'the fastest and the cheapest', esfuerzo: 'medium', respaldo: false },
+  { id: 'claude-fable-5-2', nombre: 'Claude Fable 5.2', nota: 'the most capable, and the most expensive', esfuerzo: 'high', respaldo: true },
 ];
 const MODELO_INICIAL = 'claude-opus-5-5';
 
@@ -36,14 +36,14 @@ const MAX_TOKENS = 64000;
 
 /** Un error de la API en una frase para Fran. Por clase, nunca por el texto. */
 function explicar(err) {
-  if (err instanceof Anthropic.AuthenticationError) return 'La llave no es válida o fue revocada. Revisala en Ajustes.';
-  if (err instanceof Anthropic.PermissionDeniedError) return 'Esta llave no tiene permiso para usar ese modelo.';
-  if (err instanceof Anthropic.NotFoundError) return 'Ese modelo no existe para esta llave.';
-  if (err instanceof Anthropic.RateLimitError) return 'Demasiados pedidos seguidos. Esperá un momento y probá de nuevo.';
-  if (err instanceof Anthropic.BadRequestError) return `La API rechazó el pedido: ${err.message}`;
-  if (err instanceof Anthropic.APIConnectionError) return 'No se pudo conectar con Anthropic. ¿Hay internet?';
-  if (err instanceof Anthropic.APIError) return `Anthropic respondió con un error (${err.status ?? 'sin código'}). Probá de nuevo en un rato.`;
-  return `Algo falló al pedir la respuesta: ${err?.message ?? err}`;
+  if (err instanceof Anthropic.AuthenticationError) return 'The key is invalid or was revoked. Check it in Settings.';
+  if (err instanceof Anthropic.PermissionDeniedError) return 'This key does not have permission to use that model.';
+  if (err instanceof Anthropic.NotFoundError) return 'That model does not exist for this key.';
+  if (err instanceof Anthropic.RateLimitError) return 'Too many requests in a row. Wait a moment and try again.';
+  if (err instanceof Anthropic.BadRequestError) return `The API rejected the request: ${err.message}`;
+  if (err instanceof Anthropic.APIConnectionError) return 'Could not connect to Anthropic. Is there an internet connection?';
+  if (err instanceof Anthropic.APIError) return `Anthropic answered with an error (${err.status ?? 'no code'}). Try again in a while.`;
+  return `Something failed while requesting the answer: ${err?.message ?? err}`;
 }
 
 // Cuánto se espera la respuesta al comprobar una llave.

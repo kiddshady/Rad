@@ -12,26 +12,26 @@ const PROVEEDORES = [
   {
     id: 'anthropic',
     nombre: 'Anthropic',
-    texto: 'Para los agentes que usan los modelos de Anthropic. La llave se crea en su consola, en API keys, eligiendo el workspace donde va a trabajar.',
+    texto: 'For agents that use Anthropic models. Create the key in the Console, under API keys, and pick the workspace it will work in.',
     ejemplo: 'sk-ant-…',
     sitio: 'https://console.anthropic.com/settings/keys',
-    rotulo: 'Abrir la consola de Anthropic',
+    rotulo: 'Open the Anthropic Console',
   },
   {
     id: 'venice',
     nombre: 'Venice',
-    texto: 'Para los agentes que usan los modelos de Venice. Al guardar la llave, Daimon trae la lista de modelos que hay ahora.',
-    ejemplo: 'La llave de la API de Venice',
+    texto: 'For agents that use Venice models. When you save the key, Daimon loads the current list of models.',
+    ejemplo: 'Your Venice API key',
     sitio: 'https://venice.ai/settings/api',
-    rotulo: 'Abrir los ajustes de la API de Venice',
+    rotulo: 'Open the Venice API settings',
   },
 ];
 
 // Por qué la API rechazó una llave, en una frase.
 const RECHAZOS = {
-  invalida: 'no es válida, se deshabilitó o venció. Creá otra y pegala.',
-  'sin-workspace': 'no está atada a un workspace. Creá otra y, al crearla, elegí el workspace donde va a trabajar.',
-  'sin-permiso': 'no tiene permiso para usar la API.',
+  invalida: 'it is invalid, disabled or expired. Create a new one and paste it.',
+  'sin-workspace': 'it is not scoped to a workspace. Create a new one and pick the workspace it will work in.',
+  'sin-permiso': 'it does not have permission to use the API.',
 };
 
 // Qué decir de una llave, y de qué color va el punto. `e` es lo guardado y
@@ -39,19 +39,19 @@ const RECHAZOS = {
 // guardada no dice que sirva: el verde es solo para la que la API aceptó
 // (o para la de un proveedor que no tiene cómo comprobarse).
 function describir(p, e, c) {
-  if (e.estado === 'ilegible') return { tono: 'danger', texto: 'Hay una llave guardada pero ya no se puede leer. Pegala de nuevo.' };
-  if (e.estado !== 'lista') return { tono: 'idle', texto: 'No hay ninguna llave guardada.' };
-  if (!e.seComprueba) return { tono: 'success', texto: `Guardada y cifrada en esta PC: ${e.pista}` };
-  if (c.fase === 'comprobando') return { tono: 'idle', texto: `Guardada (${e.pista}). Preguntándole a ${p.nombre} si la acepta…` };
-  if (c.fase === 'aceptada') return { tono: 'success', texto: `${p.nombre} la acepta. Guardada y cifrada en esta PC: ${e.pista}` };
+  if (e.estado === 'ilegible') return { tono: 'danger', texto: 'A key is saved but it can no longer be read. Paste it again.' };
+  if (e.estado !== 'lista') return { tono: 'idle', texto: 'No key saved.' };
+  if (!e.seComprueba) return { tono: 'success', texto: `Saved and encrypted on this PC: ${e.pista}` };
+  if (c.fase === 'comprobando') return { tono: 'idle', texto: `Saved (${e.pista}). Asking ${p.nombre} whether it accepts it…` };
+  if (c.fase === 'aceptada') return { tono: 'success', texto: `${p.nombre} accepts it. Saved and encrypted on this PC: ${e.pista}` };
   if (c.fase === 'rechazada') {
-    return { tono: 'danger', texto: `${p.nombre} la rechaza (${e.pista}): ${RECHAZOS[c.motivo] ?? 'no dijo por qué.'}`, detalle: c.detalle };
+    return { tono: 'danger', texto: `${p.nombre} rejects it (${e.pista}): ${RECHAZOS[c.motivo] ?? 'it did not say why.'}`, detalle: c.detalle };
   }
   if (c.fase === 'sin-comprobar') {
-    const porque = c.motivo === 'conexion' ? `no hay conexión con ${p.nombre}` : `${p.nombre} no contestó bien`;
-    return { tono: 'warning', texto: `Guardada (${e.pista}), pero no se pudo comprobar: ${porque}. No quiere decir que esté mal.`, detalle: c.detalle };
+    const porque = c.motivo === 'conexion' ? `there is no connection to ${p.nombre}` : `${p.nombre} did not answer properly`;
+    return { tono: 'warning', texto: `Saved (${e.pista}), but it could not be checked: ${porque}. That does not mean it is wrong.`, detalle: c.detalle };
   }
-  return { tono: 'idle', texto: `Guardada y cifrada en esta PC: ${e.pista}` };
+  return { tono: 'idle', texto: `Saved and encrypted on this PC: ${e.pista}` };
 }
 
 function tarjetaLlave(p) {
@@ -63,19 +63,19 @@ function tarjetaLlave(p) {
 
   const campo = h('input', 'rad-input', { type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: p.ejemplo, 'data-campo': 'llave' });
   const caja = h('label', 'rad-field', {},
-    h('span', 'rad-field-label', {}, 'Pegar una llave'),
+    h('span', 'rad-field-label', {}, 'Paste a key'),
     campo,
-    h('span', 'rad-field-hint', {}, 'No se muestra ni sale de esta PC: se guarda cifrada con la protección de Windows.'));
-  const guardar = h('button', 'rad-button', { type: 'submit', 'data-variant': 'primary', 'data-accion': 'guardar-llave' }, 'Guardar');
-  const quitar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'quitar-llave' }, 'Quitar la llave');
-  const probar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'comprobar-llave' }, 'Comprobar de nuevo');
+    h('span', 'rad-field-hint', {}, 'It is never shown and never leaves this PC: it is stored encrypted with Windows protection.'));
+  const guardar = h('button', 'rad-button', { type: 'submit', 'data-variant': 'primary', 'data-accion': 'guardar-llave' }, 'Save');
+  const quitar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'quitar-llave' }, 'Remove key');
+  const probar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'comprobar-llave' }, 'Check again');
   const sitio = h('button', 'dm-link', { type: 'button' }, p.rotulo);
   sitio.addEventListener('click', () => window.rad.openExternal(p.sitio));
   const acciones = h('div', 'dm-llave-acciones', {}, quitar, guardar);
   const form = h('form', 'dm-llave', {}, caja, acciones);
   wireControls(form);
   const tarjeta = h('section', 'dm-tarjeta', { 'data-proveedor': p.id },
-    h('h2', 'dm-tarjeta-nombre', {}, `Llave de ${p.nombre}`),
+    h('h2', 'dm-tarjeta-nombre', {}, `${p.nombre} key`),
     h('p', 'dm-tarjeta-instr', {}, p.texto),
     estado, cajaDetalle, form, sitio);
 
@@ -88,7 +88,7 @@ function tarjetaLlave(p) {
     estado.dataset.comprobacion = c.fase;
     estado.dataset.motivo = c.motivo ?? '';
     swapText(texto, d.texto);
-    if (d.detalle) swapText(detalle, `${p.nombre} dijo: «${d.detalle}»`);
+    if (d.detalle) swapText(detalle, `${p.nombre} said: “${d.detalle}”`);
     cajaDetalle.toggleAttribute('data-abierto', Boolean(d.detalle));
     quitar.disabled = e.estado === 'falta';
     // Comprobar de nuevo: solo donde hay con qué, y mientras no esté en eso.
@@ -100,25 +100,25 @@ function tarjetaLlave(p) {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!campo.value.trim()) { setFieldError(caja, 'Pegá la llave acá.'); campo.focus(); return; }
+    if (!campo.value.trim()) { setFieldError(caja, 'Paste the key here.'); campo.focus(); return; }
     const r = await llave.guardar(p.id, campo.value);
     if (!r.ok) { setFieldError(caja, r.error); campo.focus(); return; }
     setFieldError(caja, null);
     campo.value = '';
-    toast({ text: `Llave de ${p.nombre} guardada`, kind: 'success' });
+    toast({ text: `${p.nombre} key saved`, kind: 'success' });
   });
   campo.addEventListener('input', () => { if (caja.hasAttribute('data-invalid')) setFieldError(caja, null); });
   probar.addEventListener('click', () => llave.comprobar(p.id, { forzar: true }));
   quitar.addEventListener('click', async () => {
     const si = await confirm({
-      title: `¿Quitar la llave de ${p.nombre}?`,
-      text: 'Los agentes que la usan no van a poder contestar hasta que pegues otra.',
-      confirmLabel: 'Quitar',
+      title: `Remove the ${p.nombre} key?`,
+      text: 'Agents that use it won’t be able to answer until you paste another one.',
+      confirmLabel: 'Remove',
       danger: true,
     });
     if (!si) return;
     await llave.borrar(p.id);
-    toast({ text: `Se quitó la llave de ${p.nombre}` });
+    toast({ text: `${p.nombre} key removed` });
   });
 
   poner();
@@ -130,14 +130,14 @@ export function montarAjustes(el, { router }) {
   const datos = h('dl', 'dm-datos');
   const fila = (k, v) => datos.append(h('dt', '', {}, k), h('dd', 'rad-mono', {}, v));
   fila('Daimon', window.rad.app?.version ?? '');
-  fila('Núcleo de Rad', window.rad.core?.version ?? '');
-  fila('Piel', window.rad.skin?.name ?? '');
-  fila('Proveedores', llave.simulado() ? 'Simulado (no usa ninguna API)' : PROVEEDORES.map((p) => p.nombre).join(' y '));
+  fila('Rad core', window.rad.core?.version ?? '');
+  fila('Skin', window.rad.skin?.name ?? '');
+  fila('Providers', llave.simulado() ? 'Simulated (uses no API)' : PROVEEDORES.map((p) => p.nombre).join(' and '));
 
   el.append(h('div', 'dm-pagina', {},
-    h('header', 'dm-pagina-cabeza', {}, h('div', '', {}, h('h1', '', {}, 'Ajustes'), h('p', '', {}, 'Lo que Daimon necesita para hablar con los modelos.'))),
+    h('header', 'dm-pagina-cabeza', {}, h('div', '', {}, h('h1', '', {}, 'Settings'), h('p', '', {}, 'What Daimon needs to talk to the models.'))),
     ...PROVEEDORES.map(tarjetaLlave),
-    h('section', 'dm-tarjeta', {}, h('h2', 'dm-tarjeta-nombre', {}, 'Acerca de'), datos)));
+    h('section', 'dm-tarjeta', {}, h('h2', 'dm-tarjeta-nombre', {}, 'About'), datos)));
 
   // Al abrir Ajustes se le pregunta a la API por cada llave guardada. Lo que
   // ya contestó (la acepta o la rechaza) no se vuelve a preguntar; lo que no

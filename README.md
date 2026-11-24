@@ -198,6 +198,10 @@ const turno = createSelect({ options: [{ value: 'm', label: 'Mañana' }, …], v
 setFieldError(campo, 'Falta el nombre.');   // null lo limpia
 ```
 
+Una etiqueta que no entra en el botón del select se corta con puntos
+suspensivos (el chevron no se mueve) y el botón la muestra entera en su
+tooltip.
+
 ## Guardado y puente
 
 ```js
@@ -353,6 +357,21 @@ Los ids salen de `packages/fonts/catalog.json` (hoy: `roboto-mono` y
 con `font-display: block` y el arranque espera a que estén cargadas, así el
 texto nunca cambia de forma ya a la vista.
 
+## Idioma
+
+El núcleo pone pocos textos por su cuenta (los botones de la ventana, los
+de un `confirm`, el aviso de actualización, el placeholder de un select).
+Salen en castellano; una app en inglés lo dice al arrancar:
+
+```js
+rad.start({ …, lang: 'en' });   // 'es' si no se dice nada
+```
+
+El renderer lo ve en `rad.lang`, y el núcleo lo pone en el `lang` del
+documento. Los textos están en `packages/core/renderer/strings.js`. Lo que
+escribe la app (títulos, rótulos, mensajes) es de la app: esto no es un
+sistema de traducciones.
+
 ## Comandos
 
 ```
@@ -397,7 +416,8 @@ npm run smoke:pack:daimon   su humo contra la empaquetada
 La primera app hecha con Rad: un chat con IA donde se arman varios agentes,
 cada uno con su nombre, su proveedor y su modelo, sus instrucciones y sus
 propios chats. Por ahora conversa y nada más (sin herramientas), con los
-modelos de Anthropic y los de Venice.
+modelos de Anthropic y los de Venice. La interfaz está en inglés (el código
+y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
 
 - Las llaves de las APIs (una por proveedor) se pegan en Ajustes y se guardan
   cifradas con `safeStorage`, en documentos que el renderer no puede leer.

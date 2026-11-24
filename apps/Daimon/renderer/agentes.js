@@ -18,7 +18,7 @@ export function abrirAgente(agente = null) {
   const n = ++serie;
   const nombre = h('input', 'rad-input', { type: 'text', maxlength: '40', autocomplete: 'off', spellcheck: 'false', 'data-autofocus': true, 'data-campo': 'nombre' });
   nombre.value = agente?.nombre ?? '';
-  const campoNombre = h('label', 'rad-field', {}, h('span', 'rad-field-label', {}, 'Nombre'), nombre);
+  const campoNombre = h('label', 'rad-field', {}, h('span', 'rad-field-label', {}, 'Name'), nombre);
 
   // Proveedor y modelo. Cada proveedor tiene su propio select de modelos, los
   // dos en la misma celda: al cambiar de proveedor se relevan, y cada uno se
@@ -30,18 +30,18 @@ export function abrirAgente(agente = null) {
   const selects = new Map();
   const ponerNota = () => {
     const s = selects.get(actual);
-    const sinLista = `Pegá la llave de ${datos.nombreProveedor(actual)} en Ajustes para traer sus modelos.`;
+    const sinLista = `Paste the ${datos.nombreProveedor(actual)} key in Settings to load its models.`;
     swapText(nota, s.modelos.length ? s.modelos.find((m) => m.id === s.select.value)?.nota ?? '' : sinLista);
   };
   for (const p of lista) {
     const suyo = agente?.proveedor === p.id ? agente.modelo : null;
     // El modelo de un agente puede haber salido de la lista (Venice los
     // cambia seguido): se lo deja elegible, con su id, en vez de perderlo.
-    const modelos = suyo && !p.modelos.some((m) => m.id === suyo) ? [{ id: suyo, nombre: suyo, nota: 'ya no figura en la lista del proveedor' }, ...p.modelos] : p.modelos;
+    const modelos = suyo && !p.modelos.some((m) => m.id === suyo) ? [{ id: suyo, nombre: suyo, nota: 'no longer in the provider’s list' }, ...p.modelos] : p.modelos;
     const select = createSelect({
       options: modelos.map((m) => ({ value: m.id, label: m.nombre })),
       value: suyo ?? p.inicial,
-      placeholder: 'Sin modelos todavía',
+      placeholder: 'No models yet',
       onChange: ponerNota,
     });
     select.el.setAttribute('aria-labelledby', `dm-modelo-${n}`);
@@ -67,16 +67,16 @@ export function abrirAgente(agente = null) {
   });
   proveedor.el.setAttribute('aria-labelledby', `dm-proveedor-${n}`);
   proveedor.el.dataset.campo = 'proveedor';
-  const campoProveedor = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: `dm-proveedor-${n}` }, 'Proveedor'), proveedor.el);
-  const campoModelo = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: `dm-modelo-${n}` }, 'Modelo'), celda, nota);
+  const campoProveedor = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: `dm-proveedor-${n}` }, 'Provider'), proveedor.el);
+  const campoModelo = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: `dm-modelo-${n}` }, 'Model'), celda, nota);
   ponerProveedor();
 
-  const instrucciones = h('textarea', 'rad-input', { rows: '7', spellcheck: 'false', placeholder: 'Quién es este agente, qué sabe y cómo contesta.', 'data-campo': 'instrucciones' });
+  const instrucciones = h('textarea', 'rad-input', { rows: '7', spellcheck: 'false', placeholder: 'Who this agent is, what it knows and how it answers.', 'data-campo': 'instrucciones' });
   instrucciones.value = agente?.instrucciones ?? '';
   const campoInstr = h('label', 'rad-field', {},
-    h('span', 'rad-field-label', {}, 'Instrucciones'),
+    h('span', 'rad-field-label', {}, 'Instructions'),
     instrucciones,
-    h('span', 'rad-field-hint', {}, 'Es lo que el modelo lee antes de cada chat. Puede quedar vacío.'));
+    h('span', 'rad-field-hint', {}, 'The model reads this before every chat. It can be left empty.'));
 
   const form = h('form', 'dm-form', {}, campoNombre, h('div', 'dm-form-par', {}, campoProveedor, campoModelo), campoInstr);
   wireControls(form);
@@ -85,13 +85,13 @@ export function abrirAgente(agente = null) {
   let resultado = null;
   const guardar = () => {
     if (!nombre.value.trim()) {
-      setFieldError(campoNombre, 'Ponele un nombre.');
+      setFieldError(campoNombre, 'Give it a name.');
       nombre.focus();
       return false; // el formulario sigue abierto
     }
     const modelo = selects.get(actual).select.value;
     if (!modelo) {
-      setFieldError(campoModelo, `Todavía no hay modelos de ${datos.nombreProveedor(actual)} para elegir.`);
+      setFieldError(campoModelo, `There are no ${datos.nombreProveedor(actual)} models to choose from yet.`);
       return false;
     }
     const valores = { nombre: nombre.value, proveedor: actual, modelo, instrucciones: instrucciones.value };
@@ -106,11 +106,11 @@ export function abrirAgente(agente = null) {
   nombre.addEventListener('input', () => { if (campoNombre.hasAttribute('data-invalid')) setFieldError(campoNombre, null); });
 
   const modal = openModal({
-    title: agente ? 'Editar agente' : 'Nuevo agente',
+    title: agente ? 'Edit agent' : 'New agent',
     body: form,
     actions: [
-      { id: 'cancel', label: 'Cancelar' },
-      { id: 'ok', label: agente ? 'Guardar' : 'Crear agente', variant: 'primary', onClick: guardar },
+      { id: 'cancel', label: 'Cancel' },
+      { id: 'ok', label: agente ? 'Save' : 'Create agent', variant: 'primary', onClick: guardar },
     ],
   });
   // Enter en el nombre es lo mismo que el botón primario.
@@ -129,32 +129,32 @@ export function abrirAgente(agente = null) {
 async function eliminar(agente) {
   const n = datos.chatsDe(agente.id).length;
   const si = await confirm({
-    title: `¿Eliminar a ${agente.nombre}?`,
-    text: n ? `Se borra el agente con ${cuantos(n, 'chat', 'chats')}. Esto no se puede deshacer.` : 'Se borra el agente. Esto no se puede deshacer.',
-    confirmLabel: 'Eliminar',
+    title: `Delete ${agente.nombre}?`,
+    text: n ? `The agent and its ${cuantos(n, 'chat', 'chats')} will be deleted. This can’t be undone.` : 'The agent will be deleted. This can’t be undone.',
+    confirmLabel: 'Delete',
     danger: true,
   });
-  if (si && await datos.borrarAgente(agente.id)) toast({ text: `Se eliminó a ${agente.nombre}` });
+  if (si && await datos.borrarAgente(agente.id)) toast({ text: `${agente.nombre} was deleted` });
 }
 
 export function montarAgentes(el, { router }) {
-  const nuevo = h('button', 'rad-button', { type: 'button', 'data-variant': 'primary', 'data-accion': 'nuevo-agente' }, icono('mas'), 'Nuevo agente');
+  const nuevo = h('button', 'rad-button', { type: 'button', 'data-variant': 'primary', 'data-accion': 'nuevo-agente' }, icono('mas'), 'New agent');
   nuevo.addEventListener('click', () => abrirAgente());
   const lista = h('div', 'dm-agentes', { role: 'list' });
   el.append(h('div', 'dm-pagina', {},
     h('header', 'dm-pagina-cabeza', {},
-      h('div', '', {}, h('h1', '', {}, 'Agentes'), h('p', '', {}, 'Cada agente tiene su modelo, sus instrucciones y sus propios chats.')),
+      h('div', '', {}, h('h1', '', {}, 'Agents'), h('p', '', {}, 'Each agent has its own model, instructions and chats.')),
       nuevo),
     lista));
 
   const tarjeta = (a) => {
     const nombre = h('h2', 'dm-tarjeta-nombre rad-swap');
     const modelo = h('span', 'dm-tarjeta-modelo rad-swap');
-    const editar = h('button', 'rad-iconbutton', { type: 'button', 'aria-label': 'Editar', 'data-rad-tip': 'Editar', 'data-accion': 'editar' }, icono('lapiz'));
-    const borrar = h('button', 'rad-iconbutton', { type: 'button', 'aria-label': 'Eliminar', 'data-accion': 'eliminar' }, icono('tacho'));
+    const editar = h('button', 'rad-iconbutton', { type: 'button', 'aria-label': 'Edit', 'data-rad-tip': 'Edit', 'data-accion': 'editar' }, icono('lapiz'));
+    const borrar = h('button', 'rad-iconbutton', { type: 'button', 'aria-label': 'Delete', 'data-accion': 'eliminar' }, icono('tacho'));
     const instr = h('p', 'dm-tarjeta-instr');
     const cuenta = h('span', 'dm-tarjeta-cuenta rad-swap');
-    const abrir = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'abrir' }, 'Abrir sus chats');
+    const abrir = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'abrir' }, 'Open chats');
     const nodo = h('article', 'dm-tarjeta', { role: 'listitem' },
       h('div', 'dm-tarjeta-cabeza', {}, h('div', 'dm-tarjeta-titulo', {}, nombre, modelo), h('div', 'dm-tarjeta-acciones', {}, editar, borrar)),
       instr,
@@ -171,15 +171,15 @@ export function montarAgentes(el, { router }) {
     swapText(nodo.querySelector('.dm-tarjeta-nombre'), a.nombre);
     swapText(nodo.querySelector('.dm-tarjeta-modelo'), datos.modeloDe(a));
     const instr = nodo.querySelector('.dm-tarjeta-instr');
-    const texto = a.instrucciones || 'Sin instrucciones: contesta como el modelo, sin más.';
+    const texto = a.instrucciones || 'No instructions: it answers as the plain model.';
     if (instr.textContent !== texto) instr.textContent = texto;
     instr.toggleAttribute('data-vacio', !a.instrucciones);
-    swapText(nodo.querySelector('.dm-tarjeta-cuenta'), cuantos(datos.chatsDe(a.id).length, 'chat', 'chats', 'Sin chats'));
+    swapText(nodo.querySelector('.dm-tarjeta-cuenta'), cuantos(datos.chatsDe(a.id).length, 'chat', 'chats', 'No chats'));
     // El último agente no se borra: la app siempre tiene con quién hablar.
     const unico = datos.listaAgentes().length <= 1;
     const borrar = nodo.querySelector('[data-accion="eliminar"]');
     borrar.setAttribute('aria-disabled', String(unico));
-    borrar.setAttribute('data-rad-tip', unico ? 'Tiene que quedar al menos un agente' : 'Eliminar');
+    borrar.setAttribute('data-rad-tip', unico ? 'At least one agent has to remain' : 'Delete');
   };
 
   const dibujar = () => reconcile(lista, datos.listaAgentes(), { key: (a) => a.id, create: tarjeta, update: poner });

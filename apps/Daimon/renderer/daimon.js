@@ -15,8 +15,8 @@ await Promise.all([datos.abrir(), llave.refrescar()]);
 
 const views = [
   { id: 'chat', label: 'Chat', icon: ICONOS.chat, scroll: false, mount: (el, router) => montarChat(el, { router }) },
-  { id: 'agentes', label: 'Agentes', icon: ICONOS.agentes, mount: (el, router) => montarAgentes(el, { router }) },
-  { id: 'ajustes', label: 'Ajustes', icon: ICONOS.ajustes, mount: (el, router) => montarAjustes(el, { router }) },
+  { id: 'agentes', label: 'Agents', icon: ICONOS.agentes, mount: (el, router) => montarAgentes(el, { router }) },
+  { id: 'ajustes', label: 'Settings', icon: ICONOS.ajustes, mount: (el, router) => montarAjustes(el, { router }) },
 ];
 
 const shell = createShell({
@@ -29,7 +29,7 @@ const shell = createShell({
 // (o que alguien está contestando).
 const ponerEstado = () => {
   const a = datos.agenteActual();
-  shell.status.set('right', datos.algunoRespondiendo() ? 'Respondiendo…' : `${a.nombre} · ${datos.modeloDe(a)}`);
+  shell.status.set('right', datos.algunoRespondiendo() ? 'Answering…' : `${a.nombre} · ${datos.modeloDe(a)}`);
 };
 shell.status.set('left', views.find((v) => v.id === shell.router.current).label);
 shell.router.on('change', ({ label }) => shell.status.set('left', label));

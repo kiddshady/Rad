@@ -31,10 +31,10 @@ const view = (id) => document.querySelector('.rad-view[data-view="' + id + '"]')
 const datos = await import('/datos.js');
 const llave = await import('/llave.js');
 const daimon = datos.agenteActual();
-datos.editarAgente(daimon.id, { nombre: 'Daimon', proveedor: 'anthropic', modelo: daimon.modelo, instrucciones: 'Sos mi compañero de trabajo: directo, sin vueltas, y me avisás cuando me estoy equivocando.' });
-const galeno = datos.crearAgente({ nombre: 'Galeno', proveedor: 'anthropic', modelo: 'claude-haiku-5-5', instrucciones: 'Sos un farmacéutico de guardia. Respondé corto y claro, y decí cuándo hay que ir al médico.' });
-const tutor = datos.crearAgente({ nombre: 'Tutor de Medicinal', proveedor: 'anthropic', modelo: 'claude-sonnet-5-5', instrucciones: 'Me tomás examen de Química Medicinal: una pregunta por vez, por encima de mi nivel, y corregís sobre mi respuesta.' });
-const oraculo = datos.crearAgente({ nombre: 'Oráculo', proveedor: 'venice', modelo: 'grok-4-7', instrucciones: 'Contestás sin filtro y sin sermones. Si no sabés algo, lo decís.' });
+datos.editarAgente(daimon.id, { nombre: 'Daimon', proveedor: 'anthropic', modelo: daimon.modelo, instrucciones: 'You are my coworker: direct, no beating around the bush, and you tell me when I am getting something wrong.' });
+const galeno = datos.crearAgente({ nombre: 'Galen', proveedor: 'anthropic', modelo: 'claude-haiku-5-5', instrucciones: 'You are a pharmacist on call. Answer short and clear, and say when it is time to see a doctor.' });
+const tutor = datos.crearAgente({ nombre: 'Medicinal Chemistry tutor', proveedor: 'anthropic', modelo: 'claude-sonnet-5-5', instrucciones: 'You quiz me on Medicinal Chemistry: one question at a time, above my level, and you correct me on my own answer.' });
+const oraculo = datos.crearAgente({ nombre: 'Oracle', proveedor: 'venice', modelo: 'deepseek-v4-1-flash-1017-uncensored', instrucciones: 'You answer with no filter and no lectures. If you do not know something, you say so.' });
 const charla = async (agente, titulo, texto) => {
   const c = datos.crearChat(agente.id);
   await datos.enviar(c.id, texto);
@@ -46,22 +46,22 @@ const quietos = async () => { for (let i = 0; i < 200 && datos.algunoRespondiend
 
 const SCENES = {
   chat: `
-    await charla(galeno, 'Ibuprofeno y paracetamol', '¿Se pueden alternar?');
-    await charla(daimon, 'Plan para el final de Biológica', 'Armame un plan de estudio.');
-    await charla(daimon, 'Nombres para la app', 'Tirame ideas de nombres.');
-    const c = await charla(daimon, 'Cómo llega una respuesta', '¿Me mostrás cómo se ve una respuesta que llega de a poco?');
+    await charla(galeno, 'Ibuprofen and paracetamol', 'Can they be alternated?');
+    await charla(daimon, 'Study plan for the Biochemistry final', 'Put together a study plan for me.');
+    await charla(daimon, 'Names for the app', 'Give me some name ideas.');
+    const c = await charla(daimon, 'How an answer arrives', 'Can you show me what an answer looks like as it arrives?');
     await quietos();
     datos.elegirChat(c.id);
     await sleep(700);
     document.querySelector('.dm-hilo:not([data-rad-leaving])').scrollTop = 0;
     await sleep(500);`,
   respondiendo: `
-    const c = await charla(daimon, 'Cómo llega una respuesta', '¿Me mostrás cómo se ve una respuesta que llega de a poco?');
+    const c = await charla(daimon, 'How an answer arrives', 'Can you show me what an answer looks like as it arrives?');
     await sleep(1500);`,
   agentes: `
-    await charla(galeno, 'Ibuprofeno y paracetamol', '¿Se pueden alternar?');
-    await charla(daimon, 'Plan para el final de Biológica', 'Armame un plan de estudio.');
-    await charla(daimon, 'Nombres para la app', 'Tirame ideas de nombres.');
+    await charla(galeno, 'Ibuprofen and paracetamol', 'Can they be alternated?');
+    await charla(daimon, 'Study plan for the Biochemistry final', 'Put together a study plan for me.');
+    await charla(daimon, 'Names for the app', 'Give me some name ideas.');
     await quietos();
     await go('agentes');`,
   agente: `
@@ -69,7 +69,7 @@ const SCENES = {
     [...view('agentes').querySelectorAll('[data-accion="editar"]')].at(-1).click();
     await sleep(900);`,
   venice: `
-    const c = await charla(oraculo, 'Sin vueltas', '¿Qué modelo sos?');
+    const c = await charla(oraculo, 'Straight to the point', 'Which model are you?');
     await quietos();
     datos.elegirChat(c.id);
     await sleep(700);

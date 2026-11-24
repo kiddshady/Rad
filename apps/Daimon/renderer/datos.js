@@ -17,6 +17,7 @@ import { openDoc, removeDoc } from '/@core/store.js';
 const nuevoId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 const GUARDAR_CADA_MS = 1500;
 const TITULO_MAX = 46;
+const TITULO_NUEVO = 'New chat';
 
 let agentes;
 let chats;
@@ -46,6 +47,11 @@ export async function abrir() {
     openDoc('ui', { agente: null, chats: {} }),
     window.rad.invoke('chat:modelos'),
   ]);
+  // Hasta la 0.1.1 la interfaz estaba en castellano: un chat todavía sin
+  // nombre propio se había guardado como «Chat nuevo».
+  if (chats.get().lista.some((c) => c.auto && c.titulo === 'Chat nuevo')) {
+    chats.update((v) => { for (const c of v.lista) if (c.auto && c.titulo === 'Chat nuevo') c.titulo = TITULO_NUEVO; return v; });
+  }
   // La primera vez hay un agente para empezar a escribir sin armar nada.
   if (!agentes.get().lista.length) crearAgente({ nombre: 'Daimon', proveedor: PROVEEDOR_INICIAL, modelo: modeloInicial(PROVEEDOR_INICIAL), instrucciones: '' });
   window.rad.on('chat:evento', alLlegar);
@@ -125,7 +131,7 @@ export function chatActual() {
 
 export function crearChat(agenteId) {
   const ahora = Date.now();
-  const nuevo = { id: nuevoId(), agente: agenteId, titulo: 'Chat nuevo', auto: true, cuenta: 0, creado: ahora, tocado: ahora };
+  const nuevo = { id: nuevoId(), agente: agenteId, titulo: TITULO_NUEVO, auto: true, cuenta: 0, creado: ahora, tocado: ahora };
   chats.update((v) => { v.lista.push(nuevo); return v; });
   avisar('chats');
   elegirChat(nuevo.id);
@@ -201,7 +207,7 @@ export const pensando = (chatId) => respuestas.get(chatId)?.pensando ?? false;
 export const algunoRespondiendo = () => respuestas.size > 0;
 
 const titular = (texto) => {
-  const linea = texto.split('\n').find((l) => l.trim())?.trim().replace(/\s+/g, ' ') ?? 'Chat nuevo';
+  const linea = texto.split('\n').find((l) => l.trim())?.trim().replace(/\s+/g, ' ') ?? TITULO_NUEVO;
   return linea.length > TITULO_MAX ? `${linea.slice(0, TITULO_MAX).trimEnd()}…` : linea;
 };
 
@@ -246,7 +252,7 @@ export async function enviar(chatId, texto) {
   try {
     await window.rad.invoke('chat:enviar', { id: pedido, proveedor: a.proveedor, modelo: a.modelo, instrucciones: a.instrucciones, mensajes: historial });
   } catch {
-    terminar(chatId, 'error', 'No se pudo mandar el pedido.');
+    terminar(chatId, 'error', 'The request could not be sent.');
   }
   return true;
 }

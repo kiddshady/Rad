@@ -46,28 +46,30 @@ function relevar(celda, nuevo) {
 }
 
 const NOTAS = {
-  frenado: 'Frenado.',
-  cortado: 'Quedó a medias: Daimon se cerró mientras llegaba la respuesta.',
-  largo: 'Se cortó acá: llegó al largo máximo de una respuesta.',
-  rechazo: 'El modelo no quiso responder esto.',
+  frenado: 'Stopped.',
+  cortado: 'Left unfinished: Daimon was closed while the answer was arriving.',
+  largo: 'Cut off here: it reached the maximum length of an answer.',
+  rechazo: 'The model declined to answer this.',
 };
 
 export function montarChat(el, { router }) {
   el.classList.add('dm-chat');
 
   // ---------- El lado: agente y chats ----------
+  // El selector dice solo el nombre del agente, como un select: con qué
+  // modelo habla ya lo dicen la cabecera de la conversación y la barra de
+  // estado. (Con el modelo debajo, un nombre largo de Venice se salía del
+  // botón por encima del chevron.)
   const agNombre = h('span', 'dm-agente-nombre rad-swap');
-  const agModelo = h('span', 'dm-agente-modelo rad-swap');
-  const selector = h('button', 'dm-agente', { type: 'button', 'aria-label': 'Cambiar de agente', 'data-accion': 'agente' },
-    h('span', 'dm-agente-texto', {}, agNombre, agModelo), icono('chevron', 'dm-agente-chevron'));
+  const selector = h('button', 'dm-agente', { type: 'button', 'data-accion': 'agente' }, agNombre, icono('chevron', 'dm-agente-chevron'));
   menuButton(selector, () => [
     ...datos.listaAgentes().map((a) => ({ id: a.id, label: a.nombre, checked: a.id === datos.agenteActual().id, onSelect: () => datos.elegirAgente(a.id) })),
     { separator: true },
-    { id: 'nuevo', label: 'Nuevo agente', icon: icono('mas').innerHTML, onSelect: async () => { const a = await abrirAgente(); if (a) datos.elegirAgente(a.id); } },
-    { id: 'todos', label: 'Administrar agentes', icon: icono('agentes').innerHTML, onSelect: () => router.go('agentes') },
+    { id: 'nuevo', label: 'New agent', icon: icono('mas').innerHTML, onSelect: async () => { const a = await abrirAgente(); if (a) datos.elegirAgente(a.id); } },
+    { id: 'todos', label: 'Manage agents', icon: icono('agentes').innerHTML, onSelect: () => router.go('agentes') },
   ], { matchAnchorWidth: true });
 
-  const nuevo = h('button', 'rad-button dm-nuevo', { type: 'button', 'data-accion': 'nuevo-chat' }, icono('mas'), 'Nuevo chat');
+  const nuevo = h('button', 'rad-button dm-nuevo', { type: 'button', 'data-accion': 'nuevo-chat' }, icono('mas'), 'New chat');
   const lista = h('div', 'dm-chats rad-scroll', { role: 'list', 'data-rad-line': 'bottom' });
   wireScroll(lista);
   const lado = h('aside', 'dm-lado', { 'data-rad-chrome': '' }, selector, nuevo, lista);
@@ -77,13 +79,13 @@ export function montarChat(el, { router }) {
   const sub = h('span', 'dm-conv-sub rad-swap');
   const celda = h('div', 'dm-hilo-celda');
 
-  const irAjustes = h('button', 'rad-button', { type: 'button', 'data-accion': 'ir-ajustes' }, 'Ir a Ajustes');
+  const irAjustes = h('button', 'rad-button', { type: 'button', 'data-accion': 'ir-ajustes' }, 'Go to Settings');
   irAjustes.addEventListener('click', () => router.go('ajustes'));
   const aviso = h('div', 'dm-aviso', { role: 'status' },
     h('div', 'dm-aviso-in', {}, h('div', 'dm-aviso-caja', {},
       icono('llave'), h('span', 'dm-aviso-texto rad-swap'), irAjustes)));
 
-  const area = h('textarea', 'rad-input dm-area', { rows: '1', spellcheck: 'false', 'aria-label': 'Mensaje', placeholder: 'Escribí un mensaje' });
+  const area = h('textarea', 'rad-input dm-area', { rows: '1', spellcheck: 'false', 'aria-label': 'Message', placeholder: 'Write a message' });
   const boton = h('button', 'rad-iconbutton dm-enviar', { type: 'submit', 'data-modo': 'enviar', 'data-rad-tip-side': 'top' },
     h('span', 'dm-enviar-iconos', {}, icono('enviar', 'dm-ic-enviar'), icono('frenar', 'dm-ic-frenar')));
   const redactor = h('form', 'dm-redactor', {}, area, boton);
@@ -97,26 +99,26 @@ export function montarChat(el, { router }) {
   const acciones = (id) => {
     const c = datos.chat(id);
     return c && [
-      { id: 'renombrar', label: 'Renombrar', icon: icono('lapiz').innerHTML, onSelect: () => renombrar(c) },
+      { id: 'renombrar', label: 'Rename', icon: icono('lapiz').innerHTML, onSelect: () => renombrar(c) },
       { separator: true },
-      { id: 'eliminar', label: 'Eliminar', danger: true, icon: icono('tacho').innerHTML, onSelect: () => eliminar(c) },
+      { id: 'eliminar', label: 'Delete', danger: true, icon: icono('tacho').innerHTML, onSelect: () => eliminar(c) },
     ];
   };
 
   function renombrar(c) {
-    const campo = h('input', 'rad-input', { type: 'text', maxlength: '80', autocomplete: 'off', spellcheck: 'false', 'data-autofocus': true, 'aria-label': 'Nombre del chat' });
+    const campo = h('input', 'rad-input', { type: 'text', maxlength: '80', autocomplete: 'off', spellcheck: 'false', 'data-autofocus': true, 'aria-label': 'Chat name' });
     campo.value = c.titulo;
     const caja = h('label', 'rad-field', {}, campo);
     wireControls(caja);
     const guardar = () => {
-      if (!campo.value.trim()) { setFieldError(caja, 'Ponele un nombre.'); campo.focus(); return false; }
+      if (!campo.value.trim()) { setFieldError(caja, 'Give it a name.'); campo.focus(); return false; }
       datos.renombrarChat(c.id, campo.value);
       return true;
     };
     const modal = openModal({
-      title: 'Renombrar el chat',
+      title: 'Rename chat',
       body: caja,
-      actions: [{ id: 'cancel', label: 'Cancelar' }, { id: 'ok', label: 'Guardar', variant: 'primary', onClick: guardar }],
+      actions: [{ id: 'cancel', label: 'Cancel' }, { id: 'ok', label: 'Save', variant: 'primary', onClick: guardar }],
     });
     campo.select();
     campo.addEventListener('keydown', (e) => {
@@ -128,18 +130,18 @@ export function montarChat(el, { router }) {
 
   async function eliminar(c) {
     const si = await confirm({
-      title: '¿Eliminar este chat?',
-      text: `«${c.titulo}» se borra con todos sus mensajes. Esto no se puede deshacer.`,
-      confirmLabel: 'Eliminar',
+      title: 'Delete this chat?',
+      text: `“${c.titulo}” and all its messages will be deleted. This can’t be undone.`,
+      confirmLabel: 'Delete',
       danger: true,
     });
     if (si) datos.borrarChat(c.id);
   }
 
   const fila = (c) => {
-    if (c.id === VACIO) return h('p', 'dm-chats-vacio', {}, 'Todavía no hay chats con este agente.');
+    if (c.id === VACIO) return h('p', 'dm-chats-vacio', {}, 'No chats with this agent yet.');
     const abrir = h('button', 'dm-fila-abrir', { type: 'button' }, h('span', 'dm-fila-titulo rad-swap'), h('span', 'dm-fila-punto', { 'aria-hidden': 'true' }, h('i')));
-    const mas = h('button', 'rad-iconbutton dm-fila-mas', { type: 'button', 'aria-label': 'Acciones del chat', 'data-rad-tip': 'Acciones' }, icono('puntos'));
+    const mas = h('button', 'rad-iconbutton dm-fila-mas', { type: 'button', 'aria-label': 'Chat actions', 'data-rad-tip': 'Actions' }, icono('puntos'));
     const nodo = h('div', 'dm-fila', { role: 'listitem' }, abrir, mas);
     abrir.addEventListener('click', () => datos.elegirChat(nodo.dataset.radKey));
     menuButton(mas, () => acciones(nodo.dataset.radKey), { align: 'end' });
@@ -168,15 +170,15 @@ export function montarChat(el, { router }) {
   let turno = 0;
 
   const notaDe = (m, chatId) => {
-    if (m.estado === 'escribiendo') return !m.texto || datos.pensando(chatId) ? 'Pensando' : 'Escribiendo';
-    if (m.estado === 'error') return m.nota || 'Algo falló y no hubo respuesta.';
+    if (m.estado === 'escribiendo') return !m.texto || datos.pensando(chatId) ? 'Thinking' : 'Writing';
+    if (m.estado === 'error') return m.nota || 'Something went wrong and there was no answer.';
     return NOTAS[m.estado] ?? '';
   };
 
   const mensaje = (m) => {
     if (m.id === VACIO) {
       const a = datos.agenteActual();
-      return h('div', 'dm-vacio', {}, h('strong', '', {}, a.nombre), h('span', '', {}, 'Escribile algo para empezar.'));
+      return h('div', 'dm-vacio', {}, h('strong', '', {}, a.nombre), h('span', '', {}, 'Write something to get started.'));
     }
     const cuerpo = h('div', m.rol === 'user' ? 'dm-msg-cuerpo' : 'dm-msg-cuerpo dm-md');
     const nodo = h('article', 'dm-msg', { 'data-rol': m.rol }, cuerpo);
@@ -258,7 +260,7 @@ export function montarChat(el, { router }) {
     const c = datos.chatActual();
     const ocupado = Boolean(c && datos.respondiendo(c.id));
     boton.dataset.modo = ocupado ? 'frenar' : 'enviar';
-    const rotulo = ocupado ? 'Frenar' : 'Enviar';
+    const rotulo = ocupado ? 'Stop' : 'Send';
     boton.setAttribute('aria-label', rotulo);
     boton.setAttribute('data-rad-tip', rotulo);
     boton.disabled = !ocupado && !area.value.trim();
@@ -303,15 +305,15 @@ export function montarChat(el, { router }) {
     const a = datos.agenteActual();
     const c = datos.chatActual();
     swapText(agNombre, a.nombre);
-    swapText(agModelo, datos.modeloDe(a));
-    swapText(titulo, c?.titulo ?? 'Chat nuevo');
+    selector.setAttribute('aria-label', `Agent: ${a.nombre}`);
+    swapText(titulo, c?.titulo ?? 'New chat');
     swapText(sub, `${a.nombre} · ${datos.modeloDe(a)}`);
   };
   // El aviso es por el agente que está abierto: le falta la llave de SU proveedor.
   const ponerAviso = () => {
     const a = datos.agenteActual();
     const falta = llave.falta(a.proveedor);
-    if (falta) swapText(aviso.querySelector('.dm-aviso-texto'), `Falta la llave de ${datos.nombreProveedor(a.proveedor)}: sin ella este agente no puede contestar.`);
+    if (falta) swapText(aviso.querySelector('.dm-aviso-texto'), `The ${datos.nombreProveedor(a.proveedor)} key is missing: this agent can’t answer without it.`);
     aviso.toggleAttribute('data-abierto', falta);
   };
 

@@ -16,10 +16,12 @@ const PENSAR_MS = 180;
 // nadie. Los ids son de los que Venice tenía en noviembre de 2026.
 const VENICE = {
   lista: [
-    { id: 'zai-org-glm-5-2', nombre: 'GLM 5.2', nota: 'privado, sin retención · 1M de contexto' },
-    { id: 'grok-4-7', nombre: 'Grok 4.7', nota: 'privado, sin retención · 500k de contexto' },
-    { id: 'kimi-k3', nombre: 'Kimi K3', nota: 'privado, sin retención · 1M de contexto' },
-    { id: 'venice-uncensored-1-2', nombre: 'Venice Uncensored 1.2', nota: 'privado, sin retención · 128k de contexto' },
+    // Uno de nombre largo: es el que se salía del select y tapaba el chevron.
+    { id: 'deepseek-v4-1-flash-1017-uncensored', nombre: 'DeepSeek V4.1 Flash 1017 Uncensored', nota: 'private, no retention · 1M context' },
+    { id: 'zai-org-glm-5-2', nombre: 'GLM 5.2', nota: 'private, no retention · 1M context' },
+    { id: 'grok-4-7', nombre: 'Grok 4.7', nota: 'private, no retention · 500k context' },
+    { id: 'kimi-k3', nombre: 'Kimi K3', nota: 'private, no retention · 1M context' },
+    { id: 'venice-uncensored-1-2', nombre: 'Venice Uncensored 1.2', nota: 'private, no retention · 128k context' },
   ],
   inicial: 'grok-4-7',
 };
@@ -27,28 +29,28 @@ const VENICE = {
 function respuesta({ proveedor, modelo, instrucciones, mensajes }) {
   const ultimo = mensajes.at(-1)?.texto ?? '';
   return [
-    `## Respuesta simulada`,
+    `## Simulated answer`,
     ``,
-    `Recibí tu mensaje: «${ultimo}». Esto **no** salió de un modelo: es el proveedor de prueba de Daimon, que escribe de a poco para que se vea llegar el texto.`,
+    `I got your message: “${ultimo}”. This did **not** come from a model: it is Daimon’s test provider, which writes little by little so the text can be seen arriving.`,
     ``,
-    `- modelo: \`${modelo}\``,
-    `- instrucciones: ${instrucciones ? instrucciones.length : 0} caracteres`,
-    `- mensajes en el pedido: ${mensajes.length}`,
-    `- proveedor: ${proveedor}`,
+    `- model: \`${modelo}\``,
+    `- instructions: ${instrucciones ? instrucciones.length : 0} characters`,
+    `- messages in the request: ${mensajes.length}`,
+    `- provider: ${proveedor}`,
     ``,
-    `Un bloque de código, para ver la mono:`,
+    `A code block, to see the mono font:`,
     ``,
     '```js',
-    `const saludo = (nombre) => \`hola, \${nombre}\`;`,
-    `console.log(saludo('Daimon'));`,
+    `const greet = (name) => \`hello, \${name}\`;`,
+    `console.log(greet('Daimon'));`,
     '```',
     ``,
-    `| pieza | estado |`,
+    `| piece | status |`,
     `| --- | --- |`,
-    `| streaming | *anda* |`,
-    `| herramientas | no hay |`,
+    `| streaming | *works* |`,
+    `| tools | none |`,
     ``,
-    `Y un cierre largo, para que haya texto de sobra cuando alguien quiera frenar a mitad de camino: el agente sigue escribiendo una frase tras otra, sin apuro, hasta que se le termina el guion o hasta que le dicen basta.`,
+    `And a long ending, so there is plenty of text left when someone wants to stop halfway: the agent keeps writing one sentence after another, in no hurry, until the script runs out or until it is told to stop.`,
   ].join('\n');
 }
 

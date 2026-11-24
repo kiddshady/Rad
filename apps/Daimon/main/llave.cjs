@@ -109,9 +109,9 @@ function wire(rad, { alCambiar } = {}) {
   rad.handle('llave:guardar', async (proveedor, valor) => {
     const p = de(proveedor);
     const key = typeof valor === 'string' ? valor.trim() : '';
-    if (!FORMA.test(key)) return { ok: false, error: 'Eso no parece una llave: es un texto largo, sin espacios.' };
+    if (!FORMA.test(key)) return { ok: false, error: 'That does not look like a key: a key is a long text with no spaces.' };
     if (!safeStorage.isEncryptionAvailable()) {
-      return { ok: false, error: 'Windows no deja cifrar en esta sesión, y la llave no se guarda sin cifrar.' };
+      return { ok: false, error: 'Windows cannot encrypt in this session, and the key is not stored unencrypted.' };
     }
     await rad.store.write(p.doc, { v: 1, blob: safeStorage.encryptString(key).toString('base64') });
     alCambiar?.(proveedor);

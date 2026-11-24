@@ -26,13 +26,13 @@ const contexto = (n) => (n >= 1e6 ? `${Math.round(n / 1e5) / 10}M` : `${Math.rou
 
 /** Un error de Venice en una frase para Fran. */
 function explicar(status, detalle) {
-  if (status === 401) return 'La llave de Venice no es válida, o ese modelo pide una cuenta Pro. Revisala en Ajustes.';
-  if (status === 402) return 'No queda saldo en la cuenta de Venice.';
-  if (status === 403) return 'Esta llave de Venice no se puede usar desde esta red.';
-  if (status === 429) return 'Demasiados pedidos seguidos a Venice. Esperá un momento y probá de nuevo.';
-  if (status === 503) return 'Ese modelo de Venice está saturado. Probá en un rato, o con otro.';
-  if (status === 400 || status === 404 || status === 415) return `Venice rechazó el pedido: ${detalle || status}`;
-  return `Venice respondió con un error (${status}). Probá de nuevo en un rato.`;
+  if (status === 401) return 'The Venice key is invalid, or that model requires a Pro account. Check it in Settings.';
+  if (status === 402) return 'The Venice account has no balance left.';
+  if (status === 403) return 'This Venice key cannot be used from this network.';
+  if (status === 429) return 'Too many requests in a row to Venice. Wait a moment and try again.';
+  if (status === 503) return 'That Venice model is overloaded. Try again in a while, or use another one.';
+  if (status === 400 || status === 404 || status === 415) return `Venice rejected the request: ${detalle || status}`;
+  return `Venice answered with an error (${status}). Try again in a while.`;
 }
 
 async function detalleDe(res) {
@@ -54,11 +54,11 @@ async function modelos({ key, signal } = {}) {
     .filter((m) => m?.id && m.type === 'text' && !m.model_spec?.offline)
     .map((m) => {
       const spec = m.model_spec ?? {};
-      const partes = [spec.privacy === 'private' ? 'privado, sin retención' : 'anonimizado'];
-      if (spec.availableContextTokens) partes.push(`${contexto(spec.availableContextTokens)} de contexto`);
+      const partes = [spec.privacy === 'private' ? 'private, no retention' : 'anonymized'];
+      if (spec.availableContextTokens) partes.push(`${contexto(spec.availableContextTokens)} context`);
       return { id: m.id, nombre: spec.name || m.id, nota: partes.join(' · '), rasgos: spec.traits ?? [] };
     })
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }));
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'en', { numeric: true }));
   // El que se ofrece primero: el que Venice marca como predeterminado, o el
   // más capaz, o el primero de la lista.
   const marcado = (rasgo) => lista.find((m) => m.rasgos.includes(rasgo));
@@ -86,7 +86,7 @@ async function responder({ modelo, instrucciones, mensajes }, { key, signal, onT
     });
   } catch (err) {
     if (signal.aborted) return { motivo: 'frenado' };
-    throw new Error('No se pudo conectar con Venice. ¿Hay internet?');
+    throw new Error('Could not connect to Venice. Is there an internet connection?');
   }
   if (!res.ok) throw new Error(explicar(res.status, await detalleDe(res)));
 
@@ -94,7 +94,7 @@ async function responder({ modelo, instrucciones, mensajes }, { key, signal, onT
   let uso = { entrada: 0, salida: 0 };
   let pensando = false;
   const alLlegar = (dato) => {
-    if (dato.error) throw new Error(`Venice cortó la respuesta: ${typeof dato.error === 'string' ? dato.error : dato.error.message ?? 'sin detalle'}`);
+    if (dato.error) throw new Error(`Venice cut the answer short: ${typeof dato.error === 'string' ? dato.error : dato.error.message ?? 'no details'}`);
     if (dato.usage) uso = { entrada: dato.usage.prompt_tokens ?? 0, salida: dato.usage.completion_tokens ?? 0 };
     const opcion = dato.choices?.[0];
     if (!opcion) return;
@@ -131,7 +131,7 @@ async function responder({ modelo, instrucciones, mensajes }, { key, signal, onT
   } catch (err) {
     if (signal.aborted) return { motivo: 'frenado' };
     if (err.message.startsWith('Venice ')) throw err;
-    throw new Error('Se cortó la conexión con Venice a mitad de la respuesta.');
+    throw new Error('The connection to Venice dropped in the middle of the answer.');
   }
   if (signal.aborted) return { motivo: 'frenado' };
   return { motivo, modelo, uso };
