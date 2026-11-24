@@ -6,7 +6,7 @@
 //   chats       { lista: [{ id, agente, titulo, auto, cuenta, creado, tocado }] }
 //   chat-<id>   { mensajes: [{ id, rol, texto, estado?, nota?, modelo?, tools?, agotado? }] }
 //               y, entre los mensajes, las filas de tools: { id, rol: 'tool', tool,
-//               texto (qué tocó), estado, ms?, salida?, cortada? }
+//               texto (qué tocó), estado, ms?, salida?, cortada?, imagenes? }
 //   ui          { agente, chats: { <agente>: <chat> } }   lo último que se miraba
 // Un documento por chat: abrir la app no lee todas las conversaciones, y
 // guardar un mensaje no reescribe las demás.
@@ -336,6 +336,11 @@ function alLlegar(ev) {
   } else if (ev.tipo === 'tool-fin') {
     const fila = r.doc.get().mensajes.find((m) => m.rol === 'tool' && m.id === ev.callId);
     if (fila) Object.assign(fila, { estado: ev.status, ms: ev.ms, salida: ev.out ?? '', cortada: ev.outCut === true });
+    r.doc.set(r.doc.get());
+    avisar('mensajes', { chat: chatId });
+  } else if (ev.tipo === 'tool-imagenes') {
+    const fila = r.doc.get().mensajes.find((m) => m.rol === 'tool' && m.id === ev.callId);
+    if (fila && Array.isArray(ev.imagenes)) fila.imagenes = ev.imagenes.map(({ name, dataUrl }) => ({ name, dataUrl }));
     r.doc.set(r.doc.get());
     avisar('mensajes', { chat: chatId });
   } else if (ev.tipo === 'confirmar') {

@@ -1,8 +1,9 @@
 # Las tools de Nix
 
 Un agente con tools prendidas puede actuar en la PC: leer y escribir archivos,
-correr comandos y usar la web. Este documento cuenta cómo está armado, de dónde
-viene cada parte y qué falta.
+correr comandos (también en segundo plano), correr código, consultar bases
+SQLite, usar la web, abrir cosas y mirar la pantalla. Este documento cuenta
+cómo está armado, de dónde viene cada parte y qué falta.
 
 ## De dónde viene
 
@@ -20,13 +21,35 @@ encabezado de qué parte de NeonCode salió y qué se le adaptó.
 | `base.cjs` | Carpeta de trabajo, escritura atómica, salida acotada de un proceso |
 | `fs.cjs`, `diff.cjs` | `fs_read`, `fs_write`, `fs_edit`, `fs_delete` y el diff de la tarjeta de permiso |
 | `shell.cjs` | `shell_exec` (PowerShell) y `cmd_exec` |
+| `jobs.cjs` | `job_start`, `job_output`, `job_kill`: procesos que siguen vivos después del turno |
+| `code.cjs` | `run_code`: un fragmento de Python o de Node, en una carpeta que se conserva |
+| `sqlite.cjs` | `db_query` (la base propia del agente) y `sqlite_query` (un archivo que ya existe) |
 | `search.cjs`, `code-search-worker.cjs` | `code_search`, que corre en un proceso aparte |
 | `web.cjs` | `fetch`, `web_search`, `http_request` |
+| `abrir.cjs` | `os_open`: abre un archivo, una carpeta o una URL como lo haría el usuario |
+| `captura.cjs` | `screen_capture`: una foto de un monitor o de una ventana, que el modelo ve |
 | `index.cjs` | Arma todo y es lo único que conoce el chat |
 
 Los loops de cada proveedor están en `main/anthropic.cjs` y `main/venice.cjs`.
 Son nuevos: se escribieron para Nix siguiendo las reglas de los de NeonCode y la
 documentación de cada API.
+
+## Los grupos
+
+Las tools se prenden por grupo, en el formulario de cada agente:
+
+| Grupo | Tools |
+|---|---|
+| Files | `fs_read`, `fs_write`, `fs_edit`, `fs_delete`, `code_search` |
+| Commands | `shell_exec`, `cmd_exec`, `job_start`, `job_output`, `job_kill` |
+| Code | `run_code` |
+| Databases | `db_query`, `sqlite_query` |
+| Web | `fetch`, `web_search`, `http_request` |
+| Desktop | `os_open` |
+| Screen | `screen_capture` |
+
+La pantalla va sola en su grupo: es lo más privado que una tool puede mirar
+(lo que haya abierto, sin elegir qué), y se prende aparte de todo lo demás.
 
 ## La idea que ordena todo
 
@@ -79,6 +102,48 @@ Los números son los del documento de guardrails de NeonCode.
 | M11 | Compactar un chat que no entra en el contexto | No |
 | M12 | El recordatorio de arranque, cuando todavía no corrió nada | Sí |
 
+## Lo que cada una guarda, y dónde
+
+Las tools tienen su carpeta al lado de los documentos de la app:
+`%APPDATA%\Nix\tools`.
+
+- `code-workspace\`: la carpeta donde corre `run_code`. Se conserva de una
+  llamada a la otra, con el entorno virtual de Python que arma la primera vez
+  que se le pide un paquete (`pip`). Para Python hace falta tenerlo instalado;
+  para Node se usa el de la propia app.
+- `agent.db`: la base de `db_query`. Es una sola para todos los agentes.
+
+SQLite es `node:sqlite`, el que viene con Node, y no `better-sqlite3` como en
+NeonCode: no hay módulo nativo que recompilar con cada Electron. Dos cosas que
+aquel traía y este no: `UPDATE` o `DELETE` con `LIMIT`, y la función
+`soundex()`.
+
+Los jobs viven fuera de los turnos: sobreviven al turno y al chat que los
+arrancó (hasta 8 a la vez), el system prompt de cada turno lista los que siguen
+vivos, y al cerrar la app se matan todos, con su árbol de procesos.
+
+## Las imágenes
+
+Hay dos caminos, y no son el mismo:
+
+- **Las que hace `run_code`** (un gráfico guardado en su carpeta) se le
+  muestran **al usuario**, en la fila de esa llamada. El modelo recibe la
+  lista de archivos, no la imagen.
+- **Las de `screen_capture`** se le muestran **al modelo** y además al
+  usuario, que ve exactamente lo que vio el modelo. La foto se reescala a 1568
+  px de lado largo y viaja en JPEG. Con Anthropic va adentro del resultado de
+  esa llamada; con Venice, que no admite imágenes en un resultado, en un
+  mensaje aparte detrás de los resultados de la ronda. Para leer letra chica,
+  el modelo pide una `region` de una captura anterior y el recorte se hace
+  sobre los píxeles reales.
+
+Un modelo de Venice que no declara que acepta imágenes no recibe `screen_capture`, aunque
+el agente la tenga prendida: la imagen le llegaría igual y Venice rebotaría el
+pedido entero. Los de Anthropic ven todos.
+
+Las imágenes quedan guardadas con el chat (hasta 4 por llamada), así que un
+chat con muchas capturas pesa.
+
 ## El presupuesto de rondas
 
 Un turno admite 15 rondas que corran algo que no sea leer. Las rondas de pura
@@ -108,7 +173,6 @@ Venice) en cada pedido de un agente con tools.
 - El diario para deshacer lo que escribió una tool (los ganchos están en
   `fs.cjs`, sin nada enchufado).
 - Mandar un mensaje a mitad del turno (steer).
-- Jobs en segundo plano, `run_code`, SQLite, `os_open`, capturas de pantalla.
 - Canvas, notepad, memoria, búsqueda en chats.
 - Subagentes, MCP, skills, navegador, tareas programadas.
 - Dónde guardar secretos para `http_request` (`{{secret:NOMBRE}}`) y la llave
@@ -133,24 +197,46 @@ para arreglarlos de a uno, con su prueba:
   la casa.
 - Un secreto de `http_request` no está atado a un sitio: el modelo no lo ve,
   pero puede mandarlo a cualquier dirección.
+- Un job cuyo proceso de arranque termina dejando hijos vivos (un `start` que
+  lanza otra cosa y vuelve) figura como terminado y sus hijos quedan huérfanos:
+  `job_kill` ya no los alcanza.
+- El `until` de `job_output` es una expresión regular del modelo que se evalúa
+  en el proceso principal: una mal hecha puede colgar la app.
+- `job_kill` sin `id` contesta que no existe el job «undefined».
+- `run_code` con Python devuelve mal los acentos de lo que el fragmento
+  imprime, hereda el entorno de la app, y un Stop mientras arma el entorno
+  virtual o instala un paquete se informa como otro error.
+- `os_open` deja abrir `.html`, `.svg` y documentos de Office, que pueden
+  llevar código.
+- `db_query` y `sqlite_query` corren en el proceso principal y no se pueden
+  frenar: una consulta larga congela la app hasta que termina.
+- `screen_capture` de una ventana puede informar un alto algo menor que el de
+  la ventana (Windows no cuenta la barra de título en la miniatura).
 
 ## Cómo se prueba
 
-- `tools/test-nix-tools-fs.mjs`, `-shell.mjs`, `-web.mjs`: las pruebas de
-  NeonCode de cada familia, corriendo contra los módulos de Nix.
+- `tools/test-nix-tools-fs.mjs`, `-shell.mjs`, `-web.mjs`, `-jobs.mjs`: las
+  pruebas de NeonCode de cada familia, corriendo contra los módulos de Nix.
+- `-code.mjs`, `-sqlite.mjs`, `-captura.mjs`: nuevas, porque allá esas tools
+  no tenían pruebas. La de capturas usa pantallas y ventanas de mentira.
 - `tools/test-nix-tools-loop.mjs`: los dos loops contra un servidor local que
-  hace de las dos APIs. Mira qué pide cada ronda y qué vuelve.
+  hace de las dos APIs. Mira qué pide cada ronda y qué vuelve, también las
+  imágenes de una captura.
 - El humo (`tools/smoke-nix.js`): con el proveedor de mentira, un mensaje que
   trae un renglón `TOOLS: [...]` hace que se pidan esas llamadas por el motor
   de verdad, sobre una carpeta descartable. Recorre el permiso, el rechazo,
-  dos rondas, los argumentos malos y el modo automático.
+  dos rondas, código, la base propia, un job que se lee y se mata, dos
+  capturas, los argumentos malos y el modo automático. En el humo `os_open`
+  anota lo que habría abierto en vez de abrirlo, y la pantalla que se captura
+  es un degradé: no se fotografía el escritorio.
 
 Ninguna toca la red ni gasta un token. Lo que no está probado es un modelo de
-verdad pidiendo tools.
+verdad pidiendo tools, ni un modelo de Venice recibiendo una imagen.
 
 ## Sumar una tool
 
-1. Su definición en `defs.cjs` (y en el grupo que corresponda).
+1. Su definición en `defs.cjs` (y en el grupo que corresponda). El guion del
+   humo lista los grupos: hay que sumarla ahí también.
 2. Su runner, con el contrato que dice `base.cjs`: recibe `(run, args)`,
    avisa con `run.notify('tool:activity', …)` antes de actuar y devuelve el
    texto que lee el modelo.

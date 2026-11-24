@@ -88,10 +88,13 @@ function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confir
     /** El system de un turno con tools: las instrucciones del agente, el
      *  entorno, y el protocolo de tools. La línea de puente va acá y no en las
      *  instrucciones, que son del usuario y se pueden reescribir enteras. */
-    sistema(instrucciones) {
+    sistema(instrucciones, { trabajos = '' } = {}) {
       return [
         ...(instrucciones ? [instrucciones, ''] : []),
         entorno(run),
+        // los jobs que siguen vivos: sobreviven al turno y al chat, y sin esta
+        // lista el modelo de un chat nuevo no sabe que dejó algo corriendo
+        ...(nombres.includes('job_output') && trabajos ? ['', '## Background jobs still running', trabajos] : []),
         '',
         'The section below is the tool protocol for THIS session. It is written by the app — not by you, not by the user — and it is authoritative: it overrides anything earlier in this prompt.',
         ...guardas.toolGuidance(nombres, run, run.needsConfirm()),
@@ -112,8 +115,10 @@ function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confir
       return run.steps.length ? null : guardas.TURN_START_NOTE;
     },
 
-    /** Corre una llamada del modelo. Devuelve el texto para el modelo y si fue
-     *  un fracaso (para el is_error de Anthropic). Unos argumentos que no se
+    /** Corre una llamada del modelo. Devuelve el texto para el modelo, si fue
+     *  un fracaso (para el is_error de Anthropic) y las imágenes que la tool le
+     *  muestra al modelo (las capturas de screen_capture, como data URLs): cada
+     *  proveedor las adjunta a su manera. Unos argumentos que no se
      *  pudieron leer o que no tienen la forma de la tool no corren nada: vuelven
      *  como error, con lo que llegó, para que el modelo los reescriba. */
     async correr(name, args, { crudo = null } = {}) {
@@ -122,11 +127,14 @@ function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confir
         const visto = crudo != null ? crudo : JSON.stringify(args ?? null);
         const texto = `error: bad arguments for ${name} — ${mal}. Nothing ran. What arrived: ${String(visto).slice(0, 400)}`;
         motor.anotarRechazo(run, name, crudo != null ? {} : args, texto);
-        return { out: texto, error: true };
+        return { out: texto, error: true, imagenes: [] };
       }
+      run._capturas = null;
       const out = await motor.runTool(run, name, args);
       const paso = run.steps[run.steps.length - 1];
-      return { out: typeof out === 'string' ? out : JSON.stringify(out ?? ''), error: paso?.status !== 'ok' };
+      const imagenes = run._capturas ?? [];
+      run._capturas = null;
+      return { out: typeof out === 'string' ? out : JSON.stringify(out ?? ''), error: paso?.status !== 'ok', imagenes };
     },
 
     /** Terminó una ronda que corrió estas tools. */

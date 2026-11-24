@@ -1,5 +1,42 @@
 # Changelog
 
+## Nix 0.7.0 (2026-11-24)
+
+- **Ocho tools más, y son 18.** Se suman a los grupos que se prenden por
+  agente: procesos en segundo plano (`job_start`, `job_output`, `job_kill`,
+  en Commands), correr código (`run_code`, en Code), bases SQLite (`db_query`
+  y `sqlite_query`, en Databases), abrir cosas (`os_open`, en Desktop) y mirar
+  la pantalla (`screen_capture`, en Screen, sola en su grupo).
+- **Siguen viniendo de NeonCode, portadas tal cual**, con sus comentarios. Las
+  pruebas de los jobs vinieron con el código; las de `run_code`, SQLite y las
+  capturas son nuevas, porque allá no tenían (486 comprobaciones entre las
+  cuatro familias).
+- **Los jobs sobreviven al turno.** Un servidor o un proceso largo queda
+  corriendo mientras el chat sigue, se lee y se mata por su id, y el modelo de
+  cualquier chat ve en su system prompt los que siguen vivos. Al cerrar Nix se
+  matan todos, con su árbol de procesos.
+- **`run_code` corre Python o Node** en una carpeta que se conserva de una
+  llamada a la otra, con entorno virtual y `pip` a pedido. Las imágenes que
+  deja (un gráfico) aparecen en la fila de esa llamada, sin abrirla.
+- **SQLite sin módulo nativo.** NeonCode usaba `better-sqlite3`, que hay que
+  recompilar con cada Electron; acá es `node:sqlite`, el que viene con Node,
+  detrás de un adaptador que le da a las tools lo mismo que tenían.
+- **El modelo ve la pantalla.** `screen_capture` saca un monitor o una ventana
+  (por título, por el job que la abrió o por pid), y la imagen llega al modelo
+  y a la fila del chat: el usuario ve lo mismo que vio el modelo. Con
+  Anthropic viaja adentro del resultado de la llamada; con Venice, en un
+  mensaje aparte, y solo a los modelos que Venice declara que aceptan
+  imágenes (a los demás no se les ofrece la tool).
+- **Lo que guardan las tools** (la carpeta de `run_code`, la base del agente)
+  queda en `%APPDATA%\Nix\tools`.
+- El humo de Nix recorre las tools nuevas con el proveedor de mentira:
+  `os_open` anota lo que habría abierto en vez de abrirlo, y la pantalla que
+  se captura es un degradé, no el escritorio. Con `RAD_SMOKE_KEEP=1` deja la
+  carpeta de datos para mirarla y `RAD_SMOKE_TIMEOUT` estira su tope.
+- Los defectos que vinieron con el código están anotados en
+  `apps/Nix/docs/tools.md`, sin tocar. Sigue sin probarse con un modelo de
+  verdad.
+
 ## Nix 0.6.0 (2026-11-23)
 
 - **Tools: un agente puede actuar en la PC.** Diez para empezar, en tres

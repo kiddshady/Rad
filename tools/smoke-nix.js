@@ -653,14 +653,14 @@ else {
   const form = modal();
   type(form.querySelector('[data-campo="nombre"]'), 'Toolsmith');
   const interruptores = [...form.querySelectorAll('[data-campo="tools"] input[role="switch"]')];
-  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,web' || interruptores.some((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
-  for (const i of interruptores.slice(0, 2)) i.click(); // archivos y comandos; la web queda apagada
+  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,desktop,screen' || interruptores.some((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
+  for (const i of interruptores) if (i.dataset.grupo !== 'web') i.click(); // todo menos la web, que queda apagada
   enIngles('en el formulario con tools');
   primary().click();
   await closed();
   await settle();
   const herrero = cards().at(-1);
-  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Desktop, Screen') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
   if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'No tools') fail('un agente sin tools no dice que no las tiene');
   herrero.querySelector('[data-accion="abrir"]').click();
   await sleep(dur('base') + 260);
@@ -736,17 +736,56 @@ else {
   const afuera = tools().find((t) => t.getBoundingClientRect().right > col.right + 0.5);
   if (afuera) fail(`la fila de ${afuera.dataset.tool} se sale de la columna`);
 
+  // Las de la segunda etapa, en dos rondas y sin tarjeta (el chat ya es de
+  // confianza): correr código, la base propia del agente, abrir un archivo y
+  // un job en segundo plano que se lee y se mata con el id que devolvió.
+  await pedir([
+    [
+      { name: 'run_code', args: { language: 'node', code: "require('fs').writeFileSync('out.txt', 'hi'); console.log(6 * 7);" } },
+      { name: 'db_query', args: { sql: 'CREATE TABLE IF NOT EXISTS humo (n INTEGER)' } },
+      { name: 'db_query', args: { sql: 'INSERT INTO humo VALUES (?)', params: [4242] } },
+      { name: 'db_query', args: { sql: 'SELECT n FROM humo' } },
+      { name: 'os_open', args: { target: 'note.txt' } },
+      { name: 'job_start', args: { command: "Write-Output job-listo; Start-Sleep 60", name: 'dormilon' } },
+    ],
+    [
+      { name: 'job_output', args: { id: '$JOB', wait: 15, until: 'job-listo' } },
+      { name: 'job_kill', args: { id: '$JOB' } },
+      // la pantalla que captura el humo es de mentira: un degradé de 1920×1080
+      { name: 'screen_capture', args: {} },
+      { name: 'screen_capture', args: { region: { x: 0, y: 0, width: 400, height: 300 } } },
+    ],
+  ]);
+  await until(() => ultimo()?.dataset.estado === 'ok' && msgs().length === 13, 60000);
+  if (cuenta() !== '10 tools · 10 done') fail(`las tools de la segunda etapa: el contador dice «${cuenta()}»`);
+  const salio = (name, n = -1) => fila(name, n)?.querySelector('.dm-tool-pre').textContent ?? '';
+  if (!salio('run_code').includes('42') || !salio('run_code').includes('out.txt')) fail(`run_code devolvió: ${salio('run_code').slice(0, 160)}`);
+  if (!salio('db_query').includes('4242')) fail(`db_query no devolvió la fila que guardó: ${salio('db_query').slice(0, 120)}`);
+  if (fila('os_open')?.dataset.estado !== 'ok') fail(`os_open quedó en «${fila('os_open')?.dataset.estado}»: ${salio('os_open').slice(0, 120)}`);
+  if (!salio('job_output').includes('job-listo')) fail(`job_output no leyó lo que imprimió el job: ${salio('job_output').slice(0, 160)}`);
+  if (!/kill/i.test(salio('job_kill'))) fail(`job_kill devolvió: ${salio('job_kill').slice(0, 160)}`);
+
+  // La captura queda a la vista en su fila, sin abrirla: es lo que vio el modelo.
+  const fotoDe = (n) => fila('screen_capture', n)?.querySelector('.dm-tool-imagen');
+  await until(() => fotoDe(-2)?.naturalWidth > 0 && fotoDe(-1)?.naturalWidth > 0, 4000);
+  const [entera, zona] = [fotoDe(-2), fotoDe(-1)];
+  if (entera?.naturalWidth !== 1568 || entera?.naturalHeight !== 882) fail(`la captura entera se ve de ${entera?.naturalWidth}×${entera?.naturalHeight}: se esperaba 1568×882`);
+  if (zona?.naturalWidth !== 490 || zona?.naturalHeight !== 368) fail(`la región capturada se ve de ${zona?.naturalWidth}×${zona?.naturalHeight}: se esperaba 490×368 (recortada en píxeles reales)`);
+  if (!(entera?.getBoundingClientRect().height > 40) || op(entera) < 0.99) fail('la captura no está a la vista en su fila');
+  if (!salio('screen_capture').includes('captured a region of display 1 of 1')) fail(`screen_capture devolvió: ${salio('screen_capture').slice(0, 160)}`);
+  data.capturas = `entera ${entera?.naturalWidth}×${entera?.naturalHeight}, región ${zona?.naturalWidth}×${zona?.naturalHeight}, a ${Math.round(entera?.getBoundingClientRect().width ?? 0)} px de ancho en la fila`;
+
   // Argumentos incompletos, y una tool que este agente no tiene: ninguna
   // corre, las dos dejan su fila como fallida, y no hay tarjeta que contestar.
   await pedir([[{ name: 'fs_write', args: { path: 'x.txt' } }, { name: 'fetch', args: { url: 'https://example.com' } }]]);
-  await terminado(13);
+  await terminado(16);
   if (fila('fs_write')?.dataset.estado !== 'error' || fila('fetch')?.dataset.estado !== 'error' || cuenta() !== '2 tools · 2 failed') fail(`argumentos incompletos y una tool apagada: ${fila('fs_write')?.dataset.estado}, ${fila('fetch')?.dataset.estado}, «${cuenta()}»`);
   if (!fila('fetch').querySelector('.dm-tool-pre').textContent.includes('not available in this run')) fail('una tool que el agente no tiene prendida no fue rechazada por eso');
 
   // Sin el renglón TOOLS el agente conversa, y el contador lo dice igual.
   type(area, 'Just say hi.');
   key(area, 'Enter');
-  await terminado(15);
+  await terminado(18);
   if (cuenta() !== 'no tools') fail(`un turno con tools prendidas que no usó ninguna dice «${cuenta()}»`);
   enIngles('en un chat con tools');
 
@@ -770,7 +809,7 @@ else {
   preguntar.click();
   await settle();
   if (tarjetaTools.dataset.modo !== 'manual') fail('el modo manual no volvió');
-  data.tools = `Toolsmith: ${tools().length} filas en el último chat; permiso, rechazo, dos rondas, confianza por chat, argumentos malos y modo automático`;
+  data.tools = `Toolsmith: ${tools().length} filas en el último chat; permiso, rechazo, dos rondas, confianza por chat, código, base propia, un job, dos capturas, argumentos malos y modo automático`;
 
   // El agente de prueba se va, con sus chats, y vuelve a quedar Galen abierto
   // (la pasada 2 espera encontrar lo de antes).

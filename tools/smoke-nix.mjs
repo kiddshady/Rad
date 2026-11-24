@@ -23,7 +23,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const electron = require('electron');
 const SMOKE = path.join(ROOT, '.smoke');
 const SCRIPT = path.join(ROOT, 'tools', 'smoke-nix.js');
-const TIMEOUT_MS = 90000;
+// RAD_SMOKE_TIMEOUT (ms) lo estira y RAD_SMOKE_KEEP=1 deja la carpeta de datos
+// para mirarla: las dos son para depurar un guion que se cuelga.
+const TIMEOUT_MS = Number(process.env.RAD_SMOKE_TIMEOUT) || 240000;
 // Todas las llaves que escribe el guion en Ajustes llevan esta marca. No son
 // llaves: son textos con su forma, para comprobar que lo que se guarda no
 // queda en claro.
@@ -99,6 +101,10 @@ function checkDisk(data, report) {
   if (leer('note.txt') !== 'one\n2\n') failures.push(`note.txt quedó como ${JSON.stringify(leer('note.txt'))}: se esperaba la edición aprobada y no la rechazada`);
   if (leer('auto.txt') !== 'auto\n') failures.push(`auto.txt quedó como ${JSON.stringify(leer('auto.txt'))}`);
   if (leer('x.txt') !== null) failures.push('una llamada con argumentos incompletos escribió un archivo');
+  // os_open, en el humo, anota lo que habría abierto en vez de abrirlo.
+  if (!/^open .*note\.txt$/m.test(leer('.opened.log') ?? '')) failures.push(`os_open no pidió abrir note.txt: ${JSON.stringify(leer('.opened.log'))}`);
+  if (!fs.existsSync(path.join(taller, 'agent.db'))) failures.push('la base propia del agente no quedó en el disco');
+  if (!fs.existsSync(path.join(taller, 'code-workspace', 'out.txt'))) failures.push('run_code no dejó su archivo en el taller');
   const borrado = report.script?.chatBorrado;
   if (!borrado) failures.push('el guion no dijo qué chat borró');
   else if (files.some((f) => f.startsWith(`chat-${borrado}.`))) failures.push(`el documento del chat borrado sigue en el disco: ${files.filter((f) => f.startsWith(`chat-${borrado}.`)).join(', ')}`);
@@ -127,6 +133,7 @@ try {
     ok = second.ok;
   }
 } finally {
-  fs.rmSync(data, { recursive: true, force: true });
+  if (process.env.RAD_SMOKE_KEEP) console.log(`smoke: nix, los datos quedaron en ${data}`);
+  else fs.rmSync(data, { recursive: true, force: true });
 }
 process.exit(ok ? 0 : 1);

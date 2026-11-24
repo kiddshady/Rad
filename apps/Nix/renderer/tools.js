@@ -31,7 +31,9 @@ export function filaTool(m) {
     h('span', 'dm-tool-estado rad-swap'),
     icono('chevron', 'dm-tool-chevron'));
   const salida = h('pre', 'dm-tool-pre');
-  const nodo = h('div', 'dm-tool', {}, cabeza, h('div', 'dm-tool-salida', {}, h('div', 'dm-tool-salida-in', {}, salida)));
+  // las imágenes que dejó la llamada (un gráfico de run_code): siempre a la vista
+  const imagenes = h('div', 'dm-tool-imagenes');
+  const nodo = h('div', 'dm-tool', {}, cabeza, h('div', 'dm-tool-salida', {}, h('div', 'dm-tool-salida-in', {}, salida)), imagenes);
   cabeza.addEventListener('click', () => {
     if (!nodo.hasAttribute('data-con-salida')) return;
     const abierto = !nodo.hasAttribute('data-abierto');
@@ -53,6 +55,12 @@ export function ponerTool(nodo, m) {
   const pre = nodo.querySelector('.dm-tool-pre');
   if (pre.textContent !== texto) pre.textContent = texto;
   nodo.toggleAttribute('data-con-salida', Boolean(texto));
+  const caja = nodo.querySelector('.dm-tool-imagenes');
+  const lista = Array.isArray(m.imagenes) ? m.imagenes : [];
+  if (caja.childElementCount !== lista.length) {
+    caja.replaceChildren(...lista.map((im) => h('img', 'dm-tool-imagen', { src: im.dataUrl, alt: im.name, 'data-rad-tip': im.name })));
+  }
+  nodo.toggleAttribute('data-con-imagenes', lista.length > 0);
   if (!texto) { nodo.removeAttribute('data-abierto'); nodo.querySelector('.dm-tool-cabeza').setAttribute('aria-expanded', 'false'); }
 }
 

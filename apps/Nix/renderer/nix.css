@@ -630,6 +630,16 @@
     user-select: text;
   }
 
+  /* Las imágenes que dejó una llamada. Entran fundiéndose. */
+  .dm-tool-imagenes { display: flex; flex-wrap: wrap; gap: var(--rad-space-2); }
+  .dm-tool[data-con-imagenes] .dm-tool-imagenes { padding: 0 var(--rad-space-3) var(--rad-space-3); }
+  .dm-tool-imagen {
+    max-width: 100%;
+    max-height: 360px;
+    border-radius: var(--rad-radius-s);
+    animation: rad-fade-in var(--rad-dur-slow) var(--rad-ease-out) both;
+  }
+
   /* Un tramo de texto que quedó vacío no ocupa lugar. */
   .dm-msg[data-vacio] { display: none; }
 

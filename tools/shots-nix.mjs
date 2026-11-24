@@ -118,6 +118,19 @@ const SCENES = {
     await go('agentes');
     [...view('agentes').querySelectorAll('[data-accion="editar"]')].at(-1).click();
     await sleep(900);`,
+  // Las tools de la segunda etapa. La pantalla que se captura es la de mentira
+  // del proveedor simulado (un degradé), no el escritorio.
+  captura: `
+    datos.ponerModoTools('auto');
+    const t = datos.crearAgente({ nombre: 'Toolsmith', proveedor: 'anthropic', modelo: 'claude-sonnet-5-5', instrucciones: '', tools: ['run_code', 'db_query', 'screen_capture'] });
+    const c = datos.crearChat(t.id);
+    await datos.enviar(c.id, 'TOOLS: ' + JSON.stringify([{ name: 'run_code', args: { language: 'node', code: 'console.log(6 * 7)' } }, { name: 'db_query', args: { sql: 'SELECT 42 AS answer' } }, { name: 'screen_capture', args: {} }]));
+    await quietos();
+    datos.renombrarChat(c.id, 'A look at the screen');
+    await sleep(1200);
+    const hilo = document.querySelector('.dm-hilo:not([data-rad-leaving])');
+    hilo.scrollTop = hilo.scrollHeight;
+    await sleep(600);`,
   'sin-llave': `
     await go('ajustes');
     await sleep(400);`,

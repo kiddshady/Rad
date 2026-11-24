@@ -16,6 +16,7 @@
 // trae además { chat, tools, modo } y aparecen tres eventos:
 //     tipo 'tool'      { callId, kind, label }             se pidió una tool
 //     tipo 'tool-fin'  { callId, status, ms, out, outCut } cómo terminó
+//     tipo 'tool-imagenes' { callId, imagenes }            dejó imágenes: [{ name, dataUrl }]
 //     tipo 'confirmar' { callId, name, label, args, vista } pide permiso;
 //                      se contesta con rad.invoke('chat:confirmar', { callId, permitir, confiar, chat })
 //   y 'fin' y 'error' llevan `tools`: lo que corrió en el turno.
@@ -43,12 +44,14 @@ const DOC_VENICE = '_venice_modelos';
 const VENCE_MS = 6 * 60 * 60 * 1000;
 // Las notas de cada modelo se guardan ya escritas. Si cambia cómo se
 // escriben (hasta la 0.1.1 iban en castellano), lo guardado se vuelve a pedir.
-const FORMATO_VENICE = 3;
+const FORMATO_VENICE = 4;
 
 // Donde se guarda la carpeta de trabajo de las tools, para el arranque siguiente.
 const DOC_TOOLS = '_tools';
 // Lo más largo que la tarjeta de confirmación muestra de un argumento.
 const ARG_MAX = 1500;
+// Cuántas imágenes de una llamada se muestran (y se guardan con el chat).
+const IMAGENES_MAX = 4;
 const ESPERA_MODELOS_MS = 8000;
 
 function limpiar(pedido) {
@@ -88,15 +91,38 @@ function wire(rad, { llave }) {
   // Con el proveedor de mentira (el humo, las capturas) las tools no tocan
   // nada de verdad: trabajan en una carpeta adentro de los datos descartables
   // y lo que «borran» va a una papelera que es otra carpeta ahí mismo.
+  // Tampoco abren nada: os_open anota lo que habría abierto.
   const taller = llave.SIMULADO && process.env.RAD_DATA ? path.join(process.env.RAD_DATA, 'workspace') : null;
+  // run_code dejó imágenes: van a la fila de esa llamada, en el chat.
+  const alProducir = (run, imagenes) => run.notify('tool:artifact', { images: imagenes });
   if (taller) {
     fs.mkdirSync(path.join(taller, '.trash'), { recursive: true });
-    herramientas.iniciar({ trash: (ruta) => fs.promises.rename(ruta, path.join(taller, '.trash', `${Date.now()}-${path.basename(ruta)}`)) });
+    const abiertos = path.join(taller, '.opened.log');
+    const anotar = (que) => fs.promises.appendFile(abiertos, `${que}\n`);
+    herramientas.iniciar({
+      carpeta: taller,
+      alProducir,
+      trash: (ruta) => fs.promises.rename(ruta, path.join(taller, '.trash', `${Date.now()}-${path.basename(ruta)}`)),
+      // y no miran la pantalla de nadie: capturan una de mentira
+      ...simulado.pantallaDeMentira(),
+      shell: {
+        openPath: async (p) => { await anotar(`open ${p}`); return ''; },
+        openExternal: (u) => anotar(`url ${u}`),
+        showItemInFolder: (p) => { anotar(`reveal ${p}`); },
+      },
+    });
     herramientas.setCwd(taller);
   } else {
-    herramientas.iniciar({ trash: (ruta) => shell.trashItem(ruta) });
+    // Lo que las tools guardan (el taller de run_code, la base del agente)
+    // va al lado de los documentos de la app, en su propia carpeta.
+    const carpeta = path.join(path.dirname(rad.store.dir), 'tools');
+    fs.mkdirSync(carpeta, { recursive: true });
+    const { desktopCapturer, screen } = require('electron');
+    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen });
     herramientas.setCwd(rad.store.read(DOC_TOOLS)?.carpeta);
   }
+  // Al salir, lo que quedó corriendo en segundo plano se mata.
+  require('electron').app.on('before-quit', () => herramientas.cerrar());
   const guardarCarpeta = () => {
     const carpeta = herramientas.getCwd();
     if (!taller && rad.store.read(DOC_TOOLS)?.carpeta !== carpeta) rad.store.write(DOC_TOOLS, { carpeta }).catch(() => {});
@@ -176,13 +202,18 @@ function wire(rad, { llave }) {
         reqId: pedido.id,
         convoId: pedido.chat,
         ac: control,
-        tools: pedido.tools,
+        // un modelo sin ojos no puede usar una captura: la imagen le llegaría
+        // igual y el proveedor rebotaría el pedido entero. Los de Anthropic ven
+        // todos; uno de Venice, solo si Venice lo declara (ante la duda, no:
+        // no ofrecerla a uno que ve solo le quita una tool)
+        tools: pedido.proveedor === 'anthropic' || elModelo?.vision === true ? pedido.tools : pedido.tools.filter((n) => n !== 'screen_capture'),
         confirma: () => pedido.modo !== 'auto' && !confiados.has(pedido.chat),
         // los runners avisan sin saber su callId: se lo pone la corrida
         notify(canal, datos) {
           const callId = datos.callId ?? this._callId;
           if (canal === 'tool:activity') avisar('tool', { callId, kind: datos.kind, label: datos.label });
           else if (canal === 'tool:result') avisar('tool-fin', { callId, status: datos.status, ms: datos.ms, out: datos.out, outCut: datos.outCut });
+          else if (canal === 'tool:artifact') avisar('tool-imagenes', { callId, imagenes: (datos.images || []).slice(0, IMAGENES_MAX) });
         },
         // La tarjeta: se le manda a la interfaz qué se va a correr (y, si es
         // un archivo, qué cambia) y se espera la respuesta. Un Stop la cierra.

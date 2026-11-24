@@ -19,11 +19,20 @@
 //     cada corrida trae su lista (run.tools): las que el agente tiene prendidas.
 //   - Si una llamada pide confirmación lo decide run.needsConfirm (el modo
 //     manual / automático de Nix), no una config global.
+//   - El motor no conoce a las familias: lo que necesita de una (cómo es el
+//     destino de os_open) le llega por configurar().
 //   - No hay skills, MCP ni subagentes todavía: sus ramas de runTool no
 //     vinieron. Tampoco el registro de verificación (M10).
 
 const { resolverEn } = require('./base.cjs');
 const path = require('node:path');
+
+// Lo que el motor necesita de otra familia: cómo distinguir una ruta de una
+// URL en el destino de os_open (lo sabe abrir.cjs).
+let clasificarDestino = null;
+function configurar({ classifyOsTarget } = {}) {
+  if (classifyOsTarget !== undefined) clasificarDestino = classifyOsTarget;
+}
 
 // name -> runner(run, args). Lo llena registrar().
 const TOOL_RUNNERS = Object.create(null);
@@ -385,6 +394,11 @@ function congelarRutas(run, name, args) {
     if (Array.isArray(v)) args[k] = v.map(congelar);
     else if (v != null) args[k] = congelar(v);
   }
+  // os_open aparte: solo se congela cuando su target es una ruta y no una URL.
+  if (name === 'os_open' && typeof args.target === 'string'
+      && clasificarDestino?.(args.target).kind === 'path') {
+    args.target = congelar(args.target);
+  }
   return args;
 }
 
@@ -516,7 +530,7 @@ function anotarRechazo(run, name, args, out) {
 }
 
 module.exports = {
-  registrar, registradas, activeToolNames, runTool, anotarRechazo, argsDigest, failedOut,
+  registrar, configurar, registradas, activeToolNames, runTool, anotarRechazo, argsDigest, failedOut,
   thrashCheck, thrashRecord, thrashState, thrashOf, congelarRutas, rondaEsLectura,
   READ_ROUND_TOOLS, IDEMPOTENT_TOOLS, THRASH, CHIP_CHARS,
 };

@@ -210,12 +210,23 @@ async function responder({ modelo, instrucciones, mensajes }, { key, signal, onT
     for (const u of usos) {
       // en serie: runTool anota como canceladas las que queden detrás de un Stop
       const r = await sesion.correr(u.name, u.input);
-      resultados.push({ type: 'tool_result', tool_use_id: u.id, content: r.out, ...(r.error ? { is_error: true } : {}) });
+      resultados.push({ type: 'tool_result', tool_use_id: u.id, content: conImagenes(r), ...(r.error ? { is_error: true } : {}) });
     }
     convo.push({ role: 'user', content: resultados });
     sesion.cerrarRonda(usos.map((u) => u.name));
     if (signal.aborted) return { motivo: 'frenado', modelo: message.model, uso };
   }
+}
+
+// El contenido de un tool_result: el texto, o el texto y las imágenes que la
+// tool le muestra al modelo (una captura de pantalla), como bloques.
+function conImagenes(r) {
+  const bloques = (r.imagenes ?? []).map(bloqueDeImagen).filter(Boolean);
+  return bloques.length ? [{ type: 'text', text: r.out }, ...bloques] : r.out;
+}
+function bloqueDeImagen(dataUrl) {
+  const m = /^data:(image\/(?:jpeg|png|gif|webp));base64,(.+)$/s.exec(String(dataUrl));
+  return m ? { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } } : null;
 }
 
 module.exports = { responder, comprobar, MODELOS, MODELO_INICIAL };

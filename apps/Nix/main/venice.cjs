@@ -56,7 +56,7 @@ async function modelos({ key, signal } = {}) {
       const spec = m.model_spec ?? {};
       const partes = [spec.privacy === 'private' ? 'private, no retention' : 'anonymized'];
       if (spec.availableContextTokens) partes.push(`${contexto(spec.availableContextTokens)} context`);
-      return { id: m.id, nombre: spec.name || m.id, nota: partes.join(' · '), tools: spec.capabilities?.supportsFunctionCalling === true, rasgos: spec.traits ?? [] };
+      return { id: m.id, nombre: spec.name || m.id, nota: partes.join(' · '), tools: spec.capabilities?.supportsFunctionCalling === true, vision: spec.capabilities?.supportsVision === true, rasgos: spec.traits ?? [] };
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'en', { numeric: true }));
   // El que se ofrece primero: el que Venice marca como predeterminado, o el
@@ -218,12 +218,27 @@ async function responder({ modelo, instrucciones, mensajes }, { key, signal, onT
       ...(r.reasoning ? { reasoning_content: r.reasoning } : {}),
       ...(r.reasoningDetails.length ? { reasoning_details: r.reasoningDetails } : {}),
     });
+    const fotos = []; // las imágenes que las tools de esta ronda le muestran al modelo, en orden
     for (const c of calls) {
       let args = null;
       let crudo = null;
       try { args = JSON.parse(c.function.arguments || '{}'); } catch { crudo = c.function.arguments; }
       const out = await sesion.correr(c.function.name, args, { crudo });
       convo.push({ role: 'tool', tool_call_id: c.id, content: out.out });
+      fotos.push(...(out.imagenes ?? []));
+    }
+    // En este formato un mensaje `tool` no puede llevar imágenes, así que las
+    // capturas viajan en un `user` DESPUÉS de todos los resultados (antes
+    // rompería el pareo tool_call → tool). Dos `user` seguidos son legales acá.
+    // (De NeonCode, con su mismo texto.)
+    if (fotos.length) {
+      convo.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: `[The app attaches the ${fotos.length === 1 ? 'screenshot' : `${fotos.length} screenshots`} taken by screen_capture above, in call order. This message is not from the user.]` },
+          ...fotos.map((u) => ({ type: 'image_url', image_url: { url: u } })),
+        ],
+      });
     }
     sesion.cerrarRonda(calls.map((c) => c.function.name));
     if (rescatada) sesion.run.rescatadas = (sesion.run.rescatadas || 0) + calls.length;

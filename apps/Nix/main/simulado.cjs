@@ -27,6 +27,37 @@ const VENICE = {
   inicial: 'grok-4-7',
 };
 
+// Con qué captura screen_capture en el humo: una pantalla de mentira (un
+// degradé de 1920×1080), para no fotografiar el escritorio de nadie. Tiene la
+// forma del desktopCapturer y el screen de Electron.
+function pantallaDeMentira() {
+  const ANCHO = 1920;
+  const ALTO = 1080;
+  const imagen = () => {
+    const { nativeImage } = require('electron');
+    const px = Buffer.alloc(ANCHO * ALTO * 4);
+    for (let y = 0; y < ALTO; y++) {
+      for (let x = 0; x < ANCHO; x++) {
+        const i = (y * ANCHO + x) * 4;
+        px[i] = Math.round((x / ANCHO) * 255);     // B
+        px[i + 1] = Math.round((y / ALTO) * 255);  // G
+        px[i + 2] = 40;                            // R
+        px[i + 3] = 255;
+      }
+    }
+    return nativeImage.createFromBitmap(px, { width: ANCHO, height: ALTO });
+  };
+  const monitor = { id: 1, size: { width: ANCHO, height: ALTO }, scaleFactor: 1 };
+  return {
+    pantallas: { getPrimaryDisplay: () => monitor, getAllDisplays: () => [monitor] },
+    capturador: {
+      getSources: async ({ types = [] } = {}) => (types.includes('screen')
+        ? [{ id: 'screen:1:0', display_id: '1', name: 'Screen 1', thumbnail: imagen() }]
+        : []),
+    },
+  };
+}
+
 function respuesta({ proveedor, modelo, instrucciones, mensajes }) {
   const ultimo = mensajes.at(-1)?.texto ?? '';
   return [
@@ -84,11 +115,16 @@ async function conTools(pedido, { signal, onTexto, onPensando, sesion }) {
     return signal.aborted ? { motivo: 'frenado' } : { motivo: 'fin', modelo: pedido.modelo };
   }
   const lineas = [];
+  let ultimoJob = '';
   for (const [n, llamadas] of rondas.entries()) {
     if (signal.aborted || sesion.esFinal()) break;
     await escribir(`Round ${n + 1}: running ${llamadas.length} call${llamadas.length === 1 ? '' : 's'}.`);
     for (const c of llamadas) {
-      const r = await sesion.correr(c.name, c.args ?? {}, c.raw ? { crudo: c.raw } : {});
+      // «$JOB» en un argumento es el id del último job que arrancó: un modelo
+      // de verdad lo leería del resultado de job_start
+      const args = JSON.parse(JSON.stringify(c.args ?? {}).replaceAll('$JOB', ultimoJob));
+      const r = await sesion.correr(c.name, args, c.raw ? { crudo: c.raw } : {});
+      if (c.name === 'job_start') ultimoJob = r.out.match(/\bj\d+-[a-z0-9]+\b/)?.[0] ?? ultimoJob;
       lineas.push(`- \`${c.name}\`: ${r.error ? 'failed' : 'ok'} — ${r.out.replace(/\s+/g, ' ').slice(0, 90)}`);
     }
     sesion.cerrarRonda(llamadas.map((c) => c.name));
@@ -130,4 +166,4 @@ async function comprobarLlave(key) {
   return { fase: 'aceptada' };
 }
 
-module.exports = { responder, comprobarLlave, VENICE };
+module.exports = { responder, comprobarLlave, VENICE, pantallaDeMentira };

@@ -2,7 +2,8 @@
 // servidor local que hace de las dos APIs: qué pide cada ronda, cómo vuelven
 // los resultados, dónde va el registro del turno y cuándo se corta. Las tools
 // que corren son las de verdad (fs_read, fs_write), sobre una carpeta
-// descartable. Sin red y sin gastar un token.
+// descartable; screen_capture captura una pantalla de mentira. Sin red y sin
+// gastar un token.
 // Uso: node tools/test-nix-tools-loop.mjs
 
 import fs from 'node:fs';
@@ -73,7 +74,16 @@ const taller = fs.mkdtempSync(path.join(os.tmpdir(), 'nix-loop-'));
 fs.writeFileSync(path.join(taller, 'a.txt'), 'contenido de a\n');
 const herramientas = require(path.join(NIX, 'tools', 'index.cjs'));
 const guardas = require(path.join(NIX, 'tools', 'guardas.cjs'));
-herramientas.iniciar({ trash: async () => {} });
+// La pantalla de mentira de screen_capture: una imagen de 800×600 cuyo «JPEG»
+// es un texto, para reconocerlo en lo que viaja.
+const FOTO = Buffer.from('jpeg-de-mentira');
+const monitor = { id: 1, size: { width: 800, height: 600 }, scaleFactor: 1 };
+const foto = { getSize: () => ({ width: 800, height: 600 }), isEmpty: () => false, crop: () => foto, toJPEG: () => FOTO };
+herramientas.iniciar({
+  trash: async () => {},
+  pantallas: { getPrimaryDisplay: () => monitor, getAllDisplays: () => [monitor] },
+  capturador: { getSources: async () => [{ id: 'screen:1:0', display_id: '1', name: 'Screen 1', thumbnail: foto }] },
+});
 herramientas.setCwd(taller);
 const anthropic = require(path.join(NIX, 'anthropic.cjs'));
 const venice = require(path.join(NIX, 'venice.cjs'));
@@ -296,6 +306,50 @@ try {
     check(!r1.error && r2.error && r2.out === 'the user declined to run this tool' && !fs.existsSync(path.join(taller, 'c.txt')), 'confirmación: una llamada rechazada corrió igual');
     check(s.resumen().map((x) => x.status).join() === 'ok,declined' && s.sistema('').includes('can be DECLINED'), 'confirmación: el rechazo no quedó en el registro, o el protocolo no avisa de las tarjetas');
   }
+
+  // 13. Anthropic: la captura de screen_capture viaja ADENTRO del tool_result
+  //     de esa llamada, como bloque de imagen; el de una tool sin imagen sigue
+  //     siendo texto.
+  {
+    const s = nuevaSesion({ tools: ['fs_read', 'screen_capture'] });
+    const r = await correr(anthropic, { modelo: 'claude-opus-5-5', instrucciones: '', mensajes: [{ rol: 'user', texto: 'mirá' }] }, s, [
+      deAnthropic([{ type: 'tool_use', id: 't1', name: 'screen_capture', input: {} }, { type: 'tool_use', id: 't2', name: 'fs_read', input: { paths: ['a.txt'] } }], 'tool_use'),
+      deAnthropic([{ type: 'text', text: 'visto' }]),
+    ]);
+    check(!r.err && r.fin?.motivo === 'fin', `anthropic, captura: ${JSON.stringify(r.fin)} ${r.err?.message ?? ''}`);
+    const resultados = r.pedidos[1].messages.at(-1).content.filter((b) => b.type === 'tool_result');
+    const [c, l] = resultados;
+    check(Array.isArray(c.content) && c.content[0].type === 'text' && c.content[0].text.startsWith('captured display 1 of 1: 800×600 px'), `anthropic, captura: el resultado volvió como ${JSON.stringify(c).slice(0, 200)}`);
+    const img = c.content?.[1];
+    check(c.content.length === 2 && img?.type === 'image' && img.source?.type === 'base64' && img.source.media_type === 'image/jpeg' && img.source.data === FOTO.toString('base64'), `anthropic, captura: la imagen viajó como ${JSON.stringify(img)?.slice(0, 160)}`);
+    check(typeof l.content === 'string' && l.content.includes('contenido de a'), 'anthropic, captura: el resultado de una tool sin imagen dejó de ser texto');
+    check(!c.is_error && s.resumen().map((x) => `${x.name}:${x.status}`).join() === 'screen_capture:ok,fs_read:ok', `anthropic, captura: ${JSON.stringify(s.resumen())}`);
+    check(s.run._capturas == null, 'anthropic, captura: la imagen quedó colgada en la corrida para la llamada siguiente');
+  }
+
+  // 14. Venice: un mensaje `tool` no puede llevar imágenes, así que las de la
+  //     ronda van en UN `user` detrás de todos los resultados, en orden.
+  {
+    const s = nuevaSesion({ tools: ['fs_read', 'screen_capture'] });
+    const llamada = (index, id, name, args) => ({ tool_calls: [{ index, id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] });
+    const r = await correr(venice, { modelo: 'alfa-2', instrucciones: '', mensajes: [{ rol: 'user', texto: 'mirá' }] }, s, [
+      deVenice([llamada(0, 'c1', 'screen_capture', {}), llamada(1, 'c2', 'fs_read', { paths: ['a.txt'] }), llamada(2, 'c3', 'screen_capture', { region: { x: 0, y: 0, width: 100, height: 100 } })], 'tool_calls'),
+      deVenice([llamada(0, 'c4', 'fs_read', { paths: ['a.txt'] })], 'tool_calls'),
+      deVenice([{ content: 'visto' }]),
+    ]);
+    check(!r.err && r.fin?.motivo === 'fin', `venice, captura: ${JSON.stringify(r.fin)} ${r.err?.message ?? ''}`);
+    const p2 = r.pedidos[1];
+    const roles = p2.messages.map((m) => m.role).join();
+    check(roles === 'system,user,assistant,tool,tool,tool,user,user', `venice, captura: la segunda ronda viajó como ${roles}`);
+    check(p2.messages.slice(3, 6).every((m) => typeof m.content === 'string') && p2.messages[3].content.startsWith('captured display 1 of 1'), 'venice, captura: un resultado de tool dejó de ser texto');
+    const fotos = p2.messages[6];
+    check(Array.isArray(fotos.content) && fotos.content.length === 3 && fotos.content[0].type === 'text' && fotos.content[0].text.startsWith('[The app attaches the 2 screenshots taken by screen_capture above, in call order.'), `venice, captura: el mensaje de las imágenes es ${JSON.stringify(fotos.content)?.slice(0, 200)}`);
+    check(fotos.content.slice(1).every((b) => b.type === 'image_url' && b.image_url.url === `data:image/jpeg;base64,${FOTO.toString('base64')}`), 'venice, captura: las imágenes no viajaron como image_url');
+    check(typeof p2.messages[7].content === 'string' && p2.messages[7].content.includes('1. screen_capture(screen) -> ok'), 'venice, captura: el registro del turno no va último, después de las imágenes');
+    // en la ronda siguiente las imágenes siguen en su lugar y no se repiten
+    const p3 = r.pedidos[2];
+    check(p3.messages.filter((m) => Array.isArray(m.content)).length === 1 && p3.messages.map((m) => m.role).join() === 'system,user,assistant,tool,tool,tool,user,assistant,tool,user', `venice, captura: la tercera ronda viajó como ${p3.messages.map((m) => m.role).join()}`);
+  }
 } finally {
   server.close();
   fs.rmSync(taller, { recursive: true, force: true });
@@ -306,4 +360,4 @@ if (failures.length) {
   for (const f of failures) console.error('  ' + f);
   process.exit(1);
 }
-console.log(`test-nix-tools-loop: ok (${checks} comprobaciones: los dos loops, el registro del turno, la última ronda, el rescate, el presupuesto y la confirmación)`);
+console.log(`test-nix-tools-loop: ok (${checks} comprobaciones: los dos loops, el registro del turno, la última ronda, el rescate, el presupuesto, la confirmación y las imágenes de una tool)`);
