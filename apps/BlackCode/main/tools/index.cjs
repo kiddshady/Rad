@@ -26,6 +26,7 @@ const navegador = require('./navegador.cjs');
 const notas = require('./notas.cjs');
 const delegar = require('./delegar.cjs');
 const memoria = require('./memoria.cjs');
+const chats = require('./chats.cjs');
 const skills = require('./skills.cjs');
 const imagenes = require('./imagenes.cjs');
 const agenda = require('./agenda.cjs');
@@ -60,13 +61,14 @@ function sincronizarMcp() {
  *   subagentes         { destino(run), responder(pedido, opciones) }: con qué
  *                      modelo corre un hijo de `delegate` y cómo se lo llama
  *   memoria            la memoria de la app (main/memoria.cjs): remember y recall
+ *   chats              { lista(), leer(id) }: los chats guardados (chat_search y chat_read)
  *   skills             las skills de la app (main/skills.cjs): skill y create_skill
  *   mcp                los servidores MCP (main/mcp.cjs): sus tools, sus grupos y su runner
  *   tareas             { tareas, agentes() }: las tareas programadas (main/tareas.cjs) y los agentes, para schedule
  *   imagenes           { getKey(), ajustes(), deMentira }: la llave de Venice, lo
  *                      elegido en Settings y si es el humo (generate_image)
  */
-function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null, skills: skillsApp = null, imagenes: imagenesApp = null, mcp: mcpDeLaApp = null, tareas: tareasApp = null, reservada = null } = {}) {
+function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null, chats: chatsApp = null, skills: skillsApp = null, imagenes: imagenesApp = null, mcp: mcpDeLaApp = null, tareas: tareasApp = null, reservada = null } = {}) {
   // (la carpeta de los documentos de la app: ninguna tool que toma una ruta entra ahí; ver base.cjs)
   base.setReservada(reservada);
   archivos.configurar({ trash });
@@ -92,6 +94,7 @@ function iniciar({ carpeta = null, trash = null, shell = null, capturador = null
     ...(avisar ? { broadcast: avisar } : {}),
   });
   if (memoriaApp) memoria.configurar({ memoria: memoriaApp });
+  if (chatsApp) { chats.configurar(chatsApp); lienzo.configurar({ agenteDeChat: chats.agenteDe }); }
   if (skillsApp) skills.configurar({ skills: skillsApp });
   if (mcpDeLaApp && mcpDeLaApp !== mcpApp) {
     mcpApp = mcpDeLaApp;
@@ -106,7 +109,7 @@ function iniciar({ carpeta = null, trash = null, shell = null, capturador = null
   if (listo) return;
   motor.registrar({
     ...archivos.runners, ...comandos.runners, ...trabajos.runners, ...busqueda.runners,
-    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners, ...delegar.runners, ...memoria.runners, ...imagenes.runners, ...skills.runners, ...agenda.runners,
+    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners, ...delegar.runners, ...memoria.runners, ...chats.runners, ...imagenes.runners, ...skills.runners, ...agenda.runners,
   });
   listo = true;
 }
@@ -138,7 +141,7 @@ function catalogo() {
  *  cambiar. Para el resto, nada. */
 async function vistaPrevia(run, name, args) {
   try {
-    if (name === 'canvas') return ['edit', 'update', 'delete'].includes(args?.action) ? lienzo.canvasPreview(args) : null;
+    if (name === 'canvas') return ['edit', 'update', 'delete'].includes(args?.action) ? lienzo.canvasPreview(args, run) : null;
     // generar una imagen sale plata: la tarjeta dice con qué modelo y cuánto
     if (name === 'generate_image') return await imagenes.vista(args, run);
     // agendar o borrar una tarea: qué es y cada cuánto corre
@@ -172,7 +175,7 @@ module.exports = {
     // lista de tools cambie a mitad de un turno lo rompe.)
     const sinNotas = Array.isArray(opciones?.tools) && opciones.tools.some((n) => n === 'notepad' || n === 'notepad_write') && !notas.lista();
     // (lo mismo con la memoria, si la app no la configuró)
-    const fuera = new Set([...(sinNotas ? ['notepad', 'notepad_write'] : []), ...(memoria.lista() ? [] : ['remember', 'recall']), ...(skills.lista() ? [] : ['skill', 'create_skill']), ...(imagenes.lista() ? [] : ['generate_image'])]);
+    const fuera = new Set([...(sinNotas ? ['notepad', 'notepad_write'] : []), ...(memoria.lista() ? [] : ['remember', 'recall']), ...(chats.lista() ? [] : ['chat_search', 'chat_read']), ...(skills.lista() ? [] : ['skill', 'create_skill']), ...(imagenes.lista() ? [] : ['generate_image'])]);
     const s = sesion.crear(fuera.size && Array.isArray(opciones?.tools) ? { ...opciones, tools: opciones.tools.filter((n) => !fuera.has(n)) } : opciones);
     const sistema = s.sistema;
     // …y los canvas que este chat tiene abiertos: su cuerpo no viaja en la

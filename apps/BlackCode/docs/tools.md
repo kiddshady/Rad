@@ -61,7 +61,7 @@ agente. La barra de estado repite la cuenta.
 | Canvas | `canvas` |
 | Notes | `notepad`, `notepad_write` |
 | Subagents | `delegate` |
-| Memory | `remember`, `recall` |
+| Memory | `remember`, `recall`, `chat_search`, `chat_read` |
 | Skills | `skill`, `create_skill` |
 | Tasks | `schedule` |
 | Images (opcional) | `generate_image` |
@@ -166,7 +166,16 @@ volcarlo en el mensaje. Cómo está armado:
   papelera que dura 7 días (en modo automático nadie aprobó ese borrado).
 - **Los canales del panel** (`canvas:lista`, `:todos`, `:abrir`, `:guardar`,
   `:borrar`, `:restaurar`, `:exportar`, `:huerfanos`) están en `chat.cjs` y no
-  se acotan a un chat: la biblioteca muestra los de todos. La tool sí.
+  se acotan a un chat: la biblioteca del usuario muestra todos. La tool sí.
+- **Cada agente, sus canvas** (1.8.0). En NeonCode había un solo agente (Neo),
+  así que «la biblioteca entera» eran todos suyos; acá hay varios, y Fran pidió
+  que no se crucen. La tool solo ve los canvas de los chats de SU agente
+  (`esSuyo` en `canvas.cjs`, con `agenteDeChat` que llega por `configurar`):
+  `list` con scope «all» lista los de todos sus chats, `read` abre también los
+  de otro chat suyo (solo lectura), y `delete` borra solo uno de sus chats. El
+  de otro agente, o el de un chat ya borrado (no es de nadie: lo borra el
+  usuario desde el panel), da «not found», y la tarjeta de permiso tampoco lo
+  muestra. `edit` y `update` siguen acotados al chat, como siempre.
 - La interfaz está en `renderer/canvas.js`. Un documento se pinta con
   `markdown.js`; el código va sin resaltado.
 
@@ -514,6 +523,46 @@ decide qué leer.
   es un texto y se guarda entero: va con la `base` con la que se abrió, y lo
   que un agente le agregó mientras tanto se conserva (el cuidado de NeonCode).
 - **No vino:** el recuerdo por similitud, los embeddings y su motor local.
+
+## Los chats de antes
+
+Desde la 1.8.0. La propuso Zac (un agente de BlackCode) y Fran la pidió con una
+regla que no se negocia: **cada agente busca y lee SOLO en sus propios chats**.
+Zac no ve los de Oracle ni al revés; así los chats de un agente de Venice no
+viajan nunca a Anthropic por esta puerta. Las dos tools están en
+`main/tools/chats.cjs` y van en el grupo Memory (son la otra mitad de
+acordarse).
+
+- **`chat_search({ query?, scope?, limit? })`** viene de NeonCode 1.11.3 (que
+  la trajo de Umbra): palabras sueltas y sin orden; primero los mensajes que
+  las tienen todas y, si no hay ninguno, los que tienen alguna (y lo dice).
+  Agrupado por chat, los chats por recencia y adentro en el orden en que se
+  dijo, con un fragmento centrado en la coincidencia. Cada coincidencia trae
+  el **id del chat y el número del mensaje**, para ir con `chat_read`. Mira
+  también las filas de las tools (qué tocó cada una y su salida). `scope`:
+  `others` (de fábrica: los otros chats), `current`, `all`. Sin consulta,
+  lista los chats más recientes con su id.
+- **`chat_read({ id, around? | from?, to? })`** es de BlackCode: los mensajes
+  numerados desde 1, `around` lee cinco antes y cinco después, y un chat largo
+  viene por páginas de 12000 caracteres (dice dónde seguir). Las tools van en
+  una línea, las imágenes y los archivos adjuntos como marcas (su contenido
+  no viaja), y un mensaje de más de 3000 caracteres se corta y lo dice.
+- **De quién es la corrida:** `run.agente`. Lo pone `chat.cjs` en un turno,
+  en una tarea programada (la de su agente) y `delegar.cjs` en un subagente
+  (el de su padre). Sin agente, las dos tools contestan con un error en vez
+  de buscar en todos. Un id de otro agente da el mismo error que uno que no
+  existe: no se dice si existe.
+- **De dónde leen:** los documentos que guarda la interfaz (`chats` y
+  `chat-<id>`), por `rad.store.read` desde `chat.cjs`. Sin índice aparte: se
+  recorren al buscar, como en NeonCode. Si algún día se pone lento, FTS5 (lo
+  propuso Zac), sabiendo que hay que mantenerlo al día con cada mensaje,
+  chat borrado o renombrado.
+- **El canvas sigue la misma regla:** ver «Cada agente, sus canvas» en la
+  sección del canvas. Una corrida sin chat (una tarea) antes leía cualquier
+  canvas; ahora, solo los de su agente.
+- **Lo que no se hizo, a propósito:** el resumen automático de cada chat (Fran:
+  «es al pedo»). Los chats no se cierran nunca y costaría una llamada por chat.
+- Son de lectura: no piden permiso y sus rondas no se cobran.
 
 ## Las skills
 

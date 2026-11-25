@@ -156,7 +156,14 @@ function wire(rad, { llave }) {
     escribir: (doc) => { rad.store.write(DOC_SKILLS, doc).catch(() => {}); },
     alCambiar: (aviso) => rad.send('skills:evento', { propuesta: aviso?.propuesta ?? null }),
   });
-  const paraLaMemoria = { memoria, skills };
+  // Los chats de antes, para chat_search y chat_read: los documentos que guarda
+  // la interfaz (`chats` con la lista y `chat-<id>` con los mensajes). Cada
+  // agente ve solo los suyos: eso lo hace cumplir main/tools/chats.cjs.
+  const chats = {
+    lista: () => (Array.isArray(rad.store.read('chats')?.lista) ? rad.store.read('chats').lista : []),
+    leer: (id) => (/^[\w-]+$/.test(String(id)) ? rad.store.read(`chat-${id}`) : null),
+  };
+  const paraLaMemoria = { memoria, skills, chats };
   // El canvas: los títulos de los chats (para su biblioteca) salen del
   // documento que guarda la interfaz, y cuando el agente borra uno se avisa
   // fuera del turno (el panel puede estar mirando otro chat).
@@ -809,7 +816,8 @@ function wire(rad, { llave }) {
         notify() { toque(); },
       });
       sesion.run.ve = ve;
-      Object.assign(sesion.run, { proveedor: agente.proveedor, modelo: agente.modelo, instrucciones: pedido.instrucciones });
+      // (de qué agente es la corrida: chat_search y chat_read buscan solo en sus chats)
+      Object.assign(sesion.run, { agente: tarea.agente, proveedor: agente.proveedor, modelo: agente.modelo, instrucciones: pedido.instrucciones });
       if (!sesion.activa) sesion = null;
     }
     const tiene = (t) => Array.isArray(agente.tools) && agente.tools.includes(t);

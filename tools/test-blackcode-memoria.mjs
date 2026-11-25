@@ -194,7 +194,8 @@ function nueva(doc = undefined) {
   ok('recall no exige nada (id o query)', !de('recall').parameters.required && Object.keys(de('recall').parameters.properties).join() === 'id,query');
   ok('la descripción de remember ya no promete el recuerdo por similitud de NeonCode', !/surfaced only when relevant|RECALL memory/.test(de('remember').description) && de('remember').description.includes('Memory list'));
   const grupo = defs.GRUPOS.find((g) => g.id === 'memory');
-  ok('tienen su grupo, Memory', grupo?.nombre === 'Memory' && grupo.tools.join() === 'remember,recall');
+  // (con los chats de antes, chat_search y chat_read, desde la 1.8.0)
+  ok('tienen su grupo, Memory', grupo?.nombre === 'Memory' && grupo.tools.join() === 'remember,recall,chat_search,chat_read');
   ok('validar acepta sus argumentos', defs.validar('remember', { fact: 'x', core: true }) === null && defs.validar('recall', { id: 'm1' }) === null, String(defs.validar('remember', { fact: 'x', core: true })));
   ok('y rechaza remember sin hecho', typeof defs.validar('remember', { detail: 'x' }) === 'string');
 

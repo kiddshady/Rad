@@ -1010,8 +1010,8 @@ else {
   herrero.querySelector('[data-accion="abrir"]').click();
   await sleep(dur('base') + 260);
   await until(() => statusRight().includes('Toolsmith'), 3000);
-  // todas (33) menos las tres de la web
-  if (!statusRight().endsWith('· 30 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
+  // todas (35) menos las tres de la web
+  if (!statusRight().endsWith('· 32 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
 
   // Escribir un archivo. En modo manual (el de fábrica) primero pide permiso:
   // la tarjeta dice qué va a correr y qué va a cambiar, y hasta que no se
@@ -1214,14 +1214,14 @@ else {
     if (dice() !== 'Tools: off' || boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· no tools')) fail(`apagar todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     await pick('Turn all on');
-    if (dice() !== '33 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 33 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
+    if (dice() !== '35 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 35 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     const marcadas = [...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].length;
     // («todas» no prende Images: es opcional, porque gasta plata en cada llamada)
     if (marcadas !== 14 || menus()[0].querySelector('.rad-menu-item[aria-checked="true"]')?.parentElement.querySelectorAll('.rad-menu-item[aria-checked]').length !== 15) fail(`con todas prendidas el menú marca ${marcadas} grupos de 15 (tienen que ser 13: Images no entra en «todas»)`);
     if ([...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].some((i) => i.textContent.trim() === 'Images')) fail('«Turn all on» prendió Images, que gasta plata: es opcional');
     await pick('Web');
-    if (dice() !== '30 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
+    if (dice() !== '32 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
     // y las recibe el modelo: el pedido siguiente corre una de esas tools
     // (en modo manual, que es como quedó: pide permiso y se le da)
     await pedir([[{ name: 'fs_read', args: { paths: ['note.txt'] } }]]);
@@ -1229,7 +1229,7 @@ else {
     primary()?.click();
     await until(() => !composer.querySelector('.rad-busy') && ultimo()?.dataset.estado === 'ok' && cuenta() === '1 tool · 1 done', 20000);
     if (cuenta() !== '1 tool · 1 done') fail(`después de prender las tools desde la conversación, el contador dice «${cuenta()}»`);
-    data.toolsEnElChat = `${antes} → Tools: off → 33 tools → 30 tools`;
+    data.toolsEnElChat = `${antes} → Tools: off → 35 tools → 32 tools`;
   }
 
   // 11c. El canvas: el agente deja un documento en el panel de al lado, lo
@@ -2582,6 +2582,40 @@ else {
     await go('memoria');
     await until(() => filasM().length === 0 && areaCore.value === '', 3000);
     if (filasM().length || areaCore.value !== '' || !vista.querySelector('.dm-memoria-vacia')) fail('memoria: vaciarla no dejó la vista vacía');
+
+    // Los chats de antes (1.8.0, chat_search y chat_read, en el grupo Memory):
+    // cada agente busca y lee SOLO en los suyos (Fran). Un chat de este agente
+    // y uno de otro con la misma palabra rara; desde un chat nuevo aparece solo
+    // el propio, y el ajeno no se lee ni con su id.
+    {
+      await go('chat');
+      datosM.ponerModoTools('auto');
+      datosM.ponerTools(agenteM.id, [...new Set([...datosM.toolsDe(agenteM), 'chat_search', 'chat_read'])]);
+      const propio = datosM.crearChat(agenteM.id);
+      await datosM.enviar(propio.id, 'the secret word is zorrocuchillo');
+      await listo2();
+      const otro = datosM.crearAgente({ nombre: 'Other agent', proveedor: 'anthropic', modelo: agenteM.modelo, instrucciones: '', tools: [] });
+      const ajeno = datosM.crearChat(otro.id);
+      await datosM.enviar(ajeno.id, 'zorrocuchillo belongs to another agent');
+      await listo2();
+      // (los chats se guardan cada 1,5 s: que estén en el disco antes de buscar)
+      await sleep(2200);
+      datosM.elegirAgente(agenteM.id);
+      await settle();
+      chatView.querySelector('[data-accion="nuevo-chat"]').click();
+      await settle();
+      await pedir([[{ name: 'chat_search', args: { query: 'zorrocuchillo' } }, { name: 'chat_read', args: { id: ajeno.id } }, { name: 'chat_read', args: { id: propio.id, around: 1 } }]]);
+      await listo2();
+      const busco = sale('chat_search', 0);
+      if (!busco.includes(`id ${propio.id}`) || busco.includes(ajeno.id) || busco.includes('another agent')) fail('chats: chat_search no encontró el chat propio, o trajo el de otro agente: ' + busco.slice(0, 240));
+      if (!sale('chat_read', 0).startsWith('error: none of your chats has the id')) fail('chats: chat_read leyó un chat de otro agente con su id: ' + sale('chat_read', 0).slice(0, 160));
+      if (!sale('chat_read', 1).includes('zorrocuchillo') || !sale('chat_read', 1).includes(`(id ${propio.id})`)) fail('chats: chat_read no leyó el chat propio: ' + sale('chat_read', 1).slice(0, 160));
+      if (fila('chat_search')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'bubble' || shown(fila('chat_search', 0)?.querySelector('.dm-tool-que')) !== 'zorrocuchillo') fail('chats: la fila de chat_search no lleva su ícono o no dice qué buscó');
+      await datosM.borrarAgente(otro.id);
+      datosM.elegirAgente(agenteM.id);
+      await settle();
+      data.chats = 'chat_search encuentra el chat propio y no el de otro agente con la misma palabra; chat_read lee el propio y rechaza el ajeno';
+    }
     await go('chat');
     datosM.ponerModoTools('manual');
     data.memoria = 'texto fijo guardado solo, agregar a mano con detalle, remember (y repetido), recall por id y por palabras, core, la memoria en el system del turno siguiente, la carrera del texto fijo, buscar, cambiar, borrar, grupo apagado y modelo sin tools';

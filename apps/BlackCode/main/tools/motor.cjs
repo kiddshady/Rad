@@ -113,7 +113,7 @@ function activeToolNames(run) {
 //
 // `screen_capture` y `job_output` también son lectura: mirar la pantalla no la
 // cambia, y leer la salida de un job tampoco cambia el job.
-const READ_ROUND_TOOLS = new Set(['fs_read', 'code_search', 'chat_search', 'rag_search',
+const READ_ROUND_TOOLS = new Set(['fs_read', 'code_search', 'chat_search', 'chat_read', 'rag_search',
   'notepad', 'recall', 'skill', 'list_skills', 'web_search', 'fetch', 'browser_read', 'screen_capture', 'job_output']);
 
 // Las del browser que CAMBIAN la pestaña (todas menos browser_read). Ver el
@@ -171,6 +171,8 @@ function argsDigest(name, args) {
     }
     case 'run_code': return cut(a.language || a.lang || 'code');
     case 'web_search': case 'chat_search': case 'rag_search': case 'code_search':
+      // ([BlackCode] chat_search sin consulta lista los chats recientes)
+      if (name === 'chat_search' && !a.query) return 'recent chats';
       return cut(a.query || a.pattern);
     case 'notepad': return cut(a.query || 'recent notes');
     case 'notepad_write': return cut(`${a.action || 'write'}${a.folder ? ` · ${a.folder}` : ''}`);
@@ -211,6 +213,10 @@ function argsDigest(name, args) {
     case 'db_query': return cut(a.sql);
     case 'remember': return cut(a.fact);
     case 'recall': return cut(a.id || a.query);
+    case 'chat_read': {
+      const tramo = a.around != null ? ` · around #${a.around}` : a.from != null || a.to != null ? ` · #${a.from ?? 1}–${a.to ?? 'end'}` : '';
+      return cut(`${a.id || ''}${tramo}`);
+    }
     case 'schedule':
       if (a.action === 'list') return 'list';
       if (a.action === 'delete') return cut(`delete ${a.id || ''}`.trim());
@@ -290,7 +296,7 @@ const failedOut = (out, name) => {
 // `action`). En los tres, equivocarse hacia adentro sería bloquear una escritura
 // legítima porque devolvió dos veces la misma confirmación.
 const IDEMPOTENT_TOOLS = new Set([
-  'fs_read', 'web_search', 'chat_search', 'rag_search', 'code_search', 'notepad', 'recall', 'skill', 'fetch', 'list_skills',
+  'fs_read', 'web_search', 'chat_search', 'chat_read', 'rag_search', 'code_search', 'notepad', 'recall', 'skill', 'fetch', 'list_skills',
 ]);
 
 const THRASH = {

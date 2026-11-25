@@ -64,7 +64,7 @@ const DE_TOOL = {
   browser_navigate: 'globe', browser_read: 'globe', browser_click: 'globe',
   browser_type: 'globe', browser_press: 'globe', browser_upload: 'globe',
   canvas: 'grid', notepad: 'notepad', notepad_write: 'notepad',
-  chat_search: 'bubble', rag_search: 'library', schedule: 'clock',
+  chat_search: 'bubble', chat_read: 'bubble', rag_search: 'library', schedule: 'clock',
   skill: 'sparkle', create_skill: 'sparkle', list_skills: 'sparkle',
   mcp: 'plug', delegate: 'delegate',
   remember: 'memory', recall: 'memory',

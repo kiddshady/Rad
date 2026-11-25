@@ -359,8 +359,9 @@ const TOOL_DEFS = [{
   description:
     'Open a document or code file in the side canvas the user reads next to the chat. Use it for substantial, self-contained content worth keeping, copying or revising (long documents, essays, reports, structured notes, or source code) instead of dumping it inline in the message. '
     + 'Actions: "create" opens a new canvas; "list" shows the canvases already open in this conversation with their ids; "read" returns a canvas\'s full current content by id; "edit" changes PART of a canvas; "update" replaces a canvas whole; "delete" removes a canvas by id. '
-    + '"list" covers this chat only; pass scope "all" to list the whole canvas library (every chat, including deleted ones) with ids. '
-    + '"delete" works on any canvas of the library, not only this chat\'s. Only "delete" when the user asks for it, and only the canvases they mean — if more than one could match, list first and ask. A deleted canvas goes to a trash for ' + canvasStore.TRASH_DIAS + ' days and the user can restore it from the app. '
+    + '"list" covers this chat only; pass scope "all" to list the canvases of all YOUR chats with ids (other agents\' canvases are never visible). '
+    + '"read" also opens a canvas from another of your chats (read-only: "edit" and "update" stay limited to this chat\'s canvases). '
+    + '"delete" works on any canvas of your chats, not only this chat\'s. Only "delete" when the user asks for it, and only the canvases they mean — if more than one could match, list first and ask. A deleted canvas goes to a trash for ' + canvasStore.TRASH_DIAS + ' days and the user can restore it from the app. '
     + 'A canvas\'s content is NOT kept in the chat history, so to revise one you wrote in an earlier turn you must "read" it first to see what it says now. '
     + 'Then use "edit" with a list of exact { old, new } replacements — that is the normal way to revise a canvas, and it is all-or-nothing: each `old` must appear exactly once and if any of them is not found the canvas is left untouched and you are told which one failed. '
     + 'Only use "update" when you are genuinely rewriting the whole thing from scratch; re-emitting a long document just to change a few lines is how paragraphs go missing. '
@@ -370,7 +371,7 @@ const TOOL_DEFS = [{
     properties: {
       action: { type: 'string', enum: ['create', 'read', 'edit', 'update', 'delete', 'list'], description: 'create a new canvas; read an existing canvas\'s content by id; edit part of one; replace one whole; delete one; or list this conversation\'s canvases' },
       id: { type: 'string', description: 'canvas id — required for "read", "edit", "update" and "delete"' },
-      scope: { type: 'string', enum: ['chat', 'all'], description: 'for "list": "chat" (default) lists this conversation\'s canvases; "all" lists the whole canvas library.' },
+      scope: { type: 'string', enum: ['chat', 'all'], description: 'for "list": "chat" (default) lists this conversation\'s canvases; "all" lists the canvases of all your chats.' },
       title: { type: 'string', description: 'short title for the canvas (defaults to "Untitled"). With "edit"/"update" it renames the canvas.' },
       kind: { type: 'string', enum: ['document', 'code'], description: 'document = prose/markdown; code = a source file (default: document)' },
       language: { type: 'string', description: 'for kind "code": the language, e.g. "python", "javascript", "sql"' },
@@ -490,6 +491,32 @@ const TOOL_DEFS = [{
     },
   },
 }, {
+  // Los chats de antes (main/tools/chats.cjs): de NeonCode, que lo trajo de
+  // Umbra. Cada agente busca y lee SOLO en sus propios chats.
+  name: 'chat_search',
+  description: "Search YOUR past conversations with the user (only the chats of this agent; other agents' chats are never visible) for a topic, message or detail discussed before. Use it when the user references something from an earlier chat ('lo que hablamos del...', 'el otro día te pregunté...'). Returns matching messages grouped by chat, each with the chat id and its message number, so you can read around it with chat_read. Omit query to list your most recent chats instead. Read each [timestamp] to judge how long ago it was. Read-only.",
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Words to look for (order-independent). Messages with all of them come first; if none has all, the ones with some. Omit to list your most recent chats.' },
+      scope: { type: 'string', enum: ['others', 'current', 'all'], description: "'others' = your other chats (default), 'current' = only this one (find something said many messages ago), 'all' = both." },
+      limit: { type: 'number', description: 'Max matching messages (or chats, without query), 1-30 (default 10).' },
+    },
+  },
+}, {
+  name: 'chat_read',
+  description: 'Read part of one of YOUR past chats (only chats of this agent), by the chat id that chat_search gives. Messages are numbered from 1. Pass `around` with a message number from chat_search to read the 5 messages before and after it, or `from`/`to` for a range; with neither it starts at the beginning. Long chats come in pages: the result says where to continue. Tool calls show as one line and images as a mark. Read-only.',
+  parameters: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', description: 'The chat id, as chat_search shows it.' },
+      around: { type: 'integer', description: 'A message number: read from 5 before it to 5 after it.' },
+      from: { type: 'integer', description: 'First message number to read (default 1).' },
+      to: { type: 'integer', description: 'Last message number to read (default: the end, page by page).' },
+    },
+    required: ['id'],
+  },
+}, {
   // Las skills (main/skills.cjs). En NeonCode cada skill era una tool propia
   // y `create_skill` la dejaba viva en el acto (y podía ser código). Acá hay
   // una sola tool para cargarlas y lo que escribe el agente es una propuesta.
@@ -581,7 +608,8 @@ const GRUPOS = [
   { id: 'subagents', nombre: 'Subagents', tools: ['delegate'] },
   // La memoria. Prendido, el agente además la VE: su Core y su lista van en
   // el system (también con un modelo que no acepta tools). Ver chat.cjs.
-  { id: 'memory', nombre: 'Memory', tools: ['remember', 'recall'] },
+  // (y los chats de antes: acordarse de lo que se habló, de los chats propios)
+  { id: 'memory', nombre: 'Memory', tools: ['remember', 'recall', 'chat_search', 'chat_read'] },
   // Las skills. Prendido, el agente ve además su índice en el system.
   { id: 'skills', nombre: 'Skills', tools: ['skill', 'create_skill'] },
   // Generar imágenes gasta plata del usuario en cada llamada. Por eso el

@@ -474,7 +474,7 @@ try {
     ok_('titulosDeChats puede devolver el Map sin promesa', /chat "Sincrónico"/.test(await runCanvas(hacerRun('otro'), { action: 'list', scope: 'all' })));
     canvas.configurar({ titulosDeChats: async () => { throw new Error('no se pudo leer'); } });
     const r = await runCanvas(hacerRun('otro'), { action: 'list', scope: 'all' });
-    ok_('si titulosDeChats falla, la lista sale igual', /^All canvases in the library/.test(r) && /chat "Untitled"/.test(r), r.slice(0, 200));
+    ok_('si titulosDeChats falla, la lista sale igual', /^All the canvases of your chats/.test(r) && /chat "Untitled"/.test(r), r.slice(0, 200));
     ok_('  y la biblioteca del panel también', (await canvas.listarTodos()).length > 0);
     canvas.configurar({ titulosDeChats: () => ({ 'chat-A': 'no es un Map' }) });
     ok_('algo que no es un Map vale como ninguno', /chat "Untitled"/.test(await runCanvas(hacerRun('otro'), { action: 'list', scope: 'all' })));
@@ -520,7 +520,7 @@ try {
     canvas.configurar({ dbPath: () => OTRA });
     ok_('configurar otra ruta no la abre todavía', !fs.existsSync(OTRA));
     ok_('  y suelta la anterior', sePuedeMover(DB));
-    t('  la tool ya trabaja sobre la nueva', await runCanvas(hacerRun('chat-A'), { action: 'list', scope: 'all' }), 'The canvas library is empty.');
+    t('  la tool ya trabaja sobre la nueva', await runCanvas(hacerRun('chat-A'), { action: 'list', scope: 'all' }), 'You have no canvases in any of your chats yet.');
     ok_('  que se creó ahí', fs.existsSync(OTRA));
     t('  y no ve nada de la otra', store.get(newId), null);
   }

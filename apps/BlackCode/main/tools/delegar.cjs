@@ -129,6 +129,8 @@ async function correrSubagente(padre, { brief, i, n, padreCall, destino, access 
       confirm: (name, args, callId) => enFila(padre, () => padre.confirm(name, args, callId, { sub: n > 1 ? i + 1 : true })),
     });
     sesion.run.ve = destino.ve === true;
+    // de qué agente es: el hijo busca en los chats de su padre (chat_search), y en ningún otro
+    sesion.run.agente = padre.agente;
     // lo que la app recuerda del usuario: el hijo es una copia del agente
     sesion.run.memoria = padre.memoria ?? '';
     // …y las skills del usuario (un hijo puede cargarlas, no proponerlas)

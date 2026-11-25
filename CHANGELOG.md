@@ -1,5 +1,28 @@
 # Changelog
 
+## BlackCode 1.8.0 (2026-11-25)
+
+- **Un agente puede recuperar lo que se habló en sus otros chats.** Lo propuso
+  Zac y Fran lo pidió con una regla: **cada agente busca y lee SOLO en sus
+  propios chats** (Zac no ve los de Oracle, ni con un id adivinado, ni desde un
+  subagente o una tarea programada). Dos tools nuevas en el grupo Memory, de
+  solo lectura, en `main/tools/chats.cjs`:
+  - `chat_search`, portada de NeonCode (que la trajo de Umbra): palabras
+    sueltas, primero los mensajes con todas y si no los que tienen alguna,
+    agrupado por chat y con un fragmento. Cada coincidencia trae el id del
+    chat y el número del mensaje. Sin consulta, los chats más recientes.
+  - `chat_read`, nueva: un tramo de un chat, `around` un mensaje (cinco antes
+    y cinco después) o `from`/`to`, por páginas. Las tools en una línea y las
+    imágenes y los archivos como marcas.
+- **Cada agente, sus canvas.** `read` abre también un canvas de otro chat
+  propio (solo para leer), y el `list` con scope «all» y el `delete` ya no
+  alcanzan los canvas de otros agentes: en NeonCode había un solo agente, acá
+  varios. La tarjeta de permiso del borrado tampoco muestra uno ajeno. Una
+  tarea programada, que antes podía leer cualquier canvas, ahora lee solo los
+  de su agente.
+- **Lo que no se hizo:** el resumen automático de cada chat que también
+  proponía Zac (Fran: «es al pedo»).
+
 ## BlackCode 1.7.0 (2026-11-25)
 
 - **Un visor de imágenes con zoom** (`renderer/visor.js`). Las imágenes del

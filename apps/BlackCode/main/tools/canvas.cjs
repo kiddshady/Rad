@@ -73,6 +73,9 @@ const { diffLines } = require('./diff.cjs');
 //   titulosDeChats()    un Map id → título de los chats, o una promesa de uno.
 //   broadcast(canal, datos)   avisa a todas las ventanas, haya o no un turno
 //                       mirando (ver el delete de runCanvas).
+//   agenteDeChat(id)    [BlackCode] el agente dueño de un chat, o null: con él,
+//                       `read` abre también un canvas de OTRO chat del mismo
+//                       agente (nunca de otro agente). Sin él, solo los de este chat.
 //
 // Cada llamada cambia solo las llaves que trae. Pasar null en titulosDeChats o
 // en broadcast los desenchufa.
@@ -84,8 +87,10 @@ const SIN_BROADCAST = () => {};
 
 let titulosDeChats = SIN_TITULOS;
 let broadcast = SIN_BROADCAST;
+let agenteDeChat = null;
 
 function configurar(deps = {}) {
+  if ('agenteDeChat' in deps) agenteDeChat = typeof deps.agenteDeChat === 'function' ? deps.agenteDeChat : null;
   if (typeof deps.dbPath === 'function') {
     cerrar();
     rutaCanvasDb = deps.dbPath;
@@ -206,25 +211,38 @@ function canvasBlock(convoId) {
   }
 }
 
+// [BlackCode] ¿Este canvas es de esta corrida? En NeonCode había un solo agente
+// (Neo), así que «la biblioteca entera» eran todos suyos. Acá hay varios, y la
+// regla de Fran es que no se crucen: un agente ve, lee y borra solo los canvas
+// de SUS chats (el de este chat siempre). Uno de otro agente, o de un chat
+// borrado (no es de nadie: lo borra el usuario desde el panel), no existe para
+// la tool. Sin `agenteDeChat` (la tool sola, en sus tests) vale lo de antes.
+function esSuyo(run, c, convoId) {
+  if (!c) return false;
+  if (convoId && c.conversation_id === convoId) return true;
+  if (!agenteDeChat) return true;
+  return Boolean(c.conversation_id) && typeof run?.agente === 'string' && run.agente !== '' && agenteDeChat(c.conversation_id) === run.agente;
+}
+
 async function runCanvas(run, { action, id, title, kind = 'document', language, content, edits, replace_all: replaceAll, scope } = {}) {
   if (!canvasLista()) return 'error: the canvas store is unavailable';
   const convoId = run.convoId || null;
 
-  // La biblioteca entera: todos los canvas de todos los chats, también los de
-  // chats borrados. Existe para poder borrarlos (y ordenarlos) desde cualquier
-  // chat; sin esto el modelo solo veía los del chat abierto, que en un chat
-  // nuevo son cero. Solo metadata, igual que el list del chat.
+  // La biblioteca: los canvas de todos los chats de ESTE agente (ver esSuyo).
+  // Existe para poder borrarlos (y ordenarlos) desde cualquier chat; sin esto
+  // el modelo solo veía los del chat abierto, que en un chat nuevo son cero.
+  // Solo metadata, igual que el list del chat.
   if (action === 'list' && scope === 'all') {
-    const items = canvasStore.listAll();
+    const items = canvasStore.listAll().filter((c) => esSuyo(run, c, convoId));
     run.notify('tool:activity', { reqId: run.reqId, kind: 'canvas', label: 'library' });
-    if (!items.length) return 'The canvas library is empty.';
+    if (!items.length) return 'You have no canvases in any of your chats yet.';
     const titles = await titulosDeChats();
     const where = (c) => (!c.conversation_id ? 'its chat was deleted'
       : c.conversation_id === convoId ? 'this chat'
         : `chat "${titles.get(c.conversation_id) || 'Untitled'}"`);
-    return `All canvases in the library (${items.length}):\n`
+    return `All the canvases of your chats (${items.length}):\n`
       + items.map((c) => `- ${canvasDescriptor(c)} — ${where(c)}, updated ${c.updated_at} UTC`).join('\n')
-      + '\nAny of these ids can be deleted with action "delete". "read", "edit" and "update" only work on canvases of this chat.';
+      + '\nAny of these ids can be deleted with action "delete". "read" works on all of them; "edit" and "update" only on this chat\'s.';
   }
 
   if (action === 'list') {
@@ -238,9 +256,21 @@ async function runCanvas(run, { action, id, title, kind = 'document', language, 
   if (action === 'read') {
     if (!id) return 'error: id is required to read a canvas';
     const c = canvasStore.get(id);
-    // acotado a la conversación: un id inventado o traspapelado no lee otro chat
-    if (!c || (convoId && c.conversation_id && c.conversation_id !== convoId)) return `error: canvas not found: ${id}`;
+    // Acotado a la conversación: un id inventado o traspapelado no lee otro chat.
+    // [BlackCode] Salvo que el otro chat sea del MISMO agente: leer (no editar)
+    // un canvas de otro chat propio. Uno de otro agente, o de un chat borrado,
+    // da el mismo «not found».
+    // (una corrida sin chat, como una tarea programada, antes leía cualquiera:
+    // ahora también solo los de su agente)
+    const deEsteChat = Boolean(c && convoId && c.conversation_id === convoId);
+    const propio = !deEsteChat && Boolean(agenteDeChat) && esSuyo(run, c, convoId);
+    const sinRegla = !agenteDeChat && !convoId; // (sin la función, como antes: los tests de la tool sola)
+    if (!c || !(deEsteChat || propio || sinRegla)) return `error: canvas not found: ${id}`;
     run.notify('tool:activity', { reqId: run.reqId, kind: 'canvas', label: c.title });
+    if (propio) {
+      return `Canvas ${canvasDescriptor(c)}, from another of your chats. It can be read from here but not edited: `
+        + `edit and update only work on this chat's canvases (to build on it, create a new canvas here). Content:\n\n${c.content}`;
+    }
     return `Canvas ${canvasDescriptor(c)}. Current content follows — to revise it, call canvas action "edit" `
       + 'with the same id and a list of exact { old, new } replacements copied from this text. '
       + `Do not send the whole document back:\n\n${c.content}`;
@@ -293,6 +323,8 @@ async function runCanvas(run, { action, id, title, kind = 'document', language, 
   // (no se adivinan), y lo borrado vuelve desde la papelera.
   if (action === 'delete') {
     if (!id) return 'error: id is required to delete a canvas';
+    // (solo uno de sus chats: el de otro agente da el mismo «not found»)
+    if (!esSuyo(run, canvasStore.get(id), convoId)) return `error: canvas not found: ${id}`;
     const c = canvasStore.trash(id, null);
     if (!c) return `error: canvas not found: ${id}`;
     run.notify('tool:activity', { reqId: run.reqId, kind: 'canvas', label: c.title });
@@ -398,13 +430,15 @@ function nombreDeExport({ title, kind, language } = {}) {
 // `update` mete el documento entero como argumento, y la tarjeta lo mostraba
 // crudo. Que el panel se vea al lado no alcanza — cuando la tarjeta pregunta,
 // el cambio todavía no pasó, así que lo que hay para decidir es el diff.
-function canvasPreview(a) {
+function canvasPreview(a, run = null) {
   if (!canvasLista() || !a.id) return null;
   let c;
   try { c = canvasStore.get(a.id); } catch { return null; }
   // 'gone' y no 'missing': el modo de los archivos dice "no existe, crealo con
-  // fs_write", que sobre un canvas no significa nada
-  if (!c) return { target: `canvas ${a.id}`, mode: 'gone' };
+  // fs_write", que sobre un canvas no significa nada.
+  // [BlackCode] Uno de otro agente también: la tarjeta no muestra lo que la
+  // tool después va a rechazar (ver esSuyo).
+  if (!c || (run && (a.action === 'delete' ? !esSuyo(run, c, run.convoId || null) : !(run.convoId && c.conversation_id === run.convoId) && Boolean(agenteDeChat)))) return { target: `canvas ${a.id}`, mode: 'gone' };
   const antes = String(c.content ?? '');
   const etiqueta = `Canvas “${c.title}”`;
   // borrar: lo que se pierde es el documento entero, y eso es lo que hay que ver
