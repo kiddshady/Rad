@@ -577,6 +577,30 @@
   .dm-redactor:not([data-con-nota]) .dm-redactor-nota { display: none; }
   .dm-redactor[data-con-nota] .dm-redactor-nota { padding-bottom: var(--rad-space-1); }
 
+  /* La carpeta de trabajo del chat: un renglón debajo del campo, alineado con
+     él. Se lee como un dato (mono, tenue) y se enciende al acercarse. */
+  .dm-carpeta-fila { max-width: 760px; margin-inline: auto; padding: var(--rad-space-1) var(--rad-space-2) 0; display: flex; min-width: 0; }
+  .dm-carpeta {
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    min-width: 0;
+    max-width: 100%;
+    padding: calc(var(--rad-space-1) / 2) var(--rad-space-2);
+    border-radius: var(--rad-radius-m);
+    color: var(--rad-text-3);
+    font-size: var(--rad-text-xs);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-carpeta:hover { background: var(--rad-tint-hover); color: var(--rad-text-1); }
+  .dm-carpeta .rad-icon { flex: none; width: 13px; height: 13px; }
+  .dm-carpeta-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* la carpeta ya no existe */
+  .dm-carpeta[data-falta] { color: var(--rad-warning); }
+  /* …y la de inicio, en Settings */
+  .dm-carpeta-inicio-fila { display: flex; align-items: center; gap: var(--rad-space-3); min-width: 0; }
+  .dm-carpeta-inicio { flex: 1; min-width: 0; font-size: var(--rad-text-s); color: var(--rad-text-1); overflow-wrap: anywhere; user-select: text; }
+
   /* ---------- Los adjuntos ---------- */
   /* La tira del redactor: sin adjuntos no ocupa lugar; se despliega con el
      primero. */

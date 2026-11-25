@@ -444,7 +444,7 @@ usuario de un chat a otro: un texto fijo que va siempre al contexto y una lista
 de recuerdos de una línea que anotan los agentes (`main/memoria.cjs`), sin
 embeddings. La vista Skills guarda procedimientos escritos por el usuario
 (`main/skills.cjs`): el agente ve la lista y carga el que le sirve, y lo que
-propone un agente no se usa hasta que el usuario lo aprueba. Al lado de la conversación hay además una terminal
+propone un agente no se usa hasta que el usuario lo aprueba. Cada chat tiene su carpeta de trabajo, a la vista debajo del campo para escribir; un chat nuevo arranca en la de inicio, que se elige en Settings. Al lado de la conversación hay además una terminal
 (Ctrl+T): una shell de verdad, PowerShell 7 con el profile del usuario, que es
 solo suya (ninguna tool del agente llega a ella: `main/terminal.cjs`). Viaja
 con xterm adaptado a la CSP de la app (`scripts/vendor-xterm.mjs`) y con

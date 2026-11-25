@@ -1741,7 +1741,7 @@ else {
     if (cualT() !== 'cmd') fail('terminal: en el humo la shell tiene que ser cmd, y dice «' + cualT() + '»');
     await until(() => />$/.test(renglones().at(-1) ?? ''), 6000);
     // (una ruta larga se parte en dos renglones)
-    if (!/workspace>$/.test(renglones().slice(-2).join(''))) fail('terminal: la shell no abrió en la carpeta de trabajo de las tools: «' + renglones().slice(-2).join('') + '»');
+    if (!/workspace>$/.test(renglones().slice(-2).join(''))) fail('terminal: la shell no abrió en la carpeta del chat que se ve: «' + renglones().slice(-2).join('') + '»');
     // lo que se teclea corre
     await teclear('echo %OS%-marca\r');
     await until(() => pantalla().includes('Windows_NT-marca'), 6000);
@@ -2268,6 +2268,173 @@ else {
     await go('chat');
     datosM.ponerModoTools('manual');
     data.skills = 'escribir a mano, el índice en el system, cargar y listar, proponer (no queda en uso), el aviso que lleva a revisar, aprobar, un cambio con su diff, descartar, apagar, grupo apagado, importar un .md, cambiar y borrar';
+  }
+
+  // 11n. La carpeta de trabajo: cada chat la suya. Un chat nuevo arranca en la
+  // carpeta de inicio (Settings); si su agente se mueve, se mueve ese chat y
+  // ningún otro; se ve debajo del campo para escribir y se cambia desde ahí; y
+  // la terminal abre donde está el chat que se ve. Lo que corre de verdad es
+  // un comando que dice dónde está parado. (En el humo, «elegir una carpeta»
+  // no abre el diálogo del sistema: devuelve una de la corrida.)
+  {
+    const datosM = await import('/datos.js');
+    datosM.ponerModoTools('auto');
+    const botonC = chatView.querySelector('[data-accion="carpeta"]');
+    const ruta = () => botonC?.dataset.ruta ?? '';
+    const dice = () => shown(botonC?.querySelector('.dm-carpeta-texto'));
+    const listoC = async () => { await sleep(200); for (let i = 0; i < 400 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50); await settle(); };
+    const salida = () => fila('shell_exec', -1)?.querySelector('.dm-tool-pre').textContent ?? '';
+    const donde = async () => { await pedir([[{ name: 'shell_exec', args: { command: '(Get-Location).Path' } }]]); await listoC(); return salida(); };
+    const menuC = async () => { botonC.click(); await until(() => menus().length === 1, 2000); await sleep(dur('base') + 80); return menus()[0]; };
+    const avisosC = () => [...document.querySelectorAll('.rad-toast')].filter((n) => !n.hasAttribute('data-rad-leaving'));
+    const nuevoChat = async () => { chatView.querySelector('[data-accion="nuevo-chat"]').click(); await settle(); return datosM.chatActual().id; };
+    const inicio = datosM.carpetaInicio();
+    if (!/workspace$/.test(inicio)) fail('carpeta: la de inicio, en el humo, no es la de la corrida: ' + inicio);
+    if (!botonC) fail('carpeta: el chat no muestra dónde está parado');
+
+    // Un chat nuevo nace en la de inicio, y se ve.
+    const chatA = await nuevoChat();
+    await until(() => ruta() === inicio, 2000);
+    if (ruta() !== inicio || datosM.chat(chatA).carpeta !== inicio) fail('carpeta: un chat nuevo no nace en la carpeta de inicio: ' + ruta());
+    if (!(dice() === inicio || (/^[A-Za-z]:\\…\\/.test(dice()) && dice().endsWith('workspace'))) || !botonC.getAttribute('aria-label').endsWith(inicio)) fail('carpeta: el botón dice «' + dice() + '»');
+    {
+      const b = botonC.getBoundingClientRect();
+      const campo = composer.getBoundingClientRect();
+      if (b.width < 40 || b.top < campo.bottom - 1 || b.left < campo.left - 1 || b.right > campo.right + 1 || b.bottom > innerHeight) fail('carpeta: el botón no queda debajo del campo, alineado con él: ' + [b.left, b.top, b.right, b.bottom].map(Math.round).join() + ' / campo ' + [campo.left, campo.top, campo.right, campo.bottom].map(Math.round).join());
+    }
+    const colorSano = getComputedStyle(botonC).color;
+
+    // El agente se mueve: se mueve ESTE chat, y su turno siguiente arranca ahí.
+    await pedir([[{ name: 'shell_exec', args: { command: 'New-Item -ItemType Directory sub-a | Out-Null' } }], [{ name: 'shell_exec', args: { command: '(Get-Location).Path', cwd: 'sub-a' } }]]);
+    await listoC();
+    await until(() => ruta().endsWith('workspace\\sub-a'), 3000);
+    if (!ruta().endsWith('workspace\\sub-a') || datosM.chat(chatA).carpeta !== ruta()) fail('carpeta: el cd del agente no movió su chat: ' + ruta());
+    const enA = await donde();
+    if (!enA.includes('workspace\\sub-a')) fail('carpeta: el turno siguiente del chat no arrancó donde había quedado: ' + enA.slice(-90));
+
+    // Otro chat, nuevo: en la de inicio, no donde quedó el primero.
+    const chatB = await nuevoChat();
+    await until(() => ruta() === inicio, 2000);
+    if (chatB === chatA || ruta() !== inicio) fail('carpeta: un chat nuevo arrancó donde había quedado otro: ' + ruta());
+    const enB = await donde();
+    if (enB.includes('sub-a') || !enB.includes('workspace')) fail('carpeta: los comandos de un chat corrieron en la carpeta de otro: ' + enB.slice(-90));
+    // …y el primero sigue en la suya.
+    datosM.elegirChat(chatA);
+    await until(() => ruta().endsWith('workspace\\sub-a'), 3000);
+    await settle();
+    if (!ruta().endsWith('workspace\\sub-a')) fail('carpeta: al volver a un chat, el botón no muestra SU carpeta: ' + ruta());
+    const otraVezA = await donde();
+    if (!otraVezA.includes('workspace\\sub-a')) fail('carpeta: un chat perdió su carpeta por usar otro: ' + otraVezA.slice(-90));
+
+    // El menú: abre hacia arriba, y elegir otra carpeta mueve solo este chat.
+    {
+      const m = await menuC();
+      const rotulos = [...(m?.querySelectorAll('.rad-menu-item') ?? [])].map((i) => i.textContent.trim()).join('|');
+      if (rotulos !== 'Choose another folder…|Open in File Explorer|Copy path|Back to the home folder') fail('carpeta: el menú trae ' + rotulos);
+      if (m && m.getBoundingClientRect().bottom > botonC.getBoundingClientRect().top + 1) fail('carpeta: el menú no abre hacia arriba');
+      enIngles('en el menú de la carpeta');
+      await pick('Choose another folder');
+    }
+    await until(() => ruta().endsWith('workspace\\picked'), 3000);
+    if (!ruta().endsWith('workspace\\picked') || datosM.chat(chatA).carpeta !== ruta()) fail('carpeta: elegir otra carpeta no movió el chat: ' + ruta());
+    if (datosM.chat(chatB).carpeta !== inicio) fail('carpeta: elegir la carpeta de un chat movió la de otro');
+    const enElegida = await donde();
+    if (!enElegida.includes('workspace\\picked')) fail('carpeta: los comandos no corren en la carpeta elegida: ' + enElegida.slice(-90));
+    // Abrirla en el Explorador (en el humo no abre nada): sin queja.
+    await menuC();
+    await pick('Open in File Explorer');
+    if (avisosC().some((n) => n.textContent.includes('That folder is gone'))) fail('carpeta: abrir una carpeta que existe dice que no está');
+    // Volver a la de inicio; y ya en ella, esa opción se apaga.
+    await menuC();
+    await pick('Back to the home folder');
+    await until(() => ruta() === inicio, 3000);
+    if (ruta() !== inicio || datosM.chat(chatA).carpeta !== inicio) fail('carpeta: «Back to the home folder» dejó el chat en ' + ruta());
+    {
+      const m = await menuC();
+      const volver = [...(m?.querySelectorAll('.rad-menu-item') ?? [])].find((i) => i.textContent.includes('Back to the home folder'));
+      if (volver?.getAttribute('aria-disabled') !== 'true') fail('carpeta: en la carpeta de inicio, «volver a la de inicio» no está apagado');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await until(() => menus().length === 0, 2000);
+      await settle();
+    }
+
+    // Una carpeta que ya no existe: se avisa, y el mensaje siguiente usa la de
+    // inicio. (De paso, una ruta larga se acorta por el medio.)
+    const fantasma = inicio + '\\a-folder-with-quite-a-long-name-for-the-smoke\\and-one-more-level-just-to-be-sure-that-it-does-not-fit\\deleted-since';
+    datosM.ponerCarpeta(chatA, fantasma);
+    await until(() => botonC.hasAttribute('data-falta'), 3000);
+    await settle();
+    if (!botonC.hasAttribute('data-falta') || !botonC.getAttribute('data-rad-tip').includes('is gone') || getComputedStyle(botonC).color === colorSano) fail('carpeta: una carpeta que ya no existe no se avisa en el botón');
+    if (!/^[A-Za-z]:\\…\\/.test(dice()) || !dice().endsWith('deleted-since') || dice().length >= fantasma.length || !botonC.getAttribute('aria-label').endsWith(fantasma)) fail('carpeta: una ruta larga no se acorta por el medio: «' + dice() + '»');
+    {
+      // …y lo acortado entra en su renglón, sin pasarse del campo
+      const t = botonC.querySelector('.dm-carpeta-texto');
+      if (t.scrollWidth > t.clientWidth + 1 || botonC.getBoundingClientRect().right > composer.getBoundingClientRect().right + 1) fail('carpeta: la ruta acortada igual no entra en su renglón (' + t.scrollWidth + ' en ' + t.clientWidth + ' px): «' + dice() + '»');
+    }
+    await menuC();
+    await pick('Open in File Explorer');
+    await until(() => avisosC().some((n) => n.textContent.includes('That folder is gone')), 3000);
+    if (!avisosC().some((n) => n.textContent.includes('That folder is gone'))) fail('carpeta: abrir una carpeta que ya no existe no dice nada');
+    const sinCarpeta = await donde();
+    if (sinCarpeta.includes('deleted-since') || !sinCarpeta.includes('workspace')) fail('carpeta: con la carpeta borrada, el turno no corrió en la de inicio: ' + sinCarpeta.slice(-90));
+    await until(() => ruta() === inicio && !botonC.hasAttribute('data-falta'), 3000);
+    if (ruta() !== inicio || botonC.hasAttribute('data-falta')) fail('carpeta: después de ese turno el chat no quedó en una carpeta que existe: ' + ruta());
+
+    // La terminal abre donde está el chat que se ve (reiniciarla la lleva ahí).
+    {
+      const escena = chatView.querySelector('.dm-escena');
+      const term = chatView.querySelector('.dm-term');
+      const cuerpoT = term.querySelector('.dm-term-cuerpo');
+      const renglonesT = () => [...cuerpoT.querySelectorAll('.xterm-rows > div')].map((d) => d.textContent.replace(/ /g, ' ').trimEnd()).filter(Boolean);
+      const reiniciar = async (cola) => { term.querySelector('[data-accion="term-reiniciar"]').click(); await until(() => cola.test(renglonesT().slice(-2).join('')), 9000); return renglonesT().slice(-2).join(''); };
+      datosM.ponerCarpeta(chatA, inicio + '\\sub-a');
+      await until(() => ruta().endsWith('sub-a'), 2000);
+      chatView.querySelector('[data-accion="terminal"]').click();
+      await until(() => term.hasAttribute('data-abierto') && cuerpoT.querySelector('.xterm-rows') && />$/.test(renglonesT().at(-1) ?? ''), 9000);
+      await sleep(dur('base') + 200);
+      const enSub = await reiniciar(/sub-a>$/);
+      if (!/sub-a>$/.test(enSub)) fail('carpeta: la terminal no abrió en la carpeta del chat que se ve: «' + enSub + '»');
+      datosM.elegirChat(chatB);
+      await until(() => ruta() === inicio, 3000);
+      await settle();
+      const enInicio = await reiniciar(/workspace>$/);
+      if (!/workspace>$/.test(enInicio)) fail('carpeta: con otro chat a la vista, la terminal abrió en «' + enInicio + '»');
+      term.querySelector('[data-accion="term-cerrar"]').click();
+      await until(() => !escena.hasAttribute('data-panel'), 3000);
+      await settle();
+    }
+
+    // Settings: la carpeta de inicio. Cambiarla vale para los chats NUEVOS, y
+    // para el que todavía no arrancó (está vacío y seguía en la de inicio).
+    const chatVacio = await nuevoChat();
+    if (datosM.chat(chatVacio).carpeta !== inicio) fail('carpeta: el chat vacío no nació en la de inicio');
+    await go('ajustes');
+    const tarjetaC = view('ajustes').querySelector('[data-tarjeta="carpeta"]');
+    const inicioDice = () => shown(tarjetaC?.querySelector('.dm-carpeta-inicio'));
+    if (inicioDice() !== inicio) fail('carpeta: Settings no muestra la carpeta de inicio: «' + inicioDice() + '»');
+    enIngles('en Settings, con la carpeta de inicio');
+    tarjetaC?.querySelector('[data-accion="carpeta-inicio"]').click();
+    await until(() => inicioDice().endsWith('workspace\\picked'), 3000);
+    await settle();
+    if (!inicioDice().endsWith('workspace\\picked') || datosM.carpetaInicio() !== inicioDice()) fail('carpeta: cambiar la de inicio en Settings dejó «' + inicioDice() + '» / ' + datosM.carpetaInicio());
+    const mala = await window.rad.invoke('chat:carpeta-inicio', inicio + '\\nope-nope');
+    if (mala?.ok !== false || !datosM.carpetaInicio().endsWith('picked')) fail('carpeta: una carpeta de inicio que no existe se aceptó');
+    await go('chat');
+    await until(() => ruta().endsWith('workspace\\picked'), 2000);
+    if (!datosM.chat(chatVacio).carpeta.endsWith('workspace\\picked') || !ruta().endsWith('workspace\\picked')) fail('carpeta: un chat que todavía no arrancó no siguió a la carpeta de inicio nueva: ' + datosM.chat(chatVacio).carpeta);
+    const chatC = await nuevoChat();
+    await until(() => ruta().endsWith('workspace\\picked'), 2000);
+    if (!ruta().endsWith('workspace\\picked') || datosM.chat(chatC).carpeta !== ruta()) fail('carpeta: un chat nuevo no arranca en la carpeta de inicio nueva: ' + ruta());
+    if (datosM.chat(chatB).carpeta !== inicio || datosM.chat(chatA).carpeta !== inicio + '\\sub-a') fail('carpeta: cambiar la de inicio movió chats que ya tenían la suya');
+    const enC = await donde();
+    if (!enC.includes('workspace\\picked')) fail('carpeta: el chat nuevo no corre en la carpeta de inicio nueva: ' + enC.slice(-90));
+
+    // Queda como estaba.
+    await datosM.ponerCarpetaInicio(inicio);
+    await until(() => datosM.carpetaInicio() === inicio, 2000);
+    for (const a of avisosC()) a.querySelector('.rad-toast-close, [aria-label="Close"], [aria-label="Dismiss"]')?.click();
+    datosM.ponerModoTools('manual');
+    data.carpeta = 'un chat nuevo en la de inicio, el cd mueve solo su chat, cada chat vuelve a la suya, elegir otra, volver a la de inicio, una que ya no existe, la terminal donde está el chat, y la de inicio en Settings';
   }
 
   // Cambiarle las tools a un agente que YA existía, desde su formulario.

@@ -90,6 +90,20 @@ const shellFija = () => ({ file: 'la-shell', kind: 'pwsh', args: ['-NoLogo'] });
   ok('arrancar dos veces no lanza dos shells', t.start({ cols: 80, rows: 24 }).file === 'la-shell' && pty.lanzados.length === 1);
   t.kill();
 }
+// La carpeta del chat que se está viendo: la manda la interfaz con el pedido.
+{
+  const pty = ptyDeMentira();
+  let pedido = 0;
+  const aca = path.join(ROOT, 'tools');
+  const t = new Terminal({ pty, elegir: shellFija, getCwd: () => { pedido++; return ROOT; } });
+  ok('con una carpeta pedida, abre ahí', t.start({ cols: 80, rows: 24, cwd: aca }).cwd === aca && pty.lanzados[0].opciones.cwd === aca, String(t.info()?.cwd));
+  ok('…sin consultar la de inicio', pedido === 0, `la pidió ${pedido} veces`);
+  ok('reiniciar con otra carpeta la lleva ahí', t.restart({ cols: 80, rows: 24, cwd: ROOT }).cwd === ROOT && pty.lanzados[1].opciones.cwd === ROOT);
+  ok('una carpeta pedida que ya no existe: la de inicio, no la del usuario', t.restart({ cwd: path.join(ROOT, 'no-existe-esta-carpeta') }).cwd === ROOT, String(t.info()?.cwd));
+  ok('un archivo no es una carpeta: la de inicio', t.restart({ cwd: path.join(ROOT, 'package.json') }).cwd === ROOT, String(t.info()?.cwd));
+  ok('algo que no es texto: la de inicio', t.restart({ cwd: { no: 'texto' } }).cwd === ROOT && t.restart({ cwd: '' }).cwd === ROOT);
+  t.kill();
+}
 {
   const pty = ptyDeMentira();
   const t = new Terminal({ pty, elegir: shellFija, getCwd: () => path.join(ROOT, 'no-existe-esta-carpeta') });
@@ -173,7 +187,10 @@ const shellFija = () => ({ file: 'la-shell', kind: 'pwsh', args: ['-NoLogo'] });
   ok('lo que sale va al renderer por term:data', JSON.stringify(enviados) === '[["term:data","salida"]]');
   const r2 = canales.get('term:restart')({ cols: 80, rows: 24 }, ventana);
   ok('term:restart lanza otra', r2.ok === true && pty.lanzados.length === 2 && pty.lanzados[0].muerto);
-  pty.lanzados[1].alSalir({ exitCode: 7 });
+  const r3 = canales.get('term:restart')({ cols: 80, rows: 24, cwd: path.join(ROOT, 'tools') }, ventana);
+  ok('term:restart con la carpeta del chat abre ahí', r3.ok === true && r3.cwd === path.join(ROOT, 'tools') && pty.lanzados.at(-1).opciones.cwd === path.join(ROOT, 'tools'), JSON.stringify(r3));
+  canales.get('term:restart')({ cols: 80, rows: 24 }, ventana);
+  pty.lanzados.at(-1).alSalir({ exitCode: 7 });
   ok('y el final va por term:exit', JSON.stringify(enviados.at(-1)) === '["term:exit",{"code":7}]');
   canales.get('term:start')({}, ventana);
   ok('al salir de la app, la shell se mata', alSalir.length === 1 && (alSalir[0](), pty.lanzados.at(-1).muerto && !t.alive));

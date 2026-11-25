@@ -254,6 +254,33 @@ usuario de Windows, las carpetas de inicio, Escritorio, Documentos y Descargas,
 la carpeta de trabajo y la fecha. Eso sale hacia el proveedor (Anthropic o
 Venice) en cada pedido de un agente con tools.
 
+## La carpeta de trabajo
+
+Desde la 0.17.0 **cada chat tiene la suya**. Es donde corren los comandos de su
+agente y contra qué se resuelven sus rutas relativas.
+
+- **Dónde vive.** En la entrada del chat (`carpeta`, en el documento de los
+  chats que guarda la interfaz). Viaja en cada pedido (`chat:enviar`), la
+  sesión arranca ahí (`crearSesion({ cwd })`) y el final del turno devuelve
+  dónde quedó parado el agente (`carpeta` en los eventos `fin` y `error`):
+  si hizo `cd`, se movió ese chat y ningún otro.
+- **La de inicio.** Donde nace un chat nuevo. Se cambia en Settings (canal
+  `chat:carpeta-inicio`) y se guarda en el documento de las tools. Cambiarla
+  no mueve los chats que ya tienen mensajes o una carpeta elegida; el chat
+  vacío que seguía en la de inicio sí la sigue. Un chat cuya carpeta ya no
+  existe usa la de inicio en su próximo turno, y el botón lo avisa.
+- **Se ve.** Debajo del campo para escribir hay un botón con la carpeta del
+  chat; su menú deja elegir otra (el diálogo del sistema, canal
+  `chat:elegir-carpeta`), abrirla en el Explorador, copiar la ruta o volver a
+  la de inicio. Mientras el agente responde no se puede cambiar.
+- **Por qué.** Hasta la 0.16.0 había una sola carpeta para toda la app, que se
+  movía con el `cd` de cualquier agente, se guardaba y no se mostraba en
+  ningún lado: un agente terminaba parado donde lo había dejado otro, y no
+  había forma de saberlo ni de cambiarlo sin pedírselo al agente. Quien
+  actualiza arranca con esa última carpeta como carpeta de inicio.
+- Un subagente arranca en la carpeta de su padre en ese momento, y lo que se
+  mueva no mueve al padre (eso no cambió).
+
 ## Los subagentes
 
 `delegate` (grupo Subagents, desde la 0.13.0) le pasa un trabajo a un
@@ -378,7 +405,8 @@ guardas y sin tiempo límite. **Ninguna tool está registrada contra ese módulo
 (lo cuida `tools/test-blackcode-terminal.mjs`), y así tiene que seguir: para
 que el agente corra un comando están `shell_exec`, `cmd_exec` y los jobs, que
 sí pasan por el permiso. Lo único que comparten es la carpeta de trabajo: la
-shell del panel abre donde están parados los agentes.
+shell del panel abre en la carpeta del chat que se está viendo (reiniciarla la
+lleva a la del chat que se vea en ese momento).
 
 ## Lo que todavía no vino
 

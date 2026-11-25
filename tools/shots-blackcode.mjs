@@ -202,6 +202,19 @@ const SCENES = {
     await quietos();
     await go('skills');
     await sleep(900);`,
+  // La carpeta de trabajo del chat, debajo del campo, con su menú abierto.
+  carpeta: `
+    await charla(blackcode, 'Names for the app', 'Give me some name ideas.');
+    await quietos();
+    datos.ponerCarpeta(datos.chatActual().id, 'S:\\\\tools\\\\Rad\\\\apps\\\\BlackCode');
+    await sleep(700);
+    document.querySelector('[data-accion="carpeta"]').click();
+    await sleep(900);`,
+  // …y la carpeta de inicio, en Settings.
+  'carpeta-inicio': `
+    await go('ajustes');
+    view('ajustes').querySelector('[data-tarjeta="carpeta"]').scrollIntoView({ block: 'center' });
+    await sleep(700);`,
   // La terminal: la shell del panel (en las capturas, cmd y no la del usuario).
   terminal: `
     await charla(blackcode, 'Names for the app', 'Give me some name ideas.');

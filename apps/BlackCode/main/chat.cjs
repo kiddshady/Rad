@@ -64,7 +64,7 @@ const IMAGENES_MAX = 4;
 const ESPERA_MODELOS_MS = 8000;
 
 function limpiar(pedido) {
-  const { id, chat = '', proveedor = 'anthropic', modelo, instrucciones, mensajes, tools = [], modo = 'manual', memoria = false } = pedido ?? {};
+  const { id, chat = '', proveedor = 'anthropic', modelo, instrucciones, mensajes, tools = [], modo = 'manual', memoria = false, carpeta = '' } = pedido ?? {};
   if (typeof id !== 'string' || !id) throw new Error('[blackcode] el pedido no trae id');
   if (!RESPONDER[proveedor]) throw new Error(`[blackcode] proveedor desconocido: ${JSON.stringify(proveedor)}`);
   if (typeof modelo !== 'string' || !modelo) throw new Error('[blackcode] el pedido no trae modelo');
@@ -94,6 +94,8 @@ function limpiar(pedido) {
     modo: modo === 'auto' ? 'auto' : 'manual',
     // ¿este agente ve la memoria de la app? (lo decide la interfaz: su grupo Memory)
     memoria: memoria === true,
+    // la carpeta de trabajo de ese chat ('' = la de inicio)
+    carpeta: typeof carpeta === 'string' ? carpeta : '',
   };
 }
 
@@ -234,11 +236,40 @@ function wire(rad, { llave }) {
   // La terminal del panel: una shell del USUARIO, que abre donde están
   // trabajando las tools. Ninguna tool llega a ella (ver terminal.cjs). En el
   // humo es una shell sin el profile de nadie.
-  require('./terminal.cjs').wire(rad, { getCwd: () => herramientas.getCwd(), deMentira: Boolean(taller) });
-  const guardarCarpeta = () => {
-    const carpeta = herramientas.getCwd();
-    if (!taller && rad.store.read(DOC_TOOLS)?.carpeta !== carpeta) rad.store.write(DOC_TOOLS, { carpeta }).catch(() => {});
-  };
+  // ---------- La carpeta de trabajo ----------
+  // Cada chat tiene la suya (la guarda la interfaz, con el chat) y viaja en
+  // cada pedido. Lo que se guarda acá es la de INICIO: donde arranca un chat
+  // nuevo. Hasta la 0.16.0 había una sola carpeta para toda la app, que se
+  // movía con el `cd` de cualquier agente y no se veía en ningún lado: un
+  // agente terminaba parado donde lo había dejado otro. Esa última carpeta
+  // global es la de inicio con la que arranca quien actualiza.
+  const esCarpeta = (d) => { try { return typeof d === 'string' && Boolean(d) && fs.statSync(d).isDirectory(); } catch { return false; } };
+  let carpetaInicio = herramientas.getCwd();
+  require('./terminal.cjs').wire(rad, { getCwd: () => carpetaInicio, deMentira: Boolean(taller) });
+  rad.handle('chat:carpeta-inicio', (dir) => {
+    if (typeof dir !== 'string') return { ok: true, carpeta: carpetaInicio };
+    if (!esCarpeta(dir)) return { ok: false, error: 'That folder does not exist.' };
+    carpetaInicio = path.resolve(dir);
+    herramientas.setCwd(carpetaInicio);
+    if (!taller) rad.store.write(DOC_TOOLS, { carpeta: carpetaInicio }).catch(() => {});
+    return { ok: true, carpeta: carpetaInicio };
+  });
+  rad.handle('chat:carpeta-existe', (dir) => esCarpeta(dir));
+  // Elegir una carpeta: el diálogo del sistema. En el humo no se abre ningún
+  // diálogo: «elige» una carpeta de la corrida.
+  rad.handle('chat:elegir-carpeta', async (desde, ctx) => {
+    if (taller) { const d = path.join(taller, 'picked'); fs.mkdirSync(d, { recursive: true }); return d; }
+    const { dialog } = require('electron');
+    const ventana = ctx?.window ?? desde?.window ?? null;
+    const opciones = { title: 'Choose a folder', defaultPath: esCarpeta(desde) ? desde : carpetaInicio, properties: ['openDirectory'] };
+    const r = ventana ? await dialog.showOpenDialog(ventana, opciones) : await dialog.showOpenDialog(opciones);
+    return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
+  });
+  rad.handle('chat:abrir-carpeta', async (dir) => {
+    if (!esCarpeta(dir)) return { ok: false };
+    if (!taller) await shell.openPath(dir);
+    return { ok: true };
+  });
   const pendientes = new Map(); // callId -> resolver de la tarjeta que espera
   // Los chats donde el usuario tildó «no preguntar más». En memoria: al
   // reabrir la app, vuelve a preguntar.
@@ -248,7 +279,8 @@ function wire(rad, { llave }) {
     return [k, t.length > ARG_MAX ? `${t.slice(0, ARG_MAX)}… (${t.length - ARG_MAX} more characters)` : t];
   }));
 
-  rad.handle('chat:tools', () => herramientas.catalogo());
+  // (la carpeta del catálogo es la de inicio, no la última por donde anduvo un agente)
+  rad.handle('chat:tools', () => ({ ...herramientas.catalogo(), carpeta: carpetaInicio }));
 
   // ---------- Las notas ----------
   // Los canales de su vista. Los cuerpos son los de NeonCode (notas.cjs): cada
@@ -416,6 +448,8 @@ function wire(rad, { llave }) {
         reqId: pedido.id,
         convoId: pedido.chat,
         ac: control,
+        // la carpeta de ESTE chat; si ya no existe, la de inicio
+        cwd: esCarpeta(pedido.carpeta) ? pedido.carpeta : carpetaInicio,
         // un modelo sin ojos no puede usar una captura: la imagen le llegaría
         // igual y el proveedor rebotaría el pedido entero. Los de Anthropic ven
         // todos; uno de Venice, solo si Venice lo declara (ante la duda, no:
@@ -472,7 +506,8 @@ function wire(rad, { llave }) {
     // Las skills: su índice va en el system del agente que puede cargarlas (la
     // tool `skill`). Sin tools no hay cómo leer el cuerpo de una, así que no va.
     if (sesion?.nombres.includes('skill')) sesion.run.skills = skills.bloque();
-    const corrio = () => (sesion ? { tools: sesion.resumen(), agotado: sesion.run.stopped === 'maxrounds' } : {});
+    // (con dónde quedó parado el agente: la interfaz lo guarda con el chat)
+    const corrio = () => (sesion ? { tools: sesion.resumen(), agotado: sesion.run.stopped === 'maxrounds', ...(typeof sesion.run.cwd === 'string' ? { carpeta: sesion.run.cwd } : {}) } : {});
 
     const opciones = {
       signal: control.signal,
@@ -493,7 +528,7 @@ function wire(rad, { llave }) {
     // No se espera acá: el invoke vuelve enseguida y lo demás llega por eventos.
     trabajo
       .then((fin) => avisar('fin', { ...fin, ...corrio() }), (err) => avisar('error', { mensaje: err.message, ...corrio() }))
-      .finally(() => { activos.delete(pedido.id); if (sesion) guardarCarpeta(); });
+      .finally(() => { activos.delete(pedido.id); });
     return { ok: true };
   });
 

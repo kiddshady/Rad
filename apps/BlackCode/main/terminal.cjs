@@ -85,7 +85,8 @@ class Terminal {
 
   // Idempotente: si ya hay una shell viva devuelve la que hay. El panel lo
   // llama cada vez que se abre, y abrir dos veces no tiene que duplicar nada.
-  start({ cols = 80, rows = 24 } = {}) {
+  // `cwd`: dónde abrirla (la carpeta del chat que se está viendo); sin eso, getCwd().
+  start({ cols = 80, rows = 24, cwd: pedida = null } = {}) {
     if (this.pty) return this.info();
 
     // El require va acá adentro y no arriba del archivo para que un binario
@@ -93,7 +94,8 @@ class Terminal {
     // terminal se puede seguir usando BlackCode, y el error se ve en el panel.
     const pty = this.modulo || require('@lydell/node-pty');
     const shell = this.elegir();
-    let cwd = this.getCwd();
+    let cwd = pedida;
+    try { if (typeof cwd !== 'string' || !cwd || !fs.statSync(cwd).isDirectory()) cwd = this.getCwd(); } catch { cwd = this.getCwd(); }
     try { if (!cwd || !fs.existsSync(cwd)) cwd = os.homedir(); } catch { cwd = os.homedir(); }
 
     this.pty = pty.spawn(shell.file, shell.args ?? [], {
@@ -162,7 +164,8 @@ class Terminal {
 
 /**
  * Los canales del panel.
- *   getCwd     la carpeta de trabajo de ese momento (la de las tools)
+ *   getCwd     la carpeta de inicio: donde abre si la interfaz no dice dónde
+ *              (lo normal es que diga: la del chat que se está viendo)
  *   deMentira  el humo: una shell sin el profile de nadie (cmd.exe)
  *   pty, app   para los tests: el módulo nativo y la app de Electron
  * La shell arranca PEREZOSA, recién en el primer `term:start` (la primera vez
@@ -186,8 +189,8 @@ function wire(rad, { getCwd, deMentira = false, pty = null, app = null } = {}) {
       return { ok: false, error: String(err?.message || err) };
     }
   };
-  rad.handle('term:start', (size) => intentar(() => terminal.start({ cols: size?.cols, rows: size?.rows })));
-  rad.handle('term:restart', (size) => intentar(() => terminal.restart({ cols: size?.cols, rows: size?.rows })));
+  rad.handle('term:start', (size) => intentar(() => terminal.start({ cols: size?.cols, rows: size?.rows, cwd: size?.cwd })));
+  rad.handle('term:restart', (size) => intentar(() => terminal.restart({ cols: size?.cols, rows: size?.rows, cwd: size?.cwd })));
   rad.handle('term:input', (data) => { terminal.write(typeof data === 'string' ? data : ''); });
   rad.handle('term:resize', (size) => { terminal.resize(size?.cols, size?.rows); });
   (app ?? require('electron').app).on('before-quit', () => terminal.kill());

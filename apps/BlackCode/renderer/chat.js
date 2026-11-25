@@ -141,13 +141,93 @@ export function montarChat(el, { router }) {
   };
   const lienzo = montarCanvas({ escena, turnos });
   const nav = montarNavegador({ escena, turnos, router });
-  const consola = montarTerminal({ escena, turnos, router });
+  // (la terminal abre en la carpeta del chat que se está viendo)
+  const consola = montarTerminal({ escena, turnos, router, carpeta: () => { const c = datos.chatActual(); return c ? datos.carpetaDe(c.id) : datos.carpetaInicio(); } });
   const conv = h('section', 'dm-conv', {},
     h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, sub, nav.boton, consola.boton, lienzo.botonBiblioteca, botonTools),
     lienzo.barra, celda, aviso, h('div', 'dm-redactor-caja', {}, redactor));
   escena.append(conv, lienzo.panel, nav.panel, consola.panel);
 
   el.append(lado, escena);
+
+  // ---------- La carpeta de trabajo ----------
+  // Cada chat tiene la suya: donde corren los comandos de su agente y contra
+  // qué se resuelven sus rutas relativas. Un chat nuevo arranca en la carpeta
+  // de inicio (Settings) y después recuerda la propia: si el agente se mueve
+  // con `cd`, se mueve ese chat y ningún otro. Va a la vista, debajo del campo
+  // para escribir, porque sin eso no hay forma de saber dónde está parado un
+  // agente (antes era una sola para toda la app y no se mostraba).
+  const carpetaTexto = h('span', 'dm-carpeta-texto rad-mono rad-swap');
+  const botonCarpeta = h('button', 'dm-carpeta', { type: 'button', 'data-accion': 'carpeta', 'data-rad-tip-side': 'top' }, icono('carpeta'), carpetaTexto);
+  const filaCarpeta = h('div', 'dm-carpeta-fila', {}, botonCarpeta);
+  redactor.parentElement.append(filaCarpeta);
+  // Una ruta que no entra se acorta por el MEDIO: lo que importa es dónde
+  // termina (los puntos suspensivos de CSS se comerían justo eso). Queda la
+  // unidad y, desde el final, todas las carpetas que entren.
+  const acortar = (ruta, max) => {
+    if (ruta.length <= max) return ruta;
+    const partes = ruta.split(/[\\/]/).filter(Boolean);
+    let cola = partes.at(-1);
+    for (let i = partes.length - 2; i > 0; i--) {
+      const mas = `${partes[i]}\\${cola}`;
+      if (partes[0].length + 3 + mas.length > max) break;
+      cola = mas;
+    }
+    return `${partes[0]}\\…\\${cola}`;
+  };
+  // Cuántas letras entran en el renglón (es monoespaciada: se mide una).
+  const lienzoLetra = document.createElement('canvas').getContext('2d');
+  const entran = () => {
+    const estilo = getComputedStyle(carpetaTexto);
+    lienzoLetra.font = `${estilo.fontSize} ${estilo.fontFamily}`;
+    const letra = lienzoLetra.measureText('0').width || 7;
+    // (el ícono, su separación y el relleno del botón: unos 48 px)
+    return Math.max(18, Math.floor((filaCarpeta.clientWidth - 48) / letra) - 1);
+  };
+  const carpetaActual = () => { const c = datos.chatActual(); return c ? datos.carpetaDe(c.id) : datos.carpetaInicio(); };
+  const escribirCarpeta = () => swapText(carpetaTexto, acortar(carpetaActual(), entran()));
+  // (al cambiar el ancho de la ventana, o al abrirse un panel, entra más o menos)
+  new ResizeObserver(escribirCarpeta).observe(filaCarpeta);
+  let turnoCarpeta = 0;
+  const ponerCarpeta = async () => {
+    const ruta = carpetaActual();
+    escribirCarpeta();
+    botonCarpeta.setAttribute('aria-label', `Working folder of this chat: ${ruta}`);
+    botonCarpeta.dataset.ruta = ruta;
+    // ¿sigue existiendo? Si no, se dice: el próximo mensaje va a usar la de inicio.
+    const mio = ++turnoCarpeta;
+    const existe = await window.rad.invoke('chat:carpeta-existe', ruta).catch(() => true);
+    if (mio !== turnoCarpeta) return;
+    botonCarpeta.toggleAttribute('data-falta', !existe);
+    botonCarpeta.setAttribute('data-rad-tip', existe ? 'Working folder of this chat' : 'This folder is gone: the next message will use the home folder');
+  };
+  botonCarpeta.addEventListener('click', () => {
+    const ruta = carpetaActual();
+    const c = datos.chatActual();
+    const ocupado = Boolean(c && datos.respondiendo(c.id));
+    const elChat = () => datos.chatActual() ?? datos.crearChat(datos.agenteActual().id);
+    openMenu({
+      anchor: botonCarpeta,
+      side: 'top',
+      items: [
+        { id: 'elegir', label: ocupado ? 'Choose another folder (after this answer)' : 'Choose another folder…', icon: icono('carpeta').innerHTML, disabled: ocupado, onSelect: async () => {
+          const elegida = await window.rad.invoke('chat:elegir-carpeta', ruta).catch(() => null);
+          if (elegida) datos.ponerCarpeta(elChat().id, elegida);
+        } },
+        { id: 'abrir', label: 'Open in File Explorer', icon: icono('externo').innerHTML, onSelect: async () => {
+          const r = await window.rad.invoke('chat:abrir-carpeta', ruta).catch(() => null);
+          if (!r?.ok) toast({ text: 'That folder is gone.', kind: 'danger' });
+        } },
+        { id: 'copiar', label: 'Copy path', icon: icono('copiar').innerHTML, onSelect: () => navigator.clipboard.writeText(ruta).then(() => toast({ text: 'Copied' }), () => toast({ text: 'Could not copy', kind: 'danger' })) },
+        { separator: true },
+        { id: 'inicio', label: 'Back to the home folder', icon: icono('volver').innerHTML, disabled: ocupado || ruta === datos.carpetaInicio(), onSelect: () => datos.ponerCarpeta(elChat().id, datos.carpetaInicio()) },
+      ],
+    });
+  });
+  datos.on('chats', ponerCarpeta);
+  datos.on('seleccion', ponerCarpeta);
+  datos.on('ajustes', ponerCarpeta);
+  ponerCarpeta();
 
   // ---------- La lista de chats ----------
   const acciones = (id) => {

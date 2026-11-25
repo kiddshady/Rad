@@ -3,7 +3,8 @@
 //
 // Qué se guarda (con el store del núcleo):
 //   agentes     { lista: [{ id, nombre, proveedor, modelo, instrucciones, creado }] }
-//   chats       { lista: [{ id, agente, titulo, auto, cuenta, creado, tocado }] }
+//   chats       { lista: [{ id, agente, titulo, auto, cuenta, creado, tocado, carpeta? }] }
+//               (carpeta: la carpeta de trabajo de ese chat; sin ella, la de inicio)
 //   chat-<id>   { mensajes: [{ id, rol, texto, estado?, nota?, modelo?, tools?, agotado? }] }
 //               y, entre los mensajes, las filas de tools: { id, rol: 'tool', tool,
 //               texto (qué tocó), estado, ms?, salida?, cortada?, imagenes? }
@@ -238,7 +239,8 @@ export function chatActual() {
 
 export function crearChat(agenteId) {
   const ahora = Date.now();
-  const nuevo = { id: nuevoId(), agente: agenteId, titulo: TITULO_NUEVO, auto: true, cuenta: 0, creado: ahora, tocado: ahora };
+  // (nace en la carpeta de inicio, y de ahí en más recuerda la suya)
+  const nuevo = { id: nuevoId(), agente: agenteId, titulo: TITULO_NUEVO, auto: true, cuenta: 0, creado: ahora, tocado: ahora, carpeta: carpetaInicio() };
   chats.update((v) => { v.lista.push(nuevo); return v; });
   avisar('chats');
   elegirChat(nuevo.id);
@@ -258,6 +260,34 @@ export function renombrarChat(id, titulo) {
   const limpio = titulo.trim();
   if (!limpio || !chat(id)) return;
   chats.update((v) => { Object.assign(v.lista.find((c) => c.id === id), { titulo: limpio, auto: false }); return v; });
+  avisar('chats');
+}
+
+// ---------- La carpeta de trabajo ----------
+/** La carpeta donde arranca un chat nuevo (se cambia en Settings). */
+export const carpetaInicio = () => herramientas.carpeta || '';
+export async function ponerCarpetaInicio(dir) {
+  const antes = carpetaInicio();
+  const r = await window.rad.invoke('chat:carpeta-inicio', dir);
+  if (r?.ok) {
+    herramientas = { ...herramientas, carpeta: r.carpeta };
+    // Un chat que todavía no arrancó (vacío, y en la de inicio de antes) la
+    // sigue: si no, el chat en blanco que ya estaba abierto queda en la vieja.
+    // Los que tienen mensajes, o una carpeta elegida, no se mueven.
+    if (antes !== r.carpeta && chats.get().lista.some((c) => !c.cuenta && c.carpeta === antes)) {
+      chats.update((v) => { for (const c of v.lista) if (!c.cuenta && c.carpeta === antes) c.carpeta = r.carpeta; return v; });
+      avisar('chats');
+    }
+    avisar('ajustes');
+  }
+  return r;
+}
+/** La carpeta de trabajo de un chat: la suya, o la de inicio si todavía no
+ *  tiene (los chats de antes de la 0.17.0). */
+export const carpetaDe = (chatId) => chat(chatId)?.carpeta || carpetaInicio();
+export function ponerCarpeta(chatId, dir) {
+  if (!chat(chatId) || typeof dir !== 'string' || !dir || chat(chatId).carpeta === dir) return;
+  chats.update((v) => { v.lista.find((c) => c.id === chatId).carpeta = dir; return v; });
   avisar('chats');
 }
 
@@ -404,6 +434,8 @@ export async function enviar(chatId, texto, adjuntos = null) {
       // la memoria de la app: la ve el agente que tiene prendido su grupo
       // Memory, también si su modelo no acepta tools
       memoria: conMemoria(a),
+      // dónde está parado este chat
+      carpeta: carpetaDe(chatId),
     });
   } catch {
     terminar(chatId, 'error', 'The request could not be sent.');
@@ -470,8 +502,11 @@ function alLlegar(ev) {
     r.confirmacion = { callId: ev.callId, name: ev.name, label: ev.label, args: ev.args ?? {}, vista: ev.vista ?? null, sub: ev.sub ?? null };
     avisar('confirmar', { chat: chatId });
   } else if (ev.tipo === 'fin') {
+    // dónde quedó parado el agente (si hizo `cd`, este chat se movió con él)
+    if (typeof ev.carpeta === 'string') ponerCarpeta(chatId, ev.carpeta);
     terminar(chatId, ESTADO[ev.motivo] ?? 'ok', null, ev);
   } else if (ev.tipo === 'error') {
+    if (typeof ev.carpeta === 'string') ponerCarpeta(chatId, ev.carpeta);
     terminar(chatId, 'error', ev.mensaje, ev);
   }
 }

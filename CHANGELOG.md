@@ -1,5 +1,21 @@
 # Changelog
 
+## BlackCode 0.17.0 (2026-11-24)
+
+- **Cada chat tiene su carpeta de trabajo, y se ve.** Debajo del campo para
+  escribir hay un botón con la carpeta donde está parado ese chat: ahí corren
+  los comandos de su agente. Su menú deja elegir otra, abrirla en el
+  Explorador, copiar la ruta o volver a la de inicio.
+- Si un agente se mueve con `cd`, se mueve ese chat y ningún otro. Antes había
+  una sola carpeta para toda la app, que no se mostraba: un agente terminaba
+  parado donde lo había dejado otro.
+- **Carpeta de inicio**, en Settings: donde arranca un chat nuevo. Quien
+  actualiza arranca con la última carpeta que usó la app.
+- Si la carpeta de un chat ya no existe, el botón lo avisa y el próximo
+  mensaje usa la de inicio.
+- La terminal abre en la carpeta del chat que se está viendo; reiniciarla la
+  lleva a la del chat que se vea en ese momento.
+
 ## BlackCode 0.16.0 (2026-11-24)
 
 - **Skills.** Procedimientos que el usuario les deja a sus agentes: cómo

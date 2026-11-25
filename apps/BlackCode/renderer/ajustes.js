@@ -394,6 +394,27 @@ function tarjetaTools() {
   return tarjeta;
 }
 
+// La carpeta de inicio: donde arranca un chat nuevo. Después cada chat
+// recuerda la suya (se ve y se cambia debajo del campo para escribir).
+function tarjetaCarpeta() {
+  const ruta = h('span', 'dm-carpeta-inicio rad-mono rad-swap');
+  const cambiar = h('button', 'rad-button', { type: 'button', 'data-accion': 'carpeta-inicio' }, 'Change…');
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'carpeta' },
+    h('h2', 'dm-tarjeta-nombre', {}, 'Working folder'),
+    h('p', 'dm-tarjeta-instr', {}, 'Where a new chat starts. After that each chat keeps its own folder: when an agent moves with cd, only that chat moves. The terminal opens where the chat on screen is.'),
+    h('div', 'dm-carpeta-inicio-fila', {}, ruta, cambiar));
+  const poner = () => swapText(ruta, datosApp.carpetaInicio());
+  cambiar.addEventListener('click', async () => {
+    const elegida = await window.rad.invoke('chat:elegir-carpeta', datosApp.carpetaInicio()).catch(() => null);
+    if (!elegida) return;
+    const r = await datosApp.ponerCarpetaInicio(elegida);
+    if (!r?.ok) toast({ text: r?.error ?? 'Could not change the folder.', kind: 'danger' });
+  });
+  poner();
+  datosApp.on('ajustes', poner);
+  return tarjeta;
+}
+
 export function montarAjustes(el, { router }) {
 
   el.append(h('div', 'dm-pagina', {},
@@ -401,6 +422,7 @@ export function montarAjustes(el, { router }) {
     ...PROVEEDORES.map((p) => tarjetaLlave(p)),
     tarjetaBusqueda(),
     tarjetaTools(),
+    tarjetaCarpeta(),
     tarjetaSubagentes(),
     tarjetaAcerca()));
 

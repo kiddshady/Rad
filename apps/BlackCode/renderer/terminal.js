@@ -100,9 +100,10 @@ function tema() {
  *   escena   el contenedor de la conversación y el panel
  *   turnos   { pedir(quien) }: cierra los otros paneles antes de abrir este
  *   router   para saber si la vista de chat está al frente
+ *   carpeta  () => la carpeta de trabajo del chat que se está viendo
  * Devuelve { panel, boton, abierto(), abrir(), cerrar() }.
  */
-export function montarTerminal({ escena, turnos, router }) {
+export function montarTerminal({ escena, turnos, router, carpeta = () => '' }) {
   let term = null;
   let fit = null;
   let viva = false;     // ¿hay una shell del otro lado?
@@ -216,7 +217,8 @@ export function montarTerminal({ escena, turnos, router }) {
   }
 
   async function arrancar(canal = 'term:start') {
-    const r = await pedir(canal, { cols: term.cols, rows: term.rows }).catch((err) => ({ ok: false, error: String(err?.message || err) }));
+    // (abre en la carpeta del chat que se está viendo; reiniciarla la lleva ahí)
+    const r = await pedir(canal, { cols: term.cols, rows: term.rows, cwd: carpeta() || null }).catch((err) => ({ ok: false, error: String(err?.message || err) }));
     if (!r?.ok) {
       viva = false;
       swapText(cual, '');
