@@ -437,7 +437,8 @@ function congelarRutas(run, name, args) {
   if (!args || typeof args !== 'object') return args;
   const congelar = (v) => {
     if (typeof v !== 'string' || !v.trim()) return v;
-    try { return resolverEn(run, v); } catch { return v; } // ruta imposible: que falle el runner, con su mensaje
+    // (una ruta imposible: que falle el runner, con su mensaje. Una de la carpeta de la app, no: se rechaza acá, antes de la tarjeta)
+    try { return resolverEn(run, v); } catch (err) { if (err?.code === 'RESERVADA') throw err; return v; }
   };
   for (const k of ARGS_DE_RUTA[name] || []) {
     const v = args[k];
@@ -466,7 +467,8 @@ async function runTool(run, name, args) {
     rechazo = `error: tool '${name}' is not available in this run`;
   }
 
-  if (!rechazo) congelarRutas(run, name, args);
+  // (una ruta de la carpeta de la app se rechaza ya: no tiene sentido pedir permiso para algo que no se va a hacer)
+  if (!rechazo) { try { congelarRutas(run, name, args); } catch (err) { rechazo = `error: ${String(err?.message || err)}`; } }
 
   // El id tiene que ser único en TODA la conversación, no en el turno: con el
   // reqId adelante (uno por turno) no se repite, tampoco contra los turnos que

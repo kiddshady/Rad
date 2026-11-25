@@ -210,6 +210,7 @@ function checkDisk(data, report) {
   } catch { failures.push('la config de la voz no quedó guardada (falta _voz.json)'); }
   if (leer('voice-si.txt') !== 'said out loud\n') failures.push(`un turno de voz con «Let voice act» no dejó su archivo: ${JSON.stringify(leer('voice-si.txt'))}`);
   if (leer('voice-no.txt') !== null) failures.push('un turno de voz sin permiso escribió su archivo');
+  if (leer('allowed.txt') !== 'next door\n') failures.push(`la carpeta de trabajo, al lado de la vedada, no recibió su archivo: ${JSON.stringify(leer('allowed.txt'))}`);
   if (leer('voice-ask.txt') !== null) failures.push('un turno de voz al que se le negó el permiso escribió su archivo');
   if (leer('task-si.txt') !== 'from a task\n') failures.push(`una tarea con «Let it act» no dejó su archivo: ${JSON.stringify(leer('task-si.txt'))}`);
   if (leer('task-no.txt') !== null) failures.push('una tarea de solo lectura escribió task-no.txt');

@@ -31,7 +31,7 @@
 
 const fsp = require('node:fs/promises');
 const path = require('node:path');
-const { resolverEn, atomicWriteText } = require('./base.cjs');
+const { resolverEn, atomicWriteText, contieneLoDeLaApp } = require('./base.cjs');
 const { diffLines, splitLines } = require('./diff.cjs'); // puro: qué cambia una escritura, para la tarjeta y para el ledger
 
 // ---------------------------------------------------------------------------
@@ -430,6 +430,8 @@ async function runFsEdit(run, { path: p, edits, replace_all: replaceAll } = {}) 
 async function runFsDelete(run, { path: p, force } = {}) {
   if (!p || !String(p).trim()) return 'error: path is required';
   const abs = resolverEn(run, p);
+  // (una carpeta que tiene adentro la de la app: mandarla a la Papelera se llevaría los ajustes, los chats y las llaves)
+  if (contieneLoDeLaApp(abs)) return "error: that folder contains BlackCode's own data folder (its settings, agents, chats and keys) and cannot be deleted from here";
   run.notify('tool:activity', { reqId: run.reqId, kind: 'fs_delete', label: path.basename(abs) });
   try {
     const st = await fsp.lstat(abs); // el enlace se borra como enlace

@@ -4162,6 +4162,65 @@ else {
     data.fijar = 'sin fijados la lista es la de siempre; Pin lo sube a Pinned con Recent debajo; los dos se pliegan; Unpin del último devuelve todo a la vista';
   }
 
+  // 11w. La carpeta de la app está vedada a las tools. Un agente con las tools
+  // de archivos no puede leer ni cambiar los documentos donde BlackCode guarda
+  // sus agentes, el modo de permisos, las tareas o las llaves: con eso se daba
+  // las tools que no tenía. Se rechaza antes de pedir permiso (no se pregunta
+  // por algo que no se va a hacer). Y code_search avisa cuando no encuentra
+  // nada por haber buscado como texto algo que parece una expresión regular.
+  {
+    const datosM = await import('/datos.js');
+    const agenteW = datosM.agenteActual();
+    const modoAntes = datosM.modoTools();
+    datosM.ponerModoTools('manual');
+    await go('chat');
+    const chatW = datosM.crearChat(agenteW.id);
+    await settle();
+    const antes = JSON.stringify(await window.rad.store.read('agentes'));
+    const mandar = async (texto) => { type(composer.querySelector('textarea'), texto); send.click(); await sleep(200); await until(() => !datosM.respondiendo(chatW.id) || permiso(), 20000); };
+    const filasDe = async () => (await datosM.hilo(chatW.id)).get().mensajes.filter((m) => m.rol === 'tool');
+    // (la carpeta de trabajo del humo es hermana de la de los documentos: ..\data)
+    await mandar('TOOLS: [{"name":"fs_write","args":{"path":"..\\\\data\\\\agentes.json","content":"{}"}}]');
+    if (permiso()) { fail('vedada: escribir un documento de la app llegó a pedir permiso (no hay nada que permitir)'); [...(permiso()?.querySelectorAll('.rad-modal-actions .rad-button') ?? [])].find((b) => b.textContent === 'Decline')?.click(); await closed(); }
+    await until(() => !datosM.respondiendo(chatW.id), 20000);
+    await settle();
+    {
+      const f = (await filasDe()).at(-1);
+      if (!f || f.tool !== 'fs_write' || f.estado !== 'error' || !String(f.salida).includes("BlackCode's own data folder")) fail('vedada: escribir un documento de la app no dio su error: ' + JSON.stringify(f).slice(0, 240));
+      if (JSON.stringify(await window.rad.store.read('agentes')) !== antes) fail('vedada: el documento de los agentes cambió');
+    }
+    await mandar('TOOLS: [{"name":"fs_read","args":{"paths":["..\\\\data\\\\agentes.json"]}}]');
+    await until(() => !datosM.respondiendo(chatW.id), 20000);
+    await settle();
+    {
+      const f = (await filasDe()).at(-1);
+      if (!f || f.tool !== 'fs_read' || f.estado !== 'error' || !String(f.salida).includes("BlackCode's own data folder") || String(f.salida).includes('Toolsmith')) fail('vedada: leer un documento de la app no dio su error (o dejó ver su contenido): ' + JSON.stringify(f).slice(0, 240));
+    }
+    // …y lo de al lado (la carpeta de trabajo) sigue andando, con su tarjeta
+    await mandar('TOOLS: [{"name":"fs_write","args":{"path":"allowed.txt","content":"next door\\n"}}]');
+    if (!permiso()) fail('vedada: escribir en la carpeta de trabajo ya no pide permiso (¿se rechazó de más?)');
+    else { primary().click(); await closed(); }
+    await until(() => !datosM.respondiendo(chatW.id), 20000);
+    await settle();
+    if ((await filasDe()).at(-1)?.estado !== 'ok') fail('vedada: escribir en la carpeta de trabajo falló: ' + JSON.stringify((await filasDe()).at(-1)).slice(0, 200));
+    // code_search: «a|b» como texto no encuentra nada, y el resultado lo advierte
+    await mandar('TOOLS: [{"name":"code_search","args":{"mode":"content","pattern":"next|door"}}]');
+    if (permiso()) { primary().click(); await closed(); }
+    await until(() => !datosM.respondiendo(chatW.id), 20000);
+    await settle();
+    {
+      const f = (await filasDe()).at(-1);
+      if (!f || f.tool !== 'code_search' || !String(f.salida).startsWith('No matches') || !String(f.salida).includes('regex=true')) fail('code_search: buscar «a|b» como texto no avisa que se quiso una expresión regular: ' + JSON.stringify(f?.salida).slice(0, 240));
+    }
+    await mandar('TOOLS: [{"name":"code_search","args":{"mode":"content","pattern":"next|door","regex":true}}]');
+    if (permiso()) { primary().click(); await closed(); }
+    await until(() => !datosM.respondiendo(chatW.id), 20000);
+    await settle();
+    if (!String((await filasDe()).at(-1)?.salida).includes('allowed.txt:1')) fail('code_search: con regex=true no encontró lo que estaba: ' + JSON.stringify((await filasDe()).at(-1)?.salida).slice(0, 200));
+    datosM.ponerModoTools(modoAntes);
+    data.vedada = 'un agente no lee ni escribe los documentos de la app (sin tarjeta), la carpeta de al lado sigue andando, y code_search avisa del modo literal';
+  }
+
   data.tools = `Toolsmith: ${tools().length} filas en el último chat; permiso, rechazo, dos rondas, confianza por chat, código, base propia, un job, dos capturas, argumentos malos y modo automático`;
 
   // El agente de prueba se va, con sus chats, y vuelve a quedar Galen abierto

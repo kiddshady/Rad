@@ -85,6 +85,14 @@ function visit(full, name, { pedido = false } = {}) {
   }
 }
 
+const EXCLUIDA = typeof opts.exclude === 'string' && opts.exclude ? opts.exclude.toLowerCase() : null;
+function excluida(full) {
+  if (!EXCLUIDA) return false;
+  let real = full;
+  try { real = fs.realpathSync.native(full); } catch { /* como vino */ }
+  return real.toLowerCase() === EXCLUIDA;
+}
+
 function walk(dir) {
   if (results.length >= MAX_RESULTS || filesWalked >= MAX_FILES) return;
   let entries;
@@ -92,7 +100,8 @@ function walk(dir) {
   for (const e of entries) {
     if (results.length >= MAX_RESULTS || filesWalked >= MAX_FILES) return;
     const full = path.join(dir, e.name);
-    if (e.isDirectory()) { if (!SKIP.has(e.name) && !e.name.startsWith('.')) walk(full); continue; }
+    // (`exclude`: una carpeta que no se recorre —la de los documentos de la app—, venga de donde venga la búsqueda)
+    if (e.isDirectory()) { if (!SKIP.has(e.name) && !e.name.startsWith('.') && !excluida(full)) walk(full); continue; }
     if (!e.isFile()) continue;
     visit(full, e.name);
   }

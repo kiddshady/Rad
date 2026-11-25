@@ -758,6 +758,34 @@ hilo dejaba colgada la carga del modelo. Mira si entró algo sin esperar
 **Lo que no hay:** el micrófono de la PC, elegir al agente nombrándolo en la
 frase, más de un Echo, y un botón para callarlo fuera de Settings.
 
+## La carpeta de la app está vedada
+
+Los documentos de BlackCode (los agentes con sus tools, el modo de permisos, las
+tareas, los servidores MCP, la voz, las llaves cifradas, los chats) viven en una
+carpeta, `<datos de la app>\data`. Ninguna tool que toma una ruta entra ahí, ni
+para leer ni para escribir (desde la 1.3.1).
+
+**Por qué.** No era un problema de las llaves, que están cifradas, sino de
+permisos: un agente con solo las tools de archivos podía editar `agentes.json`
+y darse las de comandos, o prenderse «Let it act». Tener menos tools tiene que
+alcanzar para tener menos poder.
+
+**Dónde.** En un solo lugar: `resolverEn` (`base.cjs`), por donde pasan todas
+las rutas. Tira un error con `code: 'RESERVADA'`, que llega al modelo como
+`error: that path is inside BlackCode's own data folder…`. El motor lo detecta
+al congelar las rutas y rechaza la llamada **antes** de la tarjeta de permiso.
+`fs_delete` además rechaza una carpeta que **contenga** a la de la app. Y
+`code_search` no la recorre aunque se busque desde más arriba (`exclude`).
+
+**Cómo se compara.** Por el camino real (`realpathSync.native`): una ruta
+relativa, otras mayúsculas, un nombre corto (`FRANCI~1`) o una junction que
+apunte ahí dan igual. La app le pasa la carpeta a `iniciar({ reservada })`.
+
+**Lo que no cubre.** Un agente con las tools de comandos (`shell_exec`,
+`run_code`) puede hacer en la PC lo que el usuario; una lista de carpetas no lo
+frena, y no se intenta. La carpeta de trabajo de las tools y la de las imágenes
+están al lado (`…\tools`), no adentro, y siguen como siempre.
+
 ## La terminal del panel no es una tool
 
 Desde la 0.14.0 hay una terminal al lado de la conversación (`main/terminal.cjs`,

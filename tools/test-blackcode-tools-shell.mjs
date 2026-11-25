@@ -597,12 +597,15 @@ try {
     t('  y sin decir que cortó', [r.truncated, r.walkCapped, r.maxFiles], [false, false, 5000]);
     r = buscar({ root: dir, mode: 'content', pattern: 'aguja', glob: '*.md' });
     t('  y el glob filtra', r.results, ['sub/b.md:1: # aguja en otro lado']);
+    // una carpeta excluida no se recorre, venga de donde venga la búsqueda (la de los documentos de la app)
+    r = buscar({ root: dir, mode: 'content', pattern: 'aguja', exclude: fs.realpathSync.native(path.join(dir, 'sub')).toLowerCase() });
+    t('  y una carpeta excluida no se recorre', r.results, ['a.js:2: function aguja() {}']);
   }
 
   // ═══ code_search: el runner ════════════════════════════════════════════════
   seccion('code_search: el runner');
 
-  t('search.cjs exporta lo que dice', Object.keys(search).sort(), ['CODE_SEARCH_MAX_CHARS', 'configurar', 'runCodeSearch', 'runners']);
+  t('search.cjs exporta lo que dice', Object.keys(search).sort(), ['CODE_SEARCH_MAX_CHARS', 'configurar', 'pistaLiteral', 'runCodeSearch', 'runners']);
   t('y su runner es code_search', Object.keys(search.runners), ['code_search']);
   ok_('el worker está al lado de search.cjs', fs.existsSync(WORKER));
 
@@ -636,6 +639,21 @@ try {
     t('con case_sensitive sí', await cs(run, { pattern: 'AGUJA', path: dir, case_sensitive: true }), `No matches for "AGUJA" under ${dir}`);
     t('el patrón es literal salvo que se pida regex', await cs(run, { pattern: 'agu.a', path: dir }), `No matches for "agu.a" under ${dir}`);
     t('y con regex=true es una expresión regular', (await cs(run, { pattern: 'agu.a', path: dir, regex: true })).split('\n')[0], `2 results under ${dir}:`);
+    // Cero resultados en modo literal con un patrón que tiene pinta de regex: un
+    // agente buscó `encargo|Encargos`, no encontró nada y concluyó que la
+    // palabra no estaba. El resultado tiene que advertirle que se buscó tal cual.
+    {
+      const sinNada = await cs(run, { pattern: 'aguja|alfiler', path: dir });
+      ok_('«a|b» en modo literal no encuentra nada, y avisa que se buscó tal cual', sinNada.startsWith(`No matches for "aguja|alfiler" under ${dir}`) && /LITERAL/.test(sinNada) && /regex=true/.test(sinNada) && /does not show the words are absent/.test(sinNada), sinNada);
+      t('…y con regex=true los encuentra, sin aviso', (await cs(run, { pattern: 'aguja|alfiler', path: dir, regex: true })).split('\n')[0], `2 results under ${dir}:`);
+      t('una regex que no encuentra nada no lleva el aviso', await cs(run, { pattern: 'alfiler|dedal', path: dir, regex: true }), `No matches for "alfiler|dedal" under ${dir}`);
+      ok_('si en modo literal SÍ encuentra (una barra de verdad), no hay aviso', (() => { fs.writeFileSync(path.join(dir, 'tabla.md'), '| a|b | c |\n'); return true; })() && !/LITERAL/.test(await cs(run, { pattern: 'a|b', path: dir })) && (await cs(run, { pattern: 'a|b', path: dir })).includes('tabla.md:1'));
+      fs.rmSync(path.join(dir, 'tabla.md'));
+      const p = search.pistaLiteral;
+      ok_('la pista salta con lo que casi nunca es literal', ['a|b', 'foo.*bar', 'x.+', '[a-z]+', '[^0-9]', '(ab)+', '^import'].every((x) => p('content', x, false) !== ''), ['a|b', 'foo.*bar', 'x.+', '[a-z]+', '[^0-9]', '(ab)+', '^import'].filter((x) => p('content', x, false) === '').join(' '));
+      ok_('…y no con búsquedas comunes', ['aguja', 'a.b', 'aguja()', 'arr[0]', 'C:\\docs\\src', 'precio $', 'x == y', 'foo(bar)', '¿qué?', 'v1.2.3'].every((x) => p('content', x, false) === ''), ['aguja', 'a.b', 'aguja()', 'arr[0]', 'C:\\docs\\src', 'precio $', 'x == y', 'foo(bar)', '¿qué?', 'v1.2.3'].filter((x) => p('content', x, false) !== '').join(' '));
+      ok_('…ni si ya era regex, ni en modo files', p('content', 'a|b', true) === '' && p('files', 'a|b', false) === '');
+    }
     t('max_results corta la lista y lo dice', (await cs(run, { pattern: 'aguja', path: dir, max_results: 1 })).split('\n')[0],
       `1 result (truncated at limit) under ${dir}:`);
     const roto = await cs(run, { pattern: '(', path: dir, regex: true });

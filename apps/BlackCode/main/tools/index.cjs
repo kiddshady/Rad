@@ -66,7 +66,9 @@ function sincronizarMcp() {
  *   imagenes           { getKey(), ajustes(), deMentira }: la llave de Venice, lo
  *                      elegido en Settings y si es el humo (generate_image)
  */
-function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null, skills: skillsApp = null, imagenes: imagenesApp = null, mcp: mcpDeLaApp = null, tareas: tareasApp = null } = {}) {
+function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null, skills: skillsApp = null, imagenes: imagenesApp = null, mcp: mcpDeLaApp = null, tareas: tareasApp = null, reservada = null } = {}) {
+  // (la carpeta de los documentos de la app: ninguna tool que toma una ruta entra ahí; ver base.cjs)
+  base.setReservada(reservada);
   archivos.configurar({ trash });
   web.configurar({ getKey, getSecret, webSearch });
   abrir.configurar({ shell });

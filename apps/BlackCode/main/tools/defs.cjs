@@ -86,7 +86,7 @@ const TOOL_DEFS = [{
   },
 }, {
   name: 'code_search',
-  description: 'Search files for text or list files by name, recursively. mode "content": find lines matching `pattern` (literal by default; regex=true for a regular expression) → file:line: matches. mode "files": list file paths matching a `glob`. Skips node_modules/.git/build and binary files. Read-only.',
+  description: 'Search files for text or list files by name, recursively. mode "content": find lines matching `pattern` (LITERAL text by default: "a|b" looks for that exact text with the bar; pass regex=true for a regular expression, e.g. a-or-b) → file:line: matches. mode "files": list file paths matching a `glob`. Skips node_modules/.git/build and binary files. Read-only.',
   parameters: {
     type: 'object',
     properties: {
@@ -94,7 +94,7 @@ const TOOL_DEFS = [{
       pattern: { type: 'string', description: 'text or regex to find (required for mode "content").' },
       glob: { type: 'string', description: 'limit to files matching this glob, e.g. "*.js" or "**/*.ts" (required for mode "files").' },
       path: { type: 'string', description: 'directory to search, or a single file to search inside (default: current working directory).' },
-      regex: { type: 'boolean', description: 'treat pattern as a regular expression (default false = literal).' },
+      regex: { type: 'boolean', description: 'treat pattern as a regular expression (default false = literal). Needed for alternation (a|b), wildcards (.*), classes ([a-z]) or anchors.' },
       case_sensitive: { type: 'boolean', description: 'case-sensitive match (default false).' },
       max_results: { type: 'number', description: 'max results (default 100, max 1000).' },
     },

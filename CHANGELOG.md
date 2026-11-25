@@ -1,5 +1,26 @@
 # Changelog
 
+## BlackCode 1.3.1 (2026-11-25)
+
+- **Las tools no entran a la carpeta donde la app guarda lo suyo.** Un agente
+  con solo las tools de archivos podía leer y editar los documentos de
+  BlackCode: darse las tools de comandos (`agentes.json`), pasar la app a
+  automático, prenderse «Let it act» o «Let voice act», o cambiar el comando de
+  un servidor MCP. Ahora toda tool que toma una ruta (`fs_read`, `fs_write`,
+  `fs_edit`, `fs_delete`, `sqlite_query`, `code_search`, `os_open`…) rechaza
+  lo que cae en esa carpeta, también por una ruta relativa, un nombre corto o
+  una junction, y antes de mostrar la tarjeta de permiso. Tampoco se puede
+  mandar a la Papelera una carpeta que la contenga. La carpeta de trabajo y la
+  de las imágenes, que están al lado, siguen como siempre. (Un agente con las
+  tools de comandos sigue pudiendo lo que puede el usuario: esto cuida que
+  tener menos no alcance para dárselas.)
+- **`code_search` avisa cuando no encuentra nada por buscar como texto algo
+  que parece una expresión regular.** Un agente buscó `encargo|Encargos`, le
+  dio cero resultados (se buscó tal cual, con la barra) y concluyó que la
+  palabra no estaba. Ahora ese «No matches» dice que se buscó como texto y que
+  con `regex=true` es otra búsqueda. No cambia qué se busca: una `|` de verdad
+  se sigue pudiendo buscar. La descripción de la tool también lo aclara.
+
 ## BlackCode 1.3.0 (2026-11-25)
 
 - **Fijar chats.** El menú de un chat ofrece «Pin»: el chat sube al grupo

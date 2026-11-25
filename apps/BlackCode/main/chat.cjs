@@ -294,6 +294,7 @@ function wire(rad, { llave }) {
     const anotar = (que) => fs.promises.appendFile(abiertos, `${que}\n`);
     herramientas.iniciar({
       carpeta: taller,
+      reservada: rad.store.dir,
       alProducir,
       ...paraElCanvas,
       ...paraElNavegador,
@@ -316,7 +317,7 @@ function wire(rad, { llave }) {
     const carpeta = path.join(path.dirname(rad.store.dir), 'tools');
     fs.mkdirSync(carpeta, { recursive: true });
     const { desktopCapturer, screen } = require('electron');
-    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, ...paraLosSubagentes, ...paraLaMemoria, ...paraLasImagenes, ...paraMcp, ...paraLasTareas, abrirAfuera: (u) => shell.openExternal(u) });
+    herramientas.iniciar({ carpeta, reservada: rad.store.dir, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, ...paraLosSubagentes, ...paraLaMemoria, ...paraLasImagenes, ...paraMcp, ...paraLasTareas, abrirAfuera: (u) => shell.openExternal(u) });
     herramientas.setCwd(rad.store.read(DOC_TOOLS)?.carpeta);
   }
   // Al salir, lo que quedó corriendo en segundo plano se mata.

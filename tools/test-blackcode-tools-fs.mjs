@@ -653,9 +653,72 @@ try {
   limpiar();
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// La carpeta de la app: ninguna tool que toma una ruta entra a donde BlackCode
+// guarda sus documentos (los agentes y sus tools, el modo de permisos, las
+// tareas, los servidores MCP, la voz, las llaves). Con solo las tools de
+// archivos, un agente podía darse las de comandos editando agentes.json.
+// ════════════════════════════════════════════════════════════════════════════
+{
+  seccion('la carpeta de la app');
+  const base = require(path.join(TOOLS, 'base.cjs'));
+  const raiz = fresh('bc-reservada-');
+  const deLaApp = path.join(raiz, 'data');
+  const trabajo = path.join(raiz, 'workspace');
+  fs.mkdirSync(deLaApp);
+  fs.mkdirSync(trabajo);
+  const agentes = path.join(deLaApp, 'agentes.json');
+  const ORIGINAL = '{"lista":[{"nombre":"Zac","tools":["fs_read"]}]}';
+  fs.writeFileSync(agentes, ORIGINAL);
+  fs.writeFileSync(path.join(trabajo, 'nota.txt'), 'una nota\n');
+  base.setReservada(deLaApp);
+  const run = runEn(trabajo);
+  // (un runner que tira llega al modelo como «error: …»: lo arma el motor)
+  const pedir = async (tool, args) => { try { return String(await runners[tool](run, args)); } catch (e) { return `error: ${e.message}`; } };
+  const vedado = (salida) => /^error: /.test(salida) && /BlackCode's own data folder/.test(salida);
+
+  ok_('leer un documento de la app se rechaza', vedado(await pedir('fs_read', { paths: [agentes] })), await pedir('fs_read', { paths: [agentes] }));
+  ok_('…y no se filtra su contenido', !(await pedir('fs_read', { paths: [agentes] })).includes('Zac'));
+  ok_('listar la carpeta de la app se rechaza', vedado(await pedir('fs_read', { paths: [deLaApp] })));
+  ok_('escribir un documento de la app se rechaza', vedado(await pedir('fs_write', { path: agentes, content: '{"lista":[]}' })));
+  ok_('…por la ruta relativa también', vedado(await pedir('fs_write', { path: '..\\data\\agentes.json', content: 'x' })) && vedado(await pedir('fs_write', { path: '../data/agentes.json', content: 'x' })));
+  ok_('…y con otras mayúsculas', process.platform !== 'win32' || vedado(await pedir('fs_write', { path: agentes.toUpperCase(), content: 'x' })));
+  ok_('crear un archivo nuevo ahí se rechaza', vedado(await pedir('fs_write', { path: path.join(deLaApp, '_tareas.json'), content: '{}' })) && !fs.existsSync(path.join(deLaApp, '_tareas.json')));
+  ok_('editar un documento de la app se rechaza', vedado(await pedir('fs_edit', { path: agentes, edits: [{ old: '"fs_read"', new: '"fs_read","shell_exec"' }] })));
+  ok_('borrar un documento de la app se rechaza', vedado(await pedir('fs_delete', { path: agentes })));
+  ok_('el documento quedó como estaba', fs.readFileSync(agentes, 'utf8') === ORIGINAL);
+  // por un atajo (una junction en la carpeta de trabajo que apunta a la de la app)
+  let atajo = false;
+  try { fs.symlinkSync(deLaApp, path.join(trabajo, 'atajo'), 'junction'); atajo = true; } catch { /* sin permiso para crearla: no se prueba */ }
+  if (atajo) {
+    ok_('por una junction que apunta ahí, tampoco se lee', vedado(await pedir('fs_read', { paths: [path.join(trabajo, 'atajo', 'agentes.json')] })));
+    ok_('…ni se escribe', vedado(await pedir('fs_write', { path: 'atajo/agentes.json', content: 'x' })) && fs.readFileSync(agentes, 'utf8') === ORIGINAL);
+    fs.rmSync(path.join(trabajo, 'atajo'), { recursive: false, force: true });
+  }
+  // borrar una carpeta que la CONTIENE se la llevaría puesta
+  const borrarRaiz = await pedir('fs_delete', { path: raiz, force: true });
+  ok_('borrar una carpeta que contiene la de la app se rechaza', /^error: /.test(borrarRaiz) && /contains BlackCode's own data folder/.test(borrarRaiz) && fs.existsSync(agentes), borrarRaiz);
+  ok_('borrar la carpeta de la app se rechaza', vedado(await pedir('fs_delete', { path: deLaApp, force: true })) && fs.existsSync(agentes));
+  // lo de al lado sigue andando
+  ok_('la carpeta de trabajo, al lado, se lee y se escribe', (await pedir('fs_read', { paths: ['nota.txt'] })).includes('una nota') && !/^error/.test(await pedir('fs_write', { path: 'nueva.txt', content: 'ok\n' })) && fs.readFileSync(path.join(trabajo, 'nueva.txt'), 'utf8') === 'ok\n');
+  ok_('una carpeta con un nombre parecido no es la de la app', (() => { fs.mkdirSync(path.join(raiz, 'data-vieja')); fs.writeFileSync(path.join(raiz, 'data-vieja', 'a.txt'), 'x'); return base.esDeLaApp(path.join(raiz, 'data-vieja', 'a.txt')) === false && base.esDeLaApp(path.join(raiz, 'data')) === true && base.esDeLaApp(raiz) === false; })());
+  ok_('…y contener es al revés que estar adentro', base.contieneLoDeLaApp(raiz) === true && base.contieneLoDeLaApp(trabajo) === false && base.contieneLoDeLaApp(deLaApp) === true);
+  // las otras tools que toman una ruta pasan por el mismo lugar
+  const sqlite = require(path.join(TOOLS, 'sqlite.cjs'));
+  const porSqlite = await (async () => { try { return String(await sqlite.runners.sqlite_query(run, { db: path.join(deLaApp, 'x.db'), sql: 'select 1' })); } catch (e) { return `error: ${e.message}`; } })();
+  ok_('sqlite_query no abre una base ahí', vedado(porSqlite), porSqlite);
+  const motorFuente = fs.readFileSync(path.join(TOOLS, 'motor.cjs'), 'utf8');
+  ok_('el motor la rechaza ANTES de pedir permiso', motorFuente.includes("if (err?.code === 'RESERVADA') throw err;") && motorFuente.includes('if (!rechazo) { try { congelarRutas(run, name, args); } catch (err) { rechazo = `error: ${String(err?.message || err)}`; } }'));
+  const chatFuente = fs.readFileSync(path.join(ROOT, 'apps', 'BlackCode', 'main', 'chat.cjs'), 'utf8');
+  ok_('la app les dice a las tools cuál es su carpeta, también en el humo', (chatFuente.match(/reservada: rad\.store\.dir/g) ?? []).length === 2);
+  // sin carpeta reservada (un test, una app que no la pasa) no se veda nada
+  base.setReservada(null);
+  ok_('sin carpeta reservada no se veda nada', (await pedir('fs_read', { paths: [agentes] })).includes('Zac'));
+}
+
 if (failures.length) {
   console.error(`test-blackcode-tools-fs: ${failures.length} falla(s) de ${aserciones} aserciones`);
   for (const f of failures) console.error('  ' + f);
   process.exit(1);
 }
-console.log(`test-blackcode-tools-fs: ok (${aserciones} aserciones: diff, fs_read, fs_edit, fs_write, fs_delete, tarjeta, papelera y journal inyectados)`);
+console.log(`test-blackcode-tools-fs: ok (${aserciones} aserciones: diff, fs_read, fs_edit, fs_write, fs_delete, tarjeta, papelera y journal inyectados, y la carpeta de la app, vedada)`);

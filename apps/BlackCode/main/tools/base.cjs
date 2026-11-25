@@ -118,9 +118,50 @@ function cwdDe(run) {
   return run.cwd;
 }
 
+// ---------- Lo que es de la app ----------
+// La carpeta donde BlackCode guarda sus documentos: los agentes y sus tools,
+// los chats, el modo de permisos, las tareas programadas, los servidores MCP,
+// la voz y las llaves cifradas. Ninguna tool que toma una ruta entra ahí, ni
+// para leer ni para escribir: un agente que solo tiene las tools de archivos
+// podía, editando esos documentos, darse las de comandos, pasar la app a
+// automático, prenderse «Let it act» o cambiar el comando de un servidor MCP.
+// (Un agente con las tools de comandos puede hacer en la PC lo que el usuario:
+// eso no lo frena una lista de carpetas. Esto cuida que tener MENOS que eso
+// no alcance para dárselo.)
+let reservada = null;
+const RESERVADA = "that path is inside BlackCode's own data folder (its settings, agents, chats and keys), which tools cannot read or change";
+const parejo = (s) => (process.platform === 'win32' ? s.toLowerCase() : s);
+/** El camino de verdad de una ruta: sin junctions, enlaces ni nombres cortos
+ *  (FRANCI~1), hasta donde exista; lo que todavía no existe queda como vino. */
+function caminoReal(p) {
+  let actual = path.resolve(String(p));
+  const cola = [];
+  for (;;) {
+    try { return path.join(fs.realpathSync.native(actual), ...cola); } catch {
+      const padre = path.dirname(actual);
+      if (padre === actual) return path.resolve(String(p));
+      cola.unshift(path.basename(actual));
+      actual = padre;
+    }
+  }
+}
+const adentro = (base, ruta) => { const r = path.relative(base, ruta); return r === '' || (!r.startsWith('..') && !path.isAbsolute(r)); };
+function setReservada(dir) { reservada = dir ? parejo(caminoReal(dir)) : null; }
+const getReservada = () => reservada;
+/** ¿Esa ruta está en la carpeta de la app (o es la carpeta)? */
+const esDeLaApp = (abs) => Boolean(reservada) && adentro(reservada, parejo(caminoReal(abs)));
+/** ¿Esa ruta CONTIENE a la carpeta de la app? (borrar o mover eso se la lleva puesta) */
+const contieneLoDeLaApp = (abs) => Boolean(reservada) && adentro(parejo(caminoReal(abs)), reservada);
+
 /** Resuelve una ruta contra el cwd de la corrida. Reemplaza a los
- *  `path.resolve(persistentCwd, …)` que estaban repartidos por cada runner. */
-const resolverEn = (run, p) => path.resolve(cwdDe(run), String(p));
+ *  `path.resolve(persistentCwd, …)` que estaban repartidos por cada runner.
+ *  Tira si la ruta cae en la carpeta de la app: pasan por acá todas las tools
+ *  que toman una ruta, así que es el único lugar donde hay que cuidarlo. */
+const resolverEn = (run, p) => {
+  const abs = path.resolve(cwdDe(run), String(p));
+  if (esDeLaApp(abs)) throw Object.assign(new Error(RESERVADA), { code: 'RESERVADA' });
+  return abs;
+};
 
 function truncateOut(s) {
   if (s.length <= SHELL_MAX_CHARS) return s;
@@ -209,4 +250,5 @@ function setCwd(dir) {
 module.exports = {
   atomicWriteText, SHELL_MAX_CHARS, SHELL_MAX_TIMEOUT, cwdDe, resolverEn, truncateOut,
   boundedSink, killTree, resolveCwd, getCwd, setCwd,
+  setReservada, getReservada, esDeLaApp, contieneLoDeLaApp, caminoReal, RESERVADA,
 };
