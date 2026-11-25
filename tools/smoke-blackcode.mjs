@@ -9,7 +9,9 @@
 // red ni gasta un token. La llave que se guarda es de mentira, y al final se
 // revisa el disco: no puede aparecer en claro en ningún archivo.
 // Deja los informes y las capturas en .smoke/.
-// Uso: node tools/smoke-blackcode.mjs [--exe <ruta>]
+// Uso: node tools/smoke-blackcode.mjs [--exe <ruta>] [--una]
+//   --una   solo la primera pasada (el control de un cambio estético: ver
+//           «Qué correr antes de publicar» en apps/BlackCode/docs/tools.md)
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -73,6 +75,7 @@ if (EXE && !fs.existsSync(EXE)) {
   process.exit(1);
 }
 const TAG = EXE ? 'empaquetada-' : '';
+const UNA = process.argv.includes('--una');
 // Las scrollbars flotantes de las páginas se piden en la línea de comandos (ver
 // apps/BlackCode/main.cjs). La app empaquetada que arranca SIN el flag se
 // relanza sola con él: la segunda pasada del .exe corre así, para probarlo.
@@ -202,7 +205,10 @@ try {
     if (disk.length) { first.ok = false; first.failures = disk; }
   }
   show(1, first);
-  if (first.ok) {
+  if (first.ok && UNA) {
+    console.log('smoke: blackcode, una sola pasada (--una): no se probó que los datos vuelvan al reabrir');
+    ok = true;
+  } else if (first.ok) {
     const second = await run(2, data);
     show(2, second);
     ok = second.ok;

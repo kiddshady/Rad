@@ -610,6 +610,23 @@ para arreglarlos de a uno, con su prueba:
   de verdad en el pedido de un agente con tools (las tools, el protocolo) y
   que una llamada corra y vuelva, con Anthropic y con Venice.
 
+### Qué correr antes de publicar
+
+El control completo tarda media hora, y para un cambio estético casi nunca
+encuentra nada. Se elige según lo que se tocó (acordado con Fran el 25/11/2026):
+
+| Nivel | Qué se tocó | Qué corre | Tarda |
+|---|---|---|---|
+| 1 | Estético o de interfaz: CSS, un ícono, un botón | `npm run control:blackcode:1`: tests y UNA pasada del humo | ~8 min |
+| 2 | Comportamiento: una tool, datos que se guardan, el proceso principal | `npm run control:blackcode:2`: tests, el humo con sus dos pasadas y el modo real | ~15 min |
+| 3 | Lo que puede romperse instalado: una dependencia, el arranque, el actualizador, archivos en una carpeta nueva | `npm run control:blackcode:3`: lo anterior, empaquetar y el humo del `.exe` | ~30 min |
+
+Una pasada del humo ya recorre la app entera: es la que encuentra que un
+cambio rompió otra parte. La segunda prueba que los datos vuelven al
+reabrir. El empaquetado prueba lo que anda desde el repo y se rompe
+instalado. Ante la duda entre dos niveles, el de arriba. Los retoques chicos
+salen juntos en una versión, no una por cada uno.
+
 Ninguna toca la red ni gasta un token. Lo que no está probado es un modelo de
 verdad pidiendo tools, ni un modelo de Venice recibiendo una imagen.
 
