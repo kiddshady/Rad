@@ -1,5 +1,13 @@
 # Changelog
 
+## BlackCode 0.18.2 (2026-11-25)
+
+- **Ir al final del chat.** Un botón redondo aparece sobre el campo para
+  escribir cuando se subió a leer; tocarlo baja andando hasta lo último y deja
+  el chat otra vez pegado a lo que llega. Es el de NeonCode.
+- **El botón de la carpeta del chat es un toggle.** Tocarlo con el menú abierto
+  lo cierra. Antes se cerraba y se volvía a abrir de un salto.
+
 ## BlackCode 0.18.1 (2026-11-25)
 
 - **El pin de las notas**, igual que la estrella de los marcadores: en una nota

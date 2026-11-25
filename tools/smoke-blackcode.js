@@ -2048,6 +2048,50 @@ else {
     if (guardadoAlPedir[0] !== 0) fail('chat largo: el chat entero se guardó apenas entró una fila de tool (' + guardadoAlPedir[0] + ' en el disco)');
     if (alFinal.length !== 3 || alFinal.some((m) => m.estado === 'run')) fail('chat largo: al terminar el turno el disco tiene ' + alFinal.length + ' filas de tool nuevas, se esperaban 3 terminadas');
     if (thread().scrollHeight - thread().clientHeight - thread().scrollTop > 4) fail('chat largo: después del turno no quedó parado en el final');
+
+    // Ir al final («Jump to latest»): un botón que no está mientras se lee lo
+    // último, aparece al subir a leer, y al tocarlo baja andando y deja el chat
+    // otra vez pegado a lo que llega.
+    {
+      const bF = chatView.querySelector('[data-accion="al-final"]');
+      const lejos = () => thread().scrollHeight - thread().clientHeight - thread().scrollTop;
+      await sleep(dur('base') + 160);
+      if (!bF || bF.hasAttribute('data-visible') || op(bF) !== 0 || getComputedStyle(bF).visibility !== 'hidden' || bF.tabIndex !== -1 || bF.getAttribute('aria-hidden') !== 'true') fail('ir al final: parado en el final, el botón está a la vista o se puede enfocar');
+      // subir un poco no alcanza: no titila por unos píxeles
+      thread().scrollTop = thread().scrollHeight - thread().clientHeight - 100;
+      await sleep(dur('base') + 200);
+      if (bF?.hasAttribute('data-visible')) fail('ir al final: aparece con solo subir 100 px');
+      // subir de verdad: aparece, y no de golpe
+      thread().scrollTop = 0;
+      const entrada = new Set();
+      for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 260;) { entrada.add(r2(op(bF))); await frame(); }
+      if (!bF.hasAttribute('data-visible') || op(bF) < 0.99 || getComputedStyle(bF).pointerEvents === 'none' || bF.tabIndex === -1 || bF.hasAttribute('aria-hidden')) fail('ir al final: después de subir al principio el botón no aparece (opacidad ' + r2(op(bF)) + ')');
+      if (entrada.size < 3) fail('ir al final: el botón aparece de golpe (' + [...entrada].join(', ') + ')');
+      {
+        const b = bF.getBoundingClientRect();
+        const c = thread().getBoundingClientRect();
+        if (Math.abs((b.left + b.right) / 2 - (c.left + c.right) / 2) > 2 || b.bottom > c.bottom || b.bottom < c.bottom - 40 || Math.abs(b.width - b.height) > 0.5 || b.width < 28) fail('ir al final: el botón no queda centrado sobre el borde de abajo de la conversación: ' + [b.left, b.top, b.right, b.bottom].map(Math.round).join() + ' en ' + [c.left, c.top, c.right, c.bottom].map(Math.round).join());
+        const cs = getComputedStyle(bF);
+        const alfa = (col) => { const m = /rgba?\(([^)]+)\)/.exec(col); const p = m ? m[1].split(/[ ,/]+/).filter(Boolean) : []; return p.length > 3 ? parseFloat(p[3]) : 1; };
+        if (alfa(cs.backgroundColor) !== 1 || cs.backdropFilter !== 'none') fail('ir al final: el botón flota sobre texto y no es opaco (fondo ' + cs.backgroundColor + ', backdrop ' + cs.backdropFilter + ')');
+      }
+      if (bF.getAttribute('aria-label') !== 'Jump to latest' || bF.getAttribute('data-rad-tip') !== 'Jump to latest') fail('ir al final: el botón no dice qué hace');
+      // tocarlo: baja ANDANDO, llega al final y se esconde
+      const camino = new Set();
+      bF.click();
+      for (const t0 = performance.now(); performance.now() - t0 < 1500 && lejos() > 4;) { camino.add(Math.round(thread().scrollTop)); await frame(); }
+      await sleep(dur('base') + 300);
+      if (lejos() > 4) fail('ir al final: tocarlo no llevó al final (faltan ' + Math.round(lejos()) + ' px)');
+      if (camino.size < 4) fail('ir al final: bajó de un salto (' + camino.size + ' posiciones en el camino)');
+      if (bF.hasAttribute('data-visible') || op(bF) !== 0 || bF.tabIndex !== -1 || bF.getAttribute('aria-hidden') !== 'true') fail('ir al final: ya en el final, el botón sigue a la vista o se puede enfocar (opacidad ' + r2(op(bF)) + ')');
+      // …y quedó pegado: lo que llega después se sigue viendo
+      await pedir([ronda]);
+      await sleep(300);
+      await until(() => !composer.querySelector('.rad-busy') && msgs().at(-1)?.dataset.estado === 'ok', 20000);
+      await settle();
+      if (lejos() > 4 || bF.hasAttribute('data-visible')) fail('ir al final: después de bajar con el botón el chat no quedó pegado a lo que llega (faltan ' + Math.round(lejos()) + ' px)');
+      data.irAlFinal = 'aparece al subir (' + entrada.size + ' pasos), baja en ' + camino.size + ' posiciones y deja el chat pegado';
+    }
     datosM.ponerModoTools('manual');
     await datosM.borrarChat(largo.id);
     await datosM.borrarChat(otro.id);
@@ -2507,6 +2551,25 @@ else {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
       await until(() => menus().length === 0, 2000);
       await settle();
+    }
+    // El botón es un toggle: tocarlo con el menú abierto lo CIERRA. A mano son
+    // dos eventos: el mousedown (para el menú es un clic afuera, y lo cierra) y
+    // el click que viene atrás, que no tiene que volver a abrirlo. Fran lo vio
+    // cerrarse y abrirse de un salto.
+    {
+      await menuC();
+      botonC.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 }));
+      botonC.click();
+      await sleep(dur('base') + dur('fast') + 200);
+      if (menus().length || botonC.getAttribute('aria-expanded') !== 'false') fail('carpeta: tocar el botón con el menú abierto no lo cerró: se cerró y se volvió a abrir (' + menus().length + ' menús)');
+      // otro toque lo abre de nuevo
+      await sleep(260);
+      if (!(await menuC()) || botonC.getAttribute('aria-expanded') !== 'true') fail('carpeta: después de cerrarlo con el botón, el menú no volvió a abrir');
+      // y desde el teclado (un solo evento, sin mousedown) también lo cierra
+      botonC.click();
+      await until(() => menus().length === 0, 2000);
+      await settle();
+      if (menus().length) fail('carpeta: el botón no cierra su menú desde el teclado');
     }
 
     // Una carpeta que ya no existe: se avisa, y el mensaje siguiente usa la de

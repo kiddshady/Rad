@@ -25,6 +25,10 @@ import { crearAdjuntos, adjuntosDe, ACEPTA } from './adjuntos.js';
 const VACIO = '_vacio';
 // Cuánto se puede estar lejos del fondo y seguir «pegado» a lo que llega.
 const PEGADO_PX = 48;
+// Cuánto hay que haber subido para que aparezca el botón de ir al final, y
+// cuánto se le da al scroll suave para llegar (después llega de una).
+const LEJOS_PX = 140;
+const BAJADA_MS = 700;
 
 /**
  * Relevo de una superficie de texto: lo viejo se esfuma y recién entonces
@@ -110,6 +114,11 @@ export function montarChat(el, { router }) {
     ];
   }, { align: 'end' });
   const celda = h('div', 'dm-hilo-celda');
+  // Ir al final de la conversación: un botón redondo que flota sobre el borde
+  // de abajo, y aparece solo cuando uno subió a leer (es el de NeonCode). Va en
+  // un marco al lado de la celda y no adentro: la celda releva conversaciones
+  // y trata a cada hijo suyo como una.
+  const bFinal = h('button', 'dm-al-final', { type: 'button', 'data-accion': 'al-final', 'aria-label': 'Jump to latest', 'data-rad-tip': 'Jump to latest', 'data-rad-tip-side': 'top', tabindex: '-1', 'aria-hidden': 'true' }, icono('chevron'));
 
   const irAjustes = h('button', 'rad-button', { type: 'button', 'data-accion': 'ir-ajustes' }, 'Go to Settings');
   irAjustes.addEventListener('click', () => router.go('ajustes'));
@@ -145,7 +154,7 @@ export function montarChat(el, { router }) {
   const consola = montarTerminal({ escena, turnos, router, carpeta: () => { const c = datos.chatActual(); return c ? datos.carpetaDe(c.id) : datos.carpetaInicio(); } });
   const conv = h('section', 'dm-conv', {},
     h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, sub, nav.boton, consola.boton, lienzo.botonBiblioteca, botonTools),
-    lienzo.barra, celda, aviso, h('div', 'dm-redactor-caja', {}, redactor));
+    lienzo.barra, h('div', 'dm-hilo-marco', {}, celda, bFinal), aviso, h('div', 'dm-redactor-caja', {}, redactor));
   escena.append(conv, lienzo.panel, nav.panel, consola.panel);
 
   el.append(lado, escena);
@@ -201,29 +210,29 @@ export function montarChat(el, { router }) {
     botonCarpeta.toggleAttribute('data-falta', !existe);
     botonCarpeta.setAttribute('data-rad-tip', existe ? 'Working folder of this chat' : 'This folder is gone: the next message will use the home folder');
   };
-  botonCarpeta.addEventListener('click', () => {
+  // Con menuButton y no con un click que abre: el botón es un toggle. Tocarlo
+  // con el menú abierto lo cierra; a mano, el mousedown sobre el botón ya lo
+  // cerraba (es un clic «afuera» del menú) y el click que venía atrás lo volvía
+  // a abrir: cerraba y abría de un salto (Fran lo vio, 25/11/2026).
+  menuButton(botonCarpeta, () => {
     const ruta = carpetaActual();
     const c = datos.chatActual();
     const ocupado = Boolean(c && datos.respondiendo(c.id));
     const elChat = () => datos.chatActual() ?? datos.crearChat(datos.agenteActual().id);
-    openMenu({
-      anchor: botonCarpeta,
-      side: 'top',
-      items: [
-        { id: 'elegir', label: ocupado ? 'Choose another folder (after this answer)' : 'Choose another folder…', icon: icono('carpeta').innerHTML, disabled: ocupado, onSelect: async () => {
-          const elegida = await window.rad.invoke('chat:elegir-carpeta', ruta).catch(() => null);
-          if (elegida) datos.ponerCarpeta(elChat().id, elegida);
-        } },
-        { id: 'abrir', label: 'Open in File Explorer', icon: icono('externo').innerHTML, onSelect: async () => {
-          const r = await window.rad.invoke('chat:abrir-carpeta', ruta).catch(() => null);
-          if (!r?.ok) toast({ text: 'That folder is gone.', kind: 'danger' });
-        } },
-        { id: 'copiar', label: 'Copy path', icon: icono('copiar').innerHTML, onSelect: () => navigator.clipboard.writeText(ruta).then(() => toast({ text: 'Copied' }), () => toast({ text: 'Could not copy', kind: 'danger' })) },
-        { separator: true },
-        { id: 'inicio', label: 'Back to the home folder', icon: icono('volver').innerHTML, disabled: ocupado || ruta === datos.carpetaInicio(), onSelect: () => datos.ponerCarpeta(elChat().id, datos.carpetaInicio()) },
-      ],
-    });
-  });
+    return [
+      { id: 'elegir', label: ocupado ? 'Choose another folder (after this answer)' : 'Choose another folder…', icon: icono('carpeta').innerHTML, disabled: ocupado, onSelect: async () => {
+        const elegida = await window.rad.invoke('chat:elegir-carpeta', ruta).catch(() => null);
+        if (elegida) datos.ponerCarpeta(elChat().id, elegida);
+      } },
+      { id: 'abrir', label: 'Open in File Explorer', icon: icono('externo').innerHTML, onSelect: async () => {
+        const r = await window.rad.invoke('chat:abrir-carpeta', ruta).catch(() => null);
+        if (!r?.ok) toast({ text: 'That folder is gone.', kind: 'danger' });
+      } },
+      { id: 'copiar', label: 'Copy path', icon: icono('copiar').innerHTML, onSelect: () => navigator.clipboard.writeText(ruta).then(() => toast({ text: 'Copied' }), () => toast({ text: 'Could not copy', kind: 'danger' })) },
+      { separator: true },
+      { id: 'inicio', label: 'Back to the home folder', icon: icono('volver').innerHTML, disabled: ocupado || ruta === datos.carpetaInicio(), onSelect: () => datos.ponerCarpeta(elChat().id, datos.carpetaInicio()) },
+    ];
+  }, { side: 'top' });
   datos.on('chats', ponerCarpeta);
   datos.on('seleccion', ponerCarpeta);
   datos.on('ajustes', ponerCarpeta);
@@ -353,11 +362,37 @@ export function montarChat(el, { router }) {
   };
 
   const alFondo = () => { if (hilo) hilo.scroller.scrollTop = hilo.scroller.scrollHeight; };
+  // El botón de ir al final se muestra cuando abajo quedó bastante sin ver.
+  // El umbral es más ancho que el de «pegado»: no titila por unos píxeles.
+  const lejosDelFinal = (s) => s.scrollHeight - s.clientHeight - s.scrollTop;
+  const ponerAlFinal = () => {
+    const ver = Boolean(hilo) && lejosDelFinal(hilo.scroller) > LEJOS_PX;
+    if (ver === bFinal.hasAttribute('data-visible')) return;
+    bFinal.toggleAttribute('data-visible', ver);
+    // escondido no se toca ni se enfoca
+    if (ver) { bFinal.removeAttribute('aria-hidden'); bFinal.removeAttribute('tabindex'); } else { bFinal.setAttribute('aria-hidden', 'true'); bFinal.setAttribute('tabindex', '-1'); if (document.activeElement === bFinal) area.focus(); }
+  };
+  bFinal.addEventListener('click', () => {
+    if (!hilo) return;
+    const este = hilo;
+    const s = este.scroller;
+    // Vuelve a quedar pegado desde YA: lo que llegue mientras baja lo sigue.
+    este.pegado = true;
+    este.bajando = performance.now();
+    s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' });
+    // Con la ventana tapada no hay cuadros y el scroll suave no avanza: pasado
+    // el plazo, llega igual.
+    setTimeout(() => {
+      if (este.bajando) { este.bajando = 0; if (este.pegado) s.scrollTop = s.scrollHeight; }
+      ponerAlFinal();
+    }, BAJADA_MS);
+  });
   const dibujarMensajes = () => {
     if (!hilo) return;
     const lista2 = hilo.doc?.get().mensajes ?? [];
     reconcile(hilo.col, lista2.length ? lista2 : [{ id: VACIO }], { key: (m) => m.id, create: mensaje, update: ponerMensaje });
-    if (hilo.pegado) alFondo();
+    if (hilo.pegado && !hilo.bajando) alFondo();
+    ponerAlFinal();
   };
 
   // Abre la conversación del chat elegido. Si ya está abierta, la pone al día.
@@ -375,16 +410,25 @@ export function montarChat(el, { router }) {
     hilo = { clave, chatId: c?.id ?? null, doc, scroller, col, pegado: true };
     const este = hilo;
     scroller.addEventListener('scroll', () => {
-      este.pegado = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop <= PEGADO_PX;
+      const cerca = lejosDelFinal(scroller) <= PEGADO_PX;
+      // Mientras baja por el botón sigue pegado aunque todavía esté lejos; al
+      // llegar (o si el usuario sube con la rueda a mitad de camino) termina.
+      if (este.bajando) { if (cerca) este.bajando = 0; } else este.pegado = cerca;
+      if (este === hilo) ponerAlFinal();
     }, { passive: true });
+    // (la rueda o una tecla a mitad de la bajada: manda el usuario)
+    const soltar = () => { if (este.bajando) { este.bajando = 0; este.pegado = lejosDelFinal(scroller) <= PEGADO_PX; } };
+    scroller.addEventListener('wheel', soltar, { passive: true });
+    scroller.addEventListener('keydown', soltar);
     // Pegado al final también cuando el contenido cambia de alto sin que nadie
     // scrollee. Los mensajes fuera de la vista tienen un alto estimado (no se
     // maquetan): al abrir un chat largo, «el final» se corre a medida que los
     // de abajo toman su alto de verdad, y sin esto quedaba parado más arriba.
-    new ResizeObserver(() => { if (este.pegado) scroller.scrollTop = scroller.scrollHeight; }).observe(col);
+    new ResizeObserver(() => { if (este.pegado && !este.bajando) scroller.scrollTop = scroller.scrollHeight; if (este === hilo) ponerAlFinal(); }).observe(col);
     dibujarMensajes();
     relevar(celda, scroller);
     alFondo();
+    ponerAlFinal();
   }
 
   // El texto que llega: un pintado por cuadro, por más pedazos que lleguen.

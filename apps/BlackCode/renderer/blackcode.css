@@ -331,6 +331,47 @@
   /* Si no entran los dos, se achican los dos: ninguno empuja al otro afuera. */
   .dm-conv-sub { font-size: var(--rad-text-s); color: var(--rad-text-3); }
 
+  /* El marco de la conversación: la celda y, flotando sobre su borde de abajo,
+     el botón de ir al final. */
+  .dm-hilo-marco { position: relative; display: grid; min-width: 0; min-height: 0; }
+  .dm-hilo-marco > .dm-hilo-celda { grid-area: 1 / 1; }
+  /* Ir al final: un círculo centrado, que aparece cuando uno subió a leer.
+     Entra y sale fundiéndose y subiendo un poco (nunca de golpe). Es OPACO (la
+     base con el velo encima, no el velo suelto): flota sobre texto, y un vidrio
+     que se mueve no puede esmerilar. Se separa por su sombra. */
+  .dm-al-final {
+    position: absolute;
+    left: 50%;
+    bottom: var(--rad-space-2);
+    z-index: 2;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--rad-radius-pill);
+    background-color: var(--rad-surface-0);
+    background-image: linear-gradient(var(--rad-surface-3), var(--rad-surface-3));
+    box-shadow: var(--rad-shadow-2), inset 0 0 0 var(--rad-line-width) var(--rad-line);
+    color: var(--rad-text-2);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate(-50%, 8px) scale(0.9);
+    transition: opacity var(--rad-dur-base) var(--rad-ease-in-out), transform var(--rad-dur-base) var(--rad-ease-out), visibility 0s linear var(--rad-dur-base),
+      color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-al-final[data-visible] {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate(-50%, 0) scale(1);
+    transition: opacity var(--rad-dur-base) var(--rad-ease-in-out), transform var(--rad-dur-base) var(--rad-ease-out), visibility 0s,
+      color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-al-final:hover { color: var(--rad-text-1); box-shadow: var(--rad-shadow-2), inset 0 0 0 var(--rad-line-width) var(--rad-line-strong); }
+  .dm-al-final[data-visible]:active { transform: translate(-50%, 0) scale(0.92); }
+  .dm-al-final .rad-icon { width: 18px; height: 18px; }
+
   /* La celda donde una conversación releva a la otra. */
   .dm-hilo-celda { display: grid; min-width: 0; min-height: 0; }
   .dm-hilo-celda > * { grid-area: 1 / 1; min-height: 0; }
