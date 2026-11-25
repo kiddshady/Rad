@@ -1589,14 +1589,18 @@
   /* Un tramo de texto que quedó vacío no ocupa lugar. */
   .dm-msg[data-vacio] { display: none; }
 
-  /* El contador de tools, debajo de la respuesta. */
-  .dm-msg-cuenta {
+  /* Debajo de la respuesta, en un renglón: la hora en que terminó y el
+     contador de tools. Cada uno se despliega por su lado (un mensaje de antes
+     de que se guardara la hora no la tiene; un turno sin tools no cuenta nada). */
+  .dm-msg-abajo { display: flex; align-items: flex-end; min-width: 0; }
+  .dm-msg-cuando, .dm-msg-cuenta {
     display: grid;
     grid-template-rows: 0fr;
+    min-width: 0;
     transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out);
   }
-  .dm-msg-cuenta[data-abierto] { grid-template-rows: 1fr; }
-  .dm-msg-cuenta-in {
+  .dm-msg-cuando[data-abierto], .dm-msg-cuenta[data-abierto] { grid-template-rows: 1fr; }
+  .dm-msg-cuando-in, .dm-msg-cuenta-in {
     min-height: 0;
     overflow: hidden;
     font-size: var(--rad-text-xs);
@@ -1605,8 +1609,18 @@
     opacity: 0;
     transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out);
   }
-  .dm-msg-cuenta[data-abierto] .dm-msg-cuenta-in { opacity: 1; transition-delay: calc(var(--rad-dur-fast) / 2); }
+  .dm-msg-cuando[data-abierto] .dm-msg-cuando-in, .dm-msg-cuenta[data-abierto] .dm-msg-cuenta-in { opacity: 1; transition-delay: calc(var(--rad-dur-fast) / 2); }
   .dm-msg-cuenta-texto { padding-top: var(--rad-space-2); }
+  /* (la separación con el contador va en la hora: sin hora, el contador queda contra el margen) */
+  .dm-msg-cuando .dm-msg-hora { display: block; padding-top: var(--rad-space-2); }
+  .dm-msg-cuando[data-abierto] { margin-right: var(--rad-space-3); }
+
+  /* La hora de un mensaje: chica, gris y con los números parejos. Su fecha
+     entera está en el tooltip. */
+  .dm-msg-hora { font-size: var(--rad-text-xs); font-family: var(--rad-font-mono); font-variant-numeric: tabular-nums; color: var(--rad-text-3); white-space: nowrap; }
+  /* Debajo de la burbuja del usuario: la marca de voz, si se dijo, y la hora. */
+  .dm-msg-meta { display: flex; align-items: center; justify-content: flex-end; gap: var(--rad-space-3); min-width: 0; }
+  .dm-msg-meta[data-vacia] { display: none; }
 
   /* La tarjeta de permiso (adentro del modal). */
   .rad-modal:has(.dm-permiso) { --rad-modal-width: 600px; }

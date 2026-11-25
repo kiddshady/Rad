@@ -174,7 +174,7 @@ export function montarTareas(el, { router }) {
     modal.closed.then(async (que) => {
       if (que === 'borrar') await pedir('tareas:quitar-resultado', r.id);
       else if (que === 'chat') {
-        const c = await datos.chatDeTarea({ agente: r.agente, titulo: r.titulo, prompt: r.prompt, salida: r.salida || (r.error ? `(The task failed: ${r.error})` : '(The task finished with no text.)') });
+        const c = await datos.chatDeTarea({ agente: r.agente, titulo: r.titulo, prompt: r.prompt, ts: r.ts, ms: r.ms, salida: r.salida || (r.error ? `(The task failed: ${r.error})` : '(The task finished with no text.)') });
         if (c) router.go('chat');
         else toast({ text: 'The agent of that task no longer exists.', kind: 'danger' });
       }

@@ -413,13 +413,16 @@ export function crearChat(agenteId) {
 
 /** Sigue en un chat lo que dejó una tarea programada: un chat nuevo de ese
  *  agente, con el pedido y el resultado ya adentro. null si el agente ya no está. */
-export async function chatDeTarea({ agente: agenteId, titulo, prompt, salida }) {
+export async function chatDeTarea({ agente: agenteId, titulo, prompt, salida, ts = 0, ms = 0 }) {
   const a = agente(agenteId);
   if (!a) return null;
   const c = crearChat(agenteId);
   const doc = await hilo(c.id);
   const v = doc.get();
-  v.mensajes.push({ id: nuevoId(), rol: 'user', texto: String(prompt ?? '') }, { id: nuevoId(), rol: 'assistant', texto: String(salida ?? ''), estado: 'ok', modelo: a.modelo });
+  // (las horas son las de la corrida, no las de ahora: cuándo arrancó y cuándo terminó)
+  const fin = typeof ts === 'number' && ts > 0 ? ts : 0;
+  const desde = fin && typeof ms === 'number' && ms >= 0 ? fin - ms : fin;
+  v.mensajes.push({ id: nuevoId(), rol: 'user', texto: String(prompt ?? ''), ...(desde ? { t: desde } : {}) }, { id: nuevoId(), rol: 'assistant', texto: String(salida ?? ''), estado: 'ok', modelo: a.modelo, ...(fin ? { t: fin } : {}) });
   doc.set(v);
   chats.update((x) => { Object.assign(x.lista.find((y) => y.id === c.id), { titulo: titular(String(titulo || prompt || '')), auto: false, cuenta: 2, tocado: Date.now() }); return x; });
   avisar('chats');
@@ -562,8 +565,12 @@ const alViaje = (m) => {
     const dejo = (Array.isArray(m.imagenes) ? m.imagenes : []).map((im) => im.archivo).filter(Boolean);
     return { rol: 'tool', tool: m.tool, texto: m.texto, estado: m.estado, ...(dejo.length ? { dejo } : {}), ...(m.detalle ? { detalle: m.detalle } : {}) };
   }
-  if (m.rol !== 'user' || !conAdjuntos(m)) return { rol: m.rol, texto: m.texto };
-  return { rol: 'user', texto: paraElModelo(m), ...(m.imagenes?.length ? { imagenes: m.imagenes } : {}) };
+  // (`t`: cuándo se mandó. El proceso principal se la pone adelante al texto
+  // de los mensajes del usuario, para que el modelo sepa cuánto pasó entre uno
+  // y otro. Los de antes de la 1.4.0 no la tienen y viajan como siempre.)
+  const cuando = m.rol === 'user' && typeof m.t === 'number' ? { t: m.t } : {};
+  if (m.rol !== 'user' || !conAdjuntos(m)) return { rol: m.rol, texto: m.texto, ...cuando };
+  return { rol: 'user', texto: paraElModelo(m), ...(m.imagenes?.length ? { imagenes: m.imagenes } : {}), ...cuando };
 };
 /** Lo que viajaría al modelo de una lista de mensajes (para el humo). */
 export const historialDe = (mensajes) => mensajes.filter(viaja).map(alViaje);
@@ -588,7 +595,8 @@ export async function enviar(chatId, texto, adjuntos = null, { voz: dicho = fals
   // escribiendo sobre este mismo objeto mientras llega.
   const valor = doc.get();
   // (`voz`: se dijo, no se tipeó; el chat lo muestra con un micrófono)
-  const mio = { id: nuevoId(), rol: 'user', texto: limpio, ...(imagenes.length ? { imagenes } : {}), ...(archivos.length ? { archivos } : {}), ...(dicho ? { voz: true } : {}) };
+  // (`t`: cuándo se mandó. Se guarda con el mensaje: no cambia al reabrir el chat)
+  const mio = { id: nuevoId(), rol: 'user', texto: limpio, t: Date.now(), ...(imagenes.length ? { imagenes } : {}), ...(archivos.length ? { archivos } : {}), ...(dicho ? { voz: true } : {}) };
   const suyo = { id: nuevoId(), rol: 'assistant', texto: '', estado: 'escribiendo', modelo: a.modelo };
   const historial = [...valor.mensajes.filter(viaja), mio].map(alViaje);
   // Las tools del agente, si su modelo las acepta.
@@ -737,6 +745,8 @@ function terminar(chatId, estado, nota, ev = null) {
   const r = respuestas.get(chatId);
   if (!r) return;
   r.mensaje.estado = estado;
+  // cuándo terminó la respuesta (los tramos de texto de antes de una tool no la llevan: es una por turno)
+  r.mensaje.t = Date.now();
   if (nota) r.mensaje.nota = nota;
   // Lo que corrió en el turno: de acá sale el contador de debajo de la
   // respuesta. Solo si el turno tenía tools (si no, no hay nada que contar).

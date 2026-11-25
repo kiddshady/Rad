@@ -1,5 +1,29 @@
 # Changelog
 
+## BlackCode 1.4.0 (2026-11-25)
+
+- **Cada mensaje tiene su hora.** Se guarda con el mensaje (la del usuario, al
+  mandarlo; la del agente, cuando termina de contestar) y se ve chica y gris
+  debajo: `10:47` si es de hoy, `24/11 23:58` si es de otro día, y la fecha
+  entera con los segundos en el tooltip. En la respuesta va en el renglón del
+  contador de tools. Los chats de antes no tienen hora y no se les inventa una:
+  abren como siempre. Lo dicho al Atom Echo la lleva al lado de su marca, y el
+  chat que sigue a una tarea programada lleva las horas de la corrida.
+- **El agente ve esas horas.** Cada mensaje del usuario le llega con su hora
+  adelante, `[2026-11-25 10:47] hola`, y una línea fija en las instrucciones le
+  explica el formato. Antes solo sabía la hora del momento, así que creía que
+  toda la conversación pasaba «ahora»: no notaba que el usuario había vuelto
+  dos horas después, o al otro día. El sello se agrega al armar el pedido: el
+  texto guardado y el que se ve quedan limpios. Las respuestas del agente no lo
+  llevan (lo copiaría en lo que escribe). También lo llevan el encargo de un
+  subagente y el de una tarea programada.
+- **La hora ya no va en el system prompt.** Iba en su primer renglón y cambiaba
+  cada minuto; como el system es el principio del pedido, el caché del
+  proveedor no podía reusar casi nunca lo que venía después, o sea el chat
+  entero. Con la hora en cada mensaje, lo ya enviado no cambia más. (Lo pidió
+  Zac con un diseño propio; esto último es lo único que se hizo distinto de lo
+  que proponía, que era dejarla ahí actualizándose.)
+
 ## BlackCode 1.3.1 (2026-11-25)
 
 - **Las tools no entran a la carpeta donde la app guarda lo suyo.** Un agente

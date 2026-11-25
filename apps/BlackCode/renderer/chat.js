@@ -20,6 +20,7 @@ import { montarTerminal } from './terminal.js';
 import { openMenu } from '/@core/menu.js';
 import { toast } from '/@core/toast.js';
 import { crearAdjuntos, adjuntosDe, ACEPTA } from './adjuntos.js';
+import { ponerHora } from './hora.js';
 
 // Los items que no son un chat ni un mensaje: el lugar vacío de cada lista.
 const VACIO = '_vacio';
@@ -413,14 +414,24 @@ export function montarChat(el, { router }) {
     // lo que adjuntó: va arriba del texto (el orden lo pone el CSS)
     const suyos = m.rol === 'user' ? adjuntosDe(m) : null;
     if (suyos) nodo.append(suyos);
-    // se dijo, no se tipeó: es lo que Whisper entendió, y conviene verlo
-    if (m.rol === 'user' && m.voz) nodo.append(h('span', 'dm-msg-voz', {}, icono('canal'), 'Said to the Atom Echo'));
+    // Debajo de la burbuja: la marca de que se dijo y no se tipeó (es lo que
+    // Whisper entendió, y conviene verlo) y la hora en que se mandó.
+    if (m.rol === 'user') {
+      const meta = h('div', 'dm-msg-meta');
+      if (m.voz) meta.append(h('span', 'dm-msg-voz', {}, icono('canal'), 'Said to the Atom Echo'));
+      meta.append(h('span', 'dm-msg-hora'));
+      nodo.append(meta);
+    }
     if (m.rol === 'assistant') {
       nodo.append(h('div', 'dm-msg-pie', {}, h('div', 'dm-msg-pie-in', {},
         h('span', 'dm-pulso', { 'aria-hidden': 'true' }, h('i')), h('span', 'dm-msg-nota rad-swap'))));
-      // El contador de tools del turno: siempre que el turno las tuvo, también
-      // cuando no corrió ninguna. Es un dato, no una acusación.
-      nodo.append(h('div', 'dm-msg-cuenta', {}, h('div', 'dm-msg-cuenta-in', {}, h('span', 'dm-msg-cuenta-texto rad-swap'))));
+      // Debajo de la respuesta, en un renglón: la hora en que terminó y el
+      // contador de tools del turno (siempre que el turno las tuvo, también
+      // cuando no corrió ninguna: es un dato, no una acusación). Cada uno se
+      // despliega por su lado.
+      nodo.append(h('div', 'dm-msg-abajo', {},
+        h('div', 'dm-msg-cuando', {}, h('div', 'dm-msg-cuando-in', {}, h('span', 'dm-msg-hora'))),
+        h('div', 'dm-msg-cuenta', {}, h('div', 'dm-msg-cuenta-in', {}, h('span', 'dm-msg-cuenta-texto rad-swap')))));
     }
     ponerMensaje(nodo, m);
     return nodo;
@@ -431,6 +442,9 @@ export function montarChat(el, { router }) {
     const cuerpo = nodo.firstElementChild;
     if (m.rol === 'user') {
       if (cuerpo.textContent !== m.texto) cuerpo.textContent = m.texto;
+      // (un mensaje de antes de que se guardara la hora, y que tampoco se dijo: sin renglón)
+      const hay = ponerHora(nodo.querySelector('.dm-msg-hora'), m.t);
+      nodo.querySelector('.dm-msg-meta').toggleAttribute('data-vacia', !hay && !m.voz);
       return;
     }
     pintar(cuerpo, m.texto);
@@ -442,6 +456,9 @@ export function montarChat(el, { router }) {
     const cuenta = cuentaTools(m);
     if (cuenta) swapText(nodo.querySelector('.dm-msg-cuenta-texto'), cuenta);
     nodo.querySelector('.dm-msg-cuenta').toggleAttribute('data-abierto', Boolean(cuenta) && estado !== 'escribiendo');
+    // la hora, cuando la respuesta terminó (mientras llega no hay ninguna que decir)
+    const hayHora = ponerHora(nodo.querySelector('.dm-msg-hora'), estado === 'escribiendo' ? 0 : m.t);
+    nodo.querySelector('.dm-msg-cuando').toggleAttribute('data-abierto', hayHora);
     // un tramo de texto que quedó vacío (el agente llamó tools sin escribir
     // nada antes) no ocupa lugar
     nodo.toggleAttribute('data-vacio', !m.texto && estado !== 'escribiendo' && estado !== 'error');

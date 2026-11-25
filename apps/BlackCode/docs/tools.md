@@ -287,9 +287,11 @@ correr cualquier comando. Es la decisión de NeonCode, y viene con el código.
 ## Lo que el modelo recibe cuando hay tools
 
 Para que las rutas sean reales y no adivinadas, el system prompt lleva el
-usuario de Windows, las carpetas de inicio, Escritorio, Documentos y Descargas,
-la carpeta de trabajo y la fecha. Eso sale hacia el proveedor (Anthropic o
-Venice) en cada pedido de un agente con tools.
+usuario de Windows, las carpetas de inicio, Escritorio, Documentos y Descargas
+y la carpeta de trabajo. Eso sale hacia el proveedor (Anthropic o Venice) en
+cada pedido de un agente con tools. La fecha y la hora ya no van ahí (desde la
+1.4.0): van adelante de cada mensaje del usuario. Ver «La hora de cada
+mensaje».
 
 ## La carpeta de trabajo
 
@@ -758,6 +760,42 @@ hilo dejaba colgada la carga del modelo. Mira si entró algo sin esperar
 **Lo que no hay:** el micrófono de la PC, elegir al agente nombrándolo en la
 frase, más de un Echo, y un botón para callarlo fuera de Settings.
 
+## La hora de cada mensaje
+
+Cada mensaje guarda cuándo pasó en `t` (milisegundos): el del usuario, al
+mandarlo; el del agente, cuando el turno termina (los tramos de texto de antes
+de una tool no la llevan: es una por turno). Los mensajes de antes de la 1.4.0
+no tienen `t`, y no se les inventa.
+
+**Lo que se ve** (`renderer/hora.js`): `10:47` si es de hoy, `24/11 23:58` si
+es de otro día, con el año si es de otro año, y la fecha entera con segundos en
+el tooltip (`data-rad-tip`). En el mensaje del usuario va debajo de la burbuja,
+en el renglón de la marca de voz si se dijo; en la respuesta, en el renglón del
+contador de tools, y se despliega cuando el turno termina.
+
+**Lo que le llega al modelo** (`main/hora.cjs`): cada mensaje del usuario que
+tiene `t` viaja con `[2026-11-25 10:47] ` adelante de su texto, en la hora
+local, y las instrucciones llevan al final una nota fija que explica el formato
+(y pide no repetirlo). Si ningún mensaje tiene hora, no va ni la nota. Las
+respuestas del agente no llevan sello: lo imitaría.
+
+**Dónde.** `paraElProveedor(pedido)`, al salir hacia el proveedor: el texto
+guardado y el que se ve quedan limpios. Pasan por ahí los tres pedidos de
+`chat.cjs`: el del chat, el de un subagente (su encargo lleva la hora en que se
+le dio) y el de una tarea programada. El que le pone nombre a un chat, no.
+
+**Por qué no en el system prompt.** Hasta la 1.3.1 la hora iba ahí, en el primer
+renglón del entorno, y cambiaba cada minuto. El caché del proveedor reusa el
+principio del pedido mientras sea idéntico: con un system distinto cada minuto,
+de un turno al siguiente no se reusaba nada. Con el sello en cada mensaje, lo
+ya enviado no cambia. `tools/test-blackcode-hora.mjs` comprueba que el system
+de una sesión sea el mismo con el reloj en dos horas distintas.
+
+**El proveedor de mentira** saca el sello y la nota antes de leer el pedido
+(así el renglón `TOOLS:` y la cuenta de instrucciones siguen como siempre) y
+cuenta lo que había en un renglón: `time on the last message: … (2 of 3 from
+the user carry one, note yes)`. El humo lo lee (bloque 11x).
+
 ## La carpeta de la app está vedada
 
 Los documentos de BlackCode (los agentes con sus tools, el modo de permisos, las
@@ -915,6 +953,8 @@ para arreglarlos de a uno, con su prueba:
   nombres, los secretos cifrados, el permiso, las marcas, el tope, lo que pasa
   cuando el servidor se muere y el JSON pegado. El humo lo recorre desde
   Settings (bloque 11q) y comprueba que reconecte al reabrir la app.
+- `tools/test-blackcode-hora.mjs`: la hora de cada mensaje (el sello que viaja,
+  la que se ve y la medianoche, el system sin reloj, el proveedor de mentira).
 - `tools/test-blackcode-tareas.mjs`: las tareas programadas con el reloj en la
   mano (cuándo corre cada una, el latido, lo que faltó con la app cerrada,
   correr ahora y frenar, la bandeja), la tool `schedule`, qué tools tiene una

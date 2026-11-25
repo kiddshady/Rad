@@ -38,6 +38,11 @@ const herramientas = require('./tools/index.cjs');
 
 const NOMBRES = { anthropic: 'Anthropic', venice: 'Venice' };
 const RESPONDER = { anthropic: anthropic.responder, venice: venice.responder };
+// La hora de cada mensaje viaja adelante de su texto (hora.cjs). Se pone acá,
+// al salir hacia el proveedor: lo guardado y lo que se ve quedan limpios. Los
+// tres pedidos pasan por esto: el del chat, el de un subagente y el de una
+// tarea programada. El que le pone nombre a un chat (titulo.cjs), no.
+const hora = require('./hora.cjs');
 const ROLES = new Set(['user', 'assistant']);
 // Las imágenes que adjunta el usuario: data URLs de los cuatro tipos que
 // aceptan los modelos. La interfaz deja hasta 4 por mensaje; acá el tope es
@@ -98,9 +103,10 @@ function limpiar(pedido) {
         return { role: 'tool', tool: m.tool, content: corto(d?.prompt, 2000) || String(m.texto ?? ''), status: m.estado, ...(facts.length ? { facts } : {}), ...(saved.length ? { saved } : {}) };
       }
       const images = imagenesDe(m);
-      return { role: m.rol, content: m.texto, ...(images.length ? { images } : {}) };
+      // (`t`: cuándo se mandó. Solo en los del usuario: ver hora.cjs)
+      return { role: m.rol, content: m.texto, ...(images.length ? { images } : {}), ...(m.rol === 'user' && hora.sello(m.t) ? { t: m.t } : {}) };
     }))
-    .map((m) => ({ rol: m.role, texto: m.content, ...(m.images?.length ? { imagenes: m.images } : {}) }));
+    .map((m) => ({ rol: m.role, texto: m.content, ...(m.images?.length ? { imagenes: m.images } : {}), ...(m.t ? { t: m.t } : {}) }));
   if (!lista.length || lista[0].rol !== 'user') throw new Error('[blackcode] el chat tiene que empezar con un mensaje del usuario');
   return {
     id,
@@ -195,9 +201,13 @@ function wire(rad, { llave }) {
   const paraLosSubagentes = {
     subagentes: {
       destino: destinoDeSubagentes,
-      responder: (pedido, opciones) => (llave.SIMULADO
-        ? simulado.responder(pedido, opciones)
-        : RESPONDER[pedido.proveedor](pedido, { ...opciones, key: llave.leer(rad.store, pedido.proveedor) })),
+      // (el encargo de un subagente lleva la hora en que se le dio: es lo único que sabe del día)
+      responder: (crudo, opciones) => {
+        const viaja = hora.paraElProveedor({ ...crudo, mensajes: crudo.mensajes.map((m) => (m.rol === 'user' ? { ...m, t: Date.now() } : m)) });
+        return llave.SIMULADO
+          ? simulado.responder(viaja, opciones)
+          : RESPONDER[viaja.proveedor](viaja, { ...opciones, key: llave.leer(rad.store, viaja.proveedor) });
+      },
     },
   };
   // El navegador pinta su página encima de la ventana principal: hay que
@@ -697,12 +707,14 @@ function wire(rad, { llave }) {
       sesion,
     };
     let trabajo;
+    // (recién acá: las instrucciones ya tienen todo lo que el turno les sumó)
+    const viaja = hora.paraElProveedor(pedido);
     if (llave.SIMULADO) {
-      trabajo = simulado.responder(pedido, opciones);
+      trabajo = simulado.responder(viaja, opciones);
     } else {
       const key = llave.leer(rad.store, pedido.proveedor);
       trabajo = key
-        ? RESPONDER[pedido.proveedor](pedido, { ...opciones, key })
+        ? RESPONDER[pedido.proveedor](viaja, { ...opciones, key })
         : Promise.reject(new Error(`The ${NOMBRES[pedido.proveedor]} key is missing. Paste it in Settings and try again.`));
     }
 
@@ -737,7 +749,7 @@ function wire(rad, { llave }) {
     const toque = () => { clearTimeout(reloj); reloj = setTimeout(() => { muda = true; control.abort(); }, TAREA_MUDA_MS); };
     const id = 'task-' + tarea.id + '-' + Date.now().toString(36);
     const actuar = tarea.actuar === true;
-    const pedido = { id, chat: '', proveedor: agente.proveedor, modelo: agente.modelo, instrucciones: String(agente.instrucciones ?? '').trim(), mensajes: [{ rol: 'user', texto: tarea.prompt }], tools: [], modo: 'auto' };
+    const pedido = { id, chat: '', proveedor: agente.proveedor, modelo: agente.modelo, instrucciones: String(agente.instrucciones ?? '').trim(), mensajes: [{ rol: 'user', texto: tarea.prompt, t: Date.now() }], tools: [], modo: 'auto' };
     // Las tools del agente, sin las de un servidor MCP que pregunta antes de
     // cada llamada (acá no hay quién conteste).
     const suyas = mcp.expandir(Array.isArray(agente.tools) ? agente.tools.filter((t) => typeof t === 'string') : []).filter((n) => !mcp.pregunta(n));
@@ -773,11 +785,13 @@ function wire(rad, { llave }) {
     const opciones = { signal: control.signal, onPensando: toque, onTexto: (t) => { texto += t; toque(); }, sesion };
     toque();
     try {
-      if (llave.SIMULADO) await simulado.responder(pedido, opciones);
+      // (la corrida sabe a qué hora arrancó: la hora va adelante de su encargo)
+      const viaja = hora.paraElProveedor(pedido);
+      if (llave.SIMULADO) await simulado.responder(viaja, opciones);
       else {
         const key = llave.leer(rad.store, agente.proveedor);
         if (!key) throw new Error('The ' + NOMBRES[agente.proveedor] + ' key is missing. Paste it in Settings.');
-        await RESPONDER[agente.proveedor](pedido, { ...opciones, key });
+        await RESPONDER[agente.proveedor](viaja, { ...opciones, key });
       }
     } catch (err) {
       // (el corte lo declara la app: no se disfraza de error del proveedor)

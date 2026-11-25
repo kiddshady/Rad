@@ -9,6 +9,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const frame = () => new Promise((r) => { requestAnimationFrame(r); setTimeout(r, 50); });
 const op = (el) => parseFloat(getComputedStyle(el).opacity);
 const r2 = (n) => Math.round(n * 100) / 100;
+// La hora como se le pone adelante a un mensaje que viaja al modelo (main/hora.cjs).
+const selloH = (t) => { const d = new Date(t); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const dur = (name) => {
   const v = getComputedStyle(document.documentElement).getPropertyValue(`--rad-dur-${name}`).trim();
   return v.endsWith('ms') ? parseFloat(v) : parseFloat(v) * 1000;
@@ -109,7 +111,15 @@ if (marker?.pass === 1) {
   if (m.length !== 4) fail(`volvieron ${m.length} mensajes, se habían dejado 4`);
   else {
     if (m.map((x) => x.dataset.rol).join() !== 'user,assistant,user,assistant') fail('los mensajes volvieron en otro orden');
-    if (m[0].textContent !== PREGUNTA) fail(`el primer mensaje volvió como «${m[0].textContent}»`);
+    if (m[0].querySelector('.dm-msg-cuerpo').textContent !== PREGUNTA) fail(`el primer mensaje volvió como «${m[0].querySelector('.dm-msg-cuerpo').textContent}»`);
+    // Las horas vuelven como se guardaron: no se vuelven a tomar al reabrir.
+    {
+      const { horaCorta } = await import('/hora.js');
+      const guardados = (await (await import('/datos.js')).hilo(fila[0].dataset.radKey)).get().mensajes;
+      if (JSON.stringify(guardados.map((x) => x.t)) !== JSON.stringify(marker.horas) || !guardados.every((x) => typeof x.t === 'number' && x.t < performance.timeOrigin)) fail(`las horas de los mensajes cambiaron al reabrir: ${JSON.stringify(guardados.map((x) => x.t))}, eran ${JSON.stringify(marker.horas)}`);
+      if (m.map((x) => x.querySelector('.dm-msg-hora')?.textContent).join() !== guardados.map((x) => horaCorta(x.t)).join()) fail(`al reabrir, las horas a la vista son ${m.map((x) => x.querySelector('.dm-msg-hora')?.textContent).join()}`);
+      if (!m[1].querySelector('.dm-msg-cuando').hasAttribute('data-abierto') || m[1].querySelector('.dm-msg-cuando').getBoundingClientRect().height < 8 || m[0].querySelector('.dm-msg-hora').getBoundingClientRect().height < 8) fail('al reabrir, la hora de un mensaje guardado no está a la vista');
+    }
     if (m[1].dataset.estado !== 'frenado' || shown(m[1].querySelector('.dm-msg-nota')) !== 'Stopped.') fail('la respuesta frenada no volvió marcada como frenada');
     if (m[1].querySelector('.dm-msg-cuerpo').textContent.length !== marker.frenado) fail(`la respuesta frenada volvió con ${m[1].querySelector('.dm-msg-cuerpo').textContent.length} caracteres, tenía ${marker.frenado}`);
     if (m[3].dataset.estado !== 'ok' || !m[3].querySelector('.dm-codigo code')?.textContent.includes('const greet')) fail('la respuesta completa no volvió con su bloque de código');
@@ -354,7 +364,11 @@ await until(() => msgs().length === 2, 2000);
 const [mine, theirs] = msgs();
 if (!mine || !theirs) fail(`después de mandar hay ${msgs().length} mensajes`);
 else {
-  if (mine.dataset.rol !== 'user' || mine.textContent !== PREGUNTA) fail(`el mensaje del usuario salió como «${mine.textContent}»`);
+  if (mine.dataset.rol !== 'user' || mine.querySelector('.dm-msg-cuerpo').textContent !== PREGUNTA) fail(`el mensaje del usuario salió como «${mine.querySelector('.dm-msg-cuerpo').textContent}»`);
+  // Su hora va debajo de la burbuja apenas se manda; la de la respuesta,
+  // recién cuando termina.
+  if (!/^\d{2}:\d{2}$/.test(mine.querySelector('.dm-msg-hora')?.textContent ?? '') || mine.querySelector('.dm-msg-hora').getBoundingClientRect().height < 8) fail(`el mensaje recién mandado no muestra su hora: «${mine.querySelector('.dm-msg-hora')?.textContent}»`);
+  if (theirs.querySelector('.dm-msg-cuando').hasAttribute('data-abierto') || theirs.querySelector('.dm-msg-hora').textContent) fail('la respuesta muestra una hora antes de terminar');
   if (area.value !== '') fail('el campo no se vació al mandar');
   const body = theirs.querySelector('.dm-msg-cuerpo');
   if (theirs.dataset.estado !== 'escribiendo' || !theirs.querySelector('.dm-msg-pie').hasAttribute('data-abierto')) fail('la respuesta no arrancó marcada como en curso');
@@ -415,6 +429,21 @@ else {
   type(area, 'Go on. <b>fake bold</b> <img src="x" onerror="window.__colado = 1">');
   key(area, 'Enter');
   await until(() => msgs().length === 4 && msgs()[3].dataset.estado === 'ok', 9000);
+  // La hora de la respuesta se despliega cuando termina: no aparece de golpe.
+  {
+    const cuando = msgs()[3]?.querySelector('.dm-msg-cuando');
+    const altos = [];
+    for (let i = 0; cuando && i < 60; i++) {
+      const a = r2(cuando.getBoundingClientRect().height);
+      if (a !== altos.at(-1)) altos.push(a); else if (a > 8 && i > 6) break;
+      await frame();
+    }
+    const entre = altos.filter((a) => a > 0.5 && a < altos.at(-1) - 0.5);
+    if (!cuando?.hasAttribute('data-abierto') || !(altos.at(-1) > 8)) fail(`la hora de la respuesta no se desplegó al terminar: ${altos.join(' → ')} px`);
+    else if (entre.length < 2) fail(`la hora de la respuesta apareció de golpe: ${altos.join(' → ')} px`);
+    for (let i = 1; i < altos.length; i++) if (altos[i] < altos[i - 1]) { fail(`la hora de la respuesta se achicó mientras se desplegaba: ${altos.join(' → ')}`); break; }
+    data.horaDespliegue = altos.slice(0, 8).join(' → ') + (altos.length > 8 ? ` … ${altos.at(-1)}` : '') + ' px';
+  }
   const full = msgs()[3];
   if (!full || full.dataset.estado !== 'ok') fail(`la segunda respuesta no terminó (estado ${full?.dataset.estado})`);
   else {
@@ -424,7 +453,39 @@ else {
     if (thread().querySelector('img, b') || window.__colado) fail('el HTML de un mensaje se interpretó en vez de mostrarse como texto');
     if (!md.textContent.includes('<b>fake bold</b>') || !msgs()[2].textContent.includes('<b>fake bold</b>')) fail('el HTML de un mensaje no quedó a la vista como texto');
     if (has('strong')?.textContent !== 'not') fail('la negrita no se armó');
-    if (md.querySelectorAll('ul > li').length !== 4) fail(`la lista tiene ${md.querySelectorAll('ul > li').length} items`);
+    // (cinco: modelo, instrucciones, mensajes, proveedor y la hora del último mensaje)
+    if (md.querySelectorAll('ul > li').length !== 5) fail(`la lista tiene ${md.querySelectorAll('ul > li').length} items`);
+    // La hora de cada mensaje: guardada con el mensaje, a la vista debajo de
+    // él, y adelante del texto en lo que le llega al modelo (no en lo guardado
+    // ni en lo que se ve).
+    {
+      const { horaCorta, horaLarga } = await import('/hora.js');
+      const guardados = (await (await import('/datos.js')).hilo(chatId)).get().mensajes;
+      const horas = guardados.map((x) => x.t);
+      data.horasGuardadas = horas;
+      if (horas.length !== 4 || !horas.every((x) => typeof x === 'number' && Math.abs(x - Date.now()) < 120000) || horas.some((x, i) => i && x < horas[i - 1])) fail(`los cuatro mensajes no guardaron su hora, o no van en orden: ${JSON.stringify(horas)}`);
+      else {
+        if (!md.textContent.includes(`time on the last message: ${selloH(horas[2])} (2 of 2 from the user carry one, note yes)`)) fail(`al modelo no le llegó la hora adelante de cada mensaje del usuario, o la nota que la explica: ${/time on[^\n]*/.exec(md.textContent)?.[0] ?? '(sin renglón)'}`);
+        if (guardados.some((x) => /^\[\d{4}-/.test(x.texto)) || msgs()[2].querySelector('.dm-msg-cuerpo').textContent.startsWith('[')) fail('el sello de la hora quedó en el texto guardado o en el que se ve');
+        msgs().forEach((nodo, i) => {
+          const hEl = nodo.querySelector('.dm-msg-hora');
+          if (hEl?.textContent !== horaCorta(horas[i]) || !/^\d{2}:\d{2}$/.test(hEl.textContent) || hEl.getBoundingClientRect().height < 8) fail(`el mensaje ${i + 1} no muestra su hora: «${hEl?.textContent}» (guardó ${selloH(horas[i])})`);
+          if (hEl?.getAttribute('data-rad-tip') !== horaLarga(horas[i]) || hEl.hasAttribute('title')) fail(`la hora del mensaje ${i + 1} no lleva su fecha entera en el tooltip propio: ${hEl?.getAttribute('data-rad-tip')}`);
+        });
+        // debajo de la burbuja, contra su borde derecho
+        const burbuja = msgs()[2].querySelector('.dm-msg-cuerpo').getBoundingClientRect();
+        const hora2 = msgs()[2].querySelector('.dm-msg-hora').getBoundingClientRect();
+        if (hora2.top < burbuja.bottom || Math.abs(hora2.right - burbuja.right) > 1 || hora2.top - burbuja.bottom > 16) fail(`la hora del mensaje del usuario no está debajo de su burbuja, a la derecha (burbuja hasta ${r2(burbuja.right)}×${r2(burbuja.bottom)}, hora hasta ${r2(hora2.right)} desde ${r2(hora2.top)})`);
+        // el tooltip, de verdad: el propio, con la fecha entera
+        const hEl = msgs()[2].querySelector('.dm-msg-hora');
+        hEl.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+        await until(() => document.querySelector('.rad-tooltip'), 2500);
+        const tip = document.querySelector('.rad-tooltip');
+        if (tip?.textContent !== horaLarga(horas[2]) || !/^(Sun|Mon|Tues|Wednes|Thurs|Fri|Satur)day \d{1,2} [A-Z][a-z]+ \d{4}, \d{2}:\d{2}:\d{2}$/.test(tip?.textContent ?? '')) fail(`el tooltip de la hora dice «${tip?.textContent}»`);
+        hEl.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
+        await sleep(dur('base') + 120);
+      }
+    }
     if (!has('.dm-codigo code')?.textContent.includes("console.log(greet('BlackCode'));")) fail('el bloque de código no llegó entero');
     if (has('.dm-codigo-lang')?.textContent !== 'js') fail('el bloque de código no dice su lenguaje');
     if (md.querySelectorAll('.dm-tabla tbody tr').length !== 2 || has('.dm-tabla em')?.textContent !== 'works') fail('la tabla no se armó');
@@ -1868,6 +1929,8 @@ else {
       data.subagenteCorrido = Math.round(corrida) + ' px';
     }
     if (!/## Subagent 1 of 2 \([^,]+, fs_write, fs_read, \d+ s/.test(informe()) || !informe().includes('## Subagent 2 of 2') || !informe().includes('messages in the request: 1')) fail('subagentes: el informe que vuelve al agente dice: ' + informe().slice(0, 240));
+    // (el encargo de un subagente lleva la hora en que se le dio)
+    if (!/time on the last message: \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(1 of 1 from the user carry one, note yes\)/.test(informe())) fail('subagentes: el encargo no llevó la hora: ' + (/time on[^\n]*/.exec(informe())?.[0] ?? '(sin renglón)'));
     if (cuenta() !== '1 tool · 1 done') fail('subagentes: el contador del turno dice «' + cuenta() + '» (las tools del hijo no son del agente)');
     // la fila de delegate se abre para leer el informe
     del.querySelector('.dm-tool-cabeza').click();
@@ -3485,7 +3548,15 @@ else {
     await closed();
     await until(() => document.querySelector('.rad-tab[aria-current="page"]')?.dataset.view === 'chat' && msgs().length === 2, 4000);
     await settle();
-    if (msgs().length !== 2 || msgs()[0].dataset.rol !== 'user' || msgs()[0].textContent !== 'Give me the daily summary.' || msgs()[1].dataset.rol !== 'assistant' || !msgs()[1].textContent.includes('Give me the daily summary.')) fail('tareas: «Continue in a chat» no abrió un chat con el pedido y el resultado (' + msgs().length + ' mensajes)');
+    if (msgs().length !== 2 || msgs()[0].dataset.rol !== 'user' || msgs()[0].querySelector('.dm-msg-cuerpo').textContent !== 'Give me the daily summary.' || msgs()[1].dataset.rol !== 'assistant' || !msgs()[1].textContent.includes('Give me the daily summary.')) fail('tareas: «Continue in a chat» no abrió un chat con el pedido y el resultado (' + msgs().length + ' mensajes)');
+    // La corrida supo qué hora era (va adelante de su encargo), y el chat que
+    // la sigue lleva las horas de la corrida, no la de ahora.
+    {
+      const { horaLarga } = await import('/hora.js');
+      const corrida = (await window.rad.invoke('tareas:leer')).resultados.find((r) => r.titulo === 'Smoke daily');
+      if (!/time on the last message: \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(1 of 1 from the user carry one, note yes\)/.test(msgs()[1]?.textContent ?? '')) fail('tareas: el encargo de una corrida no llevó la hora: ' + (/time on[^\n]*/.exec(msgs()[1]?.textContent ?? '')?.[0] ?? '(sin renglón)'));
+      if (msgs()[0]?.querySelector('.dm-msg-hora')?.getAttribute('data-rad-tip') !== horaLarga(corrida.ts - corrida.ms) || msgs()[1]?.querySelector('.dm-msg-hora')?.getAttribute('data-rad-tip') !== horaLarga(corrida.ts)) fail('tareas: el chat que sigue a una tarea no lleva las horas de la corrida: ' + msgs()[0]?.querySelector('.dm-msg-hora')?.getAttribute('data-rad-tip') + ' y ' + msgs()[1]?.querySelector('.dm-msg-hora')?.getAttribute('data-rad-tip') + ' (la corrida terminó ' + horaLarga(corrida.ts) + ')');
+    }
     if (rows().length !== chatsAntes + 1 || shown(rows().find((f) => f.getAttribute('aria-current') === 'true')?.querySelector('.dm-fila-titulo')) !== 'Smoke daily') fail('tareas: el chat que sigue a la tarea no lleva su nombre');
     await go('tareas');
     await until(() => filasR().some((f) => !f.hasAttribute('data-sin-leer')), 3000);
@@ -3767,6 +3838,14 @@ else {
       await settle();
       if (datosM.chatActual()?.id !== chatV.id || view('chat').inert) fail('voz: «Open» no llevó al chat de voz');
       const dicho = msgs()[0];
+      // (lo dicho lleva su hora como cualquier mensaje, en el renglón de la marca)
+      {
+        const marca = dicho?.querySelector('.dm-msg-meta .dm-msg-voz')?.getBoundingClientRect();
+        const horaV = dicho?.querySelector('.dm-msg-meta .dm-msg-hora');
+        const hv = horaV?.getBoundingClientRect();
+        if (!marca || !hv || !/^\d{2}:\d{2}$/.test(horaV.textContent) || !(marca.right <= hv.left) || Math.abs((marca.top + marca.bottom) / 2 - (hv.top + hv.bottom) / 2) > 3) fail('voz: lo dicho no lleva su hora al lado de la marca: «' + horaV?.textContent + '»');
+        if (!/time on the last message: \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(1 of 1/.test(msgs()[1]?.textContent ?? '')) fail('voz: al agente no le llegó la hora de lo que se dijo');
+      }
       if (!dicho?.querySelector('.dm-msg-voz') || !dicho.querySelector('.dm-msg-voz svg') || !dicho.querySelector('.dm-msg-voz').textContent.includes('Said to the Atom Echo') || msgs()[1]?.querySelector('.dm-msg-voz')) fail('voz: el mensaje dicho no lleva su marca de micrófono (o la lleva la respuesta)');
       // El chat de voz está en el grupo «Channels», al fondo de la lista: flecha, ícono y nombre, con su tacho y sin contador.
       const grupo = chatView.querySelector('[data-grupo="canales"]');
@@ -4162,6 +4241,123 @@ else {
     data.fijar = 'sin fijados la lista es la de siempre; Pin lo sube a Pinned con Recent debajo; los dos se pliegan; Unpin del último devuelve todo a la vista';
   }
 
+  // 11x. La hora de cada mensaje, en lo que cuesta ver con un chat recién
+  // hecho: un chat de antes de que se guardara (sin hora: no se le inventa una,
+  // ni en la pantalla ni en el pedido), un mensaje de ayer (lleva el día), el
+  // mensaje nuevo (solo la hora), y un turno con tools (el renglón TOOLS: se lee
+  // aunque el mensaje viaje con la hora adelante, y la hora queda en el mismo
+  // renglón que el contador).
+  {
+    const datosM = await import('/datos.js');
+    const { horaCorta, horaLarga } = await import('/hora.js');
+    const modoAntes = datosM.modoTools();
+    datosM.ponerModoTools('auto');
+    await go('chat');
+    const agenteH = datosM.agenteActual();
+    const deAntes = datosM.chatActual();
+    const chatH = datosM.crearChat(agenteH.id);
+    await settle();
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1);
+    ayer.setHours(23, 58, 7, 0);
+    const docH = await datosM.hilo(chatH.id);
+    const vH = docH.get();
+    vH.mensajes.push(
+      { id: 'hora-1', rol: 'user', texto: 'An old question' },
+      { id: 'hora-2', rol: 'assistant', texto: 'An old answer', estado: 'ok', modelo: agenteH.modelo },
+      { id: 'hora-3', rol: 'user', texto: 'Asked last night', t: ayer.getTime() },
+      { id: 'hora-4', rol: 'assistant', texto: 'Answered last night', estado: 'ok', modelo: agenteH.modelo, t: ayer.getTime() + 61000 },
+    );
+    docH.set(vH);
+    // (se sale del chat y se vuelve: así se abre como un chat guardado)
+    if (deAntes) datosM.elegirChat(deAntes.id);
+    await settle();
+    datosM.elegirChat(chatH.id);
+    await until(() => datosM.chatActual()?.id === chatH.id && msgs().length === 4, 4000);
+    await settle();
+    const alto = (el) => (el ? el.getBoundingClientRect().height : -1);
+    if (msgs().length !== 4) fail('hora: el chat de antes abrió con ' + msgs().length + ' mensajes');
+    else {
+      const [v1, v2, a1, a2] = msgs();
+      if (alto(v1.querySelector('.dm-msg-meta')) > 0 || v1.querySelector('.dm-msg-hora').textContent || v1.querySelector('.dm-msg-hora').hasAttribute('data-rad-tip')) fail('hora: un mensaje del usuario de antes de que se guardara la hora muestra una: «' + v1.querySelector('.dm-msg-hora').textContent + '»');
+      if (v2.querySelector('.dm-msg-cuando').hasAttribute('data-abierto') || alto(v2.querySelector('.dm-msg-cuando')) > 0.5 || v2.querySelector('.dm-msg-hora').textContent) fail('hora: una respuesta de antes de que se guardara la hora muestra una');
+      // (sin hora no hay renglón debajo de la burbuja: el mensaje mide lo que su burbuja)
+      if (v1.querySelector('.dm-msg-cuerpo').textContent !== 'An old question' || alto(v1) < 20 || Math.abs(alto(v1) - alto(v1.querySelector('.dm-msg-cuerpo'))) > 0.5) fail('hora: un mensaje sin hora no se ve como siempre (mide ' + r2(alto(v1)) + ' px y su burbuja ' + r2(alto(v1.querySelector('.dm-msg-cuerpo'))) + ')');
+      if (Math.abs(alto(v2) - alto(v2.querySelector('.dm-msg-cuerpo'))) > 0.5) fail('hora: una respuesta sin hora no se ve como siempre (mide ' + r2(alto(v2)) + ' px y su texto ' + r2(alto(v2.querySelector('.dm-msg-cuerpo'))) + ')');
+      const p2 = (n) => String(n).padStart(2, '0');
+      const dia = p2(ayer.getDate()) + '/' + p2(ayer.getMonth() + 1) + (ayer.getFullYear() === new Date().getFullYear() ? '' : '/' + ayer.getFullYear());
+      if (a1.querySelector('.dm-msg-hora').textContent !== dia + ' 23:58') fail('hora: un mensaje de ayer dice «' + a1.querySelector('.dm-msg-hora').textContent + '», tenía que llevar el día: «' + dia + ' 23:58»');
+      if (a2.querySelector('.dm-msg-hora').textContent !== dia + ' 23:59' || !a2.querySelector('.dm-msg-cuando').hasAttribute('data-abierto') || alto(a2.querySelector('.dm-msg-cuando')) < 8) fail('hora: la respuesta de ayer dice «' + a2.querySelector('.dm-msg-hora').textContent + '» (alto ' + r2(alto(a2.querySelector('.dm-msg-cuando'))) + ')');
+      if (a1.querySelector('.dm-msg-hora').getAttribute('data-rad-tip') !== horaLarga(ayer.getTime()) || !/:07$/.test(horaLarga(ayer.getTime()))) fail('hora: el tooltip de un mensaje de ayer no trae su fecha entera: ' + a1.querySelector('.dm-msg-hora').getAttribute('data-rad-tip'));
+    }
+    // Un mensaje nuevo en ese chat: al modelo le llegan con hora los que la
+    // tienen (el de ayer y este), y el de antes, como estaba.
+    type(area, 'And now, today');
+    key(area, 'Enter');
+    await until(() => msgs().length === 6 && msgs()[5].querySelector('.dm-msg-cuerpo').textContent.length > 40, 6000);
+    // mientras llega, la respuesta no dice ninguna hora; la del usuario ya está, debajo de su burbuja y contra su borde
+    if (msgs()[5]?.dataset.estado !== 'escribiendo' || msgs()[5].querySelector('.dm-msg-cuando').hasAttribute('data-abierto') || msgs()[5].querySelector('.dm-msg-hora').textContent) fail('hora: la respuesta muestra una hora antes de terminar (estado ' + msgs()[5]?.dataset.estado + ')');
+    {
+      const burbuja = msgs()[4].querySelector('.dm-msg-cuerpo').getBoundingClientRect();
+      const suya = msgs()[4].querySelector('.dm-msg-hora').getBoundingClientRect();
+      if (suya.height < 8 || suya.top < burbuja.bottom || suya.top - burbuja.bottom > 16 || Math.abs(suya.right - burbuja.right) > 1) fail('hora: la del mensaje del usuario no está debajo de su burbuja, a la derecha (burbuja hasta ' + r2(burbuja.right) + '×' + r2(burbuja.bottom) + ', hora hasta ' + r2(suya.right) + ' desde ' + r2(suya.top) + ')');
+    }
+    await until(() => msgs()[5].dataset.estado === 'ok', 12000);
+    // …y cuando termina, se despliega: no aparece de golpe
+    {
+      const cuando = msgs()[5].querySelector('.dm-msg-cuando');
+      const altos = [];
+      for (let i = 0; i < 60; i++) {
+        const a = r2(cuando.getBoundingClientRect().height);
+        if (a !== altos.at(-1)) altos.push(a); else if (a > 8 && i > 6) break;
+        await frame();
+      }
+      if (!cuando.hasAttribute('data-abierto') || !(altos.at(-1) > 8)) fail('hora: la de la respuesta no se desplegó al terminar: ' + altos.join(' → ') + ' px');
+      else if (altos.filter((a) => a > 0.5 && a < altos.at(-1) - 0.5).length < 2) fail('hora: la de la respuesta apareció de golpe: ' + altos.join(' → ') + ' px');
+    }
+    await settle();
+    {
+      const guardados = docH.get().mensajes;
+      const eco = msgs()[5]?.querySelector('.dm-msg-cuerpo').textContent ?? '';
+      const nuevo = guardados[4];
+      if (typeof nuevo?.t !== 'number' || Math.abs(nuevo.t - Date.now()) > 60000) fail('hora: el mensaje nuevo no guardó cuándo se mandó: ' + JSON.stringify(nuevo?.t));
+      if (!eco.includes('time on the last message: ' + selloH(nuevo?.t) + ' (2 of 3 from the user carry one, note yes)')) fail('hora: al modelo no le llegaron con hora los mensajes que la tienen (y sin hora el que no): ' + (/time on[^\n]*/.exec(eco)?.[0] ?? eco.slice(0, 160)));
+      if (!eco.includes('messages in the request: 5') || !eco.includes('I got your message: “And now, today”')) fail('hora: el pedido no viajó entero, o el mensaje no se lee como se tipeó: ' + eco.slice(0, 200));
+      if (!eco.includes('instructions: ' + String(agenteH.instrucciones ?? '').trim().length + ' characters')) fail('hora: la nota del formato no está al final de las instrucciones (el proveedor de mentira la saca de ahí): ' + (/instructions:[^\n]*/.exec(eco)?.[0] ?? ''));
+      if (guardados.some((m) => /^\[\d{4}-/.test(m.texto)) || msgs()[4].querySelector('.dm-msg-cuerpo').textContent !== 'And now, today') fail('hora: el sello quedó guardado en el texto de un mensaje, o se ve en el chat');
+      if (msgs()[4].querySelector('.dm-msg-hora').textContent !== horaCorta(nuevo.t) || !/^\d{2}:\d{2}$/.test(msgs()[4].querySelector('.dm-msg-hora').textContent)) fail('hora: el mensaje de hoy dice «' + msgs()[4].querySelector('.dm-msg-hora').textContent + '» (va solo la hora)');
+      if (typeof guardados[5]?.t !== 'number' || guardados[5].t < nuevo.t || msgs()[5].querySelector('.dm-msg-hora').textContent !== horaCorta(guardados[5].t)) fail('hora: la respuesta no guardó o no muestra cuándo terminó');
+    }
+    // Un turno con tools.
+    type(area, 'TOOLS: [{"name":"fs_write","args":{"path":"hora.txt","content":"time\\n"}}]');
+    key(area, 'Enter');
+    await sleep(200);
+    await until(() => !datosM.respondiendo(chatH.id), 20000);
+    await settle();
+    {
+      const guardados = docH.get().mensajes;
+      const delUsuario = guardados.filter((m) => m.rol === 'user');
+      const fila = guardados.find((m) => m.rol === 'tool' && m.tool === 'fs_write');
+      const ult = msgs().at(-1);
+      const eco = ult?.querySelector('.dm-msg-cuerpo').textContent ?? '';
+      if (fila?.estado !== 'ok') fail('hora: con la hora adelante del mensaje, el renglón TOOLS: no se leyó (fs_write quedó ' + JSON.stringify(fila?.estado) + ')');
+      if (!eco.includes('time on the last message: ' + selloH(delUsuario.at(-1)?.t) + ' (3 of 4 from the user carry one, note yes)')) fail('hora: en un turno con tools el pedido no llevó las horas: ' + eco.slice(-200));
+      // la hora y el contador, en un renglón: la hora primero
+      const hEl = ult.querySelector('.dm-msg-hora');
+      const cEl = ult.querySelector('.dm-msg-cuenta-texto');
+      const hr = hEl.getBoundingClientRect();
+      const cr = cEl.getBoundingClientRect();
+      if (!hEl.textContent || !shown(cEl) || Math.abs(hr.bottom - cr.bottom) > 2 || !(hr.right <= cr.left) || cr.left - hr.right > 40) fail('hora: la hora y el contador de tools no quedaron en un renglón (hora ' + r2(hr.left) + '–' + r2(hr.right) + ' a ' + r2(hr.bottom) + ', contador desde ' + r2(cr.left) + ' a ' + r2(cr.bottom) + ')');
+      if (getComputedStyle(hEl).color !== getComputedStyle(cEl).color || parseFloat(getComputedStyle(hEl).fontSize) >= parseFloat(getComputedStyle(ult.querySelector('.dm-msg-cuerpo')).fontSize)) fail('hora: no se ve chica y gris (' + getComputedStyle(hEl).fontSize + ', ' + getComputedStyle(hEl).color + ')');
+      // el tramo de texto de antes de la tool no lleva hora: es una por turno
+      const tramo = msgs().at(-2);
+      if (tramo?.dataset.rol !== 'assistant' || tramo.querySelector('.dm-msg-cuando').hasAttribute('data-abierto') || guardados.filter((m) => m.rol === 'assistant' && typeof m.t === 'number').length !== 3) fail('hora: el tramo de texto de antes de una tool lleva su propia hora (va una por turno)');
+      data.horaRenglon = hEl.textContent.replace(/\d/g, '0') + ' + «' + shown(cEl) + '»';
+    }
+    datosM.ponerModoTools(modoAntes);
+    data.hora = 'un chat de antes sin horas inventadas, el de ayer con su día, el de hoy con la hora sola, el pedido con el sello solo donde hay hora, y un turno con tools';
+  }
+
   // 11w. La carpeta de la app está vedada a las tools. Un agente con las tools
   // de archivos no puede leer ni cambiar los documentos donde BlackCode guarda
   // sus agentes, el modo de permisos, las tareas o las llaves: con eso se daba
@@ -4315,7 +4511,7 @@ await go('ajustes');
 
 // Para la captura y para la pasada 2: de vuelta en el chat.
 await go('chat');
-window.rad.store.write('smoke', { pass: 1, chat: chatId, chatVenice, frenado: data.frenado });
+window.rad.store.write('smoke', { pass: 1, chat: chatId, chatVenice, frenado: data.frenado, horas: data.horasGuardadas });
 // Lo último: un guardado que todavía está en el debounce cuando la app cierra.
 window.rad.store.write('ultimo', { ok: true });
 

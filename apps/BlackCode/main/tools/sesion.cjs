@@ -32,14 +32,15 @@ const RONDAS_TOPE_FACTOR = 3;
 // Contexto del sistema para las tools de shell y de archivos: rutas REALES,
 // no adivinadas. Sin esto el modelo inventa el usuario de Windows y escribe en
 // C:\Users\<lo que supone>. (De NeonCode, envContext.)
+//
+// La hora NO va acá (iba, hasta la 1.3.1): cambiaba cada minuto, y como esto es
+// el principio del pedido, el proveedor no podía reusar del caché nada de lo
+// que venía después. Ahora cada mensaje del usuario lleva la suya (hora.cjs).
 function entorno(run) {
   let user = '';
   try { user = os.userInfo().username; } catch { /* sin userInfo: seguimos */ }
   const home = os.homedir();
-  const p = (n) => String(n).padStart(2, '0');
-  const d = new Date();
   return [
-    `Current date and time: ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())} (local).`,
     `System: Windows. Windows username: ${user || '(unknown)'} — use this exact name in C:\\Users paths, do NOT guess it.`,
     `Home: ${home}`,
     `Desktop: ${path.join(home, 'Desktop')}`,

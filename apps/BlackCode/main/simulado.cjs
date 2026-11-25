@@ -8,6 +8,8 @@
 // cuántas instrucciones, cuántos mensajes, el último del usuario): así el humo
 // comprueba que el pedido viajó entero, no solo que algo contestó.
 
+const hora = require('./hora.cjs');
+
 const TROZO = 9;      // caracteres por entrega
 const PAUSA_MS = 22;  // entre entrega y entrega
 const PENSAR_MS = 180;
@@ -81,7 +83,23 @@ And something that is not chemistry:
 
 It costs $5 and then $10: that is money, not math.`;
 
-function respuesta({ proveedor, modelo, instrucciones, mensajes }, system = '') {
+// La hora que la app le pone adelante a cada mensaje del usuario y su nota en
+// las instrucciones (hora.cjs): se sacan antes de leer el pedido, así todo lo
+// de abajo lo ve como se tipeó (el renglón TOOLS:, la cuenta de instrucciones),
+// y lo que había se cuenta aparte, en `horas`.
+function sinHoras(pedido) {
+  const { texto, nota } = hora.sinNota(pedido.instrucciones);
+  const delUsuario = pedido.mensajes.filter((m) => m.rol === 'user');
+  return {
+    ...pedido,
+    instrucciones: nota ? texto : pedido.instrucciones,
+    mensajes: pedido.mensajes.map((m) => (m.rol === 'user' ? { ...m, texto: hora.sinSello(m.texto) } : m)),
+    horas: { ultima: hora.selloDe(pedido.mensajes.at(-1)?.texto), con: delUsuario.filter((m) => hora.selloDe(m.texto)).length, de: delUsuario.length, nota },
+  };
+}
+const renglonDeHoras = (h) => `time on the last message: ${h.ultima} (${h.con} of ${h.de} from the user carry one, note ${h.nota ? 'yes' : 'no'})`;
+
+function respuesta({ proveedor, modelo, instrucciones, mensajes, horas }, system = '') {
   // la memoria que le llegó, si le llegó (el humo lo lee)
   const conCore = /^## Core memory$/m.test(system);
   const recuerdos = (system.match(/^- \(m\d+\)/gm) ?? []).length;
@@ -99,6 +117,8 @@ function respuesta({ proveedor, modelo, instrucciones, mensajes }, system = '') 
     `- instructions: ${instrucciones ? instrucciones.length : 0} characters`,
     `- messages in the request: ${mensajes.length}`,
     `- provider: ${proveedor}`,
+    // (solo si el último mensaje la trae: un chat viejo o un pedido sin hora no suma el renglón)
+    ...(horas?.ultima ? [`- ${renglonDeHoras(horas)}`] : []),
     // (solo si hay algo: una memoria vacía no suma un renglón, que el humo los cuenta)
     ...(conCore || recuerdos ? [`- memory: core ${conCore ? 'yes' : 'no'}, ${recuerdos} ${recuerdos === 1 ? 'entry' : 'entries'}`] : []),
     ...(skills ? [`- skills in the list: ${skills}`] : []),
@@ -163,11 +183,12 @@ async function conTools(pedido, { signal, onTexto, onPensando, sesion }) {
   if (signal.aborted) return { motivo: 'frenado' };
   // lo que la app le habría puesto al modelo al final del pedido siguiente
   const cola = sesion.cola({ final: sesion.esFinal() }) ?? '';
-  await escribir(['## Tool run', '', ...lineas, '', `record seen: ${/ACTUALLY executed/.test(cola) ? 'yes' : 'no'} · protocol: ${/HOW TOOLS ACTUALLY WORK/.test(sesion.sistema(pedido.instrucciones)) ? 'yes' : 'no'}`].join('\n'));
+  await escribir(['## Tool run', '', ...lineas, '', `record seen: ${/ACTUALLY executed/.test(cola) ? 'yes' : 'no'} · protocol: ${/HOW TOOLS ACTUALLY WORK/.test(sesion.sistema(pedido.instrucciones)) ? 'yes' : 'no'}`, ...(pedido.horas?.ultima ? ['', renglonDeHoras(pedido.horas)] : [])].join('\n'));
   return signal.aborted ? { motivo: 'frenado' } : { motivo: 'fin', modelo: pedido.modelo };
 }
 
-async function responder(pedido, { signal, onTexto, onPensando, sesion = null }) {
+async function responder(crudo, { signal, onTexto, onPensando, sesion = null }) {
+  const pedido = sinHoras(crudo);
   // con tools y un renglón TOOLS: se piden esas llamadas; sin el renglón, el
   // agente contesta lo de siempre (todos nacen con tools)
   if (sesion?.activa && guion(pedido)) return conTools(pedido, { signal, onTexto, onPensando, sesion });
