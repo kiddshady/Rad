@@ -1,6 +1,6 @@
 # Changelog
 
-## BlackCode 0.21.0 (2026-11-26)
+## BlackCode 0.21.0 (2026-11-25)
 
 - **Servidores MCP.** En Settings hay una tarjeta nueva, «MCP servers», para
   conectar servidores que les suman tools a los agentes. Un servidor puede ser
