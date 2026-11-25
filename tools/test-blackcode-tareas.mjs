@@ -355,6 +355,19 @@ ok('cada cuánto, en palabras', T.describir({ kind: 'daily', a: '09:00' }) === '
   ok('…y no son el mismo archivo', !fs.readFileSync(path.join(build, 'tray.ico')).equals(fs.readFileSync(path.join(build, 'tray-dark.ico'))));
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
   ok('…y viajan en la app empaquetada', pkg.build.files.includes('build/tray.ico') && pkg.build.files.includes('build/tray-dark.ico'));
+  // (desde la 1.3.0 el de la bandeja es el dibujo ENTERO del ícono común —contorno, rayos, agentes y núcleo—, sin la baldosa)
+  {
+    const horno = fs.readFileSync(path.join(APP, 'scripts', 'icon.mjs'), 'utf8');
+    const deBandeja = horno.slice(horno.indexOf('const trayGlyph'), horno.indexOf('const drawTray'));
+    ok('el ícono de la bandeja lleva el dibujo entero: contorno, rayos, agentes y núcleo', deBandeja.includes('alpha: CONTORNO') && deBandeja.includes('alpha: RAYOS') && (deBandeja.match(/sdSegment/g) ?? []).length === 2 && (deBandeja.match(/sdCircle/g) ?? []).length === 2);
+    ok('…y sigue sin baldosa', horno.includes('const drawTray = (size, v) => rasterizeBare(size, trayGlyph(size, v));'));
+    // el archivo horneado: de un agente al núcleo hay tinta todo el camino (el rayo), y la esquina sigue vacía
+    const crudo = fs.readFileSync(path.join(build, 'tray.ico'));
+    const n = crudo.readUInt16LE(4);
+    let mayor = null;
+    for (let i = 0; i < n; i++) { const e = 6 + i * 16; const lado = crudo[e] || 256; if (!mayor || lado > mayor.lado) mayor = { lado, largo: crudo.readUInt32LE(e + 8), desde: crudo.readUInt32LE(e + 12) }; }
+    ok('el mayor tamaño del ícono de bandeja está y pesa lo que un dibujo con líneas', mayor.lado === 64 && mayor.largo > 600, JSON.stringify(mayor));
+  }
 }
 
 // ---------- 9. el cableado ----------

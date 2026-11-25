@@ -1,5 +1,22 @@
 # Changelog
 
+## BlackCode 1.3.0 (2026-11-25)
+
+- **Fijar chats.** El menú de un chat ofrece «Pin»: el chat sube al grupo
+  «Pinned», arriba de todo, y los demás quedan debajo con el rótulo «Recent».
+  Los dos grupos se pliegan y se acuerdan. Sin ningún chat fijado no hay ni
+  grupo ni rótulos: la lista es la de siempre (y si se suelta el último fijado
+  con «Recent» plegada, se abre sola: sin rótulo no habría cómo desplegarla).
+  Las filas van sin ícono. Un chat de canal no se fija: ya tiene su grupo.
+- **El ícono de la bandeja lleva el dibujo entero** del ícono común: el
+  contorno, los rayos, los seis agentes y el núcleo, sin la baldosa. Hasta acá
+  eran solo los puntos, porque a 16 px las líneas casi no se leen; Fran lo vio
+  en su barra y lo quiso así igual. El kit de íconos acepta capas que se dejan
+  ver a través (`alpha`): sin baldosa no hay contra qué aclarar una línea tenue.
+- En Settings → Voice, un error viejo ya no queda pegado: «No voice sample
+  set.» seguía en rojo después de elegir la muestra (Fran lo vio). Al cambiar
+  el Python, la muestra o el modelo, el estado se limpia.
+
 ## BlackCode 1.2.0 (2026-11-25)
 
 - **Arreglo: la 1.1.0 instalada no podía conectarse al Atom Echo.** Quedaba en

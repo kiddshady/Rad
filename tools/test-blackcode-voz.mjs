@@ -181,6 +181,8 @@ function pythonDeMentira() {
   // no hay Python
   const sin = escucha.crear({ script: 'm.py', lanzar: () => { const p = new EventEmitter(); p.stdout = new PassThrough(); p.stderr = new PassThrough(); p.stdin = new Writable({ write(_c, _e, cb) { cb(); } }); setImmediate(() => p.emit('error', Object.assign(new Error('spawn python ENOENT'), { code: 'ENOENT' }))); return p; } });
   ok('escucha: sin Python, lo dice', await sin.transcribir(tono(100)).then(() => false, () => true) && sin.estado().estado === 'error' && sin.estado().error === 'Python was not found.', sin.estado().error);
+  sin.apagar();
+  ok('escucha: al soltarla, el error viejo se limpia', sin.estado().estado === 'off' && sin.estado().error === '');
 }
 {
   // probar: ¿este Python tiene Whisper?
@@ -576,6 +578,9 @@ function mundo({ config = {}, llave = 'LLAVE-BUENA', opciones = {} } = {}) {
   ok('habla: sin muestra, lo dice', h.decir('Hola.') === null && h.estado().error === 'No voice sample set.' && py.lanzados.length === 2);
   c.muestra = 'C:/voz/no-esta.wav';
   ok('habla: con una muestra que no está, lo dice', h.decir('Hola.') === null && h.estado().error === 'The voice sample was not found.' && py.lanzados.length === 2);
+  // el usuario elige otra muestra: la app suelta el proceso, y el cartel de antes no se queda pegado
+  h.apagar();
+  ok('habla: al soltarla, el error viejo se limpia', h.estado().estado === 'off' && h.estado().error === '');
   // se apaga sola
   const corto = habla.crear({ python: () => 'py', script: 'h.py', lanzar: py.lanzar, config: () => ({ muestra: 'C:/voz/zac.mp3' }), existe: () => true, ociosoMs: 40 });
   corto.calentar();
@@ -637,6 +642,7 @@ function mundo({ config = {}, llave = 'LLAVE-BUENA', opciones = {} } = {}) {
   ok('la frase le llega a la interfaz con el agente y el permiso', fuente.includes("rad.send('voz:frase', { n: ++cuenta, texto: f.texto, agente: c.agente, actua: c.actua, tardo: f.ms });"));
   ok('al abrir la app conecta recién cuando safeStorage puede descifrar', fuente.includes('electron.app.whenReady().then(() => eco.arrancar());') && !/\n  eco\.arrancar\(\);\n/.test(fuente));
   ok('una llave que no se pudo descifrar se avisa como ilegible', fuente.includes('ilegible: c.hayLlave && !llave'));
+  ok('cambiar el Python o la muestra suelta el proceso (y con él, el error que hubiera)', fuente.includes("!== (d.python ?? '')) { d.python = c.python.trim().slice(0, 400); escucha.apagar(); }") && fuente.includes('{ callar(); habla.apagar(); }'));
   ok('al salir se desconecta y se apagan Whisper y la voz', fuente.includes("electron.app.on('before-quit', () => { eco.parar(); escucha.apagar(); habla.apagar(); });"));
   ok('la palabra clave calla al agente si estaba hablando, y el modelo de voz empieza a cargar ahí', fuente.includes('calentar: () => { callar(); if (config().habla.activa) { try { habla.calentar(); }'));
   ok('la respuesta hablada viene apagada y solo habla si está prendida (o es la prueba de Settings)', fuente.includes('activa: d.habla?.activa === true,') && fuente.includes("if (!c.habla.activa && !prueba) return { ok: false, error: 'Spoken answers are off.' };"));

@@ -123,7 +123,8 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
     if (typeof c.agente === 'string') d.agente = c.agente.slice(0, 80);
     if (IDIOMAS.includes(c.idioma)) d.idioma = c.idioma;
     if (typeof c.actua === 'boolean') d.actua = c.actua;
-    if (typeof c.python === 'string') d.python = c.python.trim().slice(0, 400);
+    // (otro Python para Whisper: el proceso del anterior se suelta, y con él lo que hubiera dicho que fallaba)
+    if (typeof c.python === 'string' && c.python.trim().slice(0, 400) !== (d.python ?? '')) { d.python = c.python.trim().slice(0, 400); escucha.apagar(); }
     if (c.habla && typeof c.habla === 'object') {
       const h = { ...(d.habla && typeof d.habla === 'object' ? d.habla : {}) };
       const estaba = h.activa === true;

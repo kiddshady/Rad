@@ -665,6 +665,19 @@
     transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out), margin-top var(--rad-dur-base) var(--rad-ease-in-out), opacity var(--rad-dur-base) var(--rad-ease-in-out);
   }
   .dm-canales[data-vacio] { grid-template-rows: 0fr; margin-top: 0; opacity: 0; }
+  /* Los chats fijados («Pinned») y los demás («Recent»): los mismos grupos
+     plegables, sin sangría ni ícono, con el rótulo más callado. «Pinned» va
+     arriba (su aire es hacia abajo) y no ocupa lugar si no hay ninguno; el
+     rótulo «Recent» tampoco, porque sin fijados no hay de qué distinguirse. */
+  .dm-canales.dm-grupo-arriba { margin-top: 0; margin-bottom: var(--rad-space-2); transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out), margin-bottom var(--rad-dur-base) var(--rad-ease-in-out), opacity var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-canales.dm-grupo-arriba[data-vacio] { margin-bottom: 0; }
+  .dm-grupo { flex: none; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .dm-grupo-rotulo { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out), opacity var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-grupo-rotulo[data-vacio] { grid-template-rows: 0fr; opacity: 0; }
+  .dm-grupo-rotulo-in { min-height: 0; overflow: hidden; }
+  .dm-grupo-rotulo .dm-canales-cabeza { font-size: var(--rad-text-s); font-weight: var(--rad-weight-regular); color: var(--rad-text-3); padding-inline-start: var(--rad-space-2); transition: color var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-grupo-rotulo .dm-canales-fila:hover .dm-canales-cabeza { color: var(--rad-text-1); }
+  .dm-canales-in.dm-grupo-llano { padding-inline-start: 0; }
   .dm-canales-todo { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 2px; }
   .dm-canales-fila {
     flex: none;

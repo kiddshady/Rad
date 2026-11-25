@@ -3739,7 +3739,7 @@ else {
     if (!dice('voz-eco').includes('Listening…') || statusRight() !== 'Listening…') fail('voz: mientras el Echo escucha no se dice: tarjeta «' + dice('voz-eco') + '», barra «' + statusRight() + '»');
     if ((await sim({})).cargas !== 1) fail('voz: el modelo no empezó a cargar al oír la palabra clave');
     // …y dice algo: va a un chat de voz del agente, sin sacar al usuario de Settings.
-    if (chatView.querySelector('.dm-canales').offsetHeight !== 0 || !chatView.querySelector('.dm-canales').inert) fail('canales: el grupo Channels se ve sin que haya ningún chat de canal (' + chatView.querySelector('.dm-canales').offsetHeight + ' px)');
+    if (chatView.querySelector('[data-grupo="canales"]').offsetHeight !== 0 || !chatView.querySelector('[data-grupo="canales"]').inert) fail('canales: el grupo Channels se ve sin que haya ningún chat de canal (' + chatView.querySelector('[data-grupo="canales"]').offsetHeight + ' px)');
     const chatAntes = datosM.chatActual()?.id;
     const cuantosAntes = datosM.chatsDe(agenteV.id).length;
     await sim({ que: 'hablar', texto: 'Okay Zac, what time is it?' });
@@ -3769,15 +3769,22 @@ else {
       const dicho = msgs()[0];
       if (!dicho?.querySelector('.dm-msg-voz') || !dicho.querySelector('.dm-msg-voz svg') || !dicho.querySelector('.dm-msg-voz').textContent.includes('Said to the Atom Echo') || msgs()[1]?.querySelector('.dm-msg-voz')) fail('voz: el mensaje dicho no lleva su marca de micrófono (o la lleva la respuesta)');
       // El chat de voz está en el grupo «Channels», al fondo de la lista: flecha, ícono y nombre, con su tacho y sin contador.
-      const grupo = chatView.querySelector('.dm-canales');
+      const grupo = chatView.querySelector('[data-grupo="canales"]');
       const cabeza = grupo.querySelector('[data-accion="canales"]');
       const filaV = rows().find((r) => r.dataset.radKey === chatV.id);
-      const comunesF = rows().filter((r) => !r.closest('.dm-canales'));
+      const comunesF = rows().filter((r) => !r.closest('[data-grupo="canales"]'));
       await settle();
-      if (!filaV || !filaV.closest('.dm-canales') || grupo.hasAttribute('data-vacio') || grupo.inert || !(grupo.offsetHeight > 40)) fail('canales: el chat de voz no está en el grupo Channels (' + grupo.offsetHeight + ' px)');
+      if (!filaV || filaV.closest('[data-grupo]') !== grupo || grupo.hasAttribute('data-vacio') || grupo.inert || !(grupo.offsetHeight > 40)) fail('canales: el chat de voz no está en el grupo Channels (' + grupo.offsetHeight + ' px)');
       if (cabeza.textContent.trim() !== 'Channels' || cabeza.querySelectorAll('svg').length !== 2 || !grupo.querySelector('[data-accion="canales-borrar"] svg') || /\d/.test(grupo.querySelector('.dm-canales-fila').textContent)) fail('canales: la cabeza del grupo no es flecha, ícono y nombre, con su tacho y sin contador: «' + grupo.querySelector('.dm-canales-fila').textContent + '»');
       if (grupo.parentElement.lastElementChild !== grupo || !comunesF.length || comunesF.some((r) => r.getBoundingClientRect().top >= grupo.getBoundingClientRect().top)) fail('canales: el grupo no está al fondo de la lista, debajo de todos los chats');
       if (!/\d{1,2}\D\d{1,2}.* · \d{2}:\d{2}/.test(shown(filaV?.querySelector('.dm-fila-fecha'))) || comunesF.some((r) => r.querySelector('.dm-fila-fecha'))) fail('canales: la fila de un chat de canal no dice cuándo fue (o lo dice la de un chat común): «' + shown(filaV?.querySelector('.dm-fila-fecha')) + '»');
+      // (un chat de canal no se fija: su menú no lo ofrece)
+      filaV?.querySelector('.dm-fila-mas').click();
+      await until(() => menus().length === 1, 2000);
+      await sleep(dur('base') + 80);
+      if (!menus()[0] || [...menus()[0].querySelectorAll('.rad-menu-item')].some((i) => /pin/i.test(i.textContent))) fail('canales: el menú de un chat de canal ofrece fijarlo (o no abrió)');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await until(() => menus().length === 0, 2000);
       // Se pliega desplegándose (no de golpe), y se acuerda.
       {
         const caja = grupo.querySelector('.dm-canales-caja');
@@ -4049,7 +4056,7 @@ else {
     {
       datosM.elegirAgente(agenteV.id);
       await settle();
-      const grupo = chatView.querySelector('.dm-canales');
+      const grupo = chatView.querySelector('[data-grupo="canales"]');
       const n = datosM.chatsDe(agenteV.id).filter((c) => c.voz === true).length;
       const comunes0 = datosM.chatsDe(agenteV.id).filter((c) => c.voz !== true).length;
       grupo.querySelector('[data-accion="canales-borrar"]').click();
@@ -4065,6 +4072,94 @@ else {
       if (!(n >= 1) || datosM.chatsDe(agenteV.id).some((c) => c.voz === true) || datosM.chatsDe(agenteV.id).length !== comunes0 || grupo.offsetHeight !== 0 || !grupo.inert) fail('canales: el tacho no borró los ' + n + ' chats de canal y solo esos, o el grupo sigue a la vista (' + grupo.offsetHeight + ' px)');
     }
     data.habla = 'apagada de fábrica, la prueba de Settings suena y se calla, la respuesta de un turno de voz se dice y la de uno tipeado no, la palabra clave lo interrumpe, y avisa en voz alta cuando espera permiso';
+  }
+
+  // 11v. Fijar chats. Un chat fijado sube al grupo «Pinned», arriba de todo; los
+  // demás quedan debajo, con el rótulo «Recent». Los dos grupos se pliegan. Sin
+  // ningún chat fijado no hay ni grupo ni rótulos: la lista es la de siempre.
+  {
+    const datosM = await import('/datos.js');
+    const agenteF = datosM.agenteActual();
+    await go('chat');
+    // (dos chats comunes para jugar: el más nuevo queda arriba)
+    for (const texto of ['pin me, first', 'leave me, second']) {
+      datosM.crearChat(agenteF.id);
+      await settle();
+      type(composer.querySelector('textarea'), texto);
+      send.click();
+      await until(() => !datosM.respondiendo(datosM.chatActual().id) && msgs().length === 2, 20000);
+      await settle();
+    }
+    const seccion = (accion) => chatView.querySelector('[data-accion="' + accion + '"]').closest('section');
+    const cabeza = (accion) => chatView.querySelector('[data-accion="' + accion + '"]');
+    const grupoF = seccion('fijados');
+    const rotuloR = cabeza('recientes').closest('.dm-grupo-rotulo');
+    const cajaR = seccion('recientes').querySelector('.dm-canales-caja');
+    const cajaF = grupoF.querySelector('.dm-canales-caja');
+    const fila = (titulo) => rows().find((r) => shown(r.querySelector('.dm-fila-titulo')) === titulo);
+    const abrirMenu = async (titulo) => { fila(titulo).querySelector('.dm-fila-mas').click(); await until(() => menus().length === 1, 2000); await sleep(dur('base') + 80); return [...menus()[0].querySelectorAll('.rad-menu-item')].map((i) => i.textContent.trim()); };
+    const elPrimero = datosM.chatsDe(agenteF.id).find((c) => c.titulo === 'pin me, first' || c.cuenta === 2 && c.voz !== true);
+    const tPin = datosM.chat(datosM.chatsDe(agenteF.id).filter((c) => c.voz !== true)[1].id).titulo;
+    const tOtro = datosM.chat(datosM.chatsDe(agenteF.id).filter((c) => c.voz !== true)[0].id).titulo;
+    if (!elPrimero || !fila(tPin) || !fila(tOtro)) fail('fijar: no están los dos chats de prueba en la lista: ' + rows().map((r) => shown(r.querySelector('.dm-fila-titulo'))).join(' | '));
+
+    // Sin nada fijado: ni grupo ni rótulos.
+    if (grupoF.offsetHeight !== 0 || !grupoF.inert || rotuloR.offsetHeight !== 0 || !rotuloR.inert || !(cajaR.offsetHeight > 30)) fail('fijar: sin chats fijados se ve el grupo Pinned o el rótulo Recent (' + grupoF.offsetHeight + ' y ' + rotuloR.offsetHeight + ' px)');
+    // El menú del chat ofrece fijarlo.
+    {
+      const items = await abrirMenu(tPin);
+      if (items[0] !== 'Pin' || !items.includes('Rename') || !items.includes('Delete')) fail('fijar: el menú de un chat no ofrece «Pin» primero: ' + items.join(', '));
+      enIngles('en el menú de un chat');
+      await pick('Pin');
+    }
+    await until(() => !grupoF.hasAttribute('data-vacio') && fila(tPin)?.closest('section') === grupoF, 3000);
+    await settle();
+    await sleep(dur('base') + 100);
+    {
+      const fp = fila(tPin);
+      const fo = fila(tOtro);
+      if (fp?.closest('section') !== grupoF || fo?.closest('section') !== seccion('recientes')) fail('fijar: el chat fijado no pasó al grupo Pinned, o el otro salió de Recent');
+      // (y está una sola vez: fijado, ya no figura entre los recientes)
+      if (rows().filter((r) => shown(r.querySelector('.dm-fila-titulo')) === tPin).length !== 1 || rows().filter((r) => r.closest('section') === seccion('recientes')).some((r) => shown(r.querySelector('.dm-fila-titulo')) === tPin)) fail('fijar: el chat fijado sigue figurando también entre los recientes');
+      if (cabeza('fijados').textContent.trim() !== 'Pinned' || cabeza('recientes').textContent.trim() !== 'Recent' || !(grupoF.offsetHeight > 40) || !(rotuloR.offsetHeight > 16) || grupoF.inert || rotuloR.inert) fail('fijar: con un chat fijado no están los dos rótulos a la vista («' + cabeza('fijados').textContent + '» ' + grupoF.offsetHeight + ' px, «' + cabeza('recientes').textContent + '» ' + rotuloR.offsetHeight + ' px)');
+      if (!fp || !fo || !(fp.getBoundingClientRect().top < rotuloR.getBoundingClientRect().top && rotuloR.getBoundingClientRect().top < fo.getBoundingClientRect().top) || chatView.querySelector('.dm-chats').firstElementChild !== grupoF) fail('fijar: el orden no es Pinned, su chat, Recent y el resto');
+      if (fp?.querySelector('.dm-fila-abrir svg') || cabeza('fijados').querySelectorAll('svg').length !== 1) fail('fijar: el chat fijado o su rótulo llevan un ícono de más (solo va la flecha del rótulo)');
+      const guardado = ((await window.rad.store.read('chats'))?.lista ?? []).filter((c) => c.fijado === true).map((c) => c.titulo);
+      if (guardado.join() !== tPin) fail('fijar: lo fijado no quedó guardado: ' + guardado.join(', '));
+      enIngles('en la lista con un chat fijado');
+    }
+    // Pinned se pliega desplegándose, y se acuerda.
+    {
+      const alto0 = cajaF.offsetHeight;
+      cabeza('fijados').click();
+      const altos = [];
+      for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 200;) { altos.push(cajaF.offsetHeight); await frame(); }
+      await settle();
+      if (!(alto0 > 20) || cajaF.offsetHeight !== 0 || cabeza('fijados').getAttribute('aria-expanded') !== 'false' || !cajaF.inert || (await window.rad.store.read('ui'))?.grupos?.fijados !== false) fail('fijar: al plegar Pinned no quedó cerrado y guardado (' + alto0 + ' → ' + cajaF.offsetHeight + ' px)');
+      if (!altos.some((a) => a > 2 && a < alto0 - 2)) fail('fijar: Pinned se pliega de golpe: ' + [...new Set(altos)].join(' → '));
+      cabeza('fijados').click();
+      await settle();
+      await sleep(dur('base'));
+      if (cajaF.offsetHeight !== alto0 || cajaF.inert) fail('fijar: al desplegar Pinned no volvió como estaba');
+    }
+    // Recent también se pliega. Y si se suelta el último fijado con Recent plegada, vuelve a abrirse sola:
+    // sin rótulo no habría con qué desplegarla, y los chats quedarían escondidos.
+    cabeza('recientes').click();
+    await settle();
+    await sleep(dur('base'));
+    if (cajaR.offsetHeight !== 0 || !cajaR.inert || cabeza('recientes').getAttribute('aria-expanded') !== 'false') fail('fijar: Recent no se plegó (' + cajaR.offsetHeight + ' px)');
+    {
+      const items = await abrirMenu(tPin);
+      if (items[0] !== 'Unpin') fail('fijar: el menú de un chat fijado no ofrece «Unpin»: ' + items.join(', '));
+      await pick('Unpin');
+    }
+    await until(() => grupoF.hasAttribute('data-vacio'), 3000);
+    await settle();
+    await sleep(dur('base') + 100);
+    if (grupoF.offsetHeight !== 0 || rotuloR.offsetHeight !== 0 || !(cajaR.offsetHeight > 30) || cajaR.inert || !fila(tPin) || !fila(tOtro) || fila(tPin).closest('section') !== seccion('recientes')) fail('fijar: al soltar el último fijado la lista no volvió a ser la de siempre, a la vista (Pinned ' + grupoF.offsetHeight + ' px, rótulo ' + rotuloR.offsetHeight + ' px, chats ' + cajaR.offsetHeight + ' px)');
+    if (((await window.rad.store.read('chats'))?.lista ?? []).some((c) => c.fijado)) fail('fijar: al soltarlo quedó guardado como fijado');
+    datosM.ponerGrupoAbierto('recientes', true);
+    data.fijar = 'sin fijados la lista es la de siempre; Pin lo sube a Pinned con Recent debajo; los dos se pliegan; Unpin del último devuelve todo a la vista';
   }
 
   data.tools = `Toolsmith: ${tools().length} filas en el último chat; permiso, rechazo, dos rondas, confianza por chat, código, base propia, un job, dos capturas, argumentos malos y modo automático`;

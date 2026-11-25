@@ -239,7 +239,10 @@ function crear({ python = () => '', script, lanzar = spawn, config = () => ({}),
   function apagar() {
     clearTimeout(ocio);
     const p = proc;
-    if (!p) { if (e.estado !== 'error') poner({ estado: 'off', error: '' }); return; }
+    // (sin proceso que apagar, igual se limpia lo que hubiera quedado dicho: se
+    // apaga cuando el usuario cambió el Python, la muestra o el modelo, y un
+    // «falta la muestra» de antes ya no es verdad)
+    if (!p) { poner({ estado: 'off', error: '' }); return; }
     p.pedidoSalir = true;
     try { p.stdin.write('{"op":"salir"}\n'); p.stdin.end(); } catch { /* ya se fue */ }
     const t = setTimeout(() => { try { p.kill(); } catch { /* ya se fue */ } }, 3000);

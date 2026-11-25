@@ -151,7 +151,8 @@ function crear({ python = () => 'python', script, lanzar = spawn, ociosoMs = OCI
   function apagar() {
     clearTimeout(ocio);
     const p = proc;
-    if (!p) { if (e.estado !== 'error') poner({ estado: 'off', error: '' }); return; }
+    // (sin proceso que apagar, igual se limpia el error que hubiera quedado: se apaga cuando el usuario cambió algo)
+    if (!p) { poner({ estado: 'off', error: '' }); return; }
     p.pedidoSalir = true;
     try { p.stdin.write('{"op":"salir"}\n'); p.stdin.end(); } catch { /* ya se fue */ }
     // (si no sale por las buenas, por las malas)

@@ -120,30 +120,49 @@ const draw = (size, nombre = VARIANTE) => { const v = VARIANTES[nombre]; return 
 
 // ---------- El ícono de la bandeja del sistema ----------
 //
-// Fran lo pidió el 25/11/2026: simplificado, y SIN baldosa (es la excepción a
-// la regla de sus íconos: en la bandeja va suelto sobre la barra, como los del
-// sistema). Es el mismo dibujo con lo que a 16 px se lee: el núcleo y los seis
-// agentes. El contorno y los rayos se van, porque a ese tamaño lo convertían en
-// un asterisco. Ocupa el lienzo entero (no hay baldosa que le pida margen) y
-// es de un solo color, sin resplandor.
+// SIN baldosa (es la excepción a la regla de los íconos de Fran: en la bandeja
+// va suelto sobre la barra, como los del sistema), y con el dibujo ENTERO del
+// ícono común: el contorno, los rayos, los seis agentes y el núcleo. La primera
+// versión (1.0.0) llevaba solo el núcleo y los agentes, porque a 16 px las
+// líneas casi no se leen; Fran la vio en su barra y la quiso así igual: «se ve
+// feo con los puntos solos… no importa que no se llegue a notar tanto» (1.3.0).
+// Ocupa el lienzo entero (no hay baldosa que le pida margen) y va sin
+// resplandor: sobre transparente sería un halo borroso. Las líneas conservan
+// lo tenue que son en el ícono (el contorno más que los rayos), dejándose ver a
+// través en vez de aclararse contra la baldosa.
 //
 // Son dos archivos porque la barra de Windows puede ser oscura o clara:
 // tray.ico (dibujo claro, para la barra oscura) y tray-dark.ico (dibujo
-// oscuro, para la clara). La app elige cuál según el tema de Windows.
+// oscuro, para la clara). La app elige cuál según el tema de Windows. El claro
+// lleva el metal del ícono común con el núcleo blanco; el oscuro, una sola
+// tinta (el metal claro no se vería sobre una barra clara).
 const TRAY_SIZES = [16, 20, 24, 32, 40, 48, 64];
-const TRAY_CLARO = hexToRgb('#ffffff');
-const TRAY_OSCURO = hexToRgb('#141414');
-const trayGlyph = (size, tinta) => () => {
+// (el metal de arriba hacia abajo, a lo alto del lienzo entero)
+const TRAY_CLARO = { tinta: gradientStops(METAL, [0, -0.5], [0, 0.5]), nucleo: liso('#ffffff') };
+const TRAY_OSCURO = { tinta: liso('#141414'), nucleo: liso('#141414') };
+const trayGlyph = (size, v) => () => {
   const px = 1 / size;
-  const nodo = Math.max(0.085, 1.2 * px);      // el radio de un agente: nunca menos de 1,2 px
-  const nucleo = Math.max(0.15, 2 * px);       // …y el del núcleo, nunca menos de 2
+  // Las proporciones del ícono común, llevadas a que el dibujo llene el lienzo;
+  // y sus mismos pisos: una línea nunca baja de un píxel, ni un agente de 1,15
+  // de radio, ni el núcleo de 2.
+  const k0 = 0.5 / (DE_LA_HOJA.radio + DE_LA_HOJA.nodo);
+  const nodo = Math.max(DE_LA_HOJA.nodo * k0, PISO_NODO * px);
+  const nucleo = Math.max(DE_LA_HOJA.nucleo * k0, PISO_NUCLEO * px);
+  const medio = Math.max((DE_LA_HOJA.trazo / 2) * k0, (PISO_TRAZO / 2) * px);
   const radio = 0.5 - nodo - 0.5 * px;         // los agentes llegan al borde del lienzo
+  const p = VERTICES.map(([x, y]) => [x * radio / RADIO, y * radio / RADIO]);
   return [
-    ...VERTICES.map(([x, y]) => { const k = radio / RADIO; return { color: tinta, sd: (u, v) => sdCircle(u - x * k, v - y * k, nodo) }; }),
-    { color: tinta, sd: (u, v) => sdCircle(u, v, nucleo) },
+    // el contorno, tenue
+    ...p.map((a, i) => { const b = p[(i + 1) % 6]; return { color: v.tinta, alpha: CONTORNO, sd: (x, y) => sdSegment(x, y, a[0], a[1], b[0], b[1], medio) }; }),
+    // los rayos: del núcleo a cada agente
+    ...p.map((a) => ({ color: v.tinta, alpha: RAYOS, sd: (x, y) => sdSegment(x, y, 0, 0, a[0], a[1], medio) })),
+    // los seis agentes
+    ...p.map((a) => ({ color: v.tinta, sd: (x, y) => sdCircle(x - a[0], y - a[1], nodo) })),
+    // el núcleo
+    { color: v.nucleo, sd: (x, y) => sdCircle(x, y, nucleo) },
   ];
 };
-const drawTray = (size, tinta) => rasterizeBare(size, trayGlyph(size, tinta));
+const drawTray = (size, v) => rasterizeBare(size, trayGlyph(size, v));
 
 const hoja = process.argv.indexOf('--hoja');
 if (hoja > 0) {

@@ -480,6 +480,9 @@ y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
   de modelos pedida a Venice, no escrita a mano.
 - Los datos son del store del núcleo: un documento con los agentes, otro con
   el índice de chats y uno por chat.
+- Los chats se fijan desde su menú: van al grupo «Pinned», arriba de la lista,
+  con los demás debajo en «Recent»; lo que entra solo (lo dicho al Atom Echo)
+  va al grupo «Channels», al fondo. Los tres se pliegan.
 - Voz (desde la 1.1.0, apagada de fábrica): se le dice la palabra clave a un
   M5Stack Atom Echo con ESPHome y lo que sigue entra a un chat de un agente.
   BlackCode se conecta al Echo sin Home Assistant (`main/eco.cjs`, con

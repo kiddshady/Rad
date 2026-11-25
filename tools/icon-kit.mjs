@@ -126,7 +126,9 @@ const tileLayer = (tile) => ({ color: tile, sd: (x, y) => sdRoundRect(x, y, 0.5,
 /**
  * Compone las capas (de abajo hacia arriba) y devuelve el lienzo en coma
  * flotante, RGBA premultiplicado con el alfa de 0 a 1. El color de una capa
- * es [r,g,b] o una función (x, y) => [r,g,b] (un degradé).
+ * es [r,g,b] o una función (x, y) => [r,g,b] (un degradé). Una capa puede
+ * llevar `alpha` (0 a 1): cuánto tapa donde está entera. Sin baldosa detrás no
+ * hay contra qué aclarar una línea tenue, así que se la deja ver a través.
  */
 function sample(size, stack) {
   const out = new Float32Array(size * size * 4);
@@ -142,7 +144,7 @@ function sample(size, stack) {
           // Cobertura de cada capa por su distancia: medio píxel de rampa.
           let cr = 0, cg = 0, cb = 0, ca = 0;
           for (const layer of stack) {
-            const cov = Math.min(1, Math.max(0, 0.5 - layer.sd(x, y) / (px / SS)));
+            const cov = Math.min(1, Math.max(0, 0.5 - layer.sd(x, y) / (px / SS))) * (layer.alpha ?? 1);
             if (!cov) continue;
             const col = typeof layer.color === 'function' ? layer.color(x, y) : layer.color;
             cr = col[0] * cov + cr * (1 - cov);

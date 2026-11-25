@@ -146,6 +146,19 @@ export function chatDeVoz(agenteId, ahora = Date.now()) {
   avisar('chats');
   return nuevo;
 }
+/** Fija un chat arriba de la lista (o lo suelta). Un chat de canal no se fija: tiene su grupo. */
+export function fijarChat(id, si) {
+  const c = chat(id);
+  if (!c || c.voz === true) return;
+  chats.update((v) => { const x = v.lista.find((y) => y.id === id); if (si === true) x.fijado = true; else delete x.fijado; return v; });
+  avisar('chats');
+}
+/** Los grupos «Pinned» y «Recent» de la lista de chats, ¿están desplegados? (se recuerda) */
+export const grupoAbierto = (cual) => ui.get().grupos?.[cual] !== false;
+export function ponerGrupoAbierto(cual, si) {
+  ui.patch({ grupos: { ...(ui.get().grupos ?? {}), [cual]: si === true } });
+  avisar('chats');
+}
 /** El grupo «Channels» de la lista de chats, ¿está desplegado? (se recuerda) */
 export const canalesAbiertos = () => ui.get().canales !== false;
 export function ponerCanalesAbiertos(si) {

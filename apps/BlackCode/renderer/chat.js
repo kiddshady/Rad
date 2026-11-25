@@ -86,15 +86,33 @@ export function montarChat(el, { router }) {
   // Adentro: los chats de siempre y, al fondo de todo, el grupo de los canales
   // (lo que entró solo: lo dicho al Atom Echo). El grupo se pliega, y no ocupa
   // lugar mientras no hay ninguno.
-  const comunes = h('div', 'dm-chats-lista', { role: 'list' });
+  // Arriba de todo, los chats fijados, en su grupo «Pinned»; los demás quedan
+  // debajo, con el rótulo «Recent». Los dos se pliegan. Sin ninguno fijado no
+  // hay ni grupo ni rótulos: la lista es la de siempre.
+  const hacerGrupo = (nombre, accion) => {
+    const cabeza = h('button', 'dm-canales-cabeza', { type: 'button', 'aria-expanded': 'true', 'data-accion': accion }, icono('chevron', 'dm-canales-chev'), h('span', 'dm-canales-nombre', {}, nombre));
+    const suLista = h('div', 'dm-chats-lista', { role: 'list' });
+    const caja = h('div', 'dm-canales-caja', { 'data-abierto': '' }, h('div', 'dm-canales-in dm-grupo-llano', {}, suLista));
+    const rotulo = h('div', 'dm-grupo-rotulo', {}, h('div', 'dm-grupo-rotulo-in', {}, h('div', 'dm-canales-fila', {}, cabeza)));
+    cabeza.addEventListener('click', () => datos.ponerGrupoAbierto(accion, !datos.grupoAbierto(accion)));
+    return { cabeza, lista: suLista, caja, rotulo };
+  };
+  const fij = hacerGrupo('Pinned', 'fijados');
+  const rec = hacerGrupo('Recent', 'recientes');
+  const fijados = h('section', 'dm-canales dm-grupo-arriba', { 'data-grupo': 'fijados', 'data-vacio': '', 'aria-label': 'Pinned' }, h('div', 'dm-canales-todo', {}, fij.rotulo, fij.caja));
+  fijados.inert = true;
+  rec.rotulo.setAttribute('data-vacio', '');
+  rec.rotulo.inert = true;
+  const recientes = h('section', 'dm-grupo', { 'data-grupo': 'recientes', 'aria-label': 'Chats' }, rec.rotulo, rec.caja);
+  const comunes = rec.lista;
   const delCanal = h('div', 'dm-chats-lista', { role: 'list' });
   const canalesCabeza = h('button', 'dm-canales-cabeza', { type: 'button', 'aria-expanded': 'true', 'data-accion': 'canales', 'data-rad-tip': 'What you said to the Atom Echo, and the answers' },
     icono('chevron', 'dm-canales-chev'), icono('canal'), h('span', 'dm-canales-nombre', {}, 'Channels'));
   const canalesBorrar = h('button', 'rad-iconbutton dm-canales-borrar', { type: 'button', 'aria-label': 'Delete all channel chats', 'data-rad-tip': 'Delete all', 'data-accion': 'canales-borrar' }, icono('tacho'));
   const canalesCaja = h('div', 'dm-canales-caja', { 'data-abierto': '' }, h('div', 'dm-canales-in', {}, delCanal));
-  const canales = h('section', 'dm-canales', { 'data-vacio': '', 'aria-label': 'Channels' }, h('div', 'dm-canales-todo', {}, h('div', 'dm-canales-fila', {}, canalesCabeza, canalesBorrar), canalesCaja));
+  const canales = h('section', 'dm-canales', { 'data-grupo': 'canales', 'data-vacio': '', 'aria-label': 'Channels' }, h('div', 'dm-canales-todo', {}, h('div', 'dm-canales-fila', {}, canalesCabeza, canalesBorrar), canalesCaja));
   canales.inert = true;
-  lista.append(comunes, canales);
+  lista.append(fijados, recientes, canales);
   const lado = h('aside', 'dm-lado', { 'data-rad-chrome': '' }, selector, nuevo, lista);
 
   // ---------- La conversación ----------
@@ -256,6 +274,8 @@ export function montarChat(el, { router }) {
   const acciones = (id) => {
     const c = datos.chat(id);
     return c && [
+      // (un chat de canal no se fija: ya tiene su grupo)
+      ...(c.voz === true ? [] : [{ id: 'fijar', label: c.fijado === true ? 'Unpin' : 'Pin', icon: icono('pin').innerHTML, onSelect: () => datos.fijarChat(c.id, c.fijado !== true) }]),
       { id: 'renombrar', label: 'Rename', icon: icono('lapiz').innerHTML, onSelect: () => renombrar(c) },
       { separator: true },
       { id: 'eliminar', label: 'Delete', danger: true, icon: icono('tacho').innerHTML, onSelect: () => eliminar(c) },
@@ -323,8 +343,27 @@ export function montarChat(el, { router }) {
     const suyos = datos.chatsDe(datos.agenteActual().id);
     const deCanal = suyos.filter((c) => c.voz === true);
     const losDemas = suyos.filter((c) => c.voz !== true);
-    // (el lugar vacío solo si no hay NINGÚN chat: con canales, la lista de arriba queda sin nada)
-    reconcile(comunes, losDemas.length ? losDemas : (deCanal.length ? [] : [{ id: VACIO }]), { key: (c) => c.id, create: fila, update: ponerFila });
+    const losFijados = losDemas.filter((c) => c.fijado === true);
+    const losRecientes = losDemas.filter((c) => c.fijado !== true);
+    reconcile(fij.lista, losFijados, { key: (c) => c.id, create: fila, update: ponerFila });
+    // (el lugar vacío solo si no hay NINGÚN chat: con fijados o canales, esta lista queda sin nada)
+    reconcile(comunes, losRecientes.length ? losRecientes : (losFijados.length || deCanal.length ? [] : [{ id: VACIO }]), { key: (c) => c.id, create: fila, update: ponerFila });
+    fijados.toggleAttribute('data-vacio', !losFijados.length);
+    fijados.inert = !losFijados.length;
+    const fijadosAbiertos = datos.grupoAbierto('fijados');
+    fij.cabeza.setAttribute('aria-expanded', String(fijadosAbiertos));
+    fij.caja.toggleAttribute('data-abierto', fijadosAbiertos);
+    fij.caja.inert = !fijadosAbiertos;
+    // «Recent» solo lleva rótulo si hay fijados de los que distinguirse. Sin
+    // rótulo no hay con qué desplegarla, así que va abierta aunque se la
+    // hubiera dejado plegada: si no, los chats quedarían escondidos sin forma
+    // de volver a verlos.
+    rec.rotulo.toggleAttribute('data-vacio', !losFijados.length);
+    rec.rotulo.inert = !losFijados.length;
+    const recientesAbiertos = !losFijados.length || datos.grupoAbierto('recientes');
+    rec.cabeza.setAttribute('aria-expanded', String(recientesAbiertos));
+    rec.caja.toggleAttribute('data-abierto', recientesAbiertos);
+    rec.caja.inert = !recientesAbiertos;
     reconcile(delCanal, deCanal, { key: (c) => c.id, create: fila, update: ponerFila });
     canales.toggleAttribute('data-vacio', !deCanal.length);
     canales.inert = !deCanal.length;
