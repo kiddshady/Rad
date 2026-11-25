@@ -145,6 +145,13 @@ export function vistaDe(vista) {
     frase(`${vista.tool}, a tool of the MCP server “${vista.servidor}”. It is not part of BlackCode: what it does is up to that server.`);
     if (vista.siempre) frase('This server is set to ask before each call.');
   }
+  // editar una imagen: con qué modelo, qué imágenes se le mandan a Venice y cuánto sale
+  else if (vista.mode === 'imagen' && vista.edita) {
+    const n = vista.entradas?.length ?? 0;
+    frase(`Edits ${n === 1 ? 'an image' : `${n} images into one`} with ${vista.modelo}${vista.aspecto ? `, ${vista.aspecto}` : ''}${vista.resolucion ? `, ${vista.resolucion}` : ''}.`);
+    frase(`Sent to Venice: ${(vista.entradas ?? []).map((e) => `${e.rotulo}${e.ancho ? ` (${e.ancho}×${e.alto})` : ''}`).join(', ')}.`);
+    frase(typeof vista.total === 'number' ? `About $${vista.total.toFixed(2)} of your Venice balance.` : 'It is paid from your Venice balance. Venice does not publish a price for this model.');
+  }
   // generar una imagen sale plata: con qué modelo, cuántas y cuánto
   else if (vista.mode === 'imagen') {
     frase(`${vista.cuantas} image${vista.cuantas === 1 ? '' : 's'} with ${vista.modelo}${vista.aspecto ? `, ${vista.aspecto}` : ''}${vista.resolucion ? `, ${vista.resolucion}` : ''}.`);

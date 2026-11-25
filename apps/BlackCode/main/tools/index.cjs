@@ -135,7 +135,7 @@ async function vistaPrevia(run, name, args) {
   try {
     if (name === 'canvas') return ['edit', 'update', 'delete'].includes(args?.action) ? lienzo.canvasPreview(args) : null;
     // generar una imagen sale plata: la tarjeta dice con qué modelo y cuánto
-    if (name === 'generate_image') return await imagenes.vista(args);
+    if (name === 'generate_image') return await imagenes.vista(args, run);
     // una tool de un servidor MCP: de cuál es (es código de terceros)
     if (typeof name === 'string' && name.startsWith('mcp_')) return mcpApp ? mcpApp.vista(name) : null;
     return await archivos.preview(run, name, args);

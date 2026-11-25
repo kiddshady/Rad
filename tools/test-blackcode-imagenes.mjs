@@ -28,8 +28,19 @@ const MODELOS = [
   { id: 'un-texto', type: 'text', model_spec: { name: 'Un modelo de texto' } },
   { id: 'sin-precio', type: 'image', model_spec: { name: 'Beta sin precio', constraints: { promptCharacterLimit: 500 } } },
 ];
-const visto = { modelos: 0, generar: [], cabeceras: [] };
+// Los que editan (type=inpaint): otra lista, con su precio por edición.
+const MODELOS_EDICION = [
+  { id: 'seed-edit', type: 'inpaint', model_spec: { name: 'Seed', pricing: { inpaint: { usd: 0.02 }, resolutions: { '1K': { usd: 0.02 }, '2K': { usd: 0.05 } }, inputImages: { included: 1, additional: { usd: 0.01 } } }, constraints: { promptCharacterLimit: 10000, combineImages: true, maxInputImages: 10, aspectRatios: ['auto', '1:1', '16:9'], defaultResolution: '1K', resolutions: ['1K', '2K'] } } },
+  { id: 'firered-image-edit', type: 'inpaint', model_spec: { name: 'FireRed', pricing: { inpaint: { usd: 0.04 } }, constraints: { promptCharacterLimit: 1500, combineImages: true, aspectRatios: ['auto', '1:1', '16:9'] } } },
+  { id: 'luma-edit', type: 'inpaint', model_spec: { name: 'Luma', pricing: {}, constraints: { combineImages: false } } },
+  { id: 'apagado-edit', type: 'inpaint', model_spec: { name: 'Apagado', offline: true, pricing: { inpaint: { usd: 1 } }, constraints: {} } },
+  { id: 'colado-image', type: 'image', model_spec: { name: 'Colado', pricing: { generation: { usd: 1 } }, constraints: {} } },
+];
+// (lo que /image/edit devuelve: la imagen en binario, un PNG mínimo)
+const EDITADA = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(40, 3)]);
+const visto = { modelos: 0, modelosEdicion: 0, generar: [], editar: [], cabeceras: [] };
 let proximo = null; // lo que contesta el próximo /image/generate
+let proximoE = null; // …y el próximo /image/edit o /image/multi-edit
 const servidor = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   let cuerpo = '';
@@ -38,6 +49,10 @@ const servidor = http.createServer((req, res) => {
     visto.cabeceras.push(req.headers.authorization ?? '');
     const json = (status, obj, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json', ...headers }); res.end(JSON.stringify(obj)); };
     if (req.headers.authorization !== `Bearer ${LLAVE}`) return json(401, { error: 'Authentication failed' });
+    if (url.pathname === '/models' && url.searchParams.get('type') === 'inpaint') {
+      visto.modelosEdicion++;
+      return json(200, { data: MODELOS_EDICION });
+    }
     if (url.pathname === '/models') {
       visto.modelos++;
       if (url.searchParams.get('type') !== 'image') return json(200, { data: MODELOS.filter((m) => m.type === 'text') });
@@ -53,6 +68,15 @@ const servidor = http.createServer((req, res) => {
       if (r.crudo !== undefined) { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(r.crudo); }
       const imagenes = r.imagenes ?? Array.from({ length: pedido.variants ?? 1 }, () => WEBP.toString('base64'));
       return json(200, { id: 'generate-image-1', images: imagenes, timing: { total: 1 } }, r.headers ?? {});
+    }
+    if ((url.pathname === '/image/edit' || url.pathname === '/image/multi-edit') && req.method === 'POST') {
+      visto.editar.push({ ruta: url.pathname, pedido: JSON.parse(cuerpo) });
+      const r = proximoE ?? {};
+      proximoE = null;
+      if (r.cuelga) return; // nunca contesta
+      if (r.status) return json(r.status, r.cuerpo ?? { error: 'x' });
+      res.writeHead(200, { 'content-type': 'image/png', ...(r.headers ?? {}) });
+      return res.end(r.binario ?? EDITADA);
     }
     json(404, { error: 'no such endpoint' });
   });
@@ -101,15 +125,15 @@ try {
   // ---------- 2. elegir el modelo ----------
   {
     const lista = await I.modelos({ fresco: true });
-    ok('sin pedir ninguno ni elegir en Settings: el que Venice marca como predeterminado', I.elegir(lista).modelo.id === 'alfa-image');
+    ok('sin pedir ninguno ni elegir en Settings: el que Venice marca como predeterminado', I.elegir(lista).modelo?.id === 'alfa-image');
     ajustes.modelo = 'zeta-image';
-    ok('el de Settings manda sobre el predeterminado', I.elegir(lista).modelo.id === 'zeta-image');
-    ok('el que pide el agente manda sobre el de Settings', I.elegir(lista, 'sin-precio').modelo.id === 'sin-precio');
-    ok('también por su nombre', I.elegir(lista, 'beta SIN precio').modelo.id === 'sin-precio');
+    ok('el de Settings manda sobre el predeterminado', I.elegir(lista).modelo?.id === 'zeta-image');
+    ok('el que pide el agente manda sobre el de Settings', I.elegir(lista, 'sin-precio').modelo?.id === 'sin-precio');
+    ok('también por su nombre', I.elegir(lista, 'beta SIN precio').modelo?.id === 'sin-precio');
     const malo = I.elegir(lista, 'flux-99');
     ok('uno que no existe: error con la lista de los que hay', !malo.modelo && malo.error?.includes('"flux-99"') && malo.error?.includes('alfa-image, sin-precio, zeta-image'), malo.error);
     ajustes.modelo = 'uno-que-ya-no-existe';
-    ok('si el de Settings ya no existe, cae al predeterminado', I.elegir(lista).modelo.id === 'alfa-image');
+    ok('si el de Settings ya no existe, cae al predeterminado', I.elegir(lista).modelo?.id === 'alfa-image');
     ajustes.modelo = '';
     ok('sin ningún modelo en la lista, lo dice', I.elegir([]).error?.includes('no image models'));
   }
@@ -306,11 +330,11 @@ try {
     ok('su descripción avisa que gasta plata', /spends money/.test(def?.description ?? ''));
     const grupo = defs.GRUPOS.find((g) => g.id === 'images');
     ok('va sola en un grupo OPCIONAL: no nace prendida', grupo?.opcional === true && grupo.tools.join() === 'generate_image' && defs.GRUPOS.filter((g) => g.opcional).length === 1, JSON.stringify(grupo));
-    ok('cada argumento de la definición es uno que la tool lee', params.every((p) => ['prompt', 'aspect_ratio', 'variants', 'negative_prompt', 'model', 'resolution', 'style', 'seed', 'look'].includes(p)), params.join());
+    ok('cada argumento de la definición es uno que la tool lee', params.every((p) => ['prompt', 'input_images', 'aspect_ratio', 'variants', 'negative_prompt', 'model', 'resolution', 'style', 'seed', 'look'].includes(p)), params.join());
     const motor = fs.readFileSync(path.join(APP, 'main', 'tools', 'motor.cjs'), 'utf8');
     ok('un subagente no la tiene (gasta plata del usuario)', /if \(run\?\.subagent\) \{[^}]*n !== 'generate_image'/s.test(motor));
     const indice = fs.readFileSync(path.join(APP, 'main', 'tools', 'index.cjs'), 'utf8');
-    ok('la tarjeta de permiso le pide a la tool cuánto sale', indice.includes("if (name === 'generate_image') return await imagenes.vista(args);"));
+    ok('la tarjeta de permiso le pide a la tool cuánto sale', indice.includes("if (name === 'generate_image') return await imagenes.vista(args, run);"));
     ok('el catálogo le dice a la interfaz que el grupo es opcional', indice.includes("...(g.opcional ? { opcional: true } : {})"));
     const chat = fs.readFileSync(path.join(APP, 'main', 'chat.cjs'), 'utf8');
     ok('usa la llave de Venice que la app ya guarda cifrada', chat.includes("getKey: () => llave.leer(rad.store, 'venice')") && !/process\.env\.VENICE_API_KEY/.test(chat + fs.readFileSync(path.join(APP, 'main', 'tools', 'imagenes.cjs'), 'utf8')));
@@ -334,6 +358,203 @@ try {
     ok('la interfaz manda esas rutas con la fila', datos.includes("const dejo = (Array.isArray(m.imagenes) ? m.imagenes : []).map((im) => im.archivo).filter(Boolean);") && chat.includes('(Array.isArray(m.dejo) ? m.dejo : [])'));
     ok('la fila del chat guarda la ruta de la imagen, no la imagen', datos.includes('(archivo ? { name, archivo } : { name, dataUrl })'));
   }
+  // ---------- Editar una imagen que ya existe (input_images) ----------
+  {
+    const aj = { modelo: '', modeloEdicion: '', filtro: true };
+    let llaveE = LLAVE;
+    let veE = false;
+    I.configurar({ getKey: () => llaveE, ajustes: () => aj, carpeta: dir, modeloVe: () => veE, ahora: () => reloj, azar: () => 0.5, deMentira: false, pedir: (...a) => fetch(...a) });
+    const u32 = (n) => { const b = Buffer.alloc(4); b.writeUInt32BE(n); return b; };
+    const pngDe = (ancho, alto) => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), u32(13), Buffer.from('IHDR'), u32(ancho), u32(alto), Buffer.alloc(9)]);
+    const jpgDe = (ancho, alto) => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]), Buffer.alloc(14), Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08, alto >> 8, alto & 255, ancho >> 8, ancho & 255]), Buffer.alloc(12)]);
+    const webpXDe = (ancho, alto) => { const b = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8X'), Buffer.alloc(14)]); b.writeUIntLE(ancho - 1, 24, 3); b.writeUIntLE(alto - 1, 27, 3); return b; };
+    const GIF = Buffer.concat([Buffer.from('GIF89a'), Buffer.alloc(30)]);
+    const zorro = I.pngDeMentira('fox', 0);
+    const gato = I.pngDeMentira('cat', 0);
+    const url = (buf, mime = 'image/png') => 'data:' + mime + ';base64,' + buf.toString('base64');
+    const taller = fs.mkdtempSync(path.join(os.tmpdir(), 'blackcode-editar-'));
+    fs.writeFileSync(path.join(taller, 'fox.png'), zorro);
+    fs.writeFileSync(path.join(taller, 'tiny.png'), pngDe(10, 10));
+    fs.writeFileSync(path.join(taller, 'huge.png'), pngDe(8000, 8000));
+    fs.writeFileSync(path.join(taller, 'anim.gif'), GIF);
+    fs.writeFileSync(path.join(taller, 'notes.txt'), 'hola');
+    const corridaE = (extra = {}) => ({ ...corrida(), cwd: taller, adjuntas: [url(zorro), url(jpgDe(640, 480), 'image/jpeg'), url(gato)], ...extra });
+
+    // los modelos que editan: otra lista
+    const le = await I.modelosEdicion();
+    ok('los modelos de edición salen de type=inpaint, sin los apagados y en orden', visto.modelosEdicion === 1 && le.map((m) => m.id).join() === 'firered-image-edit,luma-edit,seed-edit', le.map((m) => m.id).join());
+    const fire = le.find((m) => m.id === 'firered-image-edit') ?? {};
+    const luma = le.find((m) => m.id === 'luma-edit') ?? {};
+    const seed = le.find((m) => m.id === 'seed-edit') ?? { porResolucion: {} };
+    ok('su precio es el de editar, no el de generar', fire.precio === 0.04 && seed.precio === 0.02 && seed.porResolucion['2K'] === 0.05);
+    ok('cuántas imágenes acepta: lo que diga, 3 si no dice, 1 si no combina', seed.entradas === 10 && fire.entradas === 3 && luma.entradas === 1, [seed.entradas, fire.entradas, luma.entradas].join());
+    ok('si cobra las imágenes de entrada, cuántas incluye y cuánto sale cada una más', seed.incluidas === 1 && seed.porEntrada === 0.01 && fire.incluidas === null && fire.porEntrada === null);
+    ok('el de fábrica es el de Venice', fire.predeterminado === true && !seed.predeterminado);
+    await I.modelosEdicion();
+    ok('la lista se guarda un rato', visto.modelosEdicion === 1);
+    await I.modelosEdicion({ fresco: true });
+    ok('…y fresco la vuelve a pedir', visto.modelosEdicion === 2);
+    ok('sin elegir va el de fábrica', I.elegirEdicion(le, '').modelo?.id === 'firered-image-edit');
+    aj.modeloEdicion = 'seed-edit';
+    ok('el de Settings es «modeloEdicion», no el de generar', I.elegirEdicion(le, '').modelo?.id === 'seed-edit' && (aj.modelo = 'luma-edit', I.elegirEdicion(le, '').modelo?.id === 'seed-edit'));
+    aj.modelo = '';
+    ok('el que pide el agente gana', I.elegirEdicion(le, 'luma-edit').modelo?.id === 'luma-edit');
+    ok('un modelo de generar no edita, y se dice cuáles sí', /there is no image edit model "alfa-image"\. The image edit models are: firered-image-edit, luma-edit, seed-edit/.test(I.elegirEdicion(le, 'alfa-image').error), I.elegirEdicion(le, 'alfa-image').error);
+    aj.modeloEdicion = '';
+
+    // las medidas, de la cabecera
+    ok('las medidas de un PNG', JSON.stringify(I.medidas(zorro, 'png')) === '{"ancho":256,"alto":256}' && I.medidas(pngDe(1920, 1080), 'png').alto === 1080);
+    ok('las de un JPEG', JSON.stringify(I.medidas(jpgDe(640, 480), 'jpg')) === '{"alto":480,"ancho":640}', JSON.stringify(I.medidas(jpgDe(640, 480), 'jpg')));
+    ok('las de un WebP', I.medidas(webpXDe(1568, 784), 'webp').ancho === 1568 && I.medidas(webpXDe(1568, 784), 'webp').alto === 784 && I.medidas(WEBP, 'webp').ancho > 0);
+    ok('una cabecera rota no rompe', I.medidas(Buffer.from([0xff, 0xd8, 0xff]), 'jpg') === null && I.medidas(Buffer.alloc(4), 'png') === null);
+
+    // qué imágenes se pueden editar
+    const e1 = I.entradasDe(corridaE(), ['attachment:1']);
+    ok('un adjunto por su número', e1.entradas?.length === 1 && e1.entradas[0].rotulo === 'attachment:1' && e1.entradas[0].buf.equals(zorro) && e1.entradas[0].ancho === 256, JSON.stringify(e1.error ?? e1.entradas?.map((x) => x.rotulo)));
+    ok('attachment:last es el último', I.entradasDe(corridaE(), ['attachment:last']).entradas[0].buf.equals(gato) && I.entradasDe(corridaE(), ['Attachment:LAST']).entradas[0].rotulo === 'attachment:3');
+    ok('un JPEG adjunto vale', I.entradasDe(corridaE(), ['attachment:2']).entradas[0].ext === 'jpg');
+    ok('un número que no hay dice cuántos hay', /there is no attachment:7\. The user attached 3 images in this chat: attachment:1 to attachment:3/.test(I.entradasDe(corridaE(), ['attachment:7']).error) && /there is no attachment:0/.test(I.entradasDe(corridaE(), ['attachment:0']).error), I.entradasDe(corridaE(), ['attachment:7']).error);
+    ok('sin adjuntos se dice', /has not attached any image/.test(I.entradasDe(corridaE({ adjuntas: [] }), ['attachment:1']).error) && /has not attached any image/.test(I.entradasDe({ cwd: taller }, ['attachment:last']).error));
+    const e2 = I.entradasDe(corridaE(), ['fox.png']);
+    ok('un archivo, contra la carpeta del chat', e2.entradas?.[0].rotulo === path.join(taller, 'fox.png') && e2.entradas[0].bytes === zorro.length, e2.error);
+    ok('…o por su ruta entera', I.entradasDe(corridaE({ cwd: os.tmpdir() }), [path.join(taller, 'fox.png')]).entradas?.length === 1);
+    ok('un archivo que no está', /there is no file .*nope\.png/.test(I.entradasDe(corridaE(), ['nope.png']).error));
+    ok('una carpeta no es una imagen', /is not a file/.test(I.entradasDe(corridaE(), ['.']).error));
+    ok('un GIF no se edita', /anim\.gif is not a PNG, JPEG or WebP image/.test(I.entradasDe(corridaE(), ['anim.gif']).error) && /is not a PNG, JPEG or WebP/.test(I.entradasDe(corridaE(), ['notes.txt']).error) && /attachment:1 is not a PNG/.test(I.entradasDe(corridaE({ adjuntas: [url(GIF, 'image/gif')] }), ['attachment:1']).error));
+    ok('una imagen chica no se manda', /tiny\.png is 10×10: too small to edit/.test(I.entradasDe(corridaE(), ['tiny.png']).error), I.entradasDe(corridaE(), ['tiny.png']).error);
+    ok('ni una enorme', /huge\.png is 8000×8000: too large to edit/.test(I.entradasDe(corridaE(), ['huge.png']).error));
+    ok('varias, en el orden pedido', I.entradasDe(corridaE(), ['attachment:3', 'fox.png']).entradas.map((x) => path.basename(x.rotulo)).join() === 'attachment:3,fox.png');
+    ok('una mala entre varias corta todo', Boolean(I.entradasDe(corridaE(), ['fox.png', 'nope.png']).error));
+
+    // lo que se le pide al modelo
+    ok('la instrucción es obligatoria', /say what to change/.test(I.armarEdicion(fire, {}, 1).error));
+    ok('…y tiene el tope del modelo', /takes up to 1500/.test(I.armarEdicion(fire, { prompt: 'x'.repeat(1501) }, 1).error));
+    ok('más imágenes de las que acepta el modelo', /luma-edit takes up to 1 input image and you passed 2/.test(I.armarEdicion(luma, { prompt: 'x' }, 2).error) && !I.armarEdicion(seed, { prompt: 'x' }, 10).error && /takes up to 10 input images and you passed 11/.test(I.armarEdicion(seed, { prompt: 'x' }, 11).error));
+    ok('una edición devuelve una imagen', /an edit returns one image/.test(I.armarEdicion(fire, { prompt: 'x', variants: 3 }, 1).error) && !I.armarEdicion(fire, { prompt: 'x', variants: 1 }, 1).error);
+    ok('auto es la proporción de la entrada: no se manda', I.armarEdicion(fire, { prompt: 'x', aspect_ratio: 'auto' }, 1).aspecto === '' && I.armarEdicion(fire, { prompt: 'x' }, 1).aspecto === '' && I.armarEdicion(fire, { prompt: 'x', aspect_ratio: '16:9' }, 1).aspecto === '16:9');
+    ok('una proporción que el modelo no hace', /does not do 7:3/.test(I.armarEdicion(fire, { prompt: 'x', aspect_ratio: '7:3' }, 1).error) && /must look like/.test(I.armarEdicion(fire, { prompt: 'x', aspect_ratio: 'wide' }, 1).error));
+    ok('la resolución, contra las del modelo', I.armarEdicion(seed, { prompt: 'x', resolution: '2K' }, 1).resolucion === '2K' && /does not do 8K/.test(I.armarEdicion(seed, { prompt: 'x', resolution: '8K' }, 1).error) && /single resolution/.test(I.armarEdicion(fire, { prompt: 'x', resolution: '2K' }, 1).error));
+    ok('el precio: el del modelo, o el de la resolución, más las entradas de más', I.precioEdicion(fire, '', 3) === 0.04 && I.precioEdicion(seed, '', 1) === 0.02 && I.precioEdicion(seed, '2K', 1) === 0.05 && Math.abs(I.precioEdicion(seed, '2K', 3) - 0.07) < 1e-9 && I.precioEdicion(luma, '', 1) === null, [I.precioEdicion(seed, '2K', 3), I.precioEdicion(luma, '', 1)].join());
+
+    // una imagen: /image/edit
+    {
+      const run = corridaE();
+      const antes = fs.readdirSync(path.join(dir, 'images', '2026-11')).length;
+      const out = await I.runGenerateImage(run, { prompt: 'Make it night', input_images: ['attachment:1'], seed: 5, negative_prompt: 'x', style: 'Anime' });
+      const p = visto.editar.at(-1);
+      ok('con una imagen va a /image/edit', p?.ruta === '/image/edit' && p.pedido.model === 'firered-image-edit' && p.pedido.prompt === 'Make it night' && p.pedido.safe_mode === true, JSON.stringify(p?.pedido ?? null).slice(0, 200));
+      ok('la imagen viaja entera, en base64', p.pedido.image === zorro.toString('base64'));
+      ok('sin lo que editar no acepta (semilla, variantes, negativo, estilo) ni lo que no se pidió', Object.keys(p.pedido).sort().join() === 'image,model,prompt,safe_mode', Object.keys(p.pedido).join());
+      const nuevos = fs.readdirSync(path.join(dir, 'images', '2026-11'));
+      ok('lo que devuelve Venice (binario) queda en un archivo', nuevos.length === antes + 1 && out.includes(path.join(dir, 'images', '2026-11')) && fs.readFileSync(out.split('\n').find((l) => l.startsWith('- ')).slice(2)).equals(EDITADA), out);
+      ok('el resultado dice de qué imagen salió y que la original no cambió', out.startsWith('Edited with FireRed (firered-image-edit), from attachment:1. The user sees the result in the chat, under this call. The input image was not changed.') && out.includes('Cost: about $0.04') && out.includes('To edit it again, pass that path as input_images.') && out.includes('You did not get the image itself'), out);
+      const art = run.avisos.find(([c]) => c === 'tool:artifact')?.[1];
+      ok('la fila lleva la imagen nueva y de dónde salió', art?.images.length === 1 && art.detalle.prompt === 'Make it night' && art.detalle.modelo === 'firered-image-edit' && art.detalle.entradas?.join() === 'attachment:1' && art.detalle.semilla === null && art.detalle.visto === false, JSON.stringify(art?.detalle ?? null));
+      ok('cuenta para el tope del turno', run._imagenes === 1);
+    }
+    // de un archivo: el original no cambia
+    {
+      const run = corridaE();
+      const out = await I.runGenerateImage(run, { prompt: 'Remove the background', input_images: 'fox.png' });
+      ok('un archivo como entrada (y una sola ruta suelta vale)', visto.editar.at(-1).pedido.image === zorro.toString('base64') && out.includes('from ' + path.join(taller, 'fox.png')), out.slice(0, 160));
+      ok('el archivo original queda igual', fs.readFileSync(path.join(taller, 'fox.png')).equals(zorro));
+    }
+    // varias: /image/multi-edit
+    {
+      aj.modeloEdicion = 'seed-edit';
+      aj.filtro = false;
+      const run = corridaE();
+      const out = await I.runGenerateImage(run, { prompt: 'Put the cat next to the fox', input_images: ['fox.png', 'attachment:3'], resolution: '2K', aspect_ratio: '16:9' });
+      const p = visto.editar.at(-1);
+      ok('con varias va a /image/multi-edit, con el modelo en «modelId»', p.ruta === '/image/multi-edit' && p.pedido.modelId === 'seed-edit' && p.pedido.model === undefined, JSON.stringify(Object.keys(p.pedido)));
+      ok('la primera es la base y las demás van detrás', p.pedido.images?.length === 2 && p.pedido.images[0] === zorro.toString('base64') && p.pedido.images[1] === gato.toString('base64') && p.pedido.image === undefined);
+      ok('con la resolución, la proporción y el filtro de Settings', p.pedido.resolution === '2K' && p.pedido.aspect_ratio === '16:9' && p.pedido.safe_mode === false);
+      ok('el resultado nombra las dos y lo que sale', out.includes('Edited with Seed (seed-edit), 16:9, 2K, from 2 images: ' + path.join(taller, 'fox.png') + ', attachment:3.') && out.includes('The input images were not changed.') && out.includes('Cost: about $0.06'), out);
+      aj.modeloEdicion = '';
+      aj.filtro = true;
+    }
+    // mirarla
+    {
+      veE = true;
+      const run = corridaE();
+      const out = await I.runGenerateImage(run, { prompt: 'Brighter', input_images: ['attachment:1'], look: true });
+      ok('con look y un modelo que ve, la editada va adjunta', run._capturas?.length === 1 && run._capturas[0] === 'data:image/png;base64,' + EDITADA.toString('base64') && out.includes('attached below for you to look at') && run.avisos.find(([c]) => c === 'tool:artifact')[1].detalle.visto === true);
+      veE = false;
+      const run2 = corridaE();
+      const out2 = await I.runGenerateImage(run2, { prompt: 'Brighter', input_images: ['attachment:1'], look: true });
+      ok('…y si no ve, se le dice', !run2._capturas && out2.includes('this model cannot see images'));
+    }
+    // lo que sale mal
+    {
+      const cuenta = () => visto.editar.length;
+      let n = cuenta();
+      ok('una entrada mala no llega a Venice', (await I.runGenerateImage(corridaE(), { prompt: 'x', input_images: ['tiny.png'] })).startsWith('error: ') && (await I.runGenerateImage(corridaE(), { prompt: 'x', input_images: ['attachment:9'] })).startsWith('error: there is no attachment:9') && cuenta() === n);
+      ok('ni una instrucción vacía, ni variantes', (await I.runGenerateImage(corridaE(), { input_images: ['fox.png'] })).includes('say what to change') && (await I.runGenerateImage(corridaE(), { prompt: 'x', input_images: ['fox.png'], variants: 2 })).includes('an edit returns one image') && cuenta() === n);
+      proximoE = { status: 422, cuerpo: { error: 'policy' } };
+      ok('Venice rechaza la edición', (await I.runGenerateImage(corridaE(), { prompt: 'x', input_images: ['fox.png'] })) === 'error: Venice refused the edit: the instruction or the image goes against the content rules of that model, or the image is too large');
+      proximoE = { status: 413, cuerpo: { error: 'big' } };
+      ok('un archivo que a Venice le resulta grande', (await I.runGenerateImage(corridaE(), { prompt: 'x', input_images: ['fox.png'] })).includes('too large for Venice'));
+      proximoE = { status: 402, cuerpo: { error: 'no' } };
+      const run = corridaE();
+      ok('sin saldo, y sin contar para el tope', (await I.runGenerateImage(run, { prompt: 'x', input_images: ['fox.png'] })).includes('no balance left') && !run._imagenes);
+      proximoE = { binario: Buffer.from('<html>oops</html>') };
+      ok('si lo que vuelve no es una imagen, no se guarda', (await I.runGenerateImage(corridaE(), { prompt: 'x', input_images: ['fox.png'] })).includes('could not be saved') );
+      n = cuenta();
+      ok('pasado el tope del turno no edita más', (await I.runGenerateImage(corridaE({ _imagenes: I.POR_TURNO }), { prompt: 'x', input_images: ['fox.png'] })).includes('the limit is ' + I.POR_TURNO + ' per turn') && cuenta() === n);
+      llaveE = null;
+      ok('sin llave no edita', (await I.runGenerateImage(corridaE(), { prompt: 'x', input_images: ['fox.png'] })).includes('there is no Venice API key') && cuenta() === n);
+      llaveE = LLAVE;
+      proximoE = { cuelga: true };
+      const frenada = corridaE();
+      const t0 = Date.now();
+      setTimeout(() => frenada.ac.abort(), 120);
+      ok('frenar el turno corta el pedido', (await I.runGenerateImage(frenada, { prompt: 'x', input_images: ['fox.png'] })) === 'error: stopped' && Date.now() - t0 < 600, String(Date.now() - t0));
+      proximoE = { headers: { 'x-venice-is-blurred': 'true' } };
+      ok('una editada que Venice desenfocó, se dice', (await I.runGenerateImage(corridaE(), { prompt: 'x', input_images: ['fox.png'] })).includes('Venice blurred the result'));
+    }
+    // la tarjeta de permiso
+    {
+      const v = await I.vista({ prompt: 'Make it night', input_images: ['attachment:1', 'fox.png'], model: 'seed-edit' }, corridaE());
+      ok('la tarjeta dice que edita, con qué, qué imágenes se suben y cuánto sale', v.mode === 'imagen' && v.edita === true && v.modelo === 'Seed' && v.total === 0.03 && v.entradas.length === 2 && v.entradas[0].rotulo === 'attachment:1' && v.entradas[0].ancho === 256 && v.entradas[1].bytes === zorro.length && !('buf' in v.entradas[0]), JSON.stringify(v));
+      const mal = await I.vista({ prompt: 'x', input_images: ['nope.png'] }, corridaE());
+      ok('…o por qué va a fallar', mal.mode === 'fail' && /^There is no file .*nope\.png/.test(mal.error) && (await I.vista({ prompt: 'x', input_images: ['fox.png', 'attachment:1'], model: 'luma-edit' }, corridaE())).mode === 'fail', JSON.stringify(mal));
+      const gen = await I.vista({ prompt: 'A fox' }, corridaE());
+      ok('sin imágenes de entrada sigue siendo la de generar', gen.mode === 'imagen' && !gen.edita);
+    }
+    // el modo de mentira (el humo)
+    {
+      let pedidos = 0;
+      I.configurar({ carpeta: dir, deMentira: true, getKey: () => null, pedir: () => { pedidos++; throw new Error('el modo de mentira no sale a la red'); } });
+      const a = await I.runGenerateImage(corridaE(), { prompt: 'Make it night', input_images: ['attachment:1'] });
+      const b = await I.runGenerateImage(corridaE(), { prompt: 'Make it night', input_images: ['attachment:3'] });
+      const archivo = (t) => t.split('\n').find((l) => l.startsWith('- ')).slice(2);
+      ok('en el humo edita sin red ni llave', pedidos === 0 && a.startsWith('Edited with Simulated edit (sim-edit), from attachment:1.') && I.formatoDe(fs.readFileSync(archivo(a))) === 'png', a.slice(0, 120));
+      ok('…y otra imagen de entrada da otra imagen', !fs.readFileSync(archivo(a)).equals(fs.readFileSync(archivo(b))));
+      ok('…una de mentira se puede volver a editar (mide lo mínimo)', (await I.runGenerateImage(corridaE(), { prompt: 'Again', input_images: [archivo(a)] })).startsWith('Edited with'));
+      ok('…y REFUSED hace de edición rechazada', (await I.runGenerateImage(corridaE(), { prompt: 'REFUSED', input_images: ['attachment:1'] })).startsWith('error: Venice refused the edit'));
+      ok('…con sus modelos de mentira', (await I.modelosEdicion()).map((m) => m.id).join() === 'sim-edit,sim-edit-pro');
+      I.configurar({ carpeta: dir, deMentira: false, getKey: () => llave, pedir: (...x) => fetch(...x) });
+    }
+    // el cableado
+    {
+      const chat = fs.readFileSync(path.join(APP, 'main', 'chat.cjs'), 'utf8');
+      ok('la tool recibe las imágenes adjuntas del chat con el pedido (no se copian al disco)', chat.includes("const adjuntas = pedido.mensajes.flatMap((m) => (m.rol === 'user' && Array.isArray(m.imagenes) ? m.imagenes : []));") && chat.includes('sesion.run.adjuntas = adjuntas;'));
+      ok('cada adjunto lleva su número a la vista del modelo', /const marcas = m\.imagenes\.map\(\(\) => .attachment:\$\{\+\+n\}.\);/.test(chat) && chat.includes("pedido.tools.includes('generate_image')"));
+      ok('la interfaz recibe también los modelos que editan', chat.includes('img.modelosEdicion({ fresco: fresco === true })'));
+      const defs = fs.readFileSync(path.join(APP, 'main', 'tools', 'defs.cjs'), 'utf8');
+      ok('la definición trae input_images', /input_images: \{ type: 'array', items: \{ type: 'string' \}/.test(defs) && !defs.includes('an image cannot be edited in place'));
+      ok('enhance_prompt no es un parámetro de la tool', !/enhance_prompt/.test(defs) && !/enhance_prompt: /.test(fs.readFileSync(path.join(APP, 'main', 'tools', 'imagenes.cjs'), 'utf8')));
+      const { foldToolRows } = require(path.join(APP, 'main', 'tools', 'guardas.cjs'));
+      const registro = foldToolRows([
+        { role: 'user', content: 'make it night' },
+        { role: 'tool', tool: 'generate_image', content: 'Make it night', status: 'ok', facts: ['model firered-image-edit', 'edited from attachment:1', 'you did not look at it'], saved: ['C:\\datos\\images\\2026-11\\image-9.png'] },
+        { role: 'assistant', content: 'Done.' },
+      ]).find((m) => m.appRecord)?.content ?? '';
+      ok('el registro del turno siguiente dice de qué imagen salió', registro.includes('1. generate_image(Make it night) -> ok · model firered-image-edit · edited from attachment:1 · you did not look at it · saved: C:\\datos\\images\\2026-11\\image-9.png'), registro);
+      ok('…porque chat.cjs lo arma con las entradas', /edited from \$\{d\.entradas\.filter\(/.test(chat));
+    }
+    fs.rmSync(taller, { recursive: true, force: true });
+  }
 } finally {
   servidor.close();
   fs.rmSync(dir, { recursive: true, force: true });
@@ -344,5 +565,5 @@ if (failures.length) {
   for (const f of failures) console.error('  ' + f);
   process.exit(1);
 }
-console.log(`test-blackcode-imagenes: ok (${hechas} comprobaciones: los modelos de Venice y su precio, elegir el modelo, revisar los argumentos, generar y guardar en archivos, mirar lo generado, el filtro, lo que sale mal, el tope del turno, leer para mostrar, la tarjeta de permiso y el modo de mentira)`);
+console.log(`test-blackcode-imagenes: ok (${hechas} comprobaciones: los modelos de Venice y su precio, elegir el modelo, revisar los argumentos, generar y guardar en archivos, mirar lo generado, el filtro, lo que sale mal, el tope del turno, leer para mostrar, la tarjeta de permiso, el modo de mentira, y editar una imagen que ya existe: los modelos, qué se puede editar, /image/edit y /image/multi-edit, lo que sale mal y el registro)`);
 process.exit(0);

@@ -2703,7 +2703,7 @@ else {
   // 11o. Generar imágenes (generate_image). Gasta plata del usuario en cada
   // llamada: nace apagada, la tarjeta de permiso dice cuánto sale, y hay un
   // tope por turno. La imagen queda en un archivo y al chat va su ruta. En el
-  // humo no hay Venice: los modelos y las imágenes son de mentira (PNG de 96 px).
+  // humo no hay Venice: los modelos y las imágenes son de mentira (PNG de 256 px).
   {
     const datosM = await import('/datos.js');
     const agenteI = datosM.agenteActual();
@@ -2746,7 +2746,7 @@ else {
     await sleep(dur('base') + 160);
     const gs = generadas();
     if (fila('generate_image')?.dataset.estado !== 'ok' || gs.length !== 2) fail('imágenes: la llamada quedó en «' + fila('generate_image')?.dataset.estado + '» con ' + gs.length + ' imágenes');
-    if (!gs.every((g) => { const im = g.querySelector('img'); return im.naturalWidth === 96 && im.src.startsWith('data:image/png;base64,') && op(im) > 0.99; })) fail('imágenes: las imágenes no se ven en la fila (' + gs.map((g) => g.querySelector('img').naturalWidth + ' px, opacidad ' + r2(op(g.querySelector('img')))).join(' · ') + ')');
+    if (!gs.every((g) => { const im = g.querySelector('img'); return im.naturalWidth === 256 && im.src.startsWith('data:image/png;base64,') && op(im) > 0.99; })) fail('imágenes: las imágenes no se ven en la fila (' + gs.map((g) => g.querySelector('img').naturalWidth + ' px, opacidad ' + r2(op(g.querySelector('img')))).join(' · ') + ')');
     if (gs.length === 2 && gs[0].querySelector('img').src === gs[1].querySelector('img').src) fail('imágenes: las dos variantes son la misma imagen');
     if (fila('generate_image')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'image' || shown(fila('generate_image')?.querySelector('.dm-tool-que')) !== 'A red fox in the snow') fail('imágenes: la fila no lleva su ícono o no dice qué se pidió');
     if (!salidaI().startsWith('Generated 2 images with Simulated image (sim-image), 16:9.') || !salidaI().includes('Cost: about $0.08') || !salidaI().includes('You did not get the image itself')) fail('imágenes: lo que recibió el agente: ' + salidaI().slice(0, 200));
@@ -2832,6 +2832,114 @@ else {
     await pedir([[{ name: 'generate_image', args: { prompt: 'with the chosen model' } }]]);
     await listoI();
     if (!salidaI().startsWith('Generated 1 image with Simulated image Pro (sim-image-pro)') || !salidaI().includes('Cost: about $0.10')) fail('imágenes: no usó el modelo elegido en Settings: ' + salidaI().slice(0, 120));
+
+    // EDITAR una imagen que ya existe (input_images): la misma tool, otros
+    // modelos. Sirve una imagen de un archivo (una generada antes) o una que el
+    // usuario adjuntó en el chat, por su número. En el humo, la editada es otro
+    // PNG de mentira, cuyo color sale también de la imagen de entrada.
+    {
+      datosM.ponerImagenes({ modelo: '' });
+      const rutaDe = (texto) => texto.split('\n').find((l) => l.startsWith('- '))?.slice(2) ?? '';
+      const srcDe = (n = -1) => generadas(n)[0]?.querySelector('img')?.src ?? '';
+      const cargadas = (n = -1) => until(() => generadas(n).length > 0 && generadas(n).every((g) => g.hasAttribute('data-lista')), 8000);
+      // Settings ofrece los modelos que editan, aparte de los que generan.
+      const selE = tarjetaI?.querySelector('[data-campo="img-modelo-edicion"]');
+      if (tarjetaI?.dataset.edicion !== '2' || !selE || selE.disabled || !selE.textContent.includes('Venice’s default')) fail('editar: Settings no ofrece los modelos de edición (' + tarjetaI?.dataset.edicion + '): «' + (selE?.textContent ?? '(sin selector)') + '»');
+      if (!tarjetaI?.textContent.includes('Model for editing') || !tarjetaI.textContent.includes('These are other models, with their own price.')) fail('editar: Settings no explica el modelo de edición');
+      // Una generada antes, por su ruta. En automático corre sola.
+      const origen = rutaDe(salidaI());
+      const srcOrigen = srcDe();
+      await pedir([[{ name: 'generate_image', args: { prompt: 'Make it night', input_images: [origen] } }]]);
+      await listoI();
+      await cargadas();
+      await sleep(dur('base') + 160);
+      if (fila('generate_image')?.dataset.estado !== 'ok' || !salidaI().startsWith('Edited with Simulated edit (sim-edit), from ' + origen + '.') || !salidaI().includes('The input image was not changed.') || !salidaI().includes('Cost: about $0.04')) fail('editar: la edición de una imagen generada quedó en «' + fila('generate_image')?.dataset.estado + '»: ' + salidaI().slice(0, 220));
+      const editada = generadas()[0]?.querySelector('img');
+      if (generadas().length !== 1 || editada?.naturalWidth !== 256 || !editada.src.startsWith('data:image/png;base64,') || editada.src === srcOrigen || op(editada) < 0.99) fail('editar: la imagen editada no se ve en la fila, o es la misma que la de entrada (' + generadas().length + ' imágenes, ' + editada?.naturalWidth + ' px)');
+      if (!rutaDe(salidaI()) || rutaDe(salidaI()) === origen) fail('editar: la editada no quedó en un archivo nuevo: ' + rutaDe(salidaI()));
+      if (shown(fila('generate_image')?.querySelector('.dm-tool-que')) !== 'Make it night') fail('editar: la fila no dice qué se pidió');
+      // …y el turno siguiente sabe de qué imagen salió.
+      {
+        const viaje = datosM.historialDe((await datosM.hilo(datosM.chatActual().id)).get().mensajes).filter((m) => m.tool === 'generate_image' && m.estado === 'ok').at(-1);
+        if (viaje?.detalle?.entradas?.join() !== origen || viaje.detalle.modelo !== 'sim-edit' || viaje.detalle.prompt !== 'Make it night' || viaje.dejo?.length !== 1) fail('editar: al turno siguiente no viaja de qué imagen salió la editada: ' + JSON.stringify(viaje?.detalle ?? null));
+      }
+      // Lo que no se puede editar falla con su motivo, sin dejar imagen.
+      await pedir([[{ name: 'generate_image', args: { prompt: 'x', input_images: ['attachment:1'] } }]]);
+      await listoI();
+      if (fila('generate_image')?.dataset.estado !== 'error' || !salidaI().includes('has not attached any image') || generadas().length) fail('editar: pedir un adjunto que no hay quedó en «' + fila('generate_image')?.dataset.estado + '»: ' + salidaI().slice(0, 160));
+      await pedir([[{ name: 'generate_image', args: { prompt: 'x', input_images: ['no-such-picture.png'] } }]]);
+      await listoI();
+      if (fila('generate_image')?.dataset.estado !== 'error' || !salidaI().includes('there is no file')) fail('editar: una ruta que no existe no dio su error: ' + salidaI().slice(0, 160));
+
+      // Una imagen que adjunta el usuario. El mensaje le llega al modelo con el
+      // número de la imagen (el proveedor de mentira repite lo que recibió).
+      chatView.querySelector('[data-accion="nuevo-chat"]').click();
+      await settle();
+      const lienzoE = document.createElement('canvas');
+      lienzoE.width = 800;
+      lienzoE.height = 600;
+      const ctxE = lienzoE.getContext('2d');
+      ctxE.fillStyle = '#803020';
+      ctxE.fillRect(0, 0, 800, 600);
+      ctxE.fillStyle = '#f0f0e0';
+      ctxE.fillRect(100, 100, 300, 200);
+      const dtE = new DataTransfer();
+      dtE.items.add(new File([await new Promise((r) => lienzoE.toBlob(r, 'image/png'))], 'photo.png', { type: 'image/png' }));
+      chatView.querySelector('.dm-conv').dispatchEvent(new DragEvent('drop', { dataTransfer: dtE, bubbles: true, cancelable: true }));
+      await until(() => alive(chatView.querySelectorAll('.dm-adjuntos-tira .dm-adjunto')).length === 1, 5000);
+      await settle();
+      type(area, 'Here is a photo');
+      key(area, 'Enter');
+      await listoI();
+      const eco = ultimo()?.textContent ?? '';
+      if (!eco.includes('Here is a photo') || !eco.includes('[For generate_image, the image attached to this message is attachment:1.]')) fail('editar: al modelo no le llega el número de la imagen adjunta: ' + eco.slice(0, 260));
+      // En manual, la tarjeta dice que edita, qué se le manda a Venice y cuánto sale.
+      datosM.ponerModoTools('manual');
+      await pedir([[{ name: 'generate_image', args: { prompt: 'Remove the background', input_images: ['attachment:last'], model: 'sim-edit-pro', resolution: '2K' } }]]);
+      await until(() => permiso(), 6000);
+      const diceE = permiso()?.textContent ?? '(sin tarjeta)';
+      if (!diceE.includes('Allow generate_image?') || !diceE.includes('Edits an image with Simulated edit Pro, 2K.') || !diceE.includes('Sent to Venice: attachment:1 (800×600).') || !diceE.includes('About $0.20 of your Venice balance.')) fail('editar: la tarjeta de permiso no dice que edita, qué manda y cuánto sale: ' + diceE.slice(0, 300));
+      if (diceE.includes('data:image') || diceE.length > 900) fail('editar: la tarjeta de permiso vuelca la imagen');
+      enIngles('con la tarjeta de permiso de una edición');
+      primary()?.click();
+      await closed();
+      await listoI();
+      await cargadas();
+      if (fila('generate_image')?.dataset.estado !== 'ok' || !salidaI().startsWith('Edited with Simulated edit Pro (sim-edit-pro), 2K, from attachment:1.') || !salidaI().includes('Cost: about $0.20')) fail('editar: la edición de un adjunto quedó en «' + fila('generate_image')?.dataset.estado + '»: ' + salidaI().slice(0, 220));
+      // (el adjunto no se copió al disco: en el chat sigue adentro del mensaje, y la carpeta de imágenes tiene solo las generadas)
+      {
+        const docE = await window.rad.store.read('chat-' + datosM.chatActual().id);
+        const conFoto = (docE?.mensajes ?? []).find((m) => m.rol === 'user' && m.imagenes?.length);
+        if (!conFoto || !String(conFoto.imagenes[0]).startsWith('data:image/') || 'archivo' in conFoto) fail('editar: el adjunto ya no está en el mensaje del chat');
+      }
+      // Dos imágenes: la editada de recién como base y el adjunto de referencia.
+      datosM.ponerModoTools('auto');
+      const base2 = rutaDe(salidaI());
+      await pedir([[{ name: 'generate_image', args: { prompt: 'Put them side by side', input_images: [base2, 'attachment:1'] } }]]);
+      await listoI();
+      await cargadas();
+      if (fila('generate_image')?.dataset.estado !== 'ok' || !salidaI().includes('from 2 images: ' + base2 + ', attachment:1.') || !salidaI().includes('The input images were not changed.')) fail('editar: combinar dos imágenes quedó en «' + fila('generate_image')?.dataset.estado + '»: ' + salidaI().slice(0, 220));
+      // Más de las que acepta el modelo, y una instrucción que Venice rechaza.
+      await pedir([[{ name: 'generate_image', args: { prompt: 'x', input_images: [base2, 'attachment:1', base2, 'attachment:1'] } }]]);
+      await listoI();
+      if (fila('generate_image')?.dataset.estado !== 'error' || !salidaI().includes('sim-edit takes up to 3 input images and you passed 4')) fail('editar: pasarse de imágenes de entrada no dio su error: ' + salidaI().slice(0, 160));
+      await pedir([[{ name: 'generate_image', args: { prompt: 'REFUSED', input_images: ['attachment:1'] } }]]);
+      await listoI();
+      if (fila('generate_image')?.dataset.estado !== 'error' || !salidaI().includes('Venice refused the edit') || generadas().length) fail('editar: una edición rechazada quedó en «' + fila('generate_image')?.dataset.estado + '»');
+      // El modelo de edición elegido en Settings es el que se usa.
+      datosM.ponerImagenes({ modeloEdicion: 'sim-edit-pro' });
+      await settle();
+      if (!(selE?.isConnected ? selE : tarjetaI?.querySelector('[data-campo="img-modelo-edicion"]'))?.textContent.includes('Simulated edit Pro') || (await window.rad.store.read('imagenes'))?.modeloEdicion !== 'sim-edit-pro' || datosM.ajustesImagenes().modelo !== '') fail('editar: el modelo de edición elegido no quedó en Settings o en el documento, o pisó el de generar');
+      await pedir([[{ name: 'generate_image', args: { prompt: 'Warmer light', input_images: ['attachment:1'] } }]]);
+      await listoI();
+      if (!salidaI().startsWith('Edited with Simulated edit Pro (sim-edit-pro), from attachment:1.') || !salidaI().includes('Cost: about $0.10')) fail('editar: no usó el modelo de edición elegido en Settings: ' + salidaI().slice(0, 160));
+      // …y generar sigue usando el suyo.
+      await pedir([[{ name: 'generate_image', args: { prompt: 'still generates' } }]]);
+      await listoI();
+      if (!salidaI().startsWith('Generated 1 image with Simulated image (sim-image)')) fail('editar: elegir un modelo de edición cambió con cuál se genera: ' + salidaI().slice(0, 160));
+      datosM.ponerImagenes({ modeloEdicion: '' });
+      data.editar = 'una generada por su ruta, un adjunto por su número (la nota le llega al modelo), la tarjeta con lo que se manda y el precio, dos imágenes, los errores, y el modelo de edición de Settings';
+    }
 
     // Queda como estaba.
     datosM.ponerImagenes({ modelo: '' });

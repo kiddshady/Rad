@@ -91,6 +91,8 @@ function limpiar(pedido) {
           corto(d.aspecto, 12),
           corto(d.resolucion, 8),
           Number.isSafeInteger(d.semilla) && `seed ${d.semilla}`,
+          // (una edición: de qué imágenes salió)
+          Array.isArray(d.entradas) && d.entradas.length ? `edited from ${d.entradas.filter((x) => typeof x === 'string').slice(0, 8).map((x) => x.slice(0, 200)).join(', ')}` : '',
           d.visto === true ? 'you looked at it' : 'you did not look at it',
         ].filter(Boolean) : [];
         return { role: 'tool', tool: m.tool, content: corto(d?.prompt, 2000) || String(m.texto ?? ''), status: m.estado, ...(facts.length ? { facts } : {}), ...(saved.length ? { saved } : {}) };
@@ -407,7 +409,13 @@ function wire(rad, { llave }) {
     const img = herramientas.imagenes;
     const esta = (archivo) => img.esMia(archivo) && fs.existsSync(path.resolve(archivo));
     rad.handle('imagenes:modelos', async (fresco) => {
-      try { return { ok: true, modelos: (await img.modelos({ fresco: fresco === true })).map(({ id, nombre, precio }) => ({ id, nombre, precio })) }; } catch (err) { return { ok: false, error: String(err?.message || err) }; }
+      const corto = ({ id, nombre, precio }) => ({ id, nombre, precio });
+      try {
+        const modelos = (await img.modelos({ fresco: fresco === true })).map(corto);
+        // (los que editan son otra lista; si esa falla, generar sigue andando)
+        const edicion = await img.modelosEdicion({ fresco: fresco === true }).then((l) => l.map(corto), () => []);
+        return { ok: true, modelos, edicion };
+      } catch (err) { return { ok: false, error: String(err?.message || err) }; }
     });
     rad.handle('imagenes:ver', (archivo) => img.leer(archivo));
     // En el humo no se abre nada del sistema: se contesta como si.
@@ -529,6 +537,21 @@ function wire(rad, { llave }) {
     // rebotaría el pedido entero. Quedan en el chat, y el modelo se entera de
     // que estaban (así no contesta como si no le hubieran mandado nada).
     const ve = pedido.proveedor === 'anthropic' || elModelo?.vision === true;
+    // Las imágenes que el usuario adjuntó en este chat, en orden. Un agente
+    // con generate_image las puede editar, y para eso cada una tiene un
+    // número: se lo dice una nota al pie del mensaje que la trajo (así no
+    // las cuenta a ojo). No se copian a ningún lado: la tool las toma de
+    // acá (run.adjuntas), y sirve también con un modelo que no ve.
+    const adjuntas = pedido.mensajes.flatMap((m) => (m.rol === 'user' && Array.isArray(m.imagenes) ? m.imagenes : []));
+    if (adjuntas.length && pedido.tools.includes('generate_image') && elModelo?.tools !== false) {
+      let n = 0;
+      pedido.mensajes = pedido.mensajes.map((m) => {
+        if (m.rol !== 'user' || !m.imagenes?.length) return m;
+        const marcas = m.imagenes.map(() => `attachment:${++n}`);
+        const nota = `[For generate_image, the image${marcas.length === 1 ? '' : 's'} attached to this message ${marcas.length === 1 ? 'is' : 'are'} ${marcas.join(', ')}.]`;
+        return { ...m, texto: m.texto.trim() ? `${m.texto}\n\n${nota}` : nota };
+      });
+    }
     if (!ve) {
       pedido.mensajes = pedido.mensajes.map((m) => {
         if (!m.imagenes?.length) return m;
@@ -581,6 +604,8 @@ function wire(rad, { llave }) {
       });
       // ¿este modelo acepta imágenes? Lo usa la foto de browser_read
       sesion.run.ve = ve;
+      // las imágenes adjuntas del chat, para editarlas (generate_image con input_images)
+      sesion.run.adjuntas = adjuntas;
       // lo que un subagente hereda de esta corrida, y con qué modelo va a
       // hablar (se lo dice la guía de delegate)
       Object.assign(sesion.run, { proveedor: pedido.proveedor, modelo: pedido.modelo, instrucciones: pedido.instrucciones });

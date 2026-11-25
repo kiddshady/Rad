@@ -201,10 +201,11 @@ async function nombrar(chatId, que) {
 /** Lo elegido en Settings: con qué modelo de Venice se generan ('' = el que
  *  Venice marque como predeterminado) y si va su filtro de contenido adulto.
  *  Lo lee el proceso principal del mismo documento. */
-export const ajustesImagenes = () => ({ modelo: String(imagenesDoc.get().modelo ?? ''), filtro: imagenesDoc.get().filtro !== false });
+// (modeloEdicion: con cuál se EDITA una imagen que ya existe; son otros modelos que los de generar)
+export const ajustesImagenes = () => ({ modelo: String(imagenesDoc.get().modelo ?? ''), modeloEdicion: String(imagenesDoc.get().modeloEdicion ?? ''), filtro: imagenesDoc.get().filtro !== false });
 export function ponerImagenes(cambio) {
   const ahora = ajustesImagenes();
-  imagenesDoc.patch({ modelo: typeof cambio?.modelo === 'string' ? cambio.modelo : ahora.modelo, filtro: typeof cambio?.filtro === 'boolean' ? cambio.filtro : ahora.filtro });
+  imagenesDoc.patch({ modelo: typeof cambio?.modelo === 'string' ? cambio.modelo : ahora.modelo, modeloEdicion: typeof cambio?.modeloEdicion === 'string' ? cambio.modeloEdicion : ahora.modeloEdicion, filtro: typeof cambio?.filtro === 'boolean' ? cambio.filtro : ahora.filtro });
   avisar('ajustes');
 }
 /** ¿Ese agente ve la memoria de la app? Es su grupo Memory: prendido, además

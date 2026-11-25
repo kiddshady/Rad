@@ -519,17 +519,19 @@ const TOOL_DEFS = [{
   // (de BlackCode: ver imagenes.cjs. No lleva width/height —hay modelos que
   // los rechazan— ni safe_mode, que es un ajuste del usuario)
   name: 'generate_image',
-  description: 'Generate an image from a text description and show it to the user in the chat. Every image spends money from the user\'s Venice balance, so use it when the user asks for an image or clearly wants one, not to decorate an answer. '
+  description: 'Generate an image from a text description, or edit images that already exist, and show the result to the user in the chat. Every image spends money from the user\'s Venice balance, so use it when the user asks for an image or clearly wants one, not to decorate an answer. '
     + 'Write the prompt in English, concrete and visual: the subject, the setting, the style, the light, the framing. The image is saved to a file and shown under this call. You get its path back, not the picture, unless you pass look: true. '
-    + 'To change something, call it again with the whole improved prompt: an image cannot be edited in place.',
+    + 'To change an image that already exists (one you made, a file, or one the user attached), pass it in input_images and say in the prompt what to change: the result is a new image, and the original stays as it was. '
+    + 'Without input_images the image is made from scratch, so to redo one from scratch call it again with the whole improved prompt.',
   parameters: {
     type: 'object',
     properties: {
       prompt: { type: 'string', description: 'What the image shows, in English.' },
-      aspect_ratio: { type: 'string', description: 'Shape of the image: "1:1", "16:9", "9:16", "4:3", "3:2"… Leave it out for the model\'s own.' },
+      input_images: { type: 'array', items: { type: 'string' }, description: 'Images to edit, instead of generating from scratch. Each one is the path of an image file (PNG, JPEG or WebP) or "attachment:N", the Nth image the user attached in this chat ("attachment:last" is the most recent). With one image, the prompt says what to change in it. With several, the first is the one that gets edited and the others are references: a person, a style, an object to add. Editing uses its own models and returns one image: variants, seed, negative_prompt and style do not apply.' },
+      aspect_ratio: { type: 'string', description: 'Shape of the image: "1:1", "16:9", "9:16", "4:3", "3:2"… Leave it out for the model\'s own (when editing, the shape of the input image).' },
       variants: { type: 'integer', description: 'How many different images of the same prompt, 1 to 4 (default 1). Each one costs.' },
       negative_prompt: { type: 'string', description: 'What must NOT appear in the image.' },
-      model: { type: 'string', description: 'An image model id. Leave it out to use the one the user chose in Settings.' },
+      model: { type: 'string', description: 'An image model id. Leave it out to use the one the user chose in Settings. Editing has its own list of models.' },
       resolution: { type: 'string', description: '"1K", "2K" or "4K", only for models that offer it. Higher costs more.' },
       style: { type: 'string', description: 'A Venice style preset by name, like "Cinematic", "Anime" or "3D Model".' },
       seed: { type: 'integer', description: 'The same seed with the same prompt gives the same image.' },

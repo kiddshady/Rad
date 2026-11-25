@@ -24,6 +24,8 @@
 //     interruptor de Settings. No es un parámetro de la tool.
 //   - El modelo NO recibe la imagen de vuelta salvo que la pida (`look`): el
 //     que la juzga es el usuario, y mandársela cuesta tokens.
+//   - Desde la 0.22.0 la misma tool EDITA una imagen que ya existe
+//     (`input_images`). Ver «Editar una imagen que ya existe», más abajo.
 //
 // Lo que dice la documentación de Venice (leída el 25/11/2026):
 //   POST /image/generate  { model, prompt, negative_prompt?, aspect_ratio?,
@@ -39,6 +41,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
+const crypto = require('node:crypto');
+const { resolverEn } = require('./base.cjs');
 
 const BASE = (process.env.VENICE_BASE_URL || 'https://api.venice.ai/api/v1').replace(/\/+$/, '');
 const VARIANTES_MAX = 4;     // el tope de Venice por pedido
@@ -46,6 +50,11 @@ const POR_TURNO = 8;         // imágenes por turno, entre todas las llamadas
 const ESPERA_MS = 180000;    // algunos modelos tardan más de un minuto
 const LISTA_MS = 10 * 60 * 1000;
 const PROMPT_MAX = 7500;     // el tope de Venice; cada modelo puede tener uno menor
+// Editar: lo que Venice acepta de cada imagen de entrada, y su modelo de fábrica.
+const ENTRADA_MAX_BYTES = 25 * 1024 * 1024;
+const PIXELES_MIN = 65536;       // 256×256
+const PIXELES_MAX = 33177600;
+const EDICION_PREDET = 'firered-image-edit';
 
 let deps = {
   getKey: () => null,          // la llave de Venice, descifrada
@@ -64,6 +73,7 @@ function configurar(d = {}) {
   if (typeof d.carpeta === 'string' && d.carpeta.trim()) deps.carpeta = path.resolve(d.carpeta);
   if (typeof d.deMentira === 'boolean') deps.deMentira = d.deMentira;
   cache = null;
+  cacheEdicion = null;
 }
 
 const dirImagenes = () => (deps.carpeta ? path.join(deps.carpeta, 'images') : null);
@@ -71,10 +81,17 @@ const dirImagenes = () => (deps.carpeta ? path.join(deps.carpeta, 'images') : nu
 // ---------- Los modelos ----------
 
 let cache = null; // { at, lista }
+let cacheEdicion = null; // lo mismo, para los modelos que editan
 
 const DE_MENTIRA = [
   { id: 'sim-image', nombre: 'Simulated image', precio: 0.04, limite: 1500, aspectos: ['1:1', '16:9', '9:16'], aspecto: '1:1', resoluciones: [], resolucion: '', predeterminado: true },
   { id: 'sim-image-pro', nombre: 'Simulated image Pro', precio: 0.1, limite: 3000, aspectos: [], aspecto: '', resoluciones: ['1K', '2K'], resolucion: '1K', predeterminado: false },
+];
+
+// Los que editan, en el humo. El Pro cobra las imágenes de entrada que pasen de la primera.
+const DE_MENTIRA_EDICION = [
+  { id: 'sim-edit', nombre: 'Simulated edit', precio: 0.04, porResolucion: {}, limite: 1500, aspectos: ['auto', '1:1', '16:9'], aspecto: '', resoluciones: [], resolucion: '', entradas: 3, incluidas: null, porEntrada: null, predeterminado: true },
+  { id: 'sim-edit-pro', nombre: 'Simulated edit Pro', precio: 0.1, porResolucion: { '1K': 0.1, '2K': 0.2 }, limite: 3000, aspectos: [], aspecto: '', resoluciones: ['1K', '2K'], resolucion: '1K', entradas: 6, incluidas: 1, porEntrada: 0.01, predeterminado: false },
 ];
 
 const usd = (p) => { const n = Number(p?.usd ?? p); return Number.isFinite(n) && n >= 0 ? n : null; };
@@ -101,11 +118,32 @@ function deVenice(m) {
   };
 }
 
-function explicar(status, cuerpo) {
+/** Un modelo que EDITA (type=inpaint): lo mismo, con su precio por edición,
+ *  cuántas imágenes de entrada acepta y si las cobra aparte. */
+function deVeniceEdicion(m) {
+  const spec = m?.model_spec ?? {};
+  const c = spec.constraints ?? {};
+  const precios = spec.pricing ?? {};
+  const max = Number(c.maxInputImages);
+  const incluidas = Number(precios.inputImages?.included);
+  return {
+    ...deVenice(m),
+    precio: usd(precios.inpaint),
+    // (lo que dice su documentación: si no viene, 3; 1 si el modelo no combina imágenes)
+    entradas: Number.isInteger(max) && max > 0 ? max : (c.combineImages === false ? 1 : 3),
+    incluidas: precios.inputImages && Number.isInteger(incluidas) && incluidas >= 0 ? incluidas : null,
+    porEntrada: precios.inputImages ? usd(precios.inputImages.additional) : null,
+    predeterminado: String(m.id) === EDICION_PREDET,
+  };
+}
+
+function explicar(status, cuerpo, edicion = false) {
   const detalle = typeof cuerpo?.error === 'string' ? cuerpo.error : cuerpo?.error?.message ?? '';
   if (status === 401) return detalle && /pro users/i.test(detalle) ? 'that model is only for Venice Pro accounts' : 'Venice rejected the API key (the user sets it in Settings)';
   if (status === 402) return 'the Venice account has no balance left';
   if (status === 403) return 'this Venice key cannot be used from this network';
+  if (status === 413) return 'an input image is too large for Venice (under 25 MB)';
+  if (status === 422 && edicion) return 'Venice refused the edit: the instruction or the image goes against the content rules of that model, or the image is too large';
   if (status === 422) return `Venice refused the prompt: it goes against its content rules${cuerpo?.suggested_prompt ? `. Venice suggests this prompt instead: ${JSON.stringify(String(cuerpo.suggested_prompt).slice(0, 1500))}` : ''}`;
   if (status === 429) return 'too many requests in a row to Venice. Wait a moment and try again';
   if (status === 503) return 'that Venice model is at capacity. Try again in a while, or use another model';
@@ -129,19 +167,37 @@ async function modelos({ fresco = false, signal } = {}) {
   return lista;
 }
 
+/** Los modelos que EDITAN imágenes (GET /models?type=inpaint). Otra lista, otros precios. */
+async function modelosEdicion({ fresco = false, signal } = {}) {
+  if (deps.deMentira) return DE_MENTIRA_EDICION;
+  if (!fresco && cacheEdicion && deps.ahora() - cacheEdicion.at < LISTA_MS) return cacheEdicion.lista;
+  const key = deps.getKey();
+  const res = await deps.pedir(`${BASE}/models?type=inpaint`, { headers: key ? { authorization: `Bearer ${key}` } : {}, signal });
+  if (!res.ok) throw new Error(explicar(res.status, await res.json().catch(() => null)));
+  const data = (await res.json())?.data;
+  const lista = (Array.isArray(data) ? data : [])
+    .filter((m) => m?.id && m.type === 'inpaint' && !m.model_spec?.offline)
+    .map(deVeniceEdicion)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'en', { numeric: true }));
+  cacheEdicion = { at: deps.ahora(), lista };
+  return lista;
+}
+
 /** Cuál se usa: el que pidió el agente, el de Settings, el que Venice marca
  *  como predeterminado, o el primero. `{ modelo }` o `{ error }`. */
-function elegir(lista, pedido) {
+function elegir(lista, pedido, { ajuste = 'modelo', que = 'image' } = {}) {
   const ids = () => lista.slice(0, 40).map((m) => m.id).join(', ');
-  if (!lista.length) return { error: 'Venice lists no image models for this key' };
+  if (!lista.length) return { error: `Venice lists no ${que} models for this key` };
   const p = String(pedido ?? '').trim();
   if (p) {
     const m = lista.find((x) => x.id === p) ?? lista.find((x) => x.nombre.toLowerCase() === p.toLowerCase());
-    return m ? { modelo: m } : { error: `there is no image model ${JSON.stringify(p)}. The image models are: ${ids()}` };
+    return m ? { modelo: m } : { error: `there is no ${que} model ${JSON.stringify(p)}. The ${que} models are: ${ids()}` };
   }
-  const deAjustes = lista.find((x) => x.id === deps.ajustes()?.modelo);
+  const deAjustes = lista.find((x) => x.id === deps.ajustes()?.[ajuste]);
   return { modelo: deAjustes ?? lista.find((x) => x.predeterminado) ?? lista[0] };
 }
+/** Lo mismo entre los que editan: el de Settings es `modeloEdicion`. (Un modelo de generar no edita: son ids distintos.) */
+const elegirEdicion = (lista, pedido) => elegir(lista, pedido, { ajuste: 'modeloEdicion', que: 'image edit' });
 
 const cuantasDe = (v) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(VARIANTES_MAX, Math.max(1, n)) : 1; };
 const precioDe = (modelo, resolucion) => (resolucion && modelo.porResolucion?.[resolucion] !== undefined ? modelo.porResolucion[resolucion] : modelo.precio);
@@ -218,7 +274,7 @@ function leer(archivo) {
 // Un PNG de verdad, chico, armado acá: un degradé cuyo color sale del prompt,
 // para que dos pedidos distintos den dos imágenes distintas.
 function pngDeMentira(prompt, indice) {
-  const lado = 96;
+  const lado = 256; // (lo mínimo que Venice edita: así una de mentira también se puede editar)
   let h = 2166136261;
   for (const ch of `${prompt}#${indice}`) h = Math.imul(h ^ ch.codePointAt(0), 16777619) >>> 0;
   const [r, g, b] = [h & 255, (h >>> 8) & 255, (h >>> 16) & 255];
@@ -247,6 +303,220 @@ function pngDeMentira(prompt, indice) {
   ihdr.writeUInt32BE(lado, 4);
   ihdr[8] = 8; ihdr[9] = 2; // 8 bits, RGB
   return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), trozo('IHDR', ihdr), trozo('IDAT', zlib.deflateSync(filas)), trozo('IEND', Buffer.alloc(0))]);
+}
+
+// ---------- Editar una imagen que ya existe ----------
+//
+// Con input_images la misma tool EDITA: el prompt es la instrucción («sacale
+// el fondo», «que sea de noche») y Venice devuelve una imagen nueva. Lo que
+// dice su documentación (leída el 25/11/2026; la lista de modelos se miró de
+// verdad, es pública):
+//   POST /image/edit        { model, prompt, image, aspect_ratio?, resolution?,
+//                             safe_mode }                    una imagen
+//   POST /image/multi-edit  { modelId, prompt, images: […], … }  la primera es
+//                             la base y las demás son de referencia
+//   → la respuesta ES la imagen (binario), no un JSON como /image/generate.
+//   La imagen va en base64, pesa menos de 25 MB y tiene entre 65.536 y
+//   33.177.600 píxeles. No hay seed, ni variantes, ni negative_prompt.
+//   Los modelos que editan son otra lista (GET /models?type=inpaint), con su
+//   precio (pricing.inpaint, y pricing.inputImages si cobra por imagen de
+//   entrada) y cuántas imágenes aceptan (constraints.maxInputImages; si falta,
+//   3, o 1 cuando combineImages es false). enhance_prompt existe y cuesta
+//   aparte: esta tool no lo usa.
+//
+// Qué se puede editar: una imagen de un archivo (una generada antes, o
+// cualquiera del disco) o una que el usuario adjuntó en este chat, que la tool
+// recibe por su número (attachment:N). Los adjuntos no se copian al disco:
+// llegan con el pedido del turno (run.adjuntas, ver chat.cjs).
+
+/** Ancho y alto de un PNG, JPEG o WebP, leídos de su cabecera. null si no se puede. */
+function medidas(buf, ext) {
+  try {
+    if (ext === 'png') return { ancho: buf.readUInt32BE(16), alto: buf.readUInt32BE(20) };
+    if (ext === 'jpg') {
+      for (let i = 2; i + 9 < buf.length;) {
+        if (buf[i] !== 0xff || buf[i + 1] === 0xff) { i++; continue; }
+        const m = buf[i + 1];
+        // (los marcadores SOF traen el tamaño; C4, C8 y CC no lo son)
+        if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { alto: buf.readUInt16BE(i + 5), ancho: buf.readUInt16BE(i + 7) };
+        if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { i += 2; continue; }
+        i += 2 + buf.readUInt16BE(i + 2);
+      }
+      return null;
+    }
+    if (ext === 'webp') {
+      const tipo = buf.toString('latin1', 12, 16);
+      if (tipo === 'VP8X') return { ancho: 1 + buf.readUIntLE(24, 3), alto: 1 + buf.readUIntLE(27, 3) };
+      if (tipo === 'VP8 ') return { ancho: buf.readUInt16LE(26) & 0x3fff, alto: buf.readUInt16LE(28) & 0x3fff };
+      if (tipo === 'VP8L') { const b = buf.readUInt32LE(21); return { ancho: 1 + (b & 0x3fff), alto: 1 + ((b >>> 14) & 0x3fff) }; }
+    }
+  } catch { /* una cabecera rota: no se sabe */ }
+  return null;
+}
+
+/** Lo que pidió el agente en input_images, como lista de textos. */
+const pedidasDe = (v) => (Array.isArray(v) ? v : typeof v === 'string' && v.trim() ? [v] : []).filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim());
+
+/**
+ * Busca cada imagen de entrada y la revisa contra los límites de Venice.
+ * { entradas: [{ rotulo, buf, ext, bytes, ancho, alto }] } o { error }.
+ */
+function entradasDe(run, pedidas) {
+  const adjuntas = Array.isArray(run?.adjuntas) ? run.adjuntas : [];
+  const entradas = [];
+  for (const ref of pedidas) {
+    let buf;
+    let rotulo = ref;
+    const marca = /^attachment:\s*(\d+|last)$/i.exec(ref);
+    if (marca) {
+      if (!adjuntas.length) return { error: 'the user has not attached any image in this chat, so there is no ' + ref };
+      const n = marca[1].toLowerCase() === 'last' ? adjuntas.length : Number(marca[1]);
+      const url = adjuntas[n - 1];
+      if (typeof url !== 'string') return { error: 'there is no attachment:' + n + '. The user attached ' + adjuntas.length + ' image' + (adjuntas.length === 1 ? '' : 's') + ' in this chat: attachment:1' + (adjuntas.length > 1 ? ' to attachment:' + adjuntas.length : '') };
+      rotulo = 'attachment:' + n;
+      buf = Buffer.from(url.replace(/^data:[^,]*,/, ''), 'base64');
+    } else {
+      let abs;
+      try { abs = resolverEn(run, ref); } catch { return { error: JSON.stringify(ref) + ' is not a path' }; }
+      let st;
+      try { st = fs.statSync(abs); } catch { return { error: 'there is no file ' + abs + '. Pass the path of an image, or attachment:N for an image the user attached' }; }
+      if (!st.isFile()) return { error: abs + ' is not a file' };
+      if (st.size >= ENTRADA_MAX_BYTES) return { error: abs + ' is ' + Math.round(st.size / 1048576) + ' MB and Venice takes images under 25 MB' };
+      try { buf = fs.readFileSync(abs); } catch (err) { return { error: 'could not read ' + abs + ' — ' + (err?.code ?? err?.message ?? err) }; }
+      rotulo = abs;
+    }
+    const ext = formatoDe(buf);
+    if (!ext) return { error: rotulo + ' is not a PNG, JPEG or WebP image, the three Venice can edit' };
+    if (buf.length >= ENTRADA_MAX_BYTES) return { error: rotulo + ' is ' + Math.round(buf.length / 1048576) + ' MB and Venice takes images under 25 MB' };
+    const m = medidas(buf, ext);
+    if (m && m.ancho * m.alto < PIXELES_MIN) return { error: rotulo + ' is ' + m.ancho + '×' + m.alto + ': too small to edit (Venice needs at least 256×256)' };
+    if (m && m.ancho * m.alto > PIXELES_MAX) return { error: rotulo + ' is ' + m.ancho + '×' + m.alto + ': too large to edit (Venice takes up to about 33 megapixels)' };
+    entradas.push({ rotulo, buf, ext, bytes: buf.length, ancho: m?.ancho ?? null, alto: m?.alto ?? null });
+  }
+  return { entradas };
+}
+
+/** Revisa una edición contra lo que el modelo acepta. { error } o lo que se va a pedir. */
+function armarEdicion(modelo, a = {}, cuantasEntradas = 1) {
+  const prompt = String(a.prompt ?? '').trim();
+  if (!prompt) return { error: 'prompt is required: say what to change in the image' };
+  if (prompt.length > modelo.limite) return { error: 'the prompt has ' + prompt.length + ' characters and ' + modelo.id + ' takes up to ' + modelo.limite + '. Shorten it' };
+  if (cuantasEntradas > modelo.entradas) return { error: modelo.id + ' takes up to ' + modelo.entradas + ' input image' + (modelo.entradas === 1 ? '' : 's') + ' and you passed ' + cuantasEntradas };
+  if (cuantasDe(a.variants) > 1) return { error: 'an edit returns one image: leave variants out, and call again for another take' };
+  // (auto, o nada, es la proporción de la imagen de entrada)
+  const pedido = String(a.aspect_ratio ?? '').trim().toLowerCase();
+  const aspecto = pedido === 'auto' ? '' : pedido;
+  if (aspecto && !/^\d{1,2}:\d{1,2}$/.test(aspecto)) return { error: 'aspect_ratio must look like "16:9", not ' + JSON.stringify(aspecto) + '. Leave it out to keep the shape of the input image' };
+  if (aspecto && modelo.aspectos.length && !modelo.aspectos.includes(aspecto)) return { error: modelo.id + ' does not do ' + aspecto + '. It does: ' + modelo.aspectos.join(', ') };
+  const resolucion = String(a.resolution ?? '').trim();
+  if (resolucion && modelo.resoluciones.length && !modelo.resoluciones.includes(resolucion)) return { error: modelo.id + ' does not do ' + resolucion + '. It does: ' + modelo.resoluciones.join(', ') };
+  if (resolucion && !modelo.resoluciones.length) return { error: modelo.id + ' has a single resolution: leave resolution out' };
+  return { prompt, aspecto, resolucion };
+}
+
+/** Lo que sale una edición: el precio del modelo (o el de esa resolución) y, si
+ *  el modelo cobra las imágenes de entrada, las que pasen de las incluidas. null si Venice no lo publica. */
+function precioEdicion(modelo, resolucion, cuantasEntradas) {
+  const base = precioDe(modelo, resolucion);
+  if (base === null || base === undefined) return null;
+  const extra = modelo.porEntrada !== null && modelo.porEntrada !== undefined && modelo.incluidas !== null && modelo.incluidas !== undefined
+    ? Math.max(0, cuantasEntradas - modelo.incluidas) * modelo.porEntrada : 0;
+  return base + extra;
+}
+
+async function pedirEdicion(modelo, p, entradas, filtro, signal) {
+  if (deps.deMentira) {
+    if (/\bREFUSED\b/.test(p.prompt)) return { error: explicar(422, null, true) };
+    // (el color sale de la instrucción Y de las imágenes de entrada: otra entrada, otra imagen)
+    const huella = entradas.map((e) => crypto.createHash('sha1').update(e.buf).digest('hex').slice(0, 8)).join('+');
+    return { imagen: pngDeMentira(p.prompt + '|' + huella, 0), borrosa: false };
+  }
+  const varias = entradas.length > 1;
+  const b64 = (e) => e.buf.toString('base64');
+  const cuerpo = {
+    // (el campo del modelo se llama distinto en cada endpoint)
+    ...(varias ? { modelId: modelo.id, images: entradas.map(b64) } : { model: modelo.id, image: b64(entradas[0]) }),
+    prompt: p.prompt,
+    ...(p.aspecto ? { aspect_ratio: p.aspecto } : {}),
+    ...(p.resolucion ? { resolution: p.resolucion } : {}),
+    safe_mode: filtro,
+  };
+  let res;
+  try {
+    res = await deps.pedir(BASE + (varias ? '/image/multi-edit' : '/image/edit'), {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + deps.getKey(), 'content-type': 'application/json' },
+      body: JSON.stringify(cuerpo),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(ESPERA_MS)].filter(Boolean)),
+    });
+  } catch (err) {
+    if (signal?.aborted) return { error: 'stopped' };
+    if (err?.name === 'TimeoutError') return { error: 'Venice took more than ' + (ESPERA_MS / 1000) + ' seconds. Nothing was saved; the edit may still have been charged' };
+    return { error: 'could not reach Venice — ' + (err?.cause?.code ?? err?.message ?? err) };
+  }
+  if (!res.ok) return { error: explicar(res.status, await res.json().catch(() => null), true) };
+  let imagen;
+  try { imagen = Buffer.from(await res.arrayBuffer()); } catch { return { error: 'Venice answered, but the image did not arrive whole' }; }
+  const si = (h) => String(res.headers.get(h) ?? '').toLowerCase() === 'true';
+  return { imagen, borrosa: si('x-venice-is-blurred'), infraccion: si('x-venice-is-content-violation') };
+}
+
+async function runEditarImagen(run, a, pedidas) {
+  const hechas = run._imagenes ?? 0;
+  if (hechas + 1 > POR_TURNO) return 'error: this turn already made ' + hechas + ' image' + (hechas === 1 ? '' : 's') + ' and the limit is ' + POR_TURNO + ' per turn (each one costs the user money). Stop here and ask the user before making more.';
+  if (!deps.deMentira && !deps.getKey()) return 'error: there is no Venice API key. The user sets it in Settings, under Venice key.';
+  const e = entradasDe(run, pedidas);
+  if (e.error) return 'error: ' + e.error;
+  let lista;
+  try { lista = await modelosEdicion({ signal: run.ac?.signal }); } catch (err) { return 'error: could not load the image edit models — ' + err.message; }
+  const { modelo, error: sinModelo } = elegirEdicion(lista, a?.model);
+  if (sinModelo) return 'error: ' + sinModelo;
+  const p = armarEdicion(modelo, a, e.entradas.length);
+  if (p.error) return 'error: ' + p.error;
+
+  run.notify('tool:activity', { reqId: run.reqId, kind: 'generate_image', label: p.prompt.slice(0, 80) });
+  const r = await pedirEdicion(modelo, p, e.entradas, deps.ajustes()?.filtro !== false, run.ac?.signal);
+  if (r.error) return 'error: ' + r.error;
+  let g;
+  try { g = guardar(r.imagen, 0); } catch (err) { return 'error: the image was edited but could not be saved — ' + err.message; }
+  run._imagenes = hechas + 1;
+  const mira = a?.look === true;
+  const ve = mira && deps.modeloVe(run);
+  const rotulos = e.entradas.map((x) => x.rotulo);
+  // («entradas» va al registro del turno siguiente: de qué imágenes salió esta)
+  run.notify('tool:artifact', {
+    reqId: run.reqId,
+    images: [{ name: g.name, archivo: g.archivo }],
+    detalle: { prompt: p.prompt, modelo: modelo.id, aspecto: p.aspecto, resolucion: p.resolucion, semilla: null, visto: ve, entradas: rotulos },
+  });
+  if (ve) (run._capturas ??= []).push('data:' + MIME[g.ext] + ';base64,' + r.imagen.toString('base64'));
+  const precio = precioEdicion(modelo, p.resolucion, e.entradas.length);
+  return [
+    'Edited with ' + modelo.nombre + ' (' + modelo.id + ')' + (p.aspecto ? ', ' + p.aspecto : '') + (p.resolucion ? ', ' + p.resolucion : '') + ', from ' + (rotulos.length === 1 ? rotulos[0] : rotulos.length + ' images: ' + rotulos.join(', ')) + '. The user sees the result in the chat, under this call. The input image' + (rotulos.length === 1 ? ' was' : 's were') + ' not changed.',
+    '- ' + g.archivo,
+    r.borrosa ? 'Venice blurred the result: its filter classed it as adult content. (The user can turn that filter off in Settings.)' : null,
+    r.infraccion ? 'Venice flagged the result as against its terms: the image may be blacked out.' : null,
+    precio !== null ? 'Cost: about $' + precio.toFixed(2) + " of the user's Venice balance." : null,
+    'To edit it again, pass that path as input_images.',
+    mira ? (ve ? 'It is attached below for you to look at.' : 'You asked to look at it, but this model cannot see images.') : 'You did not get the image itself: say what you asked for, not what it looks like. Pass look: true next time if you need to check it.',
+  ].filter(Boolean).join('\n');
+}
+
+/** Para la tarjeta de permiso de una edición: con qué modelo, qué imágenes se suben y cuánto sale. */
+async function vistaEdicion(run, a, pedidas) {
+  const e = entradasDe(run, pedidas);
+  const mayus = (t) => t.charAt(0).toUpperCase() + t.slice(1) + '.';
+  if (e.error) return { mode: 'fail', error: mayus(e.error) };
+  const { modelo, error } = elegirEdicion(await modelosEdicion(), a?.model);
+  if (error) return { mode: 'fail', error: mayus(error) };
+  const p = armarEdicion(modelo, a, e.entradas.length);
+  if (p.error) return { mode: 'fail', error: mayus(p.error) };
+  const precio = precioEdicion(modelo, p.resolucion, e.entradas.length);
+  return {
+    mode: 'imagen', edita: true, modelo: modelo.nombre, cuantas: 1, aspecto: p.aspecto, resolucion: p.resolucion,
+    total: precio === null ? null : Math.round(precio * 100) / 100, filtro: deps.ajustes()?.filtro !== false,
+    entradas: e.entradas.map((x) => ({ rotulo: x.rotulo, bytes: x.bytes, ancho: x.ancho, alto: x.alto })),
+  };
 }
 
 // ---------- La tool ----------
@@ -282,6 +552,9 @@ async function pedirAVenice(cuerpo, signal) {
 }
 
 async function runGenerateImage(run, a = {}) {
+  // Con imágenes de entrada no genera: edita.
+  const pedidas = pedidasDe(a?.input_images);
+  if (pedidas.length) return runEditarImagen(run, a, pedidas);
   const cuantas = cuantasDe(a?.variants);
   // El tope del turno: en modo automático nadie mira cada llamada, y cada
   // imagen sale plata. Pasado el tope, que el agente pregunte.
@@ -356,8 +629,10 @@ async function runGenerateImage(run, a = {}) {
 }
 
 /** Para la tarjeta de permiso: con qué modelo, cuántas, y cuánto sale. */
-async function vista(a = {}) {
+async function vista(a = {}, run = null) {
   try {
+    const pedidas = pedidasDe(a?.input_images);
+    if (pedidas.length) return await vistaEdicion(run, a, pedidas);
     const lista = await modelos();
     const { modelo, error } = elegir(lista, a?.model);
     if (error) return { mode: 'fail', error: error.charAt(0).toUpperCase() + error.slice(1) + '.' };
@@ -374,4 +649,4 @@ const runners = {
   generate_image: (run, a) => runGenerateImage(run, a),
 };
 
-module.exports = { runners, configurar, modelos, vista, leer, esMia, formatoDe, deVenice, elegir, armar, runGenerateImage, pngDeMentira, lista: () => Boolean(deps.carpeta), POR_TURNO, VARIANTES_MAX, MIME };
+module.exports = { runners, configurar, modelos, modelosEdicion, vista, leer, esMia, formatoDe, medidas, deVenice, deVeniceEdicion, elegir, elegirEdicion, armar, armarEdicion, entradasDe, precioEdicion, runGenerateImage, pngDeMentira, lista: () => Boolean(deps.carpeta), POR_TURNO, VARIANTES_MAX, MIME };

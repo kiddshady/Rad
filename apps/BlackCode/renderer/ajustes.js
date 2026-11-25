@@ -425,19 +425,24 @@ function tarjetaTitulos() {
 function tarjetaImagenes() {
   const PREDET = '__venice__';
   const hueco = h('div', 'rad-field dm-img-modelo', {}, h('span', 'rad-field-label', { id: 'dm-img-rotulo' }, 'Model'));
+  // Editar una imagen que ya existe lo hacen otros modelos, con otro precio.
+  const pistaE = h('span', 'rad-field-hint', {}, 'Used when an agent changes an image that already exists. These are other models, with their own price.');
+  const huecoE = h('div', 'rad-field dm-img-modelo', {}, h('span', 'rad-field-label', { id: 'dm-img-rotulo-e' }, 'Model for editing'), pistaE);
   const texto = h('span', 'dm-estado-texto rad-swap');
   const estado = h('p', 'dm-estado', { role: 'status' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), texto);
   const filtro = h('input', '', { type: 'checkbox', role: 'switch', id: 'dm-img-filtro', 'data-campo': 'img-filtro' });
   const nota = h('p', 'dm-tarjeta-instr rad-swap');
   const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'imagenes' },
     h('h2', 'dm-tarjeta-nombre', {}, 'Image generation'),
-    h('p', 'dm-tarjeta-instr', {}, 'An agent with the Images tool makes images with Venice, using the Venice key above, and shows them in the chat. Every image is paid from your Venice balance, so the tool is off on every agent until you turn it on for that agent.'),
-    hueco, estado,
+    h('p', 'dm-tarjeta-instr', {}, 'An agent with the Images tool makes and edits images with Venice, using the Venice key above, and shows them in the chat. Every image is paid from your Venice balance, so the tool is off on every agent until you turn it on for that agent.'),
+    hueco, huecoE, estado,
     h('label', 'rad-switch', {}, filtro, h('span', 'rad-switch-track'), 'Blur adult content'),
     nota);
   wireControls(tarjeta);
   let select = null;
+  let selectE = null;
   let lista = [];
+  let listaE = [];
   let turno = 0;
   const precio = (m) => (typeof m.precio === 'number' ? ` · $${m.precio.toFixed(2)} per image` : '');
   const armar = () => {
@@ -455,14 +460,29 @@ function tarjetaImagenes() {
     select.el.dataset.campo = 'img-modelo';
     select.el.disabled = !lista.length;
     hueco.append(select.el);
+    selectE?.close();
+    selectE?.el.remove();
+    const guardadoE = datosApp.ajustesImagenes().modeloEdicion;
+    const modelosE = guardadoE && !listaE.some((m) => m.id === guardadoE) ? [{ id: guardadoE, nombre: guardadoE }, ...listaE] : listaE;
+    selectE = createSelect({
+      options: [{ value: PREDET, label: 'Venice’s default' }, ...modelosE.map((m) => ({ value: m.id, label: `${m.nombre}${typeof m.precio === 'number' ? ` · $${m.precio.toFixed(2)} per edit` : ''}` }))],
+      value: guardadoE || PREDET,
+      onChange: (v) => datosApp.ponerImagenes({ modeloEdicion: v === PREDET ? '' : v }),
+    });
+    selectE.el.setAttribute('aria-labelledby', 'dm-img-rotulo-e');
+    selectE.el.dataset.campo = 'img-modelo-edicion';
+    selectE.el.disabled = !listaE.length;
+    huecoE.insertBefore(selectE.el, pistaE);
   };
   const cargar = async () => {
     const mio = ++turno;
     const r = await window.rad.invoke('imagenes:modelos', true).catch(() => null);
     if (mio !== turno) return;
     lista = r?.ok ? r.modelos : [];
+    listaE = r?.ok && Array.isArray(r.edicion) ? r.edicion : [];
     armar();
     tarjeta.dataset.modelos = String(lista.length);
+    tarjeta.dataset.edicion = String(listaE.length);
     if (r?.ok && lista.length) { estado.dataset.tono = 'success'; swapText(texto, `Venice offers ${lista.length} image model${lista.length === 1 ? '' : 's'} with your key.`); }
     else if (llave.de('venice').estado !== 'lista') { estado.dataset.tono = 'warning'; swapText(texto, 'There is no Venice key saved: add one above to generate images.'); }
     else { estado.dataset.tono = 'danger'; swapText(texto, `Could not load the image models: ${r?.error ?? 'Venice lists none for this key'}.`); }
@@ -474,6 +494,7 @@ function tarjetaImagenes() {
       ? 'Venice blurs an image when it classes it as adult content.'
       : 'Images come back as generated, without Venice’s adult content blur. Venice’s own terms still apply.');
     if (select && select.value !== (a.modelo || PREDET)) select.value = a.modelo || PREDET;
+    if (selectE && selectE.value !== (a.modeloEdicion || PREDET)) selectE.value = a.modeloEdicion || PREDET;
   };
   // (el agente no puede tocar este filtro: no es un parámetro de la tool)
   filtro.addEventListener('change', () => datosApp.ponerImagenes({ filtro: filtro.checked }));

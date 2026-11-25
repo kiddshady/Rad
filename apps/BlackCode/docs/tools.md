@@ -368,12 +368,56 @@ todo su catálogo de modelos de imagen.
   con el `suggested_prompt` si vino), demasiados pedidos (429), modelo sin
   lugar (503), modelo solo para Pro.
 - **En el humo no hay Venice**: los modelos son dos de mentira y la imagen es un
-  PNG de 96 px armado acá, con un color que sale del prompt.
+  PNG de 256 px armado acá, con un color que sale del prompt.
 - Settings: la tarjeta «Image generation» (el modelo, con su precio, y el
   filtro). Canales `imagenes:modelos|ver|abrir|mostrar|guardar-como`; lo
   elegido queda en el documento `imagenes`.
-- Lo que no está: editar una imagen, agrandarla y quitarle el fondo (Venice
-  tiene `/image/edit`; los otros dos no se verificaron en su documentación).
+- Lo que no está: agrandar una imagen y quitarle el fondo como operaciones
+  propias (no se verificaron en la documentación de Venice).
+
+### Editar una imagen que ya existe
+
+Desde la 0.22.0, la misma tool. Con `input_images` no genera: edita.
+
+- **Los endpoints** (documentación de Venice leída el 25/11/2026; los marca
+  como experimentales). Una imagen: `POST /image/edit` con `model` e `image`.
+  Varias: `POST /image/multi-edit` con `modelId` (el campo se llama distinto)
+  e `images`; la primera es la base y las demás son de referencia. Las imágenes
+  viajan en base64 adentro del JSON. **La respuesta es la imagen en binario**,
+  no un JSON como en `/image/generate`. No hay semilla, variantes, prompt
+  negativo ni estilo: si el agente los pasa, no viajan.
+- **Los modelos** son otra lista: `GET /models?type=inpaint` (es pública: no
+  pide llave). De cada uno se toma el precio (`pricing.inpaint`, o el de la
+  resolución), cuántas imágenes acepta (`constraints.maxInputImages`; si
+  falta, 3, y 1 cuando `combineImages` es false) y si cobra las imágenes de
+  entrada (`pricing.inputImages`: cuántas incluye y cuánto sale cada una
+  más). El de fábrica es `firered-image-edit`. En Settings se elige con «Model
+  for editing» (`modeloEdicion` en el documento `imagenes`); un modelo de
+  generar no edita, son ids distintos.
+- **Qué se puede pasar en `input_images`.** Una ruta (contra la carpeta del
+  chat) de un PNG, JPEG o WebP, o `attachment:N`: la enésima imagen que el
+  usuario adjuntó en ese chat (`attachment:last`, la última). **Los adjuntos
+  no se copian al disco** (Fran decidió antes no sacarlos del documento del
+  chat): llegan al proceso principal con el pedido de cada turno, y
+  `chat.cjs` se los deja a la tool en `run.adjuntas`. Para que el agente no
+  los cuente a ojo, si tiene `generate_image` cada mensaje con imágenes lleva
+  al pie una nota con sus números (`[For generate_image, the image attached to
+  this message is attachment:1.]`). Sirve también con un modelo que no ve.
+- **Lo que se revisa antes de pedir:** el formato por los primeros bytes (un
+  GIF no se edita), menos de 25 MB, y entre 65.536 y 33.177.600 píxeles, con el
+  ancho y el alto leídos de la cabecera (`medidas`). Y contra el modelo: el
+  largo de la instrucción, cuántas imágenes, la proporción (`auto`, o nada, es
+  la de la imagen de entrada: no se manda) y la resolución.
+- **Lo que deja:** un archivo nuevo en la misma carpeta de imágenes. El
+  original no se toca. Una edición cuenta como una imagen para el tope del
+  turno. En el `detalle` de la fila van las `entradas`, y el registro del
+  turno siguiente dice `edited from <ruta o attachment:N>`.
+- **La tarjeta de permiso** dice que edita, con qué modelo, qué imágenes se le
+  mandan a Venice (con sus medidas) y cuánto sale.
+- **`enhance_prompt`** (un modelo que reescribe la instrucción mirando la
+  imagen, con costo aparte) no se usa ni es un parámetro de la tool.
+- En el humo los modelos de edición son dos de mentira, y la «editada» es otro
+  PNG cuyo color sale de la instrucción y de las imágenes de entrada.
 
 ## Los subagentes
 

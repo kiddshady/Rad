@@ -1,5 +1,31 @@
 # Changelog
 
+## BlackCode 0.22.0 (2026-11-25)
+
+- **Editar una imagen que ya existe.** `generate_image` tiene un parámetro
+  nuevo, `input_images`: con él no genera de cero sino que cambia la imagen que
+  se le pasa («que sea de noche», «sacale el fondo»). Con una imagen, la
+  edita; con varias, la primera es la que se edita y las demás son de
+  referencia (una persona, un estilo, un objeto para sumar). El resultado es
+  una imagen nueva: la original queda como estaba.
+- **Qué se puede editar:** una imagen de un archivo (una generada antes, o
+  cualquiera del disco: PNG, JPEG o WebP) o **una que adjuntaste en el chat**.
+  Los adjuntos no se copian al disco: cada uno tiene un número
+  (`attachment:1`, `attachment:2`…, o `attachment:last`), que el agente ve
+  al pie del mensaje que lo trajo.
+- **Los modelos que editan son otra lista** (37 hoy en Venice), con su precio.
+  En Settings, la tarjeta «Image generation» tiene un segundo selector, «Model
+  for editing»; de fábrica va el de Venice (FireRed, $0.04 por edición).
+- La tarjeta de permiso de una edición dice con qué modelo, **qué imágenes se
+  le mandan a Venice** y cuánto sale (algunos modelos cobran aparte las
+  imágenes de entrada).
+- Se revisa antes de gastar: el tamaño de cada imagen (entre 256×256 y unos 33
+  megapíxeles, menos de 25 MB), el formato, y cuántas acepta el modelo. Una
+  edición cuenta para el tope de 8 imágenes por turno.
+- En el registro del turno siguiente queda de qué imágenes salió cada edición.
+- No usa `enhance_prompt` de Venice (cuesta aparte y tarda más): queda afuera.
+- El PNG de mentira del humo pasó de 96 a 256 px, lo mínimo que se puede editar.
+
 ## BlackCode 0.21.0 (2026-11-25)
 
 - **Servidores MCP.** En Settings hay una tarjeta nueva, «MCP servers», para

@@ -180,7 +180,7 @@ function checkDisk(data, report) {
     const dirI = path.join(taller, 'images');
     const guardadas = fs.existsSync(dirI) ? fs.readdirSync(dirI).flatMap((mes) => fs.readdirSync(path.join(dirI, mes)).map((f) => path.join(dirI, mes, f))) : [];
     const esPng = (f) => { const b = fs.readFileSync(f); return b[0] === 0x89 && b.toString('latin1', 1, 4) === 'PNG'; };
-    if (guardadas.length < 11 || !guardadas.every((f) => /image-.*\.png$/.test(f) && esPng(f))) failures.push(`generate_image dejó ${guardadas.length} archivos en images (se esperaban 11 PNG: 2, 4, 4 y 1)`);
+    if (guardadas.length < 11 || !guardadas.every((f) => /image-.*\.png$/.test(f) && esPng(f))) failures.push(`generate_image dejó ${guardadas.length} archivos en images (se esperaban al menos 11 PNG: 2, 4, 4 y 1 generadas, más las editadas)`);
     const exportadas = fs.existsSync(path.join(taller, 'exports')) ? fs.readdirSync(path.join(taller, 'exports')).filter((f) => /^image-.*\.png$/.test(f)) : [];
     if (exportadas.length !== 1 || !esPng(path.join(taller, 'exports', exportadas[0]))) failures.push(`«Save as…» de una imagen generada dejó ${exportadas.length} archivos en exports`);
   }
