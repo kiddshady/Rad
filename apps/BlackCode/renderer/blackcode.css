@@ -98,9 +98,10 @@
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
-    /* Debajo del título no hay línea: lo que sube se esfuma (el `rad-scroll`
-       del núcleo). El respiro de arriba es el alto del esfumado, así en
-       reposo no toca la primera tarjeta. */
+    /* Lo que el scroll recorta se esfuma, arriba y abajo (el `rad-scroll` del
+       núcleo). El respiro de cada punta mide por lo menos lo que el esfumado,
+       así en reposo no toca ni la primera tarjeta ni, al llegar al final, la
+       última. */
     padding: var(--rad-fade) var(--rad-space-6) var(--rad-space-6);
     visibility: hidden;
     --rad-a-scroll-inset: var(--rad-space-3);

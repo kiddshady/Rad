@@ -1496,8 +1496,9 @@ else {
       f.dataset.estado = era;
       await frame();
     }
-    // Los íconos que vinieron de NeonCode: la grilla del canvas y el chip de la memoria.
-    if (chatView.querySelector('[data-accion="canvas-biblioteca"] svg')?.querySelectorAll('rect').length !== 4) fail('el botón de los canvas no lleva la grilla de cuatro cuadrados');
+    // El ícono de los canvas (desde la 1.5.2, el documento con su destello que Fran diseñó con Zac: ya no la grilla de
+    // cuatro cuadrados que vino de NeonCode) y el chip de la memoria, que sí vino de allá.
+    if (chatView.querySelector('[data-accion="canvas-biblioteca"] svg')?.querySelectorAll('rect').length !== 0 || chatView.querySelector('[data-accion="canvas-biblioteca"] svg')?.querySelectorAll('path').length !== 3) fail('el botón de los canvas no lleva el documento con su destello');
     if (!(document.querySelector('.rad-tab[data-view="memoria"] svg path')?.getAttribute('d') ?? '').includes('M6.75 6.75h2.5v2.5h-2.5z')) fail('el ícono de Memory no es el chip con el cuadrado adentro');
 
     // El historial: por dónde se anduvo, para volver. Una entrada por
@@ -3555,6 +3556,33 @@ else {
     }
     await settle();
 
+    // El renglón de un resultado más largo que lo que muestra dice que sigue: termina en puntos suspensivos, no
+    // cortado en seco. Y uno que entra entero no los lleva.
+    {
+      const todos = (await window.rad.invoke('tareas:leer')).resultados;
+      const limpio = (r) => (r.error ? 'Failed: ' + r.error : r.salida || 'Finished with no text.').replace(/^#+\s*/gm, '').replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim();
+      let largos = 0;
+      let cortos = 0;
+      filasR().forEach((fila) => {
+        const d = fila.querySelector('.dm-skill-descripcion');
+        if (!d) return;
+        // (el resultado de esa fila: el de su tarea cuyo texto empieza como lo que se ve)
+        const r = todos.find((x) => x.titulo === fila.dataset.resultado && limpio(x).startsWith(d.textContent.replace(/…$/, '').slice(0, 60)));
+        if (!r) { fail('tareas: una fila de la bandeja no muestra el principio de ningún resultado: «' + d.textContent.slice(0, 60) + '»'); return; }
+        const entero = limpio(r);
+        if (d.textContent.length < entero.length) {
+          largos++;
+          if (!d.textContent.endsWith('…') || /\s…$/.test(d.textContent) || !entero.startsWith(d.textContent.slice(0, -1))) fail('tareas: el renglón de un resultado largo termina cortado en seco: «' + d.textContent.slice(-40) + '»');
+          // el CSS lo deja en dos líneas
+          if (d.getBoundingClientRect().height > parseFloat(getComputedStyle(d).lineHeight) * 2 + 2) fail('tareas: el renglón de un resultado largo ocupa más de dos líneas (' + r2(d.getBoundingClientRect().height) + ' px)');
+        } else {
+          cortos++;
+          if (d.textContent !== entero || d.textContent.endsWith('…') !== entero.endsWith('…')) fail('tareas: el renglón de un resultado que entra entero no lo muestra tal cual: «' + d.textContent.slice(-40) + '»');
+        }
+      });
+      if (!largos) fail('tareas: ningún resultado de prueba es más largo que su renglón: la prueba de los puntos suspensivos no prueba nada');
+      data.tareasRenglon = largos + ' cortados con puntos suspensivos, ' + cortos + ' enteros';
+    }
     // Un resultado se abre entero, queda leído, y se puede seguir en un chat.
     const chatsAntes = rows().length;
     filasR().find((f) => f.dataset.resultado === 'Smoke daily').click();
@@ -4346,7 +4374,25 @@ else {
         else if (pasosF.size < 3) fail('ajustes: el esfumado de debajo del título aparece de golpe (' + [...pasosF].join(' → ') + ')');
         if (primera < fade() - 0.5) fail('ajustes: en reposo el esfumado tocaría la primera tarjeta (está a ' + r2(primera) + ' px y el esfumado mide ' + fade() + ')');
         if (!/gradient/.test(getComputedStyle(pT).maskImage || getComputedStyle(pT).webkitMaskImage || '')) fail('ajustes: la pestaña no tiene la máscara del esfumado');
-        if (parseFloat(getComputedStyle(pT).getPropertyValue('--rad-fade-bottom')) !== 0) fail('ajustes: abajo, contra el borde del modal, hay esfumado (ahí corta limpio)');
+        // Abajo también: mientras quede algo por ver, lo que el borde del modal recorta se esfuma (como en el canvas);
+        // al llegar al final no hay nada que esfumar, y el respiro de abajo alcanza para que no toque la última tarjeta.
+        {
+          const fadeAbajo = (p = pT) => parseFloat(getComputedStyle(p).getPropertyValue('--rad-fade-bottom')) || 0;
+          if (!(fadeAbajo() > 8) || pT.classList.contains('at-bottom')) fail('ajustes: abajo, con más para ver, la pestaña se corta al aire contra el borde del modal (esfumado de ' + fadeAbajo() + ' px)');
+          const medido = fadeAbajo();
+          pT.scrollTop = pT.scrollHeight;
+          const pasosB = new Set();
+          for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 200;) { pasosB.add(Math.round(fadeAbajo())); await frame(); }
+          if (fadeAbajo() !== 0 || !pT.classList.contains('at-bottom')) fail('ajustes: al llegar al final de la pestaña sigue el esfumado de abajo (' + fadeAbajo() + ' px)');
+          else if (pasosB.size < 3) fail('ajustes: el esfumado de abajo se va de golpe al llegar al final (' + [...pasosB].join(' → ') + ')');
+          const ultima = pT.getBoundingClientRect().bottom - [...pT.querySelectorAll('.dm-ajustes-pila > *')].at(-1).getBoundingClientRect().bottom;
+          if (ultima < medido - 0.5) fail('ajustes: al final, el esfumado de abajo tocaría la última tarjeta (queda a ' + r2(ultima) + ' px y el esfumado mide ' + medido + ')');
+          // una pestaña que entra entera (About) no esfuma nada
+          const corta = panel('about');
+          if (corta.scrollHeight > corta.clientHeight + 1) fail('ajustes: About ya no entra entera en el modal: la prueba de «sin esfumado» no prueba nada');
+          else if (fadeAbajo(corta) !== 0 || (parseFloat(getComputedStyle(corta).getPropertyValue('--rad-fade-top')) || 0) !== 0) fail('ajustes: una pestaña que entra entera lleva esfumado');
+          data.ajustesFadeAbajo = [...pasosB].join(' → ') + ' px al llegar al final';
+        }
         data.ajustesFade = [...pasosF].join(' → ') + ' px';
         pT.scrollTop = 0;
         await sleep(dur('base') + 120);
@@ -4467,8 +4513,16 @@ else {
         if (!/rotate\(45 /.test(boton('integrations').querySelector('svg g')?.getAttribute('transform') ?? '')) fail('ajustes: el enchufe de Integrations no va en diagonal');
         const robot = document.querySelector('.rad-tab[data-view="agentes"] svg');
         if (!robot?.querySelector('rect[rx]') || robot.querySelectorAll('circle').length !== 1 || !robot.querySelector('g[transform^="scale"]')) fail('ajustes: Agents no lleva el robot de Umbra (cabeza, antena con su punta y hombros)');
+        // …y el de los canvas, el que diseñó con Zac: un documento con la esquina doblada y un destello adentro (ya no cuatro cuadrados)
+        const bCanvas = chatView.querySelector('[data-accion="canvas-biblioteca"]');
+        const dCanvas = bCanvas?.querySelector('svg');
+        if (!dCanvas || dCanvas.querySelector('rect') || dCanvas.querySelectorAll('g[transform^="scale"] > path').length !== 3 || !dCanvas.innerHTML.includes('M12 11l.9 2.1')) fail('ajustes: el botón de los canvas no lleva el documento con su destello');
+        // …y el de Images, la varita mágica (el palo en diagonal y sus destellos), no un cuadro
+        const dImages = boton('images').querySelector('svg');
+        if (dImages.querySelector('rect') || dImages.querySelectorAll('g[transform^="scale"] > path').length !== 8 || !dImages.innerHTML.includes('m21.64 3.64')) fail('ajustes: Images no lleva la varita mágica');
         // ninguno se sale de su caja de 16
-        for (const [nombre, el] of [['Voice', boton('voice')], ['Integrations', boton('integrations')], ['Agents', document.querySelector('.rad-tab[data-view="agentes"]')]]) {
+        for (const [nombre, el] of [['Voice', boton('voice')], ['Images', boton('images')], ['Integrations', boton('integrations')], ['Agents', document.querySelector('.rad-tab[data-view="agentes"]')], ['los canvas', bCanvas]]) {
+          if (!el) continue;
           const svg = el.querySelector('svg');
           const c = svg.getBoundingClientRect();
           const d = [...svg.querySelectorAll('path, rect, circle')].map((x) => x.getBoundingClientRect());

@@ -6,6 +6,19 @@
   el aviso de «Check for updates» (y cualquier otro: una llave guardada, una
   tarea que terminó) salía por debajo de su velo: ni se veía ni se podía
   tocar. Lo vio Fran al actualizar a la 1.5.1.
+- **En Tasks, el renglón de un resultado largo termina en puntos suspensivos.**
+  Se cortaba a los 180 caracteres, y con la ventana ancha eso entraba en sus
+  dos líneas: quedaba cortado en seco, a mitad de palabra. Ahora se corta más
+  lejos (así el recorte del renglón pone los puntos) y, si se cortó, lo dice.
+- **Los canvas tienen ícono nuevo:** un documento con la esquina doblada y un
+  destello adentro («documento que escribió Zac»). Lo diseñó Fran con Zac;
+  reemplaza a los cuatro cuadrados en el botón del chat, el panel y la
+  biblioteca.
+- **La pestaña Images lleva una varita mágica** con sus destellos, también
+  diseñada por Fran con Zac, en lugar del cuadro con la montaña.
+- **Settings también se esfuma abajo.** Lo que el borde del modal recorta al
+  scrollear ya no se ve cortado: se esfuma, como en el canvas. Al llegar al
+  final no queda esfumado, y una pestaña que entra entera no lo lleva.
 - **Núcleo 0.20.1:** la pila de toasts va por encima de lo demás que flota
   (`z-index` propio en la capa de overlays; el tooltip, más arriba todavía).
   En la capa mandaba el orden de llegada, pero la pila se crea una sola vez,

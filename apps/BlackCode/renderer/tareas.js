@@ -238,7 +238,16 @@ export function montarTareas(el, { router }) {
   const bLeidas = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'tareas-leidas' }, 'Mark all read');
   const bVaciar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'tareas-vaciar' }, 'Clear');
   // (el resultado es markdown: en el renglón de la lista va sin sus marcas)
-  const resumen = (r) => (r.error ? `Failed: ${r.error}` : r.salida || 'Finished with no text.').replace(/^#+\s*/gm, '').replace(/[*_`]/g, '').replace(/\s+/g, ' ').slice(0, 180);
+  // El renglón muestra dos líneas. Si el texto es más largo que lo que entra,
+  // el recorte del CSS le pone los puntos suspensivos; pero con la ventana
+  // ancha entraba entero lo que se cortaba acá, a los 180 caracteres, y quedaba
+  // cortado en seco («…porque el c»). Se corta más lejos (para que el CSS
+  // llene las dos líneas) y, si se cortó, se dice.
+  const RESUMEN_MAX = 320;
+  const resumen = (r) => {
+    const texto = (r.error ? `Failed: ${r.error}` : r.salida || 'Finished with no text.').replace(/^#+\s*/gm, '').replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim();
+    return texto.length > RESUMEN_MAX ? `${texto.slice(0, RESUMEN_MAX).trimEnd()}…` : texto;
+  };
   const filaR = (r) => {
     if (r.id === VACIO) { const p = h('p', 'dm-memoria-vacia rad-swap'); swapText(p, r.texto); return p; }
     const nodo = h('button', 'dm-skill-fila dm-tarea-resultado-fila', { type: 'button', role: 'listitem', 'data-accion': 'resultado-abrir' },

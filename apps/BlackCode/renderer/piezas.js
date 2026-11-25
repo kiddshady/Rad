@@ -25,7 +25,10 @@ export const ICONOS = {
   agentes: svg('<g transform="scale(.6667)" stroke-width="2.25"><rect x="5" y="5" width="14" height="11.5" rx="3.5"/><path d="M12 5V2.8"/><circle cx="12" cy="1.8" r="1.1" fill="currentColor" stroke="none"/><path d="M3.5 9.5v2.5M20.5 9.5v2.5M9.5 9.4v2.8M14.5 9.4v2.8"/><path d="M5.5 21v-1.5a2.5 2.5 0 0 1 2.5-2.5h8a2.5 2.5 0 0 1 2.5 2.5V21"/></g>'),
   ajustes: svg('<path d="M2.5 5h6M11.5 5h2M2.5 11h2M7.5 11h6"/><circle cx="10" cy="5" r="1.5"/><circle cx="6" cy="11" r="1.5"/>'),
   // (las pestañas de Settings que no tenían ícono: imágenes, integraciones, acerca de)
-  imagen: svg('<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><circle cx="6" cy="6.5" r="1"/><path d="M3 11.5l3-3 2.5 2.5 2-2 2.5 2.5"/>'),
+  // La de las imágenes: una varita mágica con sus destellos, la que Fran
+  // diseñó con Zac (nov 2026). Su trazo tal cual, de una grilla de 24 con
+  // trazo de 2, escalado a esta de 16 con el trazo compensado.
+  varita: svg('<g transform="scale(.6667)" stroke-width="2.25"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></g>'),
   // (el enchufe va en diagonal, como la llave y la herramienta que tiene al lado)
   enchufe: svg('<g transform="translate(-.6 .6) rotate(45 8 8)"><path d="M6 2.5v3M10 2.5v3M4.5 5.5h7V8a3.5 3.5 0 0 1-7 0zM8 11.5v2"/></g>'),
   // La voz: la onda de Verba (las cinco barras de su marca, con las mismas
@@ -78,7 +81,11 @@ export const ICONOS = {
   // la terminal: una ventana con su prompt
   terminal: svg('<rect x="2" y="3" width="12" height="10" rx="1.75"/><path d="M5 6.5 7 8 5 9.5M8.5 10H11"/>'),
   // el canvas: los cuatro cuadrados de NeonCode (su `grid`, en la grilla de 16)
-  canvas: svg('<rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/><rect x="9" y="9" width="4.5" height="4.5" rx="1"/>'),
+  // Los canvas: «Documento + sparkle», el que Fran diseñó con Zac (nov 2026:
+  // «documento que escribió Zac»). Es su trazo tal cual, de una grilla de 24
+  // con trazo de 2: va escalado a esta de 16, con el trazo compensado para
+  // que quede en el 1,5 de los demás. (Antes eran cuatro cuadrados.)
+  canvas: svg('<g transform="scale(.6667)" stroke-width="2.25"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 11l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></g>'),
   codigo: svg('<path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/>'),
   biblioteca: svg('<path d="M3 2.75v10.5M6 4.75v8.5M9 3.5v9.75l4-1-1.75-9z"/>'),
   // una tool: una llave fija

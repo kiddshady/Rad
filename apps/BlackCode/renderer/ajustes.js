@@ -1070,7 +1070,7 @@ export const PESTANAS = [
   { id: 'general', nombre: 'General', icono: 'ajustes' },
   { id: 'providers', nombre: 'Providers', icono: 'llave' },
   { id: 'tools', nombre: 'Tools', icono: 'tool' },
-  { id: 'images', nombre: 'Images', icono: 'imagen' },
+  { id: 'images', nombre: 'Images', icono: 'varita' },
   { id: 'integrations', nombre: 'Integrations', icono: 'enchufe' },
   { id: 'voice', nombre: 'Voice', icono: 'onda' },
   { id: 'about', nombre: 'About', icono: 'info' },
@@ -1112,9 +1112,10 @@ function armar() {
   for (const p of PESTANAS) {
     const boton = h('button', 'dm-ajustes-tab', { type: 'button', role: 'tab', id: `dm-ajustes-tab-${p.id}`, 'data-tab': p.id, 'aria-selected': 'false', 'aria-controls': `dm-ajustes-panel-${p.id}`, tabindex: '-1' },
       icono(p.icono), h('span', '', {}, p.nombre));
-    // (`rad-scroll`: lo que sube se esfuma debajo del título, que no lleva
-    // línea. Abajo no: ahí el límite es el borde del modal.)
-    const panel = h('div', 'dm-ajustes-panel rad-scroll', { role: 'tabpanel', id: `dm-ajustes-panel-${p.id}`, 'data-tab': p.id, 'data-rad-line': 'bottom', 'aria-labelledby': `dm-ajustes-tab-${p.id}` },
+    // (`rad-scroll`: lo que el scroll recorta se esfuma, arriba debajo del
+    // título, que no lleva línea, y abajo contra el borde del modal, como en
+    // el canvas. Fran lo pidió así: el borde no alcanza, cortado se ve mal.)
+    const panel = h('div', 'dm-ajustes-panel rad-scroll', { role: 'tabpanel', id: `dm-ajustes-panel-${p.id}`, 'data-tab': p.id, 'aria-labelledby': `dm-ajustes-tab-${p.id}` },
       h('div', 'dm-ajustes-pila', {}, ...tarjetas[p.id]));
     panel.inert = true;
     wireScroll(panel);
