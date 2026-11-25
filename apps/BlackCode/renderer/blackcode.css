@@ -419,6 +419,54 @@
   /* Si no entran los dos, se achican los dos: ninguno empuja al otro afuera. */
   .dm-conv-sub { font-size: var(--rad-text-s); color: var(--rad-text-3); }
 
+  /* ---------- La pantalla de inicio ---------- */
+  /* Sin chat elegido (así arranca siempre la app), en el lugar de la
+     conversación, el aviso y el campo para escribir va la pantalla de inicio:
+     el símbolo de BlackCode y dos frases, centrados. Cada parte de la
+     conversación tiene su fila, y la pantalla de inicio ocupa las tres de
+     abajo, encima de lo que ahí está oculto. El cambio va en orden: lo que
+     se va termina de irse y recién ahí entra lo otro. */
+  .dm-conv > :nth-child(1) { grid-row: 1; grid-column: 1; }
+  .dm-conv > :nth-child(2) { grid-row: 2; grid-column: 1; }
+  .dm-conv > :nth-child(3) { grid-row: 3; grid-column: 1; }
+  .dm-conv > :nth-child(4) { grid-row: 4; grid-column: 1; }
+  .dm-conv > :nth-child(5) { grid-row: 5; grid-column: 1; }
+  .dm-conv > .dm-inicio {
+    grid-row: 3 / 6;
+    grid-column: 1;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: var(--rad-space-2);
+    min-width: 0;
+    min-height: 0;
+    padding: var(--rad-space-6);
+    text-align: center;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out), visibility 0s linear var(--rad-dur-fast);
+  }
+  .dm-conv[data-inicio] > .dm-inicio {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity var(--rad-dur-base) var(--rad-ease-out) var(--rad-dur-fast), visibility 0s;
+  }
+  .dm-conv > .dm-hilo-marco, .dm-conv > .dm-redactor-caja {
+    transition: opacity var(--rad-dur-base) var(--rad-ease-out) var(--rad-dur-fast), visibility 0s;
+  }
+  .dm-conv[data-inicio] > .dm-hilo-marco, .dm-conv[data-inicio] > .dm-redactor-caja {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out), visibility 0s linear var(--rad-dur-fast);
+  }
+  .dm-conv-titulo[data-vacio] { display: none; }
+  .dm-inicio-marca { width: 92px; height: 92px; margin-bottom: var(--rad-space-3); user-select: none; -webkit-user-drag: none; }
+  .dm-inicio-titulo { font-family: var(--rad-font-display); font-size: var(--rad-text-xl); font-weight: var(--rad-weight-strong); color: var(--rad-text-1); text-wrap: balance; }
+  .dm-inicio-sub { max-width: 340px; font-size: var(--rad-text-m); line-height: 1.5; color: var(--rad-text-2); text-wrap: balance; }
+
   /* El marco de la conversación: la celda y, flotando sobre su borde de abajo,
      el botón de ir al final. */
   .dm-hilo-marco { position: relative; display: grid; min-width: 0; min-height: 0; }

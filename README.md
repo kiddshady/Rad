@@ -499,6 +499,9 @@ y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
   `motor/escucha_motor.py`). Desde la 1.2.0 el agente puede contestar en voz
   alta, con una voz clonada (Qwen3-TTS, `main/habla.cjs` y
   `motor/habla_motor.py`). Está contado en `apps/BlackCode/docs/tools.md`.
+- Arranca siempre en la pantalla de inicio: sin chat elegido, con el símbolo
+  sin baldosa y dos frases, y sin campo para escribir (`.dm-inicio` en
+  `renderer/chat.js`; `datos.abrir()` olvida el chat que estaba abierto).
 - Settings es un modal con pestañas que flota sobre la vista en la que uno
   esté (`renderer/ajustes.js`, `abrirAjustes(pestaña)`): General, Providers,
   Tools, Images, Integrations, Voice y About. Lo de adentro se arma una vez y

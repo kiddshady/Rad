@@ -163,6 +163,7 @@ const trayGlyph = (size, v) => () => {
   ];
 };
 const drawTray = (size, v) => rasterizeBare(size, trayGlyph(size, v));
+const MARCA_PX = 368;
 
 const hoja = process.argv.indexOf('--hoja');
 if (hoja > 0) {
@@ -179,6 +180,10 @@ if (hoja > 0) {
   fs.writeFileSync(path.join(out, 'icon.ico'), encodeICO(ICO_SIZES.map((size) => ({ size, rgba: draw(size) }))));
   fs.writeFileSync(path.join(out, 'tray.ico'), encodeICO(TRAY_SIZES.map((size) => ({ size, rgba: drawTray(size, TRAY_CLARO) }))));
   fs.writeFileSync(path.join(out, 'tray-dark.ico'), encodeICO(TRAY_SIZES.map((size) => ({ size, rgba: drawTray(size, TRAY_OSCURO) }))));
+  // La marca de la pantalla de inicio: el mismo dibujo sin baldosa de la
+  // bandeja (el claro), grande. Se ve a 92 px; va a 368 para que quede nítida
+  // con la pantalla al 200 % y más.
+  fs.writeFileSync(path.join(APP, 'renderer', 'marca.png'), encodePNG(MARCA_PX, drawTray(MARCA_PX, TRAY_CLARO)));
   // Para mirarlo en chico, al lado de otros: cada tamaño del .ico, suelto.
   if (process.argv.includes('--sueltos')) {
     for (const size of [16, 24, 32, 48, 64, 256]) fs.writeFileSync(path.join(out, `icon-${size}.png`), encodePNG(size, draw(size)));

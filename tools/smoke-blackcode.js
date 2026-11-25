@@ -74,6 +74,32 @@ const send = chatView.querySelector('.dm-enviar');
 const composer = chatView.querySelector('.dm-redactor');
 const statusRight = () => shown(document.querySelector('.rad-status-right'));
 
+// La pantalla de inicio: lo que se ve sin ningún chat elegido, que es como
+// arranca siempre la app. Devuelve qué anda mal, o '' si está todo en su lugar.
+const inicioMal = () => {
+  const conv = chatView.querySelector('.dm-conv');
+  const inicio = conv?.querySelector('.dm-inicio');
+  const marca = inicio?.querySelector('.dm-inicio-marca');
+  const caja = conv?.querySelector('.dm-redactor-caja');
+  const marco = conv?.querySelector('.dm-hilo-marco');
+  if (!conv?.hasAttribute('data-inicio') || !inicio) return 'no está la pantalla de inicio';
+  if (op(inicio) !== 1 || getComputedStyle(inicio).visibility !== 'visible' || inicio.getAttribute('aria-hidden') !== 'false') return 'la pantalla de inicio no se ve (opacidad ' + op(inicio) + ')';
+  if (!marca?.complete || marca.naturalWidth < 300 || Math.abs(marca.getBoundingClientRect().width - 92) > 0.5 || Math.abs(marca.getBoundingClientRect().height - 92) > 0.5) return 'el símbolo no cargó o no mide 92 px (' + marca?.naturalWidth + ' px de origen, ' + r2(marca?.getBoundingClientRect().width ?? 0) + ' a la vista)';
+  if (inicio.querySelector('.dm-inicio-titulo')?.textContent !== 'Select or start a conversation' || inicio.querySelector('.dm-inicio-sub')?.textContent !== 'Create a new chat or select one from the sidebar to talk with an agent.') return 'las frases son «' + inicio.querySelector('.dm-inicio-titulo')?.textContent + '» y «' + inicio.querySelector('.dm-inicio-sub')?.textContent + '»';
+  // ni el campo para escribir ni la conversación: no se ven, no se tocan y no reciben el foco
+  if (getComputedStyle(caja).visibility !== 'hidden' || op(caja) !== 0 || !caja.inert || getComputedStyle(marco).visibility !== 'hidden' || !marco.inert) return 'el campo para escribir o la conversación siguen ahí (campo: ' + getComputedStyle(caja).visibility + ', opacidad ' + op(caja) + ', inerte ' + caja.inert + ')';
+  if (rows().some((f) => f.getAttribute('aria-current') === 'true')) return 'hay un chat elegido en la lista';
+  // centrada: el símbolo y las frases, en el medio del lugar de la conversación (de la cabecera para abajo)
+  const c = conv.getBoundingClientRect();
+  const cabeza = conv.querySelector('.dm-conv-cabeza').getBoundingClientRect();
+  const partes = [...inicio.children].map((x) => x.getBoundingClientRect());
+  const medioX = (Math.min(...partes.map((p) => p.left)) + Math.max(...partes.map((p) => p.right))) / 2;
+  const medioY = (partes[0].top + partes.at(-1).bottom) / 2;
+  if (Math.abs(medioX - (c.left + c.right) / 2) > 2) return 'no está centrada a lo ancho (' + r2(medioX) + ' contra ' + r2((c.left + c.right) / 2) + ')';
+  if (Math.abs(medioY - (cabeza.bottom + c.bottom) / 2) > 24) return 'no está centrada a lo alto (' + r2(medioY) + ' contra ' + r2((cabeza.bottom + c.bottom) / 2) + ')';
+  return '';
+};
+
 const LLAVE = 'sk-ant-api03-humo-de-blackcode-no-es-una-llave-0000';
 const INSTRUCCIONES = 'Answer like a pharmacist on call: short and clear.';
 const LLAVE_VENICE = 'venice-humo-de-blackcode-no-es-una-llave-1111';
@@ -122,7 +148,18 @@ if (marker?.pass === 1) {
   if (shown(chatView.querySelector('.dm-agente-nombre')) !== 'Galen on call') fail(`abrió con el agente «${shown(chatView.querySelector('.dm-agente-nombre'))}», se había dejado Galeno`);
   const fila = rows();
   if (fila.length !== 1 || shown(fila[0].querySelector('.dm-fila-titulo')) !== 'Headache') fail(`los chats que volvieron: ${fila.map((f) => shown(f.querySelector('.dm-fila-titulo'))).join(' | ')}`);
-  if (fila[0]?.getAttribute('aria-current') !== 'true') fail('el chat que estaba abierto no volvió abierto');
+  // La app arranca siempre en la pantalla de inicio: el chat que estaba abierto NO vuelve abierto (el agente sí).
+  {
+    const mal = inicioMal();
+    if (mal) fail('al reabrir la app, ' + mal);
+    if (msgs().length) fail('al reabrir la app hay una conversación a la vista: tenía que arrancar en la pantalla de inicio');
+    if (Object.keys((await window.rad.store.read('ui'))?.chats ?? {}).length) fail('al reabrir la app quedó guardado un chat elegido');
+    // …y el chat está donde se lo dejó: se lo elige de la lista
+    fila[0]?.querySelector('.dm-fila-abrir').click();
+    await until(() => fila[0]?.getAttribute('aria-current') === 'true' && !chatView.querySelector('.dm-conv').hasAttribute('data-inicio'), 3000);
+    await sleep(dur('fast') + dur('base') + 200);
+    if (fila[0]?.getAttribute('aria-current') !== 'true' || inicioMal() === '') fail('elegir un chat desde la pantalla de inicio no lo abrió');
+  }
   await until(() => msgs().length === 4, 3000);
   const m = msgs();
   if (m.length !== 4) fail(`volvieron ${m.length} mensajes, se habían dejado 4`);
@@ -362,9 +399,50 @@ if (shown(chatView.querySelector('.dm-agente-nombre')) !== 'Galen on call') fail
   if (!shown(chatView.querySelector('.dm-conv-sub')).includes('Claude Haiku 5.5') || !statusRight().includes('Claude Haiku 5.5')) fail('el modelo del agente no figura ni en la cabecera ni en la barra de estado');
 }
 
+// 2b. La pantalla de inicio: así arranca la app, sin ningún chat elegido. El
+// símbolo de BlackCode (sin baldosa), dos frases, y nada donde escribir: se
+// escribe en un chat. La cabecera no nombra ningún chat.
+{
+  const mal = inicioMal();
+  if (mal) fail('inicio: ' + mal);
+  if (shown(chatView.querySelector('.dm-conv-titulo')) !== '') fail('inicio: la cabecera nombra un chat sin que haya ninguno: «' + shown(chatView.querySelector('.dm-conv-titulo')) + '»');
+  if (document.activeElement === area) fail('inicio: el foco está en el campo para escribir, que no se ve');
+  // (el símbolo es el dibujo entero sin baldosa: las esquinas del lienzo, transparentes)
+  {
+    const marca = chatView.querySelector('.dm-inicio-marca');
+    const lienzo = document.createElement('canvas');
+    lienzo.width = marca.naturalWidth;
+    lienzo.height = marca.naturalHeight;
+    const g = lienzo.getContext('2d');
+    g.drawImage(marca, 0, 0);
+    const alfa = (x, y) => g.getImageData(x, y, 1, 1).data[3];
+    const n = marca.naturalWidth;
+    if (alfa(2, 2) !== 0 || alfa(n - 3, 2) !== 0 || alfa(2, n - 3) !== 0 || alfa(n - 3, n - 3) !== 0) fail('inicio: el símbolo trae baldosa (sus esquinas no son transparentes)');
+    if (alfa(n >> 1, n >> 1) < 250) fail('inicio: el símbolo no tiene su núcleo en el centro');
+  }
+  enIngles('en la pantalla de inicio');
+  data.inicio = 'símbolo de 92 px sin baldosa, las dos frases, sin campo y sin chat elegido';
+}
+
 // 3. Crear un chat: aparece su fila, elegida. Con el chat todavía vacío,
-// «Nuevo chat» no apila otro.
+// «Nuevo chat» no apila otro. La pantalla de inicio se va y recién después
+// entran la conversación y el campo para escribir: nunca las dos a la vista.
 chatView.querySelector('[data-accion="nuevo-chat"]').click();
+{
+  const conv = chatView.querySelector('.dm-conv');
+  const inicio = conv.querySelector('.dm-inicio');
+  const caja = conv.querySelector('.dm-redactor-caja');
+  const ver = (el) => (getComputedStyle(el).visibility === 'visible' ? op(el) : 0);
+  const pasos = [];
+  for (const t0 = performance.now(); performance.now() - t0 < dur('fast') + dur('base') + 260;) { pasos.push([r2(ver(inicio)), r2(ver(caja))]); await frame(); }
+  const dice = pasos.filter((p, i) => !i || p.join() !== pasos[i - 1].join()).map((p) => p.join('/')).join(' ');
+  if (pasos.some(([a, b]) => a > 0.05 && b > 0.05)) fail('inicio: al abrir un chat, la pantalla de inicio y el campo para escribir se ven a la vez (inicio/campo): ' + dice);
+  if (new Set(pasos.map((p) => p[0]).filter((x) => x > 0.02 && x < 0.98)).size < 2) fail('inicio: la pantalla de inicio se va de golpe: ' + dice);
+  if (new Set(pasos.map((p) => p[1]).filter((x) => x > 0.02 && x < 0.98)).size < 2) fail('inicio: el campo para escribir aparece de golpe: ' + dice);
+  if (pasos.at(-1).join() !== '0,1' || conv.hasAttribute('data-inicio') || caja.inert || conv.querySelector('.dm-hilo-marco').inert || inicio.getAttribute('aria-hidden') !== 'true') fail('inicio: con un chat abierto sigue la pantalla de inicio, o el campo no quedó a mano: ' + dice);
+  if (document.activeElement !== area) fail('inicio: al crear un chat desde la pantalla de inicio, el foco no fue al campo para escribir');
+  data.inicioRelevo = dice;
+}
 await settle();
 if (rows().length !== 1 || rows()[0].getAttribute('aria-current') !== 'true') fail(`después de «Nuevo chat» hay ${rows().length} filas (o la nueva no quedó elegida)`);
 chatView.querySelector('[data-accion="nuevo-chat"]').click();

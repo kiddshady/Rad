@@ -186,9 +186,28 @@ export function montarChat(el, { router }) {
   const nav = montarNavegador({ escena, turnos, router });
   // (la terminal abre en la carpeta del chat que se está viendo)
   const consola = montarTerminal({ escena, turnos, router, carpeta: () => { const c = datos.chatActual(); return c ? datos.carpetaDe(c.id) : datos.carpetaInicio(); } });
+  // La pantalla de inicio: lo que se ve cuando no hay ningún chat elegido, que
+  // es como arranca siempre la app. El símbolo de BlackCode sin baldosa y dos
+  // frases (las de Umbra). Ocupa el lugar de la conversación, el aviso y el
+  // campo para escribir, que ahí no están: se escribe en un chat.
+  const inicio = h('div', 'dm-inicio', {},
+    h('img', 'dm-inicio-marca', { src: 'marca.png', alt: 'BlackCode', width: '92', height: '92', draggable: 'false' }),
+    h('h2', 'dm-inicio-titulo', {}, 'Select or start a conversation'),
+    h('p', 'dm-inicio-sub', {}, 'Create a new chat or select one from the sidebar to talk with an agent.'));
+  const marco = h('div', 'dm-hilo-marco', {}, celda, bFinal);
+  const cajaRedactor = h('div', 'dm-redactor-caja', {}, redactor);
   const conv = h('section', 'dm-conv', {},
     h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, sub, nav.boton, consola.boton, lienzo.botonBiblioteca, botonTools),
-    lienzo.barra, h('div', 'dm-hilo-marco', {}, celda, bFinal), aviso, h('div', 'dm-redactor-caja', {}, redactor));
+    lienzo.barra, marco, aviso, cajaRedactor, inicio);
+  const enInicio = () => !datos.chatActual();
+  const ponerInicio = () => {
+    const si = enInicio();
+    conv.toggleAttribute('data-inicio', si);
+    // lo que no se ve tampoco se toca ni recibe el foco
+    marco.inert = si;
+    cajaRedactor.inert = si;
+    inicio.setAttribute('aria-hidden', String(!si));
+  };
   escena.append(conv, lienzo.panel, nav.panel, consola.panel);
 
   el.append(lado, escena);
@@ -607,9 +626,11 @@ export function montarChat(el, { router }) {
   });
   // Soltar archivos sobre la conversación. El resaltado va en el redactor.
   const traeArchivos = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
-  conv.addEventListener('dragover', (e) => { if (!traeArchivos(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; redactor.setAttribute('data-soltar', ''); });
+  conv.addEventListener('dragover', (e) => { if (!traeArchivos(e) || enInicio()) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; redactor.setAttribute('data-soltar', ''); });
   conv.addEventListener('dragleave', (e) => { if (!conv.contains(e.relatedTarget)) redactor.removeAttribute('data-soltar'); });
   conv.addEventListener('drop', (e) => {
+    // (en la pantalla de inicio no hay campo donde dejar un archivo)
+    if (enInicio()) return;
     if (!traeArchivos(e)) return;
     e.preventDefault();
     redactor.removeAttribute('data-soltar');
@@ -662,7 +683,10 @@ export function montarChat(el, { router }) {
     const c = datos.chatActual();
     swapText(agNombre, a.nombre);
     selector.setAttribute('aria-label', `Agent: ${a.nombre}`);
-    swapText(titulo, c?.titulo ?? 'New chat');
+    // (en la pantalla de inicio no hay chat que nombrar)
+    swapText(titulo, c?.titulo ?? '');
+    // (sin nombre que mostrar, tampoco ocupa su lugar: lo que sigue queda contra el margen)
+    titulo.toggleAttribute('data-vacio', !c);
     swapText(sub, `${a.nombre} · ${datos.modeloDe(a)}`);
     const n = datos.toolsQueViajan(a);
     swapText(toolsTexto, n ? `${n} tool${n === 1 ? '' : 's'}` : datos.modeloConTools(a.proveedor, a.modelo) ? 'Tools: off' : 'Tools: not supported');
@@ -673,7 +697,8 @@ export function montarChat(el, { router }) {
     const a = datos.agenteActual();
     const falta = llave.falta(a.proveedor);
     if (falta) swapText(aviso.querySelector('.dm-aviso-texto'), `The ${datos.nombreProveedor(a.proveedor)} key is missing: this agent can’t answer without it.`);
-    aviso.toggleAttribute('data-abierto', falta);
+    // (en la pantalla de inicio no va: es de la conversación)
+    aviso.toggleAttribute('data-abierto', falta && !enInicio());
   };
 
   datos.on('agentes', () => { ponerCabeza(); ponerAviso(); dibujarMensajes(); });
@@ -682,8 +707,9 @@ export function montarChat(el, { router }) {
   datos.on('seleccion', () => lienzo.alCambiarDeChat());
   datos.on('chats', () => lienzo.alCambiarDeChat());
   lienzo.alCambiarDeChat();
-  datos.on('chats', () => { ponerCabeza(); dibujarLista(); });
-  datos.on('seleccion', () => { ponerCabeza(); ponerAviso(); dibujarLista(); mostrarHilo(); ponerRedactor(); });
+  datos.on('chats', () => { ponerCabeza(); dibujarLista(); ponerInicio(); ponerAviso(); });
+  datos.on('seleccion', () => { ponerInicio(); ponerCabeza(); ponerAviso(); dibujarLista(); mostrarHilo(); ponerRedactor(); });
+  ponerInicio();
   datos.on('mensajes', ({ chat }) => { if (hilo?.chatId === chat) dibujarMensajes(); });
   datos.on('texto', alTexto);
   datos.on('respuesta', ({ chat }) => {

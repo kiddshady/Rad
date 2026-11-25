@@ -70,6 +70,10 @@ export async function abrir() {
     window.rad.invoke('chat:modelos'),
     window.rad.invoke('chat:tools'),
   ]);
+  // La app arranca siempre en la pantalla de inicio (1.6.0, pedido de Fran):
+  // sin ningún chat elegido, de ningún agente. El agente sí se recuerda. De
+  // ahí en más, en la sesión, cada agente recuerda el chat que se le abrió.
+  if (Object.keys(ui.get().chats ?? {}).length) ui.update((v) => { v.chats = {}; return v; });
   fondoDoc = await openDoc('fondo', { bandeja: true });
   {
     const v = await window.rad.invoke('voz:estado').catch(() => null);

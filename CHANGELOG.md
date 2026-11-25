@@ -1,5 +1,23 @@
 # Changelog
 
+## BlackCode 1.6.0 (2026-11-25)
+
+- **La app arranca en una pantalla de inicio.** Abría siempre en el último
+  chat; ahora abre sin ningún chat elegido, con el símbolo de BlackCode (el
+  dibujo entero, sin baldosa) en el centro y dos frases, las de Umbra: «Select
+  or start a conversation» y «Create a new chat or select one from the sidebar
+  to talk with an agent». El agente que estaba elegido sí se recuerda. La pidió
+  Fran, «un estilo así como en Umbra».
+- **Ahí no hay campo para escribir** (decisión de Fran): se escribe en un chat.
+  Al crear o elegir uno, la pantalla de inicio se va y recién después entran
+  la conversación y el campo, que queda con el foco. Tampoco dice con qué
+  agente se va a hablar, porque se puede cambiar.
+- Es también lo que se ve cuando un agente no tiene chat elegido: al cambiar
+  de agente ya no se abre solo su último chat hasta que se elija uno en la
+  sesión. La cabecera, sin chat, no dice «New chat».
+- El símbolo sale del mismo script que el ícono (`scripts/icon.mjs` →
+  `renderer/marca.png`): es el dibujo de la bandeja, a 368 px.
+
 ## BlackCode 1.5.2 (2026-11-25) · núcleo 0.20.1
 
 - **Los avisos se ven con Settings abierto.** Desde que Settings es un modal,
