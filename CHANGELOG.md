@@ -1,5 +1,10 @@
 # Changelog
 
+## BlackCode 0.18.1 (2026-11-25)
+
+- **El pin de las notas**, igual que la estrella de los marcadores: en una nota
+  fijada se rellena, y nada más. El botón ya no queda remarcado.
+
 ## BlackCode 0.18.0 (2026-11-25)
 
 - **Scrollbars flotantes en las páginas del navegador**, como en Prism: un hilo

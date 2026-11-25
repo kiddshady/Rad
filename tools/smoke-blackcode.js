@@ -1524,6 +1524,17 @@ else {
     boton('nota-fijar').click();
     await until(() => notasL().some((n) => n.hasAttribute('data-fijada')), 3000);
     if (!notasL().find((n) => n.textContent.includes('Shopping'))?.hasAttribute('data-fijada')) fail('notas: fijar no marcó la nota');
+    {
+      // El pin de una nota fijada se rellena y nada más: el botón no queda
+      // «apretado» (igual que la estrella de los marcadores).
+      const pin = boton('nota-fijar');
+      const vecino = [...pin.parentElement.querySelectorAll('.rad-iconbutton')].find((b) => b !== pin && !b.hasAttribute('aria-pressed'));
+      await until(() => pin.getAttribute('aria-pressed') === 'true', 2000);
+      await sleep(dur('fast') + 160);
+      const cp = getComputedStyle(pin);
+      if (pin.getAttribute('aria-pressed') !== 'true' || getComputedStyle(pin.querySelector('svg')).fill !== cp.color) fail('notas: el pin de una nota fijada no se rellena (relleno ' + getComputedStyle(pin.querySelector('svg')).fill + ', color ' + cp.color + ')');
+      if (!vecino || cp.boxShadow !== 'none' || cp.backgroundColor !== getComputedStyle(vecino).backgroundColor) fail('notas: con la nota fijada el botón del pin queda remarcado (fondo ' + cp.backgroundColor + ', sombra ' + cp.boxShadow + '): alcanza con el pin relleno');
+    }
     const buscarN = v.querySelector('input[type="search"]');
     type(buscarN, 'agent');
     await settle();

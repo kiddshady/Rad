@@ -1295,7 +1295,11 @@
   .dm-notas-icono { color: var(--rad-text-3); }
   .dm-notas-donde { color: var(--rad-text-2); font-size: var(--rad-text-s); }
   .dm-notas-guardado { flex: 1; min-width: 0; color: var(--rad-text-3); font-size: var(--rad-text-xs); }
-  .dm-notas [data-accion='nota-fijar'][aria-pressed='true'] { color: var(--rad-text-1); }
+  /* Una nota fijada: el pin se rellena y nada más, igual que la estrella de los
+     marcadores. El botón no queda «apretado» (Fran, 25/11/2026). */
+  .dm-notas [data-accion='nota-fijar'][aria-pressed='true'] { color: var(--rad-text-1); background-color: transparent; box-shadow: none; }
+  .dm-notas [data-accion='nota-fijar'][aria-pressed='true']:hover { background-color: var(--rad-tint-hover); }
+  .dm-notas [data-accion='nota-fijar'] svg { transition: fill var(--rad-dur-fast) var(--rad-ease-out); fill: transparent; }
   .dm-notas [data-accion='nota-fijar'][aria-pressed='true'] svg { fill: currentColor; }
   .dm-notas-cuerpo { min-height: 0; padding: var(--rad-space-2) var(--rad-space-6) var(--rad-space-5); }
   .dm-notas-cuerpo > * { animation: rad-fade-in var(--rad-dur-base) var(--rad-ease-out) both; }
