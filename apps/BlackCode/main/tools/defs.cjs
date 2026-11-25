@@ -255,7 +255,7 @@ const TOOL_DEFS = [{
   parameters: {
     type: 'object',
     properties: {
-      url: { type: 'string', description: "Where to go. A full https:// address, a bare domain like example.com, a local one like localhost:5173 or 192.168.1.20:8080 (local addresses load over http), or the name of one of the user's bookmarks. Optional only when switching tabs with `tab`." },
+      url: { type: 'string', description: "Where to go. A full https:// address, a bare domain like example.com, a local one like localhost:5173 or 192.168.1.20:8080 (local addresses load over http), a .html file on this PC (C:\\path\\page.html, file:///C:/path/page.html, or a path relative to the working directory) to show the user a page you made, or the name of one of the user's bookmarks. Only .html files open from disk, and such a page can only load files from its own folder and the folders inside it. Optional only when switching tabs with `tab`." },
       new_tab: { type: 'boolean', description: 'Open the URL in a new tab instead of replacing the current page (default false). If the panel already has 4 tabs it opens in the current one and tells you.' },
       tab: { type: 'integer', description: 'Switch to this open tab first, by its number from the tab list in browser_read (1-4). With no url it just switches.' },
     },

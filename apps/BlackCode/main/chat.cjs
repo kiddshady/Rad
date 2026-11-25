@@ -500,6 +500,48 @@ function wire(rad, { llave }) {
       }
       try { fs.copyFileSync(path.resolve(archivo), destino); return { ok: true, destino }; } catch (err) { return { ok: false, error: String(err?.message || err) }; }
     });
+
+    // Las imágenes que viajan adentro del chat (la captura de screen_capture,
+    // un gráfico de run_code) no tienen archivo: para abrirlas afuera se
+    // escriben en la temporal (una por contenido), y «Save as…» las escribe
+    // donde diga el usuario. Solo se acepta una imagen en base64, con tope.
+    const EXT_DATO = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
+    const deDato = (pedido) => {
+      const m = /^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(String(pedido?.dataUrl ?? ''));
+      if (!m || m[2].length > 60 * 1024 * 1024) return null;
+      const ext = EXT_DATO[m[1]];
+      const base = String(pedido?.nombre ?? '').replace(/\.[a-z0-9]+$/i, '').replace(/[^\w.-]+/g, '-').slice(0, 60) || 'image';
+      return { bytes: Buffer.from(m[2], 'base64'), nombre: `${base}.${ext}` };
+    };
+    rad.handle('imagenes:abrir-dato', async (pedido) => {
+      const d = deDato(pedido);
+      if (!d) return { ok: false };
+      const hash = require('node:crypto').createHash('sha1').update(d.bytes).digest('hex').slice(0, 12);
+      const dir = path.join(taller ?? require('node:os').tmpdir(), 'BlackCode-images');
+      const archivo = path.join(dir, `${path.parse(d.nombre).name}-${hash}${path.extname(d.nombre)}`);
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        if (!fs.existsSync(archivo)) fs.writeFileSync(archivo, d.bytes);
+        if (!taller) { const err = await shell.openPath(archivo); if (err) return { ok: false, error: err }; }
+        return { ok: true };
+      } catch (err) { return { ok: false, error: String(err?.message || err) }; }
+    });
+    rad.handle('imagenes:guardar-dato', async (pedido, ctx) => {
+      const d = deDato(pedido);
+      if (!d) return { ok: false, error: 'That is not an image.' };
+      let destino;
+      if (taller) {
+        destino = path.join(taller, 'exports', d.nombre);
+        fs.mkdirSync(path.dirname(destino), { recursive: true });
+      } else {
+        const { dialog, app } = require('electron');
+        const opciones = { title: 'Save image', defaultPath: path.join(app.getPath('pictures'), d.nombre) };
+        const r = ctx?.window ? await dialog.showSaveDialog(ctx.window, opciones) : await dialog.showSaveDialog(opciones);
+        if (r.canceled || !r.filePath) return { ok: false, cancelado: true };
+        destino = r.filePath;
+      }
+      try { fs.writeFileSync(destino, d.bytes); return { ok: true, destino }; } catch (err) { return { ok: false, error: String(err?.message || err) }; }
+    });
   }
 
   // ---------- El canvas ----------

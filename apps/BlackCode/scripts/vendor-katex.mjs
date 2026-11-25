@@ -6,7 +6,7 @@
 //
 // La versión sale de node_modules (devDependency `katex`, fijada exacta). Lo
 // copiado se commitea: correr esto solo al cambiar de versión.
-// Uso: node apps/BlackCode/scripts/vendor-katex.mjs   (o npm run katex -w daimon)
+// Uso: node apps/BlackCode/scripts/vendor-katex.mjs   (o npm run katex -w blackcode)
 
 import fs from 'node:fs';
 import path from 'node:path';

@@ -71,8 +71,10 @@ function arrancar() {
   rad.start({
     skin: require('@rad/skin-mono'),
     renderer: path.join(__dirname, 'renderer'),
-    // El appId y el repo de releases siguen siendo los de «daimon», el nombre
-    // con que nació la app: es por donde la instalada encuentra su actualización.
+    // El appId sigue siendo el de «daimon», el nombre con que nació la app: es
+    // lo que Windows usa para saber que es la misma (la desinstalación, la
+    // actualización, los íconos anclados). El paquete y el repo de releases ya
+    // se llaman blackcode (1.7.0); el appId no cambia nunca.
     appId: 'com.umbrovex.daimon',
     // En Windows la ventana lleva el mismo .ico que el ejecutable: con el PNG,
     // la barra de tareas muestra el de 256 achicado y no el dibujado a su tamaño.
@@ -88,7 +90,7 @@ function arrancar() {
     lang: 'en',
     // El código y los datos, en Roboto Mono (viaja con Rad).
     fonts: { mono: 'roboto-mono' },
-    // Se actualiza desde kiddshady/daimon-releases (build.publish del
+    // Se actualiza desde kiddshady/blackcode-releases (build.publish del
     // package.json). Solo la app instalada: abierta desde el repo no busca nada.
     updates: true,
     tray: {

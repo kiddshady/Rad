@@ -1,5 +1,47 @@
 # Changelog
 
+## BlackCode 1.7.0 (2026-11-25)
+
+- **Un visor de imágenes con zoom** (`renderer/visor.js`). Las imágenes del
+  chat (la captura de `screen_capture`, las de `generate_image`, un gráfico
+  de `run_code` y las que adjunta el usuario) se abren con un clic, con la
+  lupa como cursor: casi del tamaño de la ventana, entera y con aire, con la
+  rueda que acerca alrededor del puntero, arrastre cuando no entra, doble
+  clic de entera a tamaño real, y `+` `-` `0` `1` y Esc. Pasado el 100 % se
+  ven los píxeles. La imagen lleva esquinas redondeadas que miden lo mismo
+  con cualquier zoom. Reemplaza al visor sin zoom de los adjuntos. Lo pidió
+  Fran.
+- **El clic derecho abre el menú de la imagen**, en la miniatura y adentro del
+  visor. En una de `generate_image`, el de siempre (Open, Save as…, Show in
+  folder, Copy path); antes un clic común abría ese menú, ahora abre el
+  visor. Las que viajan en el chat (capturas, gráficos, adjuntos) no tienen
+  archivo: traen Open y Save as…, y para eso el proceso principal las
+  escribe (canales `imagenes:abrir-dato` e `imagenes:guardar-dato`).
+- **El navegador abre los `.html` del disco**, para que un agente le muestre
+  al usuario una página que armó. Solo `.html`, desde la barra o
+  `browser_navigate` (ruta absoluta, `file:///…` o relativa a la carpeta del
+  chat). La página carga lo de su carpeta y subcarpetas, salvo las que
+  empiezan con punto y la carpeta de la app; una página web no lleva nunca
+  a una local. Lo encierra un `protocol.handle('file')` en la sesión de las
+  pestañas: sin él no se abre ninguna. Ver `docs/tools.md`.
+- **La fila de `generate_image` lleva la varita** del grupo Images, en lugar
+  del cuadro con la montaña.
+- **La cabecera del chat dice solo su nombre:** el agente y el modelo ya los
+  dice la barra de estado. Y la barra ya no dice a la izquierda en qué vista
+  se está: lo dicen las pestañas.
+- **El anillo de foco de la lista de chats sale entero.** Los grupos que se
+  pliegan lo recortaban (arriba en la primera fila, a la izquierda en todas):
+  ahora recortan con un margen del tamaño del anillo.
+- **El tacho de Channels ya no se pone rojo** al pasarle el mouse: es como los
+  demás tachos de la app. Lo de borrar lo avisa la confirmación.
+- **Se acabó el nombre «daimon» donde se veía** (pedido de Fran): el paquete se
+  llama `blackcode` (`npm run pack -w blackcode`) y el repo de releases,
+  `kiddshady/blackcode-releases`. GitHub redirige `daimon-releases`, así que
+  una instalada vieja se sigue actualizando. La caché del actualizador sale
+  del nombre del paquete y pasa a `blackcode-updater`. El `appId` sigue
+  siendo `com.umbrovex.daimon` a propósito: es lo que Windows usa para saber
+  que es la misma app.
+
 ## BlackCode 1.6.0 (2026-11-25)
 
 - **La app arranca en una pantalla de inicio.** Abría siempre en el último

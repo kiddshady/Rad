@@ -29,6 +29,10 @@ export const ICONOS = {
   // diseñó con Zac (nov 2026). Su trazo tal cual, de una grilla de 24 con
   // trazo de 2, escalado a esta de 16 con el trazo compensado.
   varita: svg('<g transform="scale(.6667)" stroke-width="2.25"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></g>'),
+  // (el visor de imágenes: acercar, alejar y que entre entera)
+  lupaMas: svg('<circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 13.5 13.5M5 7h4M7 5v4"/>'),
+  lupaMenos: svg('<circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 13.5 13.5M5 7h4"/>'),
+  ajustar: svg('<path d="M2.5 6V3.5a1 1 0 0 1 1-1H6M10 2.5h2.5a1 1 0 0 1 1 1V6M13.5 10v2.5a1 1 0 0 1-1 1H10M6 13.5H3.5a1 1 0 0 1-1-1V10"/>'),
   // (el enchufe va en diagonal, como la llave y la herramienta que tiene al lado)
   enchufe: svg('<g transform="translate(-.6 .6) rotate(45 8 8)"><path d="M6 2.5v3M10 2.5v3M4.5 5.5h7V8a3.5 3.5 0 0 1-7 0zM8 11.5v2"/></g>'),
   // La voz: la onda de Verba (las cinco barras de su marca, con las mismas

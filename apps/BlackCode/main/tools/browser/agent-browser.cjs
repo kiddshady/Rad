@@ -17,6 +17,8 @@
 //     arma Electron con el nombre de la app (el productName).
 //   - El preload de sesión está al lado y se llama chrome-preload.cjs (allá
 //     browser-chrome-preload.cjs, en la raíz).
+//   - BlackCode 1.7.0: abre los .html del disco, encerrados en su carpeta (ver
+//     «Las páginas locales», junto a urlValida). Allá file:// no entraba nunca.
 //
 // Lo que NO se tocó aunque lleve el nombre viejo, porque es interno y ninguna
 // página ni el modelo lo leen como texto: los atributos `data-neon-ref` y
@@ -80,9 +82,12 @@
 // interceptar red, ahí se discute.
 'use strict';
 
-const { WebContentsView, session, clipboard, nativeImage } = require('electron');
+const { WebContentsView, session, clipboard, nativeImage, net } = require('electron');
 const { isIP } = require('node:net');
+const os = require('node:os');
 const path = require('node:path');
+const { fileURLToPath, pathToFileURL } = require('node:url');
+const { caminoReal, esDeLaApp } = require('../base.cjs'); // (BlackCode: las páginas locales, ver «Las páginas locales»)
 
 // Cuánto vive una cookie de sesión que se vuelve persistente (ver
 // `_blindarSesion`). Un mes: lo bastante para no reloguearse cada semana, y no
@@ -638,13 +643,68 @@ function esPrivada(host) {
   return false;
 }
 
-// Lo que se acepta como destino. `file://` NO entra: el agente ya tiene fs_read
-// con sus guardrails para leer del disco, y dejarlo cargar archivos locales acá
-// le daría un segundo camino al mismo lugar, sin gate y con el DOM de una página
-// que después se lee como si viniera de internet.
+// ---------------------------------------------------------------------------
+// Las páginas locales (BlackCode 1.7.0, no viene de NeonCode)
+//
+// file:// estaba cerrado entero: el agente ya lee el disco con fs_read, y
+// dejarlo cargar archivos acá le daba un segundo camino al mismo lugar, con el
+// DOM de un archivo local leyéndose después como si viniera de internet. Fran
+// pidió poder abrir los .html que arma un agente (una hoja de comparación, un
+// informe) en el panel, y se abrió SOLO eso, con estos límites:
+//   1. Solo .html. Ni una imagen, ni un .txt, ni una carpeta.
+//   2. Un .html local lo abren la barra, browser_navigate y las pestañas que
+//      vuelven al reabrir. Una página de internet no lleva a uno: ni con un
+//      link, ni con window.open, ni con una redirección.
+//   3. Lo que se abre así marca su carpeta como RAÍZ. Una página local solo
+//      carga cosas (imágenes, CSS, JS, iframes) y solo lleva a otros .html de
+//      una raíz y de sus subcarpetas, salvo las que empiezan con punto (.ssh,
+//      .git). Si la raíz es demasiado ancha (la de un disco o la carpeta del
+//      usuario), solo lo que está en esa misma carpeta.
+//   4. Nunca la carpeta de datos de la app (las llaves, los chats): la misma
+//      regla que todas las tools (`esDeLaApp`, en base.cjs).
+// El 3 y el 4 los hace cumplir el handler del esquema file de ESTA sesión
+// (ver _blindarSesion): todo pedido file:// de las pestañas pasa por ahí, sea
+// la página, un recurso o un iframe.
+const PAGINA_LOCAL = /\.html$/i;
+const parejo = (s) => (process.platform === 'win32' ? s.toLowerCase() : s);
+
+// La dirección file:// de un .html del disco, o null. Acepta la dirección
+// (file:///C:/…/x.html) o la ruta absoluta (C:\…\x.html). Una ruta de red
+// (\\servidor\… o file://servidor/…) no: eso ya no es «este disco».
+function archivoHtml(entrada) {
+  const u = String(entrada || '').trim();
+  let ruta = null;
+  let cola = '';
+  if (/^file:/i.test(u)) {
+    try {
+      const p = new URL(u);
+      if (p.host && p.host.toLowerCase() !== 'localhost') return null;
+      ruta = fileURLToPath(new URL(p.pathname, 'file:///'));
+      cola = p.search + p.hash;
+    } catch { return null; }
+  } else if (/^[a-z]:[\\/]/i.test(u)) {
+    ruta = u;
+  } else {
+    return null;
+  }
+  ruta = path.normalize(ruta);
+  if (!path.isAbsolute(ruta) || ruta.startsWith('\\\\') || !PAGINA_LOCAL.test(ruta)) return null;
+  return pathToFileURL(ruta).href + cola;
+}
+
+// ¿Es demasiado ancha para dejar cargar de sus subcarpetas? La raíz de un
+// disco y la carpeta del usuario (ahí cuelgan AppData, Documentos, todo).
+function raizAncha(raiz) {
+  if (path.dirname(raiz) === raiz) return true;
+  try { return raiz === parejo(caminoReal(os.homedir())); } catch { return false; }
+}
+
+// Lo que se acepta como destino: http(s), y un .html local (ver arriba).
 function urlValida(url) {
   const u = String(url || '').trim();
   if (!u) return null;
+  const local = archivoHtml(u);
+  if (local) return local;
   if (/^https?:\/\//i.test(u)) {
     try { return new URL(u).hostname ? u : null; } catch { return null; }
   }
@@ -1783,11 +1843,12 @@ class AgentBrowser {
   attach(win, { restaurar = null } = {}) {
     if (this.alive) return this.state();
     this.win = win;
+    if (!this._raices) this._raices = new Set();
 
     this._ses = session.fromPartition(PARTITION);
     this._blindarSesion(this._ses);
 
-    const urls = Array.isArray(restaurar?.urls) ? restaurar.urls.slice(0, MAX_TABS).map((u) => (u ? urlValida(u) : null)) : [];
+    const urls = Array.isArray(restaurar?.urls) ? restaurar.urls.slice(0, MAX_TABS).map((u) => { const v = u ? urlValida(u) : null; return this._abrible(v) ? v : null; }) : [];
     if (!urls.length) {
       this._crearTab();
     } else {
@@ -1862,6 +1923,7 @@ class AgentBrowser {
     view.setBounds(this.bounds || { x: 0, y: 0, width: 0, height: 0 });
 
     this.tabs.push(tab);
+    if (url) this._abrirLocal(url);
     view.webContents.loadURL(url || HOME);
     if (activar) this._activar(tab, { foco });
     else this._emitir();
@@ -1908,7 +1970,8 @@ class AgentBrowser {
     let destino = null;
     if (url) {
       destino = urlValida(url);
-      if (!destino) return { ok: false, error: 'not a valid http(s) address' };
+      if (!destino) return { ok: false, error: 'not a valid http(s) address or local .html file' };
+      if (!this._abrible(destino)) return { ok: false, error: 'local pages cannot be opened in this browser' };
     }
     const tab = this._crearTab({ url: destino, activar, foco });
     return { ok: true, id: tab.id, url: destino || '' };
@@ -2033,6 +2096,33 @@ class AgentBrowser {
       if (borrada || !cookie || !cookie.session) return;
       perpetuarCookie(ses, cookie);
     });
+
+    // Las páginas locales (ver «Las páginas locales»): todo file:// de las
+    // pestañas pasa por acá. Si el handler no se pudo poner, no se abre ningún
+    // .html local: sin él, Chromium serviría cualquier archivo que una página
+    // local pidiera.
+    try {
+      ses.protocol.handle('file', (req) => this._servirLocal(req));
+      ses._localesBlindados = true;
+    } catch { /* sin protocol.handle: las páginas locales quedan cerradas */ }
+  }
+
+  // ¿Se puede abrir esta dirección a pedido? Un .html local, solo si la sesión
+  // tiene el handler que lo encierra en su carpeta.
+  _abrible(u) {
+    return Boolean(u) && (!/^file:/i.test(u) || this._ses?._localesBlindados === true);
+  }
+
+  // Adónde puede llevar una página por su cuenta (un link, window.open, una
+  // redirección): a la web, y a un .html local solo desde otra página local y
+  // adentro de una raíz. Una página de internet no lleva nunca al disco.
+  _destinoDesde(wc, url) {
+    const u = urlValida(url);
+    if (!u || !/^file:/i.test(u)) return u;
+    let desde = '';
+    try { desde = wc.getURL(); } catch { /* ya no está */ }
+    if (!/^file:/i.test(desde) || !this._abrible(u)) return null;
+    return this._localPermitido(u, { pagina: true }) ? u : null;
   }
 
   // La view en sí. Acá viven las dos puertas por las que una página se escapa de
@@ -2062,9 +2152,10 @@ class AgentBrowser {
     // caso sí va como ventana, chica, encima de la app y blindada igual que una
     // pestaña (ver `_blindarPopup`), como hace Prism.
     wc.setWindowOpenHandler(({ url, disposition }) => {
-      const u = urlValida(url);
+      const u = this._destinoDesde(wc, url);
       if (!u) return { action: 'deny' };
-      if (disposition === 'new-window' && this.win && !this.win.isDestroyed()) {
+      // (un popup es para los logins de la web: una página local abre pestañas)
+      if (disposition === 'new-window' && !/^file:/i.test(u) && this.win && !this.win.isDestroyed()) {
         return {
           action: 'allow',
           overrideBrowserWindowOptions: {
@@ -2104,10 +2195,10 @@ class AgentBrowser {
     // No se abren afuera tampoco: `shell.openExternal` sobre un esquema
     // arbitrario es exactamente el mismo agujero con un paso más.
     wc.on('will-navigate', (e, url) => {
-      if (!urlValida(url)) e.preventDefault();
+      if (!this._destinoDesde(wc, url)) e.preventDefault();
     });
     wc.on('will-redirect', (e, url) => {
-      if (!urlValida(url)) e.preventDefault();
+      if (!this._destinoDesde(wc, url)) e.preventDefault();
     });
 
     // Sin subframes con privilegios: una webview adentro de la página tampoco.
@@ -2132,13 +2223,15 @@ class AgentBrowser {
     try {
       ventana.setMenu(null);
       const cw = ventana.webContents;
+      // (un popup de login es de la web: nunca lleva a un .html local)
+      const web = (url) => { const u = urlValida(url); return u && !/^file:/i.test(u) ? u : null; };
       cw.setWindowOpenHandler(({ url }) => {
-        const u = urlValida(url);
+        const u = web(url);
         if (u) this.nuevaTab(u, { activar: true, foco: true });
         return { action: 'deny' };
       });
-      cw.on('will-navigate', (e, url) => { if (!urlValida(url)) e.preventDefault(); });
-      cw.on('will-redirect', (e, url) => { if (!urlValida(url)) e.preventDefault(); });
+      cw.on('will-navigate', (e, url) => { if (!web(url)) e.preventDefault(); });
+      cw.on('will-redirect', (e, url) => { if (!web(url)) e.preventDefault(); });
       cw.on('will-attach-webview', (e) => e.preventDefault());
       const titular = (t) => {
         let host = '';
@@ -2351,10 +2444,51 @@ class AgentBrowser {
 
   navigate(url) {
     const u = urlValida(url);
-    if (!u) return { ok: false, error: 'not a valid http(s) address' };
+    if (!u) return { ok: false, error: 'not a valid http(s) address or local .html file' };
     if (!this.wc) return { ok: false, error: 'the browser panel is not open' };
+    if (!this._abrible(u)) return { ok: false, error: 'local pages cannot be opened in this browser' };
+    this._abrirLocal(u);
     this.wc.loadURL(u);
     return { ok: true, url: u };
+  }
+
+  // Un .html local que se abrió a pedido (la barra, la tool, una pestaña que
+  // vuelve): su carpeta pasa a ser una raíz. Ver «Las páginas locales».
+  _abrirLocal(url) {
+    if (!/^file:/i.test(url)) return;
+    if (!this._raices) this._raices = new Set();
+    try { this._raices.add(parejo(caminoReal(path.dirname(fileURLToPath(new URL(url)))))); } catch { /* no era una ruta */ }
+  }
+
+  // ¿Una página local puede cargar este file://? Adentro de una raíz, sin
+  // carpetas con punto por debajo de ella, y nunca lo de la app. `pagina`: que
+  // además sea un .html (para navegar; un recurso puede ser cualquier cosa).
+  _localPermitido(url, { pagina = false } = {}) {
+    let abs;
+    try { abs = fileURLToPath(new URL(url)); } catch { return false; }
+    if (pagina && !PAGINA_LOCAL.test(abs)) return false;
+    let real;
+    try { real = parejo(caminoReal(abs)); if (esDeLaApp(abs)) return false; } catch { return false; }
+    for (const raiz of this._raices || []) {
+      const rel = path.relative(raiz, real);
+      if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) continue;
+      const partes = rel.split(path.sep);
+      if (partes.some((s) => s.startsWith('.'))) continue;
+      if (partes.length > 1 && raizAncha(raiz)) continue;
+      return true;
+    }
+    return false;
+  }
+
+  // El handler del esquema file de la sesión de las pestañas: lo que no pasa
+  // _localPermitido no se sirve (403); lo que pasa, se lee como siempre.
+  async _servirLocal(req) {
+    if (!this._localPermitido(req.url)) return new Response('', { status: 403 });
+    try {
+      return await net.fetch(req.url, { bypassCustomProtocolHandlers: true });
+    } catch {
+      return new Response('', { status: 404 });
+    }
   }
 
   back() { if (this.wc?.navigationHistory.canGoBack()) this.wc.navigationHistory.goBack(); }

@@ -42,8 +42,10 @@ const PATHS = {
   // la memoria: el `chip` de NeonCode, tal cual (el cuerpo, un cuadrado adentro
   // con el centro hueco, y las patas)
   memory: "M7 7h10v10H7zM10 10h4v4h-4zM9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3",
-  // una imagen generada: el marco, el sol y la montaña (Feather `image`)
-  image: "M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM21 15l-5-5L5 21",
+  // una imagen generada: la varita con sus destellos, la del grupo Images (la
+  // `varita` de piezas.js, que es de esta misma grilla de 24 con trazo 2; Fran
+  // la pidió acá en vez del marco con la montaña, 25/11/2026)
+  varita: "M21.64 3.64l-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72M14 7l3 3M5 6v4M19 14v4M10 2v2M7 8H3M21 16h-4M11 3H9",
   delegate: "M12 3a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M12 8v3M12 11c-4 0-6 1.5-6 5M12 11c4 0 6 1.5 6 5M6 16a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M18 16a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5",
 };
 
@@ -66,7 +68,7 @@ const DE_TOOL = {
   skill: 'sparkle', create_skill: 'sparkle', list_skills: 'sparkle',
   mcp: 'plug', delegate: 'delegate',
   remember: 'memory', recall: 'memory',
-  generate_image: 'image',
+  generate_image: 'varita',
 };
 
 /** El nombre del ícono de una tool, o null si no tiene uno propio. */

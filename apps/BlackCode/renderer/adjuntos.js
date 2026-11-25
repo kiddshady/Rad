@@ -21,7 +21,9 @@
 // igual y el proveedor rebotaba el pedido entero).
 
 import { reconcile } from '/@core/list.js';
+import { contextMenu } from '/@core/menu.js';
 import { h, icono } from './piezas.js';
+import { abrirVisor, menuDeDato } from './visor.js';
 
 export const MAX_IMAGENES = 4;
 export const MAX_ARCHIVOS = 6;
@@ -74,26 +76,16 @@ export function paraElModelo(m) {
 }
 
 // ---------- El visor ----------
-/** Muestra una imagen a pantalla completa. Un clic o Esc la cierra. */
-export function verImagen(src, nombre = '') {
-  const capas = document.querySelector('.rad-overlays') ?? document.body;
-  const img = h('img', 'dm-visor-imagen', { src, alt: nombre });
-  const visor = h('div', 'dm-visor', { role: 'dialog', 'aria-label': nombre || 'Image', tabindex: '-1' }, img);
-  let cerrado = false;
-  const cerrar = () => {
-    if (cerrado) return;
-    cerrado = true;
-    document.removeEventListener('keydown', alTeclear, true);
-    visor.removeAttribute('data-abierto');
-    visor.setAttribute('data-rad-leaving', '');
-    setTimeout(() => visor.remove(), 260);
-  };
-  const alTeclear = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrar(); } };
-  visor.addEventListener('click', cerrar);
-  document.addEventListener('keydown', alTeclear, true);
-  capas.append(visor);
-  requestAnimationFrame(() => requestAnimationFrame(() => { visor.setAttribute('data-abierto', ''); visor.focus({ preventScroll: true }); }));
-  return { cerrar };
+// Una imagen adjunta se mira en el visor de todas las imágenes del chat
+// (visor.js: zoom, y el clic derecho con su menú). Antes tenía uno propio,
+// sin zoom; Fran pidió unificarlos el 25/11/2026.
+/** Le pone a la miniatura de una imagen lo de todas: el clic la abre en el
+ *  visor y el clic derecho, su menú. */
+function mirable(boton, src, nombre) {
+  const menu = menuDeDato(src, nombre);
+  boton.addEventListener('click', () => abrirVisor({ src, nombre, menu }));
+  contextMenu(boton, menu);
+  return boton;
 }
 
 /** Los adjuntos de un mensaje ya enviado, para su burbuja: las imágenes y los
@@ -105,9 +97,8 @@ export function adjuntosDe(m) {
   const caja = h('div', 'dm-adjuntos-msg');
   if (imagenes.length) {
     caja.append(h('div', 'dm-adjuntos-imagenes', {}, ...imagenes.map((src, i) => {
-      const b = h('button', 'dm-adjunto-imagen', { type: 'button', 'aria-label': `Image ${i + 1}` }, h('img', '', { src, alt: '' }));
-      b.addEventListener('click', () => verImagen(src));
-      return b;
+      const b = h('button', 'dm-adjunto-imagen', { type: 'button', 'aria-label': `Image ${i + 1}: view` }, h('img', '', { src, alt: '' }));
+      return mirable(b, src, `image-${i + 1}.png`);
     })));
   }
   if (archivos.length) {
@@ -137,8 +128,7 @@ export function crearAdjuntos({ alCambiar = () => {} } = {}) {
         // por identidad: el que se va es ESTE, esté donde esté ahora
         quitar.addEventListener('click', (e) => { e.stopPropagation(); items = items.filter((y) => y !== x); pintar(); alCambiar(); });
         if (x.clase === 'imagen') {
-          const ver = h('button', 'dm-adjunto-ver', { type: 'button', 'aria-label': `View ${x.name}` }, h('img', '', { src: x.dataUrl, alt: '' }));
-          ver.addEventListener('click', () => verImagen(x.dataUrl, x.name));
+          const ver = mirable(h('button', 'dm-adjunto-ver', { type: 'button', 'aria-label': `View ${x.name}` }, h('img', '', { src: x.dataUrl, alt: '' })), x.dataUrl, x.name);
           return h('div', 'dm-adjunto dm-adjunto-miniatura', { role: 'listitem', 'data-clase': 'imagen' }, ver, quitar);
         }
         return h('div', 'dm-adjunto dm-adjunto-chip', { role: 'listitem', 'data-clase': 'texto' },

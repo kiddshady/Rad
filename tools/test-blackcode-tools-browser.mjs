@@ -220,9 +220,10 @@ try {
   t('http pasa (con candado rojo en la barra)', urlValida('http://192.168.0.10:8080'), 'http://192.168.0.10:8080');
   t('dominio pelado asume https', urlValida('ollama.com'), 'https://ollama.com');
   t('dominio con path', urlValida('github.com/kiddshady'), 'https://github.com/kiddshady');
-  // Un file:// acá sería un SEGUNDO camino al disco del usuario, sin los
+  // Un file:// cualquiera sería un SEGUNDO camino al disco del usuario, sin los
   // guardrails de fs_read y con el DOM de un archivo local leyéndose después como
-  // si viniera de internet.
+  // si viniera de internet. Desde BlackCode 1.7.0 pasa un .html, y nada más
+  // (ver «las páginas locales»).
   t('file:// NO', urlValida('file:///C:/Users/x/.ssh/id_rsa'), null);
   // El resto son ejecución de otro programa disparada desde adentro del panel: en
   // Windows cualquier app instalada registra su esquema.
@@ -261,8 +262,65 @@ try {
     t(`busca: ${consulta}`, destinoBarra(`  ${consulta}  `), `https://duckduckgo.com/?q=${encodeURIComponent(consulta)}`);
     t(`la tool no lo convierte en búsqueda: ${consulta}`, urlValida(consulta), null);
   }
-  for (const entrada of ['https://', 'https://bad host/', 'localhost:99999', 'javascript:alert(1)', 'file:///C:/test.html', 'data:text/html,test', 'mailto:a@b.com', 'ms-settings:privacy', 'C:\\test.html', '\\\\server\\share', '']) {
+  for (const entrada of ['https://', 'https://bad host/', 'localhost:99999', 'javascript:alert(1)', 'file:///C:/test.txt', 'data:text/html,test', 'mailto:a@b.com', 'ms-settings:privacy', 'C:\\test.png', 'C:\\carpeta', '\\\\server\\share', '\\\\server\\share\\x.html', 'file://server/share/x.html', '']) {
     t(`la barra rechaza: ${JSON.stringify(entrada)}`, destinoBarra(entrada), null);
+  }
+
+  // BlackCode 1.7.0: un .html del disco sí (Fran, para ver en el panel las
+  // páginas que arma un agente), y SOLO .html. Lo que esa página puede cargar
+  // lo encierra el handler de file de la sesión (ver «páginas locales» abajo).
+  seccion('urlValida: las páginas locales (.html)');
+  t('una ruta de Windows a un .html', urlValida('C:\\Users\\x\\hoja.html'), 'file:///C:/Users/x/hoja.html');
+  t('la misma con barras', urlValida('C:/Users/x/hoja.html'), 'file:///C:/Users/x/hoja.html');
+  t('la dirección file://', urlValida('file:///C:/Users/x/hoja.html'), 'file:///C:/Users/x/hoja.html');
+  t('con espacios y acentos', urlValida('C:\\Mis cosas\\íconos.html'), 'file:///C:/Mis%20cosas/%C3%ADconos.html');
+  t('el ancla de la página se conserva', urlValida('file:///C:/x/hoja.html#tabla'), 'file:///C:/x/hoja.html#tabla');
+  t('.HTML en mayúsculas también', urlValida('C:\\x\\HOJA.HTML'), 'file:///C:/x/HOJA.HTML');
+  t('la barra lo abre igual', destinoBarra('C:\\Users\\x\\hoja.html'), 'file:///C:/Users/x/hoja.html');
+  t('un .htm no (solo .html)', urlValida('C:\\x\\hoja.htm'), null);
+  t('un .svg no', urlValida('file:///C:/x/dibujo.svg'), null);
+  t('una clave no', urlValida('file:///C:/Users/x/.ssh/id_rsa'), null);
+  t('un .html que en realidad es una carpeta con «..» que sale', urlValida('C:\\x\\..\\..\\y.png'), null);
+
+  // Lo que una página local puede cargar y adónde puede llevar. Con carpetas de
+  // verdad: las rutas se comparan por su camino real (FRANCI~1, junctions).
+  seccion('las páginas locales: su carpeta y nada más');
+  {
+    const base = require(path.join(TOOLS, 'base.cjs'));
+    const L = path.join(TMP, 'locales');
+    const hoja = path.join(L, 'hoja', 'index.html');
+    for (const f of [hoja, path.join(L, 'hoja', 'img', 'a.png'), path.join(L, 'hoja', 'otra.html'), path.join(L, 'hoja', '.git', 'config'), path.join(L, 'vecina', 'secreto.txt'), path.join(L, 'app', 'chats.json')]) {
+      fs.mkdirSync(path.dirname(f), { recursive: true });
+      fs.writeFileSync(f, 'x');
+    }
+    const antes = base.getReservada();
+    base.setReservada(path.join(L, 'hoja', 'app-datos'));
+    fs.mkdirSync(path.join(L, 'hoja', 'app-datos'), { recursive: true });
+    fs.writeFileSync(path.join(L, 'hoja', 'app-datos', 'llave.json'), 'x');
+    const brL = new AgentBrowser({});
+    const url = (p) => require('node:url').pathToFileURL(p).href;
+    ok('sin nada abierto, ninguna página local puede cargar nada', !brL._localPermitido(url(hoja)));
+    brL._abrirLocal(url(hoja));
+    ok('abierta la hoja: la hoja misma', brL._localPermitido(url(hoja)));
+    ok('  sus imágenes, en una subcarpeta', brL._localPermitido(url(path.join(L, 'hoja', 'img', 'a.png'))));
+    ok('  otro .html de su carpeta, como página', brL._localPermitido(url(path.join(L, 'hoja', 'otra.html')), { pagina: true }));
+    ok('  pero no una imagen como página', !brL._localPermitido(url(path.join(L, 'hoja', 'img', 'a.png')), { pagina: true }));
+    ok('  ni lo que está en una carpeta con punto (.git)', !brL._localPermitido(url(path.join(L, 'hoja', '.git', 'config'))));
+    ok('  ni la carpeta de al lado', !brL._localPermitido(url(path.join(L, 'vecina', 'secreto.txt'))));
+    ok('  ni subiendo con ..', !brL._localPermitido('file:///' + path.join(L, 'hoja', '..', 'vecina', 'secreto.txt').replace(/\\/g, '/')));
+    ok('  ni la carpeta de la app, aunque esté adentro', !brL._localPermitido(url(path.join(L, 'hoja', 'app-datos', 'llave.json'))));
+    ok('  ni una carpeta entera', !brL._localPermitido(url(path.join(L, 'hoja'))));
+    // A un .html local se llega desde otra página local, nunca desde la web.
+    const wcWeb = { getURL: () => 'https://ejemplo.com/' };
+    const wcLocal = { getURL: () => url(hoja) };
+    brL._ses = { _localesBlindados: true };
+    t('una página web no lleva al disco', brL._destinoDesde(wcWeb, url(path.join(L, 'hoja', 'otra.html'))), null);
+    t('una local lleva a otro .html de su carpeta', brL._destinoDesde(wcLocal, url(path.join(L, 'hoja', 'otra.html'))), url(path.join(L, 'hoja', 'otra.html')));
+    t('  pero no a uno de afuera', brL._destinoDesde(wcLocal, url(path.join(L, 'vecina', 'x.html'))), null);
+    t('  y a la web sí', brL._destinoDesde(wcLocal, 'https://ejemplo.com/'), 'https://ejemplo.com/');
+    brL._ses = {};
+    t('sin el handler de file en la sesión, ni siquiera eso', brL._destinoDesde(wcLocal, url(path.join(L, 'hoja', 'otra.html'))), null);
+    base.setReservada(antes);
   }
 
   // El http es para la red de adentro, no para cualquier IP. 8.8.8.8 es tan
@@ -1024,8 +1082,24 @@ try {
     t('  con los argumentos vacíos también', await N.runners.browser_navigate(hacerRun()), 'error: url is required (or tab, to switch to another open tab)');
     t('una pestaña nueva necesita url', await nav({ tab: 1, new_tab: true }), 'error: url is required to open a new tab');
     t('una pestaña que no existe lo dice', await nav({ tab: 3 }), 'error: there is no tab 3 — the panel has 1 tab. Call browser_read to see them.');
-    t('lo que no es una dirección ni un favorito no navega', await nav({ url: 'hola mundo' }), 'error: not a valid http(s) address');
-    t('  y un file:// tampoco', await nav({ url: 'file:///C:/Users/x/.ssh/id_rsa' }), 'error: not a valid http(s) address');
+    t('lo que no es una dirección ni un favorito no navega', await nav({ url: 'hola mundo' }), 'error: not a valid http(s) address or local .html file');
+    t('  y un file:// que no es un .html tampoco', await nav({ url: 'file:///C:/Users/x/.ssh/id_rsa' }), 'error: not a valid http(s) address or local .html file');
+    // Un .html con ruta relativa es del disco si existe en la carpeta del chat.
+    // (La sesión de mentira no tiene el handler de file: que lo rechace por ESO
+    // es la prueba de que lo tomó como archivo y no como dominio.)
+    {
+      const dir = path.join(TMP, 'rel');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'hoja.html'), 'x');
+      const run = hacerRun();
+      run.cwd = dir;
+      t('una ruta relativa que existe es la página local', await nav({ url: 'hoja.html' }, run), 'error: local pages cannot be opened in this browser');
+      const run2 = hacerRun();
+      run2.cwd = dir;
+      await nav({ url: 'no-existe.html' }, run2);
+      t('  una que no existe sigue siendo lo que era (un dominio)', ab.wc.loaded.at(-1), 'https://no-existe.html');
+      await nav({ url: 'ollama.com' }); // (la pestaña vuelve a donde la esperan las de abajo)
+    }
     ok('  nada de eso se cargó', !vista1.webContents.loaded.some((u) => /^file:|hola/.test(u)), vista1.webContents.loaded.join(','));
 
     const run = hacerRun();
@@ -1282,7 +1356,7 @@ try {
     t('  o una búsqueda', N.ipc.navigate('cómo usar electron'), { ok: true, url: `https://duckduckgo.com/?q=${encodeURIComponent('cómo usar electron')}` });
     t('  que se cargó en la activa', activa.loaded.at(-1), `https://duckduckgo.com/?q=${encodeURIComponent('cómo usar electron')}`);
     t('  y un esquema que no es web se rechaza', [N.ipc.navigate('javascript:alert(1)'), N.ipc.navigate('file:///C:/x.html')],
-      [{ ok: false, error: 'not a valid http(s) address' }, { ok: false, error: 'not a valid http(s) address' }]);
+      [{ ok: false, error: 'not a valid http(s) address or local .html file' }, { ok: false, error: 'local pages cannot be opened in this browser' }]);
 
     // Las pestañas, desde la tira: los tres devuelven el estado entero.
     const ids = N.ipc.state().tabs.map((x) => x.id);
@@ -1368,7 +1442,7 @@ try {
       ['https://sied.umaza.edu.ar', 'https://viejo.example', 'https://github.com/kiddshady']);
     t('  y una que no está deja la lista igual', N.ipc.favRemove('https://no-esta.example').favoritos.length, 3);
     t('favOpen la abre en la pestaña activa', [N.ipc.favOpen('https://viejo.example'), ab.wc.loaded.at(-1)], [{ ok: true, url: 'https://viejo.example' }, 'https://viejo.example']);
-    t('  revalidando: un file:// guardado a mano no pasa', N.ipc.favOpen('file:///C:/x.html'), { ok: false, error: 'not a valid http(s) address' });
+    t('  revalidando: un file:// guardado a mano no pasa (la sesión de mentira no tiene el handler de file)', N.ipc.favOpen('file:///C:/x.html'), { ok: false, error: 'local pages cannot be opened in this browser' });
     await esperarArchivo(FAVS, (x) => JSON.parse(x).favoritos.length === 3 && !x.includes('trampa'));
 
     // Un archivo que no se pudo LEER no es un archivo vacío.
@@ -1509,7 +1583,7 @@ try {
     ok('el runner abre en pestaña nueva con nuevaTab', /agentBrowser\.nuevaTab\(u2\)/.test(runNav));
     ok('  cambia de pestaña SIN foco (no le roba el cursor al usuario)', /agentBrowser\.activar\(destino\.id\)/.test(runNav) && !/activar\(destino\.id, \{/.test(runNav));
     ok('  y con el cupo lleno sigue en la activa en vez de fallar', /r\.lleno/.test(runNav) && /agentBrowser\.navigate\(u2\)/.test(runNav));
-    ok('  acepta el nombre de un favorito cuando no es una dirección', /if \(u && !urlValida\(u\)\)/.test(runNav) && /buscarFavorito\(u\)/.test(runNav));
+    ok('  acepta el nombre de un favorito cuando no es una dirección', /if \(u2 === u && u && !urlValida\(u\)\)/.test(runNav) && /buscarFavorito\(u\)/.test(runNav));
     ok('el modelo no puede cerrar pestañas', !/cerrarTab/.test(runNav) && !/cerrarTab/.test(tabla));
 
     const runUp = grab(/async function runBrowserUpload\([\s\S]*?\n\}/, 'runBrowserUpload');

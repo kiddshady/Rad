@@ -24,7 +24,7 @@
 // veces está: si xterm cambia, esto falla acá, con el motivo, y no en la app.
 // La versión sale de node_modules (devDependencies, fijadas exactas). Lo
 // copiado se commitea: correr esto solo al cambiar de versión.
-// Uso: node apps/BlackCode/scripts/vendor-xterm.mjs   (o npm run xterm -w daimon)
+// Uso: node apps/BlackCode/scripts/vendor-xterm.mjs   (o npm run xterm -w blackcode)
 
 import fs from 'node:fs';
 import path from 'node:path';

@@ -396,7 +396,9 @@ if (shown(chatView.querySelector('.dm-agente-nombre')) !== 'Galen on call') fail
   const alto = selector.getBoundingClientRect().height;
   const nuevoChat = chatView.querySelector('[data-accion="nuevo-chat"]').getBoundingClientRect().height;
   if (Math.abs(alto - nuevoChat) > 1) fail(`el selector de agente mide ${r2(alto)} de alto y el botón de abajo ${r2(nuevoChat)}`);
-  if (!shown(chatView.querySelector('.dm-conv-sub')).includes('Claude Haiku 5.5') || !statusRight().includes('Claude Haiku 5.5')) fail('el modelo del agente no figura ni en la cabecera ni en la barra de estado');
+  // (el agente y el modelo van en la barra de estado; la cabecera dice solo el nombre del chat)
+  if (!statusRight().includes('Claude Haiku 5.5')) fail('el modelo del agente no figura en la barra de estado');
+  if (chatView.querySelector('.dm-conv-cabeza').textContent.includes('Claude Haiku 5.5')) fail('la cabecera de la conversación repite el modelo, que ya dice la barra de estado');
 }
 
 // 2b. La pantalla de inicio: así arranca la app, sin ningún chat elegido. El
@@ -959,7 +961,7 @@ else {
       return null;
     };
     const selector = chatView.querySelector('.dm-agente');
-    const seSale = dentro(selector, '.dm-agente-nombre > *') ?? dentro(chatView.querySelector('.dm-lado'), '.dm-agente *, .dm-fila-titulo > *') ?? dentro(chatView.querySelector('.dm-conv-cabeza'), '.dm-conv-titulo > *, .dm-conv-sub > *');
+    const seSale = dentro(selector, '.dm-agente-nombre > *') ?? dentro(chatView.querySelector('.dm-lado'), '.dm-agente *, .dm-fila-titulo > *') ?? dentro(chatView.querySelector('.dm-conv-cabeza'), '.dm-conv-titulo > *');
     if (seSale) fail(`un texto se sale de su caja: ${seSale}`);
     if (selector.textContent.trim() !== 'Oracle') fail(`el selector de agente dice «${selector.textContent.trim()}»`);
     if (!statusRight().includes(MODELO_LARGO)) fail(`la barra de estado no dice el modelo del agente: «${statusRight()}»`);
@@ -1120,6 +1122,36 @@ else {
   if (!(entera?.getBoundingClientRect().height > 40) || op(entera) < 0.99) fail('la captura no está a la vista en su fila');
   if (!salio('screen_capture').includes('captured a region of display 1 of 1')) fail(`screen_capture devolvió: ${salio('screen_capture').slice(0, 160)}`);
   data.capturas = `entera ${entera?.naturalWidth}×${entera?.naturalHeight}, región ${zona?.naturalWidth}×${zona?.naturalHeight}, a ${Math.round(entera?.getBoundingClientRect().width ?? 0)} px de ancho en la fila`;
+
+  // Un clic la abre en el visor, entera y con zoom; el clic derecho, su menú
+  // (abrir afuera y guardar: no tiene carpeta ni ruta). Fran, 25/11/2026.
+  {
+    entera?.closest('button')?.click();
+    await until(() => modal()?.classList.contains('dm-zoom-modal'), 3000);
+    await sleep(dur('slow') + 120);
+    const vz = modal()?.querySelector('.dm-zoom-img');
+    if (!modal()?.classList.contains('dm-zoom-modal') || vz?.naturalWidth !== 1568) fail('visor: un clic en la captura no la abrió en el visor (' + (vz?.naturalWidth ?? 'sin imagen') + ')');
+    const lz = modal()?.querySelector('.dm-zoom-lienzo');
+    const pz = () => modal()?.querySelector('.dm-zoom-pct')?.textContent ?? '';
+    const antesZ = pz();
+    lz?.dispatchEvent(new WheelEvent('wheel', { deltaY: -480, bubbles: true, cancelable: true, clientX: Math.round(lz.getBoundingClientRect().left + 200), clientY: Math.round(lz.getBoundingClientRect().top + 150) }));
+    await sleep(dur('fast') + 200);
+    if (!(parseInt(pz(), 10) > parseInt(antesZ, 10))) fail(`visor: la rueda no acercó (${antesZ} → ${pz()})`);
+    enIngles('en el visor');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await closed();
+    if (modal()) fail('visor: Esc no lo cerró');
+    const cajaE = entera?.closest('button');
+    const r = cajaE?.getBoundingClientRect();
+    cajaE?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: Math.round((r?.left ?? 0) + 30), clientY: Math.round((r?.top ?? 0) + 20) }));
+    await until(() => menus().length === 1, 2000);
+    await sleep(dur('base') + 80);
+    const rotulosE = [...(menus()[0]?.querySelectorAll('.rad-menu-item') ?? [])].map((i) => i.textContent.trim()).join('|');
+    if (rotulosE !== 'Open|Save as…') fail('visor: el menú de la captura trae ' + rotulosE);
+    await pick('Save as');
+    await until(() => [...document.querySelectorAll('.rad-toast')].some((n) => !n.hasAttribute('data-rad-leaving') && n.textContent.includes('Saved')), 3000);
+    if (![...document.querySelectorAll('.rad-toast')].some((n) => n.textContent.includes('Saved'))) fail('visor: «Save as…» no guardó la captura');
+  }
 
   // Cada fila lleva el ícono de su tool (los de NeonCode), y las de una misma
   // familia lo comparten.
@@ -1876,13 +1908,24 @@ else {
     if (fotos().length !== 3 || fotos().includes(segunda)) fail('adjuntos: dos clics en la × de una imagen dejaron ' + fotos().length + ' (tenían que quedar 3)');
     for (const n of fotos().slice(1)) n.querySelector('.dm-adjunto-x').click();
     await until(() => fotos().length === 1, 3000);
-    // El visor: un clic en la miniatura la muestra entera; Esc la cierra.
+    // El visor (el mismo de las imágenes de las tools): un clic en la
+    // miniatura la muestra entera; Esc la cierra. El clic derecho, su menú.
     fotos()[0].querySelector('.dm-adjunto-ver').click();
-    await until(() => document.querySelector('.dm-visor[data-abierto]'), 2000);
-    if (!document.querySelector('.dm-visor[data-abierto] .dm-visor-imagen')) fail('adjuntos: la miniatura no abre el visor');
+    await until(() => modal()?.classList.contains('dm-zoom-modal'), 3000);
+    if (!(modal()?.querySelector('.dm-zoom-img')?.naturalWidth > 0)) fail('adjuntos: la miniatura no abre el visor');
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-    await until(() => !document.querySelector('.dm-visor'), 2000);
-    if (document.querySelector('.dm-visor')) fail('adjuntos: Esc no cerró el visor');
+    await closed();
+    if (modal()) fail('adjuntos: Esc no cerró el visor');
+    {
+      const ver = fotos()[0].querySelector('.dm-adjunto-ver');
+      const r = ver.getBoundingClientRect();
+      ver.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: Math.round(r.left + 20), clientY: Math.round(r.top + 20) }));
+      await until(() => menus().length === 1, 2000);
+      const rotulos = [...(menus()[0]?.querySelectorAll('.rad-menu-item') ?? [])].map((i) => i.textContent.trim()).join('|');
+      if (rotulos !== 'Open|Save as…') fail('adjuntos: el menú de una imagen adjunta trae ' + rotulos);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await until(() => !menus().length, 2000);
+    }
     enIngles('con adjuntos en el redactor');
 
     // Mandar: el mensaje guarda sus adjuntos, la tira queda vacía, y al
@@ -2955,7 +2998,7 @@ else {
     if (fila('generate_image')?.dataset.estado !== 'ok' || gs.length !== 2) fail('imágenes: la llamada quedó en «' + fila('generate_image')?.dataset.estado + '» con ' + gs.length + ' imágenes');
     if (!gs.every((g) => { const im = g.querySelector('img'); return im.naturalWidth === 256 && im.src.startsWith('data:image/png;base64,') && op(im) > 0.99; })) fail('imágenes: las imágenes no se ven en la fila (' + gs.map((g) => g.querySelector('img').naturalWidth + ' px, opacidad ' + r2(op(g.querySelector('img')))).join(' · ') + ')');
     if (gs.length === 2 && gs[0].querySelector('img').src === gs[1].querySelector('img').src) fail('imágenes: las dos variantes son la misma imagen');
-    if (fila('generate_image')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'image' || shown(fila('generate_image')?.querySelector('.dm-tool-que')) !== 'A red fox in the snow') fail('imágenes: la fila no lleva su ícono o no dice qué se pidió');
+    if (fila('generate_image')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'varita' || shown(fila('generate_image')?.querySelector('.dm-tool-que')) !== 'A red fox in the snow') fail('imágenes: la fila no lleva su ícono o no dice qué se pidió');
     if (!salidaI().startsWith('Generated 2 images with Simulated image (sim-image), 16:9.') || !salidaI().includes('Cost: about $0.08') || !salidaI().includes('You did not get the image itself')) fail('imágenes: lo que recibió el agente: ' + salidaI().slice(0, 200));
     // En el chat guardado va la RUTA de cada imagen, no la imagen.
     {
@@ -2971,8 +3014,26 @@ else {
       if (viaje?.detalle?.prompt !== 'A red fox in the snow' || viaje.detalle.modelo !== 'sim-image' || viaje.detalle.aspecto !== '16:9' || viaje.detalle.visto !== false) fail('imágenes: al turno siguiente no viaja con qué se hizo la imagen (el prompt entero, el modelo, si la miró): ' + JSON.stringify(viaje?.detalle ?? null));
       if (viaje?.dejo?.length !== 2 || !viaje.dejo.every((p) => /image-.*\.png$/.test(p))) fail('imágenes: al turno siguiente no viaja dónde quedaron las imágenes: ' + JSON.stringify(viaje ?? null).slice(0, 200));
     }
-    // Tocar una imagen abre su menú; guardarla y mostrarla en su carpeta andan.
+    // Un clic la abre en el visor; el clic derecho, su menú (el mismo adentro
+    // del visor). Guardarla y mostrarla en su carpeta andan.
+    const derecho = (el) => { const r = el?.getBoundingClientRect(); el?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: Math.round((r?.left ?? 0) + 30), clientY: Math.round((r?.top ?? 0) + 30) })); };
     gs[0]?.click();
+    await until(() => modal()?.classList.contains('dm-zoom-modal'), 3000);
+    await sleep(dur('slow') + 120);
+    if (modal()?.querySelector('.dm-zoom-img')?.naturalWidth !== 256 || !modal()?.querySelector('.dm-zoom-nombre')?.textContent.endsWith('.png')) fail('imágenes: un clic en la imagen no la abrió en el visor');
+    if (menus().length) fail('imágenes: el clic primario abrió el menú (tiene que abrir el visor)');
+    derecho(modal()?.querySelector('.dm-zoom-lienzo'));
+    await until(() => menus().length === 1, 2000);
+    await sleep(dur('base') + 80);
+    {
+      const rotulos = [...(menus()[0]?.querySelectorAll('.rad-menu-item') ?? [])].map((i) => i.textContent.trim()).join('|');
+      if (rotulos !== 'Open|Save as…|Show in folder|Copy path') fail('imágenes: el menú adentro del visor trae ' + rotulos);
+    }
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await sleep(dur('base') + 80);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await closed();
+    derecho(gs[0]);
     await until(() => menus().length === 1, 2000);
     await sleep(dur('base') + 80);
     {
@@ -2983,7 +3044,7 @@ else {
     await pick('Save as');
     await until(() => avisosI().some((n) => n.textContent.includes('Saved')), 3000);
     if (!avisosI().some((n) => n.textContent.includes('Saved'))) fail('imágenes: «Save as…» no guardó la imagen: ' + avisosI().map((n) => n.textContent).join(' | '));
-    gs[0]?.click();
+    derecho(gs[0]);
     await until(() => menus().length === 1, 2000);
     await sleep(dur('base') + 80);
     await pick('Show in folder');

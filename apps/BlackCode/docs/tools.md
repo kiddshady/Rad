@@ -208,9 +208,21 @@ Un navegador de verdad, en un panel, que comparten el usuario y el agente.
 - **Las tools exigen el panel abierto:** si no lo está, se lo piden a la
   interfaz (`browser:open`) y esperan hasta 3 segundos.
 - **Sesión propia** (`persist:nix-browser`), sin preload de la app, con
-  sandbox. Solo http y https (http, solo a direcciones locales o privadas).
-  Permisos negados, descargas canceladas, `alert`/`confirm`/`prompt`
-  neutralizados (un `alert` congelaba la pestaña).
+  sandbox. http y https (http, solo a direcciones locales o privadas), y los
+  `.html` del disco (abajo). Permisos negados, descargas canceladas,
+  `alert`/`confirm`/`prompt` neutralizados (un `alert` congelaba la pestaña).
+- **Las páginas locales** (1.7.0, pedido de Fran: que un agente le muestre en el
+  panel una página que armó). Solo `.html`, y solo los abren la barra,
+  `browser_navigate` (ruta absoluta, `file:///…` o relativa a la carpeta del
+  chat si existe) y las pestañas que vuelven. Lo abierto así marca su carpeta
+  como raíz: la página carga lo que está en ella y en sus subcarpetas (salvo
+  las que empiezan con punto; con una raíz demasiado ancha, como la de un disco
+  o la del usuario, solo esa carpeta) y nada de la carpeta de la app. Lo hace
+  cumplir `ses.protocol.handle('file', …)` en la sesión de las pestañas: si no
+  se pudo poner, no se abre ninguna. Una página web no lleva nunca a una local
+  (link, `window.open` ni redirección). Probado de punta a punta con un
+  Electron de verdad: lo de afuera sale 403 y la prueba falla con el filtro
+  roto.
 - **En el system prompt:** los favoritos por nombre y la pestaña que el
   usuario tiene a la vista (título y dirección, no el contenido).
 - Pestañas, favoritos e historial se guardan en `%APPDATA%\BlackCode\tools`

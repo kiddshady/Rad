@@ -9,7 +9,8 @@
 import { openModal } from '/@core/modal.js';
 import { wireControls } from '/@core/controls.js';
 import { swapText } from '/@core/motion.js';
-import { menuButton } from '/@core/menu.js';
+import { contextMenu } from '/@core/menu.js';
+import { abrirVisor, menuDeDato } from './visor.js';
 import { toast } from '/@core/toast.js';
 import * as datos from './datos.js';
 import { h, icono } from './piezas.js';
@@ -26,7 +27,8 @@ const ESTADOS = {
 
 // Una imagen de generate_image. No viaja adentro del chat: está en un archivo
 // y acá se la pide por su ruta, cuando la fila se acerca a la vista (un chat
-// con muchas imágenes no las carga todas al abrir). Tocarla abre su menú.
+// con muchas imágenes no las carga todas al abrir). Un clic la abre en el
+// visor (visor.js) y el clic derecho, su menú: el mismo adentro del visor.
 const vistas = new Map(); // archivo -> Promise<dataUrl | null>
 const verArchivo = (archivo) => {
   if (!vistas.has(archivo)) vistas.set(archivo, window.rad.invoke('imagenes:ver', archivo).catch(() => null));
@@ -40,10 +42,10 @@ const alAcercarse = new IntersectionObserver((entradas) => {
   for (const e of entradas) if (e.isIntersecting) { alAcercarse.unobserve(e.target); cargarGenerada(e.target); }
 }, { rootMargin: '600px 0px' });
 function generada(im) {
-  const caja = h('button', 'dm-generada', { type: 'button', 'data-archivo': im.archivo, 'aria-label': `Generated image ${im.name}: options`, 'data-rad-tip': im.name },
+  const caja = h('button', 'dm-generada', { type: 'button', 'data-archivo': im.archivo, 'aria-label': `Generated image ${im.name}: view`, 'data-rad-tip': im.name },
     h('img', 'dm-generada-img', { alt: im.name }), h('span', 'dm-generada-nota'));
   const pedir = (canal) => window.rad.invoke(canal, im.archivo).catch(() => null);
-  menuButton(caja, () => {
+  const items = () => {
     const falta = caja.hasAttribute('data-falta');
     return [
       { id: 'abrir', label: 'Open', icon: icono('externo').innerHTML, disabled: falta, onSelect: async () => { if (!(await pedir('imagenes:abrir'))?.ok) toast({ text: 'That image file is gone.', kind: 'danger' }); } },
@@ -54,8 +56,28 @@ function generada(im) {
       { id: 'mostrar', label: 'Show in folder', icon: icono('carpeta').innerHTML, disabled: falta, onSelect: async () => { if (!(await pedir('imagenes:mostrar'))?.ok) toast({ text: 'That image file is gone.', kind: 'danger' }); } },
       { id: 'copiar', label: 'Copy path', icon: icono('copiar').innerHTML, onSelect: () => navigator.clipboard.writeText(im.archivo).then(() => toast({ text: 'Copied' }), () => toast({ text: 'Could not copy', kind: 'danger' })) },
     ];
+  };
+  caja.addEventListener('click', () => {
+    const src = caja.querySelector('.dm-generada-img').getAttribute('src');
+    if (!src || caja.hasAttribute('data-falta')) return; // (todavía cargando, o el archivo ya no está: el menú lo dice)
+    abrirVisor({ src, nombre: nombreDeArchivo(im.archivo) || im.name, menu: items });
   });
+  contextMenu(caja, items);
   alAcercarse.observe(caja);
+  return caja;
+}
+const nombreDeArchivo = (ruta) => String(ruta || '').split(/[\\/]/).pop();
+
+// Una imagen que viaja adentro del chat (la captura de screen_capture, un
+// gráfico de run_code): no tiene archivo propio. Un clic la abre en el visor;
+// el clic derecho, su menú (menuDeDato, en visor.js).
+function enChat(im) {
+  const nombre = im.name || 'image.png';
+  const caja = h('button', 'dm-tool-imagen-caja', { type: 'button', 'aria-label': `Image ${nombre}: view`, 'data-rad-tip': nombre },
+    h('img', 'dm-tool-imagen', { src: im.dataUrl, alt: nombre }));
+  const items = menuDeDato(im.dataUrl, nombre);
+  caja.addEventListener('click', () => abrirVisor({ src: im.dataUrl, nombre, menu: items }));
+  contextMenu(caja, items);
   return caja;
 }
 
@@ -102,7 +124,7 @@ export function ponerTool(nodo, m) {
   const caja = nodo.querySelector('.dm-tool-imagenes');
   const lista = Array.isArray(m.imagenes) ? m.imagenes : [];
   if (caja.childElementCount !== lista.length) {
-    caja.replaceChildren(...lista.map((im) => (im.archivo ? generada(im) : h('img', 'dm-tool-imagen', { src: im.dataUrl, alt: im.name, 'data-rad-tip': im.name }))));
+    caja.replaceChildren(...lista.map((im) => (im.archivo ? generada(im) : enChat(im))));
   }
   nodo.toggleAttribute('data-con-imagenes', lista.length > 0);
   if (!texto) { nodo.removeAttribute('data-abierto'); nodo.querySelector('.dm-tool-cabeza').setAttribute('aria-expanded', 'false'); }

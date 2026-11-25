@@ -296,13 +296,13 @@
   /* Una celda de relevo que corta su texto con puntos suspensivos. El tope
      va en el ítem: un texto que no parte renglón mide entero, y sin tope se
      sale de la celda en vez de cortarse. */
-  .dm-agente-nombre.rad-swap, .dm-fila-titulo.rad-swap, .dm-conv-titulo.rad-swap, .dm-conv-sub.rad-swap,
+  .dm-agente-nombre.rad-swap, .dm-fila-titulo.rad-swap, .dm-conv-titulo.rad-swap,
   .dm-tarjeta-nombre.rad-swap, .dm-tarjeta-modelo.rad-swap {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     min-width: 0;
   }
-  .dm-agente-nombre > *, .dm-fila-titulo > *, .dm-conv-titulo > *, .dm-conv-sub > *,
+  .dm-agente-nombre > *, .dm-fila-titulo > *, .dm-conv-titulo > *,
   .dm-tarjeta-nombre.rad-swap > *, .dm-tarjeta-modelo > * {
     max-width: 100%;
     overflow: hidden;
@@ -415,9 +415,6 @@
   }
   .dm-conv-tools[data-prendidas] { color: var(--rad-text-1); }
   .dm-conv-tools-texto { white-space: nowrap; }
-
-  /* Si no entran los dos, se achican los dos: ninguno empuja al otro afuera. */
-  .dm-conv-sub { font-size: var(--rad-text-s); color: var(--rad-text-3); }
 
   /* ---------- La pantalla de inicio ---------- */
   /* Sin chat elegido (así arranca siempre la app), en el lugar de la
@@ -793,6 +790,15 @@
      grupo al fondo de la lista. Se pliega, y mientras no hay ninguno no ocupa
      lugar; las dos cosas, desplegándose (no de golpe). */
   .dm-chats-lista { flex: none; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  /* Lo que se pliega recorta, pero el anillo de foco del núcleo sobresale
+     (2 px de separación + 2 px de trazo): con `overflow: hidden` la fila de
+     arriba lo perdía arriba y todas a la izquierda. Se recorta con `clip` y un
+     margen del tamaño del anillo, que no cambia el maquetado. Plegado, ese
+     margen deja asomar lo de adentro, pero ahí ya es transparente y no toma
+     el mouse. (El margen lleva `padding-box` delante, que es la caja de
+     siempre: Chromium 152 lo calcula en 0 si el var() trae un calc() solo.) */
+  .dm-canales-todo, .dm-canales-in, .dm-grupo-rotulo-in { --dm-aro: calc(var(--rad-line-width) * 4); }
+  .dm-canales-caja:not([data-abierto]) .dm-canales-in, .dm-grupo-rotulo[data-vacio] .dm-grupo-rotulo-in { pointer-events: none; }
   .dm-canales {
     flex: none;
     display: grid;
@@ -810,11 +816,11 @@
   .dm-grupo { flex: none; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .dm-grupo-rotulo { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out), opacity var(--rad-dur-base) var(--rad-ease-in-out); }
   .dm-grupo-rotulo[data-vacio] { grid-template-rows: 0fr; opacity: 0; }
-  .dm-grupo-rotulo-in { min-height: 0; overflow: hidden; }
+  .dm-grupo-rotulo-in { min-height: 0; overflow: clip; overflow-clip-margin: padding-box var(--dm-aro); }
   .dm-grupo-rotulo .dm-canales-cabeza { font-size: var(--rad-text-s); font-weight: var(--rad-weight-regular); color: var(--rad-text-3); padding-inline-start: var(--rad-space-2); transition: color var(--rad-dur-fast) var(--rad-ease-out); }
   .dm-grupo-rotulo .dm-canales-fila:hover .dm-canales-cabeza { color: var(--rad-text-1); }
   .dm-canales-in.dm-grupo-llano { padding-inline-start: 0; }
-  .dm-canales-todo { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 2px; }
+  .dm-canales-todo { min-height: 0; overflow: clip; overflow-clip-margin: padding-box var(--dm-aro); display: flex; flex-direction: column; gap: 2px; }
   .dm-canales-fila {
     flex: none;
     display: flex;
@@ -841,16 +847,17 @@
   /* la flecha mira hacia abajo con el grupo abierto y gira al plegarlo */
   .dm-canales-chev { transition: transform var(--rad-dur-base) var(--rad-ease-in-out); }
   .dm-canales-cabeza[aria-expanded='false'] .dm-canales-chev { transform: rotate(-90deg); }
-  /* el tacho aparece al pasar por la cabeza (o con el foco adentro), y avisa que borra */
+  /* el tacho aparece al pasar por la cabeza (o con el foco adentro). Al
+     pasarle por encima es un botón como los demás tachos de la app: sin rojo
+     (lo de borrar lo avisa el confirm). */
   .dm-canales-borrar {
     opacity: 0;
     transition: opacity var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
   }
   .dm-canales-fila:hover .dm-canales-borrar, .dm-canales-fila:focus-within .dm-canales-borrar { opacity: 1; }
-  .dm-canales-borrar:hover { color: var(--rad-danger); }
   .dm-canales-caja { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out); }
   .dm-canales-caja[data-abierto] { grid-template-rows: 1fr; }
-  .dm-canales-in { min-height: 0; overflow: hidden; padding-inline-start: var(--rad-space-4); opacity: 0; transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out); }
+  .dm-canales-in { min-height: 0; overflow: clip; overflow-clip-margin: padding-box var(--dm-aro); padding-inline-start: var(--rad-space-4); opacity: 0; transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out); }
   .dm-canales-caja[data-abierto] .dm-canales-in { opacity: 1; transition-delay: calc(var(--rad-dur-base) / 2); }
   /* la fila de un chat de canal: el nombre y, debajo, cuándo fue */
   .dm-fila-textos { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
@@ -867,7 +874,7 @@
   .dm-adjuntos-lista { position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--rad-space-2); padding: var(--rad-space-2) var(--rad-space-2) var(--rad-space-1); }
   .dm-adjunto { position: relative; flex: none; animation: rad-fade-in var(--rad-dur-base) var(--rad-ease-out) both; }
   .dm-adjunto-miniatura { height: 72px; }
-  .dm-adjunto-ver { display: block; height: 100%; border-radius: var(--rad-radius-m); overflow: hidden; box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line); }
+  .dm-adjunto-ver { display: block; height: 100%; cursor: zoom-in; border-radius: var(--rad-radius-m); overflow: hidden; box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line); }
   .dm-adjunto-ver img { display: block; height: 100%; width: auto; max-width: 220px; object-fit: cover; }
   .dm-adjunto-chip {
     display: flex;
@@ -903,29 +910,12 @@
   .dm-msg[data-rol='user'] { justify-items: end; gap: var(--rad-space-2); }
   .dm-adjuntos-msg { order: -1; display: grid; justify-items: end; gap: var(--rad-space-2); min-width: 0; }
   .dm-adjuntos-imagenes, .dm-adjuntos-archivos { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--rad-space-2); }
-  .dm-adjunto-imagen { flex: none; display: block; line-height: 0; border-radius: var(--rad-radius-m); overflow: hidden; box-shadow: var(--rad-shadow-1); transition: filter var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-adjunto-imagen { flex: none; display: block; line-height: 0; cursor: zoom-in; border-radius: var(--rad-radius-m); overflow: hidden; box-shadow: var(--rad-shadow-1); transition: filter var(--rad-dur-fast) var(--rad-ease-out); }
   .dm-adjunto-imagen:hover { filter: brightness(1.12); }
   .dm-adjunto-imagen img { display: block; width: auto; height: auto; max-width: 320px; max-height: 240px; }
   .dm-adjunto-archivo { display: inline-flex; align-items: center; gap: var(--rad-space-2); max-width: 260px; padding: var(--rad-space-1) var(--rad-space-3); border-radius: var(--rad-radius-m); background: var(--rad-surface-2); color: var(--rad-text-2); font-size: var(--rad-text-s); }
   .dm-msg[data-rol='user'] .dm-msg-cuerpo:empty { display: none; }
 
-  /* El visor: una imagen a pantalla completa. Un clic o Esc la cierra. */
-  .dm-visor {
-    position: fixed;
-    inset: 0;
-    z-index: 5;
-    display: grid;
-    place-items: center;
-    padding: var(--rad-space-6);
-    background: var(--rad-scrim);
-    cursor: zoom-out;
-    opacity: 0;
-    transition: opacity var(--rad-dur-base) var(--rad-ease-in-out);
-    pointer-events: auto;
-  }
-  .dm-visor[data-abierto] { opacity: 1; }
-  .dm-visor-imagen { max-width: 100%; max-height: 100%; border-radius: var(--rad-radius-m); box-shadow: var(--rad-shadow-3); transform: scale(0.97); transition: transform var(--rad-dur-base) var(--rad-ease-out); }
-  .dm-visor[data-abierto] .dm-visor-imagen { transform: none; }
   /* El campo va desnudo: la que tiene forma, y la que carga, es la barra. */
   .dm-redactor .rad-input,
   .dm-redactor .rad-input:hover,
@@ -1059,7 +1049,8 @@
   /* Las imágenes que dejó una llamada. Entran fundiéndose. */
   .dm-tool-imagenes { display: flex; flex-wrap: wrap; gap: var(--rad-space-2); }
   /* Una imagen de generate_image: más grande que una captura (es lo que se
-     pidió ver), cargada cuando la fila se acerca. Tocarla abre su menú. */
+     pidió ver), cargada cuando la fila se acerca. Un clic la abre en el
+     visor (el cursor es la lupa); el clic derecho, su menú. */
   .dm-generada {
     display: grid;
     place-items: center;
@@ -1070,11 +1061,12 @@
     border-radius: var(--rad-radius-m);
     overflow: hidden;
     background: color-mix(in srgb, var(--rad-surface-0) 62%, transparent);
-    cursor: pointer;
+    cursor: zoom-in;
     transition: filter var(--rad-dur-fast) var(--rad-ease-out);
   }
+  .dm-generada[data-falta] { cursor: default; }
   .dm-generada > * { grid-area: 1 / 1; }
-  .dm-generada:hover, .dm-generada[aria-expanded='true'] { filter: brightness(1.08); }
+  .dm-generada:hover { filter: brightness(1.08); }
   .dm-generada-img { display: block; max-width: 100%; max-height: 420px; opacity: 0; transition: opacity var(--rad-dur-base) var(--rad-ease-in-out); }
   .dm-generada[data-lista] .dm-generada-img { opacity: 1; }
   .dm-generada[data-falta] .dm-generada-img { display: none; }
@@ -1083,12 +1075,72 @@
   /* varias variantes del mismo pedido: de a dos por renglón */
   .dm-tool-imagenes:has(.dm-generada ~ .dm-generada) .dm-generada { max-width: calc(50% - var(--rad-space-1)); }
   .dm-tool[data-con-imagenes] .dm-tool-imagenes { padding: 0 var(--rad-space-3) var(--rad-space-3); }
+  /* Una imagen que viaja en el chat (una captura, un gráfico): el mismo
+     trato, clic al visor y clic derecho al menú. */
+  .dm-tool-imagen-caja {
+    display: block;
+    max-width: 100%;
+    padding: 0;
+    border-radius: var(--rad-radius-s);
+    cursor: zoom-in;
+    transition: filter var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-tool-imagen-caja:hover { filter: brightness(1.08); }
   .dm-tool-imagen {
+    display: block;
     max-width: 100%;
     max-height: 360px;
-    border-radius: var(--rad-radius-s);
+    border-radius: inherit;
     animation: rad-fade-in var(--rad-dur-slow) var(--rad-ease-out) both;
   }
+
+  /* ---------- El visor de imágenes (visor.js) ----------
+     Un modal casi del tamaño de la ventana: el lienzo, y abajo la barra con
+     el nombre, la medida y el zoom. El lienzo no pinta fondo (el modal es
+     de vidrio: un fondo propio sumaría otro velo). La imagen se mueve con
+     transform, transicionado salvo arrastrando y al nacer. Pasado el tamaño
+     real se ven los píxeles (pixelated): es para mirar de cerca. */
+  .rad-modal.dm-zoom-modal {
+    --rad-modal-width: 1600px;
+    height: calc(100vh - var(--rad-space-6) * 2);
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+  }
+  .dm-zoom-modal > .rad-modal-body { flex: 1; min-height: 0; display: flex; }
+  .dm-zoom { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; }
+  .dm-zoom:focus-visible { outline: none; }
+  .dm-zoom-lienzo {
+    position: relative;
+    overflow: hidden;
+    cursor: zoom-in;
+    touch-action: none;
+    user-select: none;
+    border-radius: var(--rad-radius-l) var(--rad-radius-l) 0 0;
+  }
+  .dm-zoom-lienzo[data-movible] { cursor: grab; }
+  .dm-zoom-lienzo[data-arrastrando] { cursor: grabbing; }
+  .dm-zoom-img {
+    position: absolute;
+    left: 0;
+    top: 0;
+    max-width: none;
+    transform-origin: 0 0;
+    will-change: transform;
+    transition: transform var(--rad-dur-fast) var(--rad-ease-out), border-radius var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-zoom-lienzo[data-quieto] .dm-zoom-img, .dm-zoom-lienzo[data-arrastrando] .dm-zoom-img { transition: none; }
+  .dm-zoom-lienzo[data-pixeles] .dm-zoom-img { image-rendering: pixelated; }
+  .dm-zoom-barra {
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-1);
+    padding: var(--rad-space-2) var(--rad-space-3) var(--rad-space-2) var(--rad-space-4);
+    border-top: var(--rad-line-width) solid var(--rad-line);
+  }
+  .dm-zoom-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--rad-text-s); color: var(--rad-text-1); user-select: text; }
+  .dm-zoom-medida { flex: none; margin-inline-end: var(--rad-space-3); font-size: var(--rad-text-xs); color: var(--rad-text-3); font-variant-numeric: tabular-nums; }
+  .dm-zoom-pct { flex: none; min-width: 64px; justify-content: center; font-size: var(--rad-text-s); font-variant-numeric: tabular-nums; }
 
   /* ---------- La escena y el canvas ---------- */
   /* La conversación y, a su derecha, el panel que esté abierto. El hueco del

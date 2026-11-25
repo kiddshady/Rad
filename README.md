@@ -455,9 +455,12 @@ npm run smoke:pack:blackcode   su humo contra la empaquetada
 
 ## BlackCode
 
-(Hasta la 0.4.0 se llamó Daimon. El paquete se sigue llamando `daimon`, su
-`appId` es `com.umbrovex.daimon` y publica en `kiddshady/daimon-releases`:
-es por donde la instalada encuentra su actualización, y no se tocan.)
+(Hasta la 0.4.0 se llamó Daimon y hasta la 0.9.0, Nix. Desde la 1.7.0 el
+paquete se llama `blackcode` y publica en `kiddshady/blackcode-releases`,
+que antes era `daimon-releases`: GitHub redirige el nombre viejo, así que una
+instalada vieja se sigue actualizando. Lo único que conserva el nombre viejo
+es el `appId`, `com.umbrovex.daimon`: es lo que Windows usa para saber que es
+la misma app, y no se toca.)
 
 La primera app hecha con Rad: un chat con IA donde se arman varios agentes,
 cada uno con su nombre, su proveedor y su modelo, sus instrucciones y sus
@@ -507,7 +510,7 @@ y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
   Tools, Images, Integrations, Voice y About. Lo de adentro se arma una vez y
   se reusa; con el modal cerrado queda guardado en el documento, oculto,
   porque las tarjetas se siguen poniendo al día con los datos de la app.
-- Se instala y se actualiza desde `kiddshady/daimon-releases`. En Settings,
+- Se instala y se actualiza desde `kiddshady/blackcode-releases`. En Settings,
   About tiene un botón para buscar una versión nueva sin esperar al núcleo.
 - El ícono es la «Red hexagonal»: seis agentes en los vértices de un
   hexágono, todos conectados al núcleo, sobre baldosa negra, en el degradé

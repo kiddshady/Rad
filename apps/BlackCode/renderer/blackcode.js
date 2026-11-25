@@ -52,8 +52,7 @@ const ponerEstado = () => {
   // (mientras el Atom Echo escucha o Whisper transcribe, eso es lo que se dice)
   shell.status.set('right', estadoDeVoz() ?? estadoDeHabla() ?? (datos.algunoRespondiendo() ? 'Answering…' : `${a.nombre} · ${datos.modeloDe(a)} · ${tools}`));
 };
-shell.status.set('left', views.find((v) => v.id === shell.router.current).label);
-shell.router.on('change', ({ label }) => shell.status.set('left', label));
+// (el lado izquierdo de la barra queda vacío: dónde se está ya lo dicen las pestañas)
 // Settings flota sobre la vista: lo que lleve a una vista (el «Open» de un
 // aviso, «Go to the chat», el ícono de la bandeja) lo cierra, o quedaría
 // tapando el lugar al que se quiso ir.

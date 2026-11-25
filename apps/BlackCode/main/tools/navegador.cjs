@@ -442,7 +442,13 @@ async function runBrowserNavigate(run, { url, tab, new_tab: nueva } = {}) {
   // modelo a saber la URL. Solo cuando lo que llegó NO es una dirección — un
   // dominio de verdad nunca se reinterpreta como nombre.
   let u2 = u;
-  if (u && !urlValida(u)) {
+  // (BlackCode) Un .html con ruta relativa es del disco si existe en la carpeta
+  // del chat, como en fs_read; si no existe, sigue siendo lo que era (un
+  // dominio, un favorito). La carpeta de la app no se resuelve: resolverEn tira.
+  if (u && /\.html$/i.test(u) && !/^[a-z][a-z\d+.-]*:/i.test(u) && !path.isAbsolute(u)) {
+    try { const abs = resolverEn(run, u); if (fs.existsSync(abs)) u2 = abs; } catch { /* queda como vino */ }
+  }
+  if (u2 === u && u && !urlValida(u)) {
     const fav = buscarFavorito(u);
     if (fav.url) u2 = fav.url;
     else if (fav.varios) return `error: more than one bookmark matches ${JSON.stringify(u)}: ${fav.varios.map((f) => JSON.stringify(nombreFavorito(f))).join(', ')} — pass the exact name`;

@@ -19,7 +19,7 @@
 //
 // Escribe build/icon.png (1024) y build/icon.ico (16 a 256), y el ícono de la
 // bandeja del sistema (build/tray.ico y build/tray-dark.ico; ver más abajo).
-// Para volver a hornearlo: npm run icon -w daimon.
+// Para volver a hornearlo: npm run icon -w blackcode.
 //   --sueltos       además deja cada tamaño suelto en build/
 //   --hoja <dir>    no toca build/: deja en <dir> cada variante de color a
 //                   varios tamaños, para elegir mirándolas en chico

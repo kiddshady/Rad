@@ -118,8 +118,8 @@ export function montarChat(el, { router }) {
   const lado = h('aside', 'dm-lado', { 'data-rad-chrome': '' }, selector, nuevo, lista);
 
   // ---------- La conversación ----------
+  // (solo el nombre del chat: el agente y el modelo los dice la barra de estado)
   const titulo = h('h2', 'dm-conv-titulo rad-swap');
-  const sub = h('span', 'dm-conv-sub rad-swap');
   // Las tools del agente, a la vista y a un clic: nacen apagadas, y con el
   // interruptor solo en el formulario del agente no había forma de enterarse,
   // desde el chat, de que el modelo no las tenía.
@@ -197,7 +197,7 @@ export function montarChat(el, { router }) {
   const marco = h('div', 'dm-hilo-marco', {}, celda, bFinal);
   const cajaRedactor = h('div', 'dm-redactor-caja', {}, redactor);
   const conv = h('section', 'dm-conv', {},
-    h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, sub, nav.boton, consola.boton, lienzo.botonBiblioteca, botonTools),
+    h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, nav.boton, consola.boton, lienzo.botonBiblioteca, botonTools),
     lienzo.barra, marco, aviso, cajaRedactor, inicio);
   const enInicio = () => !datos.chatActual();
   const ponerInicio = () => {
@@ -687,7 +687,6 @@ export function montarChat(el, { router }) {
     swapText(titulo, c?.titulo ?? '');
     // (sin nombre que mostrar, tampoco ocupa su lugar: lo que sigue queda contra el margen)
     titulo.toggleAttribute('data-vacio', !c);
-    swapText(sub, `${a.nombre} · ${datos.modeloDe(a)}`);
     const n = datos.toolsQueViajan(a);
     swapText(toolsTexto, n ? `${n} tool${n === 1 ? '' : 's'}` : datos.modeloConTools(a.proveedor, a.modelo) ? 'Tools: off' : 'Tools: not supported');
     botonTools.toggleAttribute('data-prendidas', n > 0);
