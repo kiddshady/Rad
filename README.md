@@ -480,6 +480,12 @@ y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
   de modelos pedida a Venice, no escrita a mano.
 - Los datos son del store del núcleo: un documento con los agentes, otro con
   el índice de chats y uno por chat.
+- Voz (desde la 1.1.0, apagada de fábrica): se le dice la palabra clave a un
+  M5Stack Atom Echo con ESPHome y lo que sigue entra a un chat de un agente.
+  BlackCode se conecta al Echo sin Home Assistant (`main/eco.cjs`, con
+  `esphome-client`), corta la frase (`main/corte.cjs`) y la transcribe en
+  esta máquina con Whisper, en el Python del usuario (`main/escucha.cjs`,
+  `motor/escucha_motor.py`). Está contado en `apps/BlackCode/docs/tools.md`.
 - Se instala y se actualiza desde `kiddshady/daimon-releases`. En Settings,
   About tiene un botón para buscar una versión nueva sin esperar al núcleo.
 - El ícono es la «Red hexagonal»: seis agentes en los vértices de un

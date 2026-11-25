@@ -227,11 +227,14 @@ function wire(rad, { llave }) {
   const DOC_MCP = '_mcp';
   let avisarMcp = () => {}; // se arma más abajo, con el catálogo de tools
   const { safeStorage } = require('electron');
+  // (el mismo cifrado guarda la llave del Atom Echo: ver voz.cjs)
+  const cifrar = (texto) => { try { return safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(texto).toString('base64') : null; } catch { return null; } };
+  const descifrar = (blob) => { try { return safeStorage.decryptString(Buffer.from(String(blob), 'base64')); } catch { return null; } };
   const mcp = require('./mcp.cjs').crear({
     leer: () => rad.store.read(DOC_MCP),
     escribir: (doc) => rad.store.write(DOC_MCP, doc),
-    cifrar: (texto) => { try { return safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(texto).toString('base64') : null; } catch { return null; } },
-    descifrar: (blob) => { try { return safeStorage.decryptString(Buffer.from(String(blob), 'base64')); } catch { return null; } },
+    cifrar,
+    descifrar,
     alCambiar: () => avisarMcp(),
   });
   const paraMcp = { mcp };
@@ -268,6 +271,15 @@ function wire(rad, { llave }) {
     },
   });
   const paraLasTareas = { tareas: { tareas, agentes: losAgentes, alBorrar: (t) => rad.send('tareas:borrada', { id: t.id, titulo: t.titulo }) } };
+  // ---------- La voz ----------
+  // Darle una orden a un agente hablándole al Atom Echo: BlackCode se
+  // conecta al Echo, transcribe la frase en esta máquina y se la pasa a la
+  // interfaz, que la manda a un chat. Apagada de fábrica. Ver main/voz.cjs.
+  // En el humo no hay ni Echo ni Whisper: los dos son de mentira, y el
+  // guion los maneja por `voz:simular`.
+  const ecoDeMentira = taller ? require('./eco-simulado.cjs').paraElHumo() : null;
+  require('./voz.cjs').wire(rad, { taller, cifrar, descifrar, agentes: losAgentes, simulada: ecoDeMentira });
+  if (taller) rad.handle('voz:simular', (que) => ({ ...ecoDeMentira.simular(que && typeof que === 'object' ? que : {}), llaveDeMentira: ecoDeMentira.llave }));
   // generate_image: la llave de Venice (la misma de los agentes de Venice), lo
   // que el usuario eligió en Settings (el modelo y el filtro de contenido
   // adulto) y, en el humo, sin red.

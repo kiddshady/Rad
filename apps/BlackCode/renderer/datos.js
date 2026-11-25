@@ -72,6 +72,10 @@ export async function abrir() {
   ]);
   fondoDoc = await openDoc('fondo', { bandeja: true });
   {
+    const v = await window.rad.invoke('voz:estado').catch(() => null);
+    if (v && typeof v === 'object') vozEstado = v;
+  }
+  {
     const m = await window.rad.invoke('mcp:lista').catch(() => null);
     if (m && Array.isArray(m.servidores)) { servidoresMcp = m; podarMcp(); }
   }
@@ -103,7 +107,47 @@ export async function abrir() {
     avisar('mcp');
   });
   window.rad.on('chat:tools', (nuevo) => { if (Array.isArray(nuevo?.grupos)) { herramientas = nuevo; avisar('tools'); } });
+  // El Atom Echo conecta, escucha, transcribe: su estado llega solo.
+  window.rad.on('voz:evento', (v) => { if (v && typeof v === 'object') { vozEstado = v; avisar('voz'); } });
 }
+
+// ---------- La voz ----------
+// Darle una orden a un agente hablándole al Atom Echo. La config y la llave
+// del Echo las guarda el proceso principal (voz.cjs): acá llega el estado,
+// sin la llave (solo si está puesta).
+let vozEstado = { activa: false, host: '', puerto: 0, agente: '', idioma: 'es', actua: false, python: '', hayLlave: false, cifrado: true, eco: { conexion: 'off', error: '', dispositivo: null, fase: 'idle', ultima: null }, whisper: { estado: 'off', error: '' } };
+export const voz = () => vozEstado;
+export async function refrescarVoz() {
+  const v = await window.rad.invoke('voz:estado').catch(() => null);
+  if (v && typeof v === 'object') { vozEstado = v; avisar('voz'); }
+}
+export async function guardarVoz(cambio) {
+  const r = await window.rad.invoke('voz:guardar', cambio).catch(() => ({ ok: false, error: 'It could not be saved.' }));
+  await refrescarVoz();
+  return r;
+}
+export async function ponerLlaveVoz(texto) {
+  const r = await window.rad.invoke('voz:llave', texto).catch(() => ({ ok: false, error: 'It could not be saved.' }));
+  await refrescarVoz();
+  return r;
+}
+/** El agente que recibe lo que se dice: el elegido en Settings o, si no hay
+ *  o ya no existe, el primero de la lista. */
+export const agenteDeVoz = (id = vozEstado.agente) => agente(id) ?? listaAgentes()[0];
+// Lo dicho va a un chat de voz de ese agente. Si el último mensaje de voz fue
+// hace más que esto, se abre uno nuevo: el contexto no crece para siempre.
+export const VOZ_CHAT_MS = 30 * 60000;
+/** El chat adonde va la próxima frase dicha a ese agente (lo crea si hace falta, sin cambiar lo que hay en pantalla). */
+export function chatDeVoz(agenteId, ahora = Date.now()) {
+  const vigente = chats.get().lista.filter((c) => c.agente === agenteId && c.voz === true && ahora - c.tocado < VOZ_CHAT_MS).sort((a, b) => b.tocado - a.tocado)[0];
+  if (vigente) return vigente;
+  const nuevo = { id: nuevoId(), agente: agenteId, titulo: TITULO_NUEVO, auto: true, voz: true, cuenta: 0, creado: ahora, tocado: ahora, carpeta: carpetaInicio() };
+  chats.update((v) => { v.lista.push(nuevo); return v; });
+  avisar('chats');
+  return nuevo;
+}
+/** ¿El turno que corre en ese chat vino por voz? */
+export const turnoDeVoz = (chatId) => respuestas.get(chatId)?.voz === true;
 
 // ---------- Los servidores MCP ----------
 // Un agente no guarda las tools de un servidor (cambian con él): guarda una
@@ -511,7 +555,7 @@ export const modeloVe = (prov, id) => prov === 'anthropic' || modelosDe(prov).fi
 /** Manda un mensaje y abre la respuesta. Devuelve si lo mandó. `adjuntos`
  *  es { imagenes: [dataUrl], archivos: [{ name, size, content }] }: con
  *  adjuntos, el texto puede faltar. */
-export async function enviar(chatId, texto, adjuntos = null) {
+export async function enviar(chatId, texto, adjuntos = null, { voz: dicho = false, modo = null } = {}) {
   const limpio = texto.trim();
   const imagenes = Array.isArray(adjuntos?.imagenes) ? adjuntos.imagenes : [];
   const archivos = Array.isArray(adjuntos?.archivos) ? adjuntos.archivos : [];
@@ -524,7 +568,8 @@ export async function enviar(chatId, texto, adjuntos = null) {
   // Se cambia el valor vivo del documento (no una copia): la respuesta se va
   // escribiendo sobre este mismo objeto mientras llega.
   const valor = doc.get();
-  const mio = { id: nuevoId(), rol: 'user', texto: limpio, ...(imagenes.length ? { imagenes } : {}), ...(archivos.length ? { archivos } : {}) };
+  // (`voz`: se dijo, no se tipeó; el chat lo muestra con un micrófono)
+  const mio = { id: nuevoId(), rol: 'user', texto: limpio, ...(imagenes.length ? { imagenes } : {}), ...(archivos.length ? { archivos } : {}), ...(dicho ? { voz: true } : {}) };
   const suyo = { id: nuevoId(), rol: 'assistant', texto: '', estado: 'escribiendo', modelo: a.modelo };
   const historial = [...valor.mensajes.filter(viaja), mio].map(alViaje);
   // Las tools del agente, si su modelo las acepta.
@@ -545,7 +590,7 @@ export async function enviar(chatId, texto, adjuntos = null) {
   if (primero && titulosConModelo()) nombrar(chatId, { texto: limpio, archivos: archivos.map((f) => f.name), imagenes: imagenes.length });
 
   const pedido = nuevoId();
-  respuestas.set(chatId, { pedido, mensaje: suyo, doc, pensando: false, guardado: Date.now() });
+  respuestas.set(chatId, { pedido, mensaje: suyo, doc, pensando: false, guardado: Date.now(), voz: dicho === true });
   porPedido.set(pedido, chatId);
   avisar('chats');
   avisar('mensajes', { chat: chatId });
@@ -554,7 +599,8 @@ export async function enviar(chatId, texto, adjuntos = null) {
   try {
     await window.rad.invoke('chat:enviar', {
       id: pedido, chat: chatId, agente: a.id, proveedor: a.proveedor, modelo: a.modelo, instrucciones: a.instrucciones, mensajes: historial,
-      tools, modo: modoTools(),
+      // (un turno de voz no hereda el modo de la app: lleva el suyo, ver voz.js)
+      tools, modo: modo === 'auto' || modo === 'manual' ? modo : modoTools(),
       // la memoria de la app: la ve el agente que tiene prendido su grupo
       // Memory, también si su modelo no acepta tools
       memoria: conMemoria(a),
@@ -689,4 +735,6 @@ function terminar(chatId, estado, nota, ev = null) {
   avisar('mensajes', { chat: chatId });
   avisar('respuesta', { chat: chatId });
   if (habiaTarjeta) avisar('confirmar', { chat: chatId });
+  // (terminó un turno: lo usa la voz, para avisar y para mandar la frase que quedó esperando)
+  avisar('turno', { chat: chatId, estado, voz: r.voz === true, texto: r.mensaje.texto, nota: nota ?? '' });
 }

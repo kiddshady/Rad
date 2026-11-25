@@ -653,6 +653,60 @@ el documento `fondo`, `{ bandeja: false }`.
 **Lo que no hay:** días de la semana, una fecha exacta, arrancar con Windows,
 y reintentos cuando una corrida falla.
 
+## La voz
+
+Desde la 1.1.0 se le puede dar una orden a un agente hablándole a un **M5Stack
+Atom Echo** con firmware de ESPHome: se dice la palabra clave (la reconoce el
+Echo, con `micro_wake_word`) y lo que sigue entra a un chat como si se hubiera
+tipeado. No es una tool: es otra forma de escribir. Viene apagada (Settings →
+Voice).
+
+**Sin Home Assistant.** El Echo le pide atención a quien esté suscripto a su
+API nativa como «asistente de voz»; antes era Home Assistant, ahora es
+BlackCode. El firmware no se toca. Cuatro archivos, los tres primeros sin
+Electron:
+
+| Archivo | Qué hace |
+|---|---|
+| `main/eco.cjs` | La conexión (TCP 6053, cifrada con la llave de `api: encryption: key:`), la suscripción y la frase: acepta el pedido, recibe el audio, y le avisa al Echo cada paso |
+| `main/corte.cjs` | Dónde termina la frase, mirando el volumen: voz es lo que supera el piso de ruido; cierra a los 900 ms de silencio, a los 4 s si nadie habla, o a los 15 s |
+| `main/escucha.cjs` | Whisper, en un proceso de Python aparte (`motor/escucha_motor.py`): lo levanta, le pasa el audio en base64 y filtra lo que Whisper inventa |
+| `main/voz.cjs` | Los une con la app: la config (documento reservado `_voz`), la llave cifrada, y el canal `voz:frase` hacia la interfaz |
+
+**Lo que se le avisa al Echo** (es lo que prende su LED): `RUN_START`,
+`STT_START`, `STT_VAD_END` (deja de mandar audio), `STT_END` con el texto y
+`RUN_END`. La corrida se cierra apenas hay texto, sin esperar la respuesta del
+agente: el Echo va sin parlante y no espera nada más. Si nadie habló, o Whisper
+no sacó nada, va `ERROR` con el código `stt-no-text-recognized`, que el
+firmware no muestra como error; si Whisper no anda, `stt-provider-unavailable`
+(rojo).
+
+**Whisper es del usuario.** No viaja con la app: se usa el `python` del PATH (u
+otro, elegido en Settings) con `openai-whisper` y el modelo `large-v3-turbo`.
+El proceso arranca con la primera frase —el modelo empieza a cargar cuando el
+Echo oye la palabra clave— y se apaga a los cinco minutos sin uso. Medido en
+una RTX 3060: 0,4 s por frase con el modelo cargado; en frío, unos 9 s (3 de
+levantar Python y 6 de cargar el modelo). El audio no toca el disco.
+
+**En la interfaz** (`renderer/voz.js`): la frase va al agente elegido en
+Settings, en su **chat de voz** (un chat común marcado `voz: true`; pasada
+media hora sin hablar, la siguiente abre uno nuevo). No cambia lo que hay en
+pantalla: un toast dice qué se oyó y lleva al chat, y si nadie mira la ventana
+el proceso principal manda un aviso de Windows con la respuesta. Si el chat de
+voz todavía contesta, la frase espera su turno.
+
+**Permisos.** Un turno de voz va con `modo: 'manual'` aunque la app esté en
+automático: la frase la pudo haber dicho un video, y Whisper se puede
+equivocar. Con «Let voice act» va con `'auto'`; lo que pide permiso siempre
+(agendar una tarea, un servidor MCP con «preguntar») lo sigue pidiendo.
+
+**La llave del Echo** entra una vez, se guarda cifrada con `safeStorage` y no
+vuelve a la interfaz (que solo sabe si está puesta). BlackCode sale hacia el
+Echo: no abre ningún puerto.
+
+**Lo que no hay:** respuesta hablada (es la segunda parte), el micrófono de la
+PC, elegir al agente nombrándolo en la frase, y más de un Echo.
+
 ## La terminal del panel no es una tool
 
 Desde la 0.14.0 hay una terminal al lado de la conversación (`main/terminal.cjs`,
@@ -828,7 +882,9 @@ salen juntos en una versión, no una por cada uno.
 
 Ninguna toca la red ni gasta un token. Lo que no está probado es un modelo de
 verdad pidiendo tools, ni un modelo de Venice recibiendo una imagen, ni un
-servidor MCP que no sea el de mentira.
+servidor MCP que no sea el de mentira. De la voz, el humo usa un Echo y un
+Whisper de mentira (`main/eco-simulado.cjs`): contra el Echo y el Whisper de
+verdad se probó a mano, fuera de la app.
 
 ## Sumar una tool
 

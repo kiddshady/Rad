@@ -285,7 +285,8 @@ export function montarChat(el, { router }) {
 
   const fila = (c) => {
     if (c.id === VACIO) return h('p', 'dm-chats-vacio', {}, 'No chats with this agent yet.');
-    const abrir = h('button', 'dm-fila-abrir', { type: 'button' }, h('span', 'dm-fila-titulo rad-swap'), h('span', 'dm-fila-punto', { 'aria-hidden': 'true' }, h('i')));
+    // (el micrófono solo se ve en un chat de voz: lo que se le dijo al Atom Echo)
+    const abrir = h('button', 'dm-fila-abrir', { type: 'button' }, h('span', 'dm-fila-voz', { 'aria-hidden': 'true' }, icono('mic')), h('span', 'dm-fila-titulo rad-swap'), h('span', 'dm-fila-punto', { 'aria-hidden': 'true' }, h('i')));
     const mas = h('button', 'rad-iconbutton dm-fila-mas', { type: 'button', 'aria-label': 'Chat actions', 'data-rad-tip': 'Actions' }, icono('puntos'));
     const nodo = h('div', 'dm-fila', { role: 'listitem' }, abrir, mas);
     abrir.addEventListener('click', () => datos.elegirChat(nodo.dataset.radKey));
@@ -300,6 +301,7 @@ export function montarChat(el, { router }) {
     if (actual) nodo.setAttribute('aria-current', 'true');
     else nodo.removeAttribute('aria-current');
     nodo.toggleAttribute('data-respondiendo', datos.respondiendo(c.id));
+    nodo.toggleAttribute('data-voz', c.voz === true);
   };
   const dibujarLista = () => {
     const suyos = datos.chatsDe(datos.agenteActual().id);
@@ -331,6 +333,8 @@ export function montarChat(el, { router }) {
     // lo que adjuntó: va arriba del texto (el orden lo pone el CSS)
     const suyos = m.rol === 'user' ? adjuntosDe(m) : null;
     if (suyos) nodo.append(suyos);
+    // se dijo, no se tipeó: es lo que Whisper entendió, y conviene verlo
+    if (m.rol === 'user' && m.voz) nodo.append(h('span', 'dm-msg-voz', {}, icono('mic'), 'Said to the Atom Echo'));
     if (m.rol === 'assistant') {
       nodo.append(h('div', 'dm-msg-pie', {}, h('div', 'dm-msg-pie-in', {},
         h('span', 'dm-pulso', { 'aria-hidden': 'true' }, h('i')), h('span', 'dm-msg-nota rad-swap'))));

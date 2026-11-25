@@ -551,6 +551,203 @@ function tarjetaFondo() {
   return tarjeta;
 }
 
+// La voz: darle una orden a un agente hablándole a un Atom Echo. La config y
+// la llave del Echo las guarda el proceso principal (voz.cjs): la llave entra
+// una vez, se cifra y no vuelve; acá solo se sabe si está puesta.
+const IDIOMAS_VOZ = [{ value: 'es', label: 'Spanish' }, { value: 'en', label: 'English' }, { value: 'auto', label: 'Detect it' }];
+function describirEco(v) {
+  const e = v.eco ?? {};
+  if (!v.activa) return { tono: 'idle', texto: 'Off: BlackCode is not connected to any device.' };
+  if (e.conexion === 'connected') {
+    const d = e.dispositivo;
+    const quien = d?.nombre ? `${d.nombre}${d.version ? ` (ESPHome ${d.version})` : ''}` : v.host;
+    if (e.fase === 'listening') return { tono: 'success', texto: `Connected to ${quien}. Listening…` };
+    if (e.fase === 'transcribing') return { tono: 'success', texto: `Connected to ${quien}. Transcribing…` };
+    return { tono: 'success', texto: `Connected to ${quien}. Waiting for the wake word.` };
+  }
+  if (e.conexion === 'error') return { tono: 'danger', texto: e.error || 'The connection failed.' };
+  if (e.error) return { tono: 'warning', texto: `${e.error} Trying again…` };
+  return { tono: 'idle', texto: `Connecting to ${v.host || 'the device'}…` };
+}
+function describirUltima(v) {
+  const u = v.eco?.ultima;
+  if (!u) return '';
+  if (u.texto) return `Last heard: “${u.texto}”`;
+  if (u.error) return `Last time it could not be transcribed: ${u.error}`;
+  return 'Last time the wake word was heard, but no speech followed.';
+}
+function tarjetaVoz() {
+  const activa = h('input', '', { type: 'checkbox', role: 'switch', 'data-campo': 'voz-activa' });
+  const texto = h('span', 'dm-estado-texto rad-swap');
+  const estado = h('p', 'dm-estado', { role: 'status', 'data-estado': 'voz-eco' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), texto);
+  const ultima = h('p', 'dm-voz-ultima rad-swap', { 'data-estado': 'voz-ultima' });
+
+  const host = h('input', 'rad-input', { type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: 'atom-echo.local', 'data-campo': 'voz-host' });
+  const cajaHost = h('label', 'rad-field', {}, h('span', 'rad-field-label', {}, 'Address'), host,
+    h('span', 'rad-field-hint', {}, 'The device’s name on your network (its ESPHome name plus .local) or its IP.'));
+
+  const textoLlave = h('span', 'dm-estado-texto rad-swap');
+  const estadoLlave = h('p', 'dm-estado', { role: 'status', 'data-estado': 'voz-llave' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), textoLlave);
+  const campo = h('input', 'rad-input', { type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: 'The key from api: encryption: key:', 'data-campo': 'voz-llave' });
+  const cajaLlave = h('label', 'rad-field', {}, h('span', 'rad-field-label', {}, 'Paste the device’s API key'), campo,
+    h('span', 'rad-field-hint', {}, 'It is in the device’s ESPHome YAML (or its secrets.yaml). It is never shown and never leaves this PC: it is stored encrypted with Windows protection.'));
+  const guardar = h('button', 'rad-button', { type: 'submit', 'data-variant': 'primary', 'data-accion': 'voz-guardar-llave' }, 'Save');
+  const quitar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'voz-quitar-llave' }, 'Remove key');
+  const form = h('form', 'dm-llave', {}, cajaLlave, h('div', 'dm-llave-acciones', {}, quitar, guardar));
+
+  const huecoAgente = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-voz-rotulo-agente' }, 'Agent'));
+  const pistaAgente = h('span', 'rad-field-hint', {}, 'Who receives what you say. It goes to a voice chat of that agent; after half an hour without talking, the next thing you say starts a new one.');
+  huecoAgente.append(pistaAgente);
+  const huecoIdioma = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-voz-rotulo-idioma' }, 'Language you speak'));
+
+  const textoW = h('span', 'dm-estado-texto rad-swap');
+  const estadoW = h('p', 'dm-estado', { role: 'status', 'data-estado': 'voz-whisper' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), textoW);
+  const probar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'voz-probar' }, 'Check again');
+  const python = h('input', 'rad-input', { type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: 'python', 'data-campo': 'voz-python' });
+  const cajaPython = h('label', 'rad-field', {}, h('span', 'rad-field-label', {}, 'Python'), python,
+    h('span', 'rad-field-hint', {}, 'Whisper runs in your own Python, with the openai-whisper package. Leave it empty to use the one in your PATH, or put the full path to another python.exe.'));
+
+  const actua = h('input', '', { type: 'checkbox', role: 'switch', 'data-campo': 'voz-actua' });
+  const nota = h('p', 'dm-tarjeta-instr rad-swap');
+
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'voz' },
+    h('h2', 'dm-tarjeta-nombre', {}, 'Voice'),
+    h('p', 'dm-tarjeta-instr', {}, 'Say the wake word to an M5Stack Atom Echo running ESPHome, and what you say next goes to an agent as a chat message. BlackCode connects to the device itself, without Home Assistant, and turns the audio into text on this PC with Whisper. The audio is never saved.'),
+    h('label', 'rad-switch', {}, activa, h('span', 'rad-switch-track'), 'Listen to the Atom Echo'),
+    estado, ultima,
+    cajaHost, estadoLlave, form,
+    h('div', 'dm-voz-par', {}, huecoAgente, huecoIdioma),
+    h('h3', 'dm-subtarjeta-nombre', {}, 'Whisper'),
+    h('div', 'dm-voz-whisper', {}, estadoW, probar),
+    cajaPython,
+    h('label', 'rad-switch', {}, actua, h('span', 'rad-switch-track'), 'Let voice act'),
+    nota);
+  wireControls(tarjeta);
+
+  let selAgente = null;
+  let selIdioma = null;
+  let prueba = null;      // lo que contestó Python la última vez que se le preguntó
+  let probando = false;
+  const armarAgente = () => {
+    selAgente?.close();
+    selAgente?.el.remove();
+    const v = datosApp.voz();
+    selAgente = createSelect({
+      options: datosApp.listaAgentes().map((a) => ({ value: a.id, label: a.nombre })),
+      value: datosApp.agenteDeVoz()?.id ?? '',
+      onChange: (id) => datosApp.guardarVoz({ agente: id }),
+    });
+    selAgente.el.setAttribute('aria-labelledby', 'dm-voz-rotulo-agente');
+    selAgente.el.dataset.campo = 'voz-agente';
+    huecoAgente.insertBefore(selAgente.el, pistaAgente);
+    tarjeta.dataset.agente = datosApp.agenteDeVoz(v.agente)?.id ?? '';
+  };
+  const armarIdioma = () => {
+    selIdioma = createSelect({ options: IDIOMAS_VOZ, value: datosApp.voz().idioma, onChange: (id) => datosApp.guardarVoz({ idioma: id }) });
+    selIdioma.el.setAttribute('aria-labelledby', 'dm-voz-rotulo-idioma');
+    selIdioma.el.dataset.campo = 'voz-idioma';
+    // (pegado a su rótulo: wireControls ya le sumó al campo el lugar del error, y detrás de él quedaría más abajo que el de al lado)
+    huecoIdioma.querySelector('.rad-field-label').after(selIdioma.el);
+  };
+  const describirWhisper = (v) => {
+    const w = v.whisper ?? {};
+    if (probando) return { tono: 'idle', texto: 'Asking Python whether it has Whisper…' };
+    if (w.estado === 'error') return { tono: 'danger', texto: w.error || 'Whisper stopped.' };
+    if (w.estado === 'loading' || w.estado === 'starting') return { tono: 'idle', texto: 'Loading the model…' };
+    if (w.estado === 'ready') return { tono: 'success', texto: `The model is loaded${w.gpu ? ` on ${w.gpu}` : w.dispositivo === 'cpu' ? ' on the CPU' : ''}. It unloads after five minutes without use.` };
+    if (!prueba) return { tono: 'idle', texto: 'Not checked yet.' };
+    if (!prueba.ok) return { tono: 'danger', texto: prueba.error || 'Whisper could not be loaded.' };
+    return { tono: 'success', texto: `Whisper is installed${prueba.gpu ? ` and will use ${prueba.gpu}` : ', and will run on the CPU'}. ${prueba.modelo ? 'The model loads when the wake word is heard.' : 'The model is not downloaded yet: the first phrase will download it (1.5 GB).'}` };
+  };
+  const poner = () => {
+    const v = datosApp.voz();
+    activa.checked = v.activa;
+    actua.checked = v.actua;
+    if (document.activeElement !== host) host.value = v.host;
+    if (document.activeElement !== python) python.value = v.python;
+    const d = describirEco(v);
+    estado.dataset.tono = d.tono;
+    swapText(texto, d.texto);
+    swapText(ultima, describirUltima(v));
+    ultima.toggleAttribute('data-vacia', !describirUltima(v));
+    estadoLlave.dataset.tono = v.hayLlave ? 'success' : 'idle';
+    swapText(textoLlave, !v.cifrado ? 'Windows encryption is not available, so a key cannot be saved.' : v.hayLlave ? 'A key is saved and encrypted on this PC.' : 'No key saved. A device with API encryption will not answer without it.');
+    quitar.disabled = !v.hayLlave;
+    const w = describirWhisper(v);
+    estadoW.dataset.tono = w.tono;
+    swapText(textoW, w.texto);
+    probar.disabled = probando;
+    swapText(nota, v.actua
+      ? 'What you say runs like a chat in automatic mode: tools run without asking. Scheduling a task, and the MCP servers set to ask, still ask. Anything the microphone picks up can start it, a video included.'
+      : 'What you say runs like a chat in manual mode: a tool that needs permission shows its card in the window and waits for you.');
+    if (selAgente && selAgente.value !== (datosApp.agenteDeVoz()?.id ?? '')) selAgente.value = datosApp.agenteDeVoz()?.id ?? '';
+    if (selIdioma && selIdioma.value !== v.idioma) selIdioma.value = v.idioma;
+    tarjeta.dataset.activa = v.activa ? 'si' : 'no';
+    tarjeta.dataset.conexion = v.eco?.conexion ?? 'off';
+    tarjeta.dataset.fase = v.eco?.fase ?? 'idle';
+    tarjeta.dataset.llave = v.hayLlave ? 'si' : 'no';
+    tarjeta.dataset.actua = v.actua ? 'si' : 'no';
+    // la tarjeta trabaja mientras conecta
+    setBusy(tarjeta, v.activa && v.eco?.conexion === 'connecting');
+  };
+  const preguntar = async () => {
+    probando = true;
+    poner();
+    prueba = await window.rad.invoke('voz:probar').catch(() => ({ ok: false, error: 'Python could not be asked.' }));
+    probando = false;
+    tarjeta.dataset.whisper = prueba?.ok ? 'si' : 'no';
+    poner();
+  };
+
+  activa.addEventListener('change', async () => {
+    // Al prenderla queda anotado a qué agente le habla (el que se ve elegido):
+    // si no, sería «el primero de la lista», y cambiaría al reordenarlos.
+    const sinElegir = activa.checked && !datosApp.agente(datosApp.voz().agente);
+    const r = await datosApp.guardarVoz({ activa: activa.checked, ...(sinElegir ? { agente: datosApp.agenteDeVoz()?.id ?? '' } : {}) });
+    if (!r?.ok) toast({ text: r?.error ?? 'It could not be saved.', kind: 'danger' });
+  });
+  actua.addEventListener('change', () => datosApp.guardarVoz({ actua: actua.checked }));
+  const guardarHost = async () => {
+    if (host.value.trim() === datosApp.voz().host) { setFieldError(cajaHost, null); return; }
+    const r = await datosApp.guardarVoz({ host: host.value });
+    setFieldError(cajaHost, r?.ok ? null : (r?.error ?? 'It could not be saved.'));
+  };
+  host.addEventListener('change', guardarHost);
+  host.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); host.blur(); } });
+  python.addEventListener('change', async () => {
+    if (python.value.trim() === datosApp.voz().python) return;
+    await datosApp.guardarVoz({ python: python.value });
+    preguntar();
+  });
+  python.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); python.blur(); } });
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!campo.value.trim()) { setFieldError(cajaLlave, 'Paste the key here.'); campo.focus(); return; }
+    const r = await datosApp.ponerLlaveVoz(campo.value);
+    if (!r?.ok) { setFieldError(cajaLlave, r?.error ?? 'It could not be saved.'); campo.focus(); return; }
+    setFieldError(cajaLlave, null);
+    campo.value = '';
+    toast({ text: 'Device key saved', kind: 'success' });
+  });
+  campo.addEventListener('input', () => { if (cajaLlave.hasAttribute('data-invalid')) setFieldError(cajaLlave, null); });
+  quitar.addEventListener('click', async () => {
+    const si = await confirm({ title: 'Remove the device key?', text: 'BlackCode won’t be able to connect to a device that uses API encryption until you paste it again.', confirmLabel: 'Remove', danger: true });
+    if (!si) return;
+    await datosApp.ponerLlaveVoz(null);
+    toast({ text: 'Device key removed' });
+  });
+  probar.addEventListener('click', preguntar);
+
+  armarAgente();
+  armarIdioma();
+  poner();
+  datosApp.on('voz', poner);
+  datosApp.on('agentes', () => { armarAgente(); poner(); });
+  // (a Python se le pregunta la primera vez que se abre Settings, no al abrir la app)
+  tarjeta.preguntar = () => { if (!prueba && !probando) preguntar(); };
+  return tarjeta;
+}
+
 // Los servidores MCP: tools de terceros para los agentes. Un servidor es un
 // comando que corre en esta PC (stdio) o una dirección (HTTP). Sus variables
 // de entorno y sus encabezados suelen ser llaves: el proceso principal los
@@ -759,6 +956,7 @@ function tarjetaMcp() {
 }
 
 export function montarAjustes(el, { router }) {
+  const laVoz = tarjetaVoz();
 
   el.append(h('div', 'dm-pagina', {},
     h('header', 'dm-pagina-cabeza', {}, h('div', '', {}, h('h1', '', {}, 'Settings'), h('p', '', {}, 'What BlackCode needs to talk to the models.'))),
@@ -769,6 +967,7 @@ export function montarAjustes(el, { router }) {
     tarjetaTitulos(),
     tarjetaImagenes(),
     tarjetaMcp(),
+    laVoz,
     tarjetaFondo(),
     tarjetaSubagentes(),
     tarjetaAcerca()));
@@ -776,7 +975,7 @@ export function montarAjustes(el, { router }) {
   // Al abrir Ajustes se le pregunta a la API por cada llave guardada. Lo que
   // ya contestó (la acepta o la rechaza) no se vuelve a preguntar; lo que no
   // se pudo comprobar, sí.
-  const comprobarTodas = () => { for (const p of PROVEEDORES) llave.comprobar(p.id); };
+  const comprobarTodas = () => { for (const p of PROVEEDORES) llave.comprobar(p.id); laVoz.preguntar(); };
   comprobarTodas();
   router.on('change', ({ id }) => { if (id === 'ajustes') comprobarTodas(); });
 }

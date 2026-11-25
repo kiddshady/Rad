@@ -182,6 +182,17 @@ if (marker?.pass === 1) {
     if ((await window.rad.invoke('bandeja:estado')).icono !== true || (await window.rad.store.read('fondo'))?.bandeja !== true) fail('bandeja: al reabrir no está el ícono de la bandeja, o el ajuste no volvió');
     data.tareas = 'la tarea, su bandeja y el ajuste de la bandeja volvieron';
   }
+  // La voz vuelve con la app: quedó prendida, así que se conectó sola al abrir, con la llave que se guardó.
+  {
+    const datosM = await import('/datos.js');
+    await until(async () => (await window.rad.invoke('voz:estado')).eco.conexion === 'connected', 5000);
+    const e = await window.rad.invoke('voz:estado');
+    const s = await window.rad.invoke('voz:simular', {});
+    if (e.activa !== true || e.hayLlave !== true || e.host !== 'fake-atom.local' || e.actua !== false || e.eco.conexion !== 'connected' || s.conexiones !== 1 || s.llave !== true || s.suscripto !== 1) fail('voz: al reabrir la app la escucha no volvió prendida y conectada: ' + JSON.stringify({ ...e, whisper: undefined }).slice(0, 300) + ' / ' + JSON.stringify({ conexiones: s.conexiones, llave: s.llave }));
+    // (el agente que se había elegido se borró: lo que se diga va al primero de la lista)
+    if (datosM.agente(e.agente) || datosM.agenteDeVoz()?.id !== datosM.listaAgentes()[0].id) fail('voz: con el agente elegido borrado, lo dicho no va al primero de la lista');
+    data.voz = 'la escucha quedó prendida y se conectó sola al abrir, con su llave';
+  }
   data.persistencia = `3 agentes (uno de Venice), el chat con 4 mensajes (la frenada con ${marker.frenado} caracteres), llaves: Anthropic ${llave.anthropic?.estado}, Venice ${llave.venice?.estado}`;
   window.rad.store.write('smoke', { pass: 2 });
   return { failures, data };
@@ -3626,6 +3637,226 @@ else {
     await settle();
     if (nombres().join() !== orden0.join() || (await guardados()).join() !== orden0.join()) fail('mover: subirlo de vuelta no dejó el orden de antes: ' + nombres().join(', '));
     await go('chat');
+  }
+
+  // 11t. La voz: darle una orden a un agente hablándole al Atom Echo. BlackCode
+  // se conecta al Echo (acá, uno de mentira que el guion maneja por
+  // `voz:simular`), corta la frase, la transcribe (con una escucha de mentira:
+  // «oye» el texto que el guion le deja dicho) y la manda a un chat de voz del
+  // agente elegido, sin sacar al usuario de donde está. Viene apagada, la llave
+  // del Echo se guarda cifrada y no vuelve a la interfaz, y un turno de voz va
+  // en manual aunque la app esté en automático, salvo «Let voice act».
+  {
+    const datosM = await import('/datos.js');
+    const sim = (que = {}) => window.rad.invoke('voz:simular', que);
+    const estadoV = () => window.rad.invoke('voz:estado');
+    const agenteV = datosM.agenteActual();
+    const modoAntes = datosM.modoTools();
+    const avisosV = () => [...document.querySelectorAll('.rad-toast')].filter((n) => !n.hasAttribute('data-rad-leaving'));
+    const chatsDeVoz = () => datosM.chatsDe(agenteV.id).filter((c) => c.voz === true);
+    const quieto = async (chatId) => { await sleep(150); await until(() => !datosM.respondiendo(chatId), 20000); await settle(); };
+
+    // (acá el Echo y Whisper son de mentira: que la librería de verdad y el motor viajen con la app se mira aparte)
+    {
+      const p = await window.rad.invoke('voz:piezas');
+      if (p.libreria !== true || p.motor !== true) fail('voz: la app no trae la librería del Echo o el motor de Whisper: ' + JSON.stringify(p));
+    }
+    // De fábrica: apagada, sin llave, sin conectarse a nada.
+    {
+      const e = await estadoV();
+      const s = await sim({ que: 'limpiar' });
+      if (e.activa !== false || e.hayLlave !== false || e.actua !== false || e.host !== '' || e.eco.conexion !== 'off' || s.conexiones !== 0) fail('voz: no viene apagada de fábrica: ' + JSON.stringify(e).slice(0, 300) + ' / ' + s.conexiones + ' conexiones');
+      if ('llave' in e) fail('voz: el estado que llega a la interfaz trae la llave');
+      if (await window.rad.store.read('_voz').then(() => true, () => false)) fail('voz: la interfaz puede leer el documento de la voz (ahí va la llave del Echo)');
+    }
+    await go('ajustes');
+    const tarjetaV = view('ajustes').querySelector('[data-tarjeta="voz"]');
+    const campoV = (c) => tarjetaV.querySelector('[data-campo="' + c + '"]');
+    const errorV = (c) => { const f = campoV(c).closest('.rad-field'); return f.hasAttribute('data-invalid') ? f.textContent : ''; };
+    const dice = (cual) => shown(tarjetaV.querySelector('[data-estado="' + cual + '"] .rad-swap') ?? tarjetaV.querySelector('[data-estado="' + cual + '"]'));
+    if (!tarjetaV) fail('voz: no está la tarjeta Voice en Settings');
+    tarjetaV.scrollIntoView({ block: 'center' });
+    await until(() => tarjetaV.dataset.whisper === 'si', 4000);
+    await settle();
+    if (campoV('voz-activa').checked || campoV('voz-actua').checked || tarjetaV.dataset.conexion !== 'off' || !dice('voz-eco').startsWith('Off')) fail('voz: la tarjeta no muestra la escucha apagada: «' + dice('voz-eco') + '»');
+    if (!dice('voz-llave').startsWith('No key saved') || !campoV('voz-llave') || campoV('voz-llave').type !== 'password' || !tarjetaV.querySelector('[data-accion="voz-quitar-llave"]').disabled) fail('voz: la llave no figura como sin guardar, o su campo no es de contraseña');
+    if (!dice('voz-whisper').includes('Whisper is installed')) fail('voz: no dice si Python tiene Whisper: «' + dice('voz-whisper') + '»');
+    if (tarjetaV.querySelector('.dm-voz-ultima').offsetHeight !== 0) fail('voz: «lo último que se oyó» ocupa lugar sin haber oído nada');
+    enIngles('en la tarjeta Voice');
+
+    // La llave: una que no lo es se rechaza en su campo; la buena se guarda y el campo queda vacío.
+    const llaveBuena = (await sim({ que: 'limpiar' })).llaveDeMentira;
+    type(campoV('voz-llave'), 'not-a-key');
+    tarjetaV.querySelector('[data-accion="voz-guardar-llave"]').click();
+    await until(() => errorV('voz-llave'), 2000);
+    if (!errorV('voz-llave').includes('does not look like an ESPHome API key') || (await estadoV()).hayLlave) fail('voz: una llave mal formada no dio su error, o se guardó: «' + errorV('voz-llave') + '»');
+    type(campoV('voz-llave'), llaveBuena);
+    tarjetaV.querySelector('[data-accion="voz-guardar-llave"]').click();
+    await until(() => tarjetaV.dataset.llave === 'si', 3000);
+    await settle();
+    if (campoV('voz-llave').value !== '' || errorV('voz-llave') || !dice('voz-llave').startsWith('A key is saved and encrypted') || tarjetaV.querySelector('[data-accion="voz-quitar-llave"]').disabled) fail('voz: al guardar la llave el campo no quedó vacío, o no dice que está guardada');
+    if (JSON.stringify(await estadoV()).includes(llaveBuena) || document.body.innerHTML.includes(llaveBuena)) fail('voz: la llave del Echo volvió a la interfaz');
+    // La dirección: sin esquema ni barras.
+    type(campoV('voz-host'), 'http://atom/echo');
+    campoV('voz-host').dispatchEvent(new Event('change', { bubbles: true }));
+    await until(() => errorV('voz-host'), 2000);
+    if (!errorV('voz-host').includes('does not look right') || (await estadoV()).host !== '') fail('voz: una dirección mal escrita no dio su error, o se guardó');
+    type(campoV('voz-host'), 'fake-atom.local');
+    campoV('voz-host').dispatchEvent(new Event('change', { bubbles: true }));
+    await until(async () => (await estadoV()).host === 'fake-atom.local', 2000);
+    await sleep(120);
+    if (errorV('voz-host') || (await sim({})).conexiones !== 0) fail('voz: guardar la dirección dejó un error, o conectó con la escucha apagada');
+    // El agente: el que está en pantalla.
+    campoV('voz-agente').click();
+    await until(() => menus().length === 1, 2000);
+    await sleep(dur('base') + 80);
+    await pick(agenteV.nombre);
+    await sleep(150);
+
+    // Se prende: conecta con la llave, a esa dirección, como asistente de voz.
+    campoV('voz-activa').click();
+    await until(() => tarjetaV.dataset.conexion === 'connected', 4000);
+    await settle();
+    {
+      const s = await sim({});
+      if (tarjetaV.dataset.conexion !== 'connected' || !dice('voz-eco').includes('Connected to fake-atom (ESPHome 2026.4.5). Waiting for the wake word.')) fail('voz: al prenderla no dice que conectó: «' + dice('voz-eco') + '»');
+      if (s.conexiones !== 1 || s.suscripto !== 1 || s.llave !== true || s.host !== 'fake-atom.local' || s.eventos.length !== 0) fail('voz: no conectó como se esperaba: ' + JSON.stringify(s));
+      // (y quedó anotado a quién le habla, aunque fuera el que ya se veía elegido)
+      if ((await estadoV()).agente !== agenteV.id) fail('voz: al prenderla no quedó guardado el agente que recibe lo dicho: «' + (await estadoV()).agente + '»');
+      if (tarjetaV.querySelector('.rad-busy')) await until(() => !tarjetaV.querySelector('.rad-busy'), 3000);
+    }
+
+    // El Echo oye la palabra clave: mientras escucha, se ve (en la tarjeta y en la barra de abajo).
+    await sim({ que: 'pedir' });
+    await until(() => tarjetaV.dataset.fase === 'listening', 2000);
+    await settle();
+    if (!dice('voz-eco').includes('Listening…') || statusRight() !== 'Listening…') fail('voz: mientras el Echo escucha no se dice: tarjeta «' + dice('voz-eco') + '», barra «' + statusRight() + '»');
+    if ((await sim({})).cargas !== 1) fail('voz: el modelo no empezó a cargar al oír la palabra clave');
+    // …y dice algo: va a un chat de voz del agente, sin sacar al usuario de Settings.
+    const chatAntes = datosM.chatActual()?.id;
+    const cuantosAntes = datosM.chatsDe(agenteV.id).length;
+    await sim({ que: 'hablar', texto: 'Okay Zac, what time is it?' });
+    await until(() => chatsDeVoz().length === 1, 4000);
+    const chatV = chatsDeVoz()[0];
+    if (!chatV) fail('voz: lo dicho no abrió un chat de voz');
+    await quieto(chatV.id);
+    {
+      const s = await sim({});
+      if (s.eventos.join() !== 'RESPUESTA,RUN_START,STT_START,STT_VAD_END,STT_END,RUN_END') fail('voz: al Echo no se le avisó cada paso (es lo que prende su LED): ' + s.eventos.join());
+      if (JSON.stringify(s.datos[4]) !== JSON.stringify([{ name: 'text', value: 'what time is it?' }])) fail('voz: al Echo no le llegó el texto sin la palabra clave: ' + JSON.stringify(s.datos[4]));
+      if (view('ajustes').inert) fail('voz: lo dicho sacó al usuario de Settings');
+      if (datosM.chatActual()?.id !== chatAntes || datosM.chatsDe(agenteV.id).length !== cuantosAntes + 1) fail('voz: lo dicho cambió el chat que estaba abierto, o no creó exactamente un chat');
+      const hilo = (await datosM.hilo(chatV.id)).get().mensajes;
+      if (hilo.length !== 2 || hilo[0].rol !== 'user' || hilo[0].texto !== 'what time is it?' || hilo[0].voz !== true || hilo[1].estado !== 'ok' || !hilo[1].texto.includes('what time is it?')) fail('voz: el chat de voz no quedó con lo dicho y su respuesta: ' + JSON.stringify(hilo).slice(0, 300));
+      const aviso = avisosV().find((n) => n.textContent.includes('heard:'));
+      if (!aviso || !aviso.textContent.includes(agenteV.nombre + ' heard: “what time is it?”') || !aviso.querySelector('button')) fail('voz: no avisó qué oyó, con cómo ir al chat: ' + (aviso?.textContent ?? '(sin aviso)'));
+      const w = await window.rad.invoke('voz:ultimo-aviso');
+      if (!w || w.titulo !== agenteV.nombre || !w.cuerpo.includes('what time is it?') || w.chat !== chatV.id) fail('voz: al terminar el turno no se pidió el aviso de Windows con la respuesta: ' + JSON.stringify(w));
+      if (statusRight() === 'Listening…' || statusRight() === 'Transcribing…' || tarjetaV.dataset.fase !== 'idle') fail('voz: después de la frase la barra quedó en «' + statusRight() + '»');
+      if (!dice('voz-ultima').includes('Last heard: “what time is it?”') || tarjetaV.querySelector('.dm-voz-ultima').offsetHeight === 0) fail('voz: Settings no dice qué fue lo último que se oyó: «' + dice('voz-ultima') + '»');
+      // El botón del aviso lleva al chat: lo dicho lleva su micrófono, y la fila del chat, el suyo.
+      [...(aviso?.querySelectorAll('button') ?? [])].find((b) => b.textContent.trim() === 'Open')?.click();
+      await until(() => datosM.chatActual()?.id === chatV.id && msgs().length === 2, 4000);
+      await settle();
+      if (datosM.chatActual()?.id !== chatV.id || view('chat').inert) fail('voz: «Open» no llevó al chat de voz');
+      const dicho = msgs()[0];
+      if (!dicho?.querySelector('.dm-msg-voz') || !dicho.querySelector('.dm-msg-voz svg') || !dicho.querySelector('.dm-msg-voz').textContent.includes('Said to the Atom Echo') || msgs()[1]?.querySelector('.dm-msg-voz')) fail('voz: el mensaje dicho no lleva su marca de micrófono (o la lleva la respuesta)');
+      const filaV = rows().find((r) => r.dataset.radKey === chatV.id);
+      const otras = rows().filter((r) => r.dataset.radKey !== chatV.id && r.querySelector('.dm-fila-voz'));
+      if (!filaV?.hasAttribute('data-voz') || !(filaV.querySelector('.dm-fila-voz')?.offsetWidth > 0) || otras.some((r) => r.querySelector('.dm-fila-voz').offsetWidth > 0)) fail('voz: la fila del chat de voz no lleva su micrófono, o lo lleva otra');
+      enIngles('en un chat de voz');
+    }
+
+    // Otra frase al rato va al MISMO chat; dos seguidas salen en orden, una después de la otra.
+    await sim({ que: 'limpiar' });
+    sim({ que: 'frase', texto: 'first of two' });
+    await sim({ que: 'frase', texto: 'second of two' });
+    await until(async () => (await datosM.hilo(chatV.id)).get().mensajes.length === 6, 20000);
+    await quieto(chatV.id);
+    {
+      const hilo = (await datosM.hilo(chatV.id)).get().mensajes;
+      if (chatsDeVoz().length !== 1 || hilo.length !== 6 || hilo[2].texto !== 'first of two' || hilo[4].texto !== 'second of two' || !hilo[3].texto.includes('first of two') || !hilo[5].texto.includes('second of two') || hilo[5].estado !== 'ok') fail('voz: dos frases seguidas no quedaron en orden en el mismo chat: ' + JSON.stringify(hilo.map((m) => m.texto)).slice(0, 300));
+      if (avisosV().some((n) => n.textContent.includes('heard: “second of two”'))) fail('voz: avisa qué oyó aunque el chat de voz está a la vista');
+    }
+    // Pasada media hora sin hablar, la próxima frase abre un chat nuevo.
+    {
+      const nuevo = datosM.chatDeVoz(agenteV.id, Date.now() + datosM.VOZ_CHAT_MS + 1000);
+      if (nuevo.id === chatV.id || nuevo.voz !== true || datosM.chatActual()?.id !== chatV.id) fail('voz: pasada media hora no se abre un chat de voz nuevo, o se cambió el que estaba en pantalla');
+      await datosM.borrarChat(nuevo.id);
+      if (datosM.chatDeVoz(agenteV.id).id !== chatV.id) fail('voz: dentro de la media hora no vuelve al chat de voz que ya había');
+    }
+
+    // Nadie habla después de la palabra clave: no entra ningún mensaje, y se dice qué pasó.
+    await sim({ que: 'limpiar' });
+    const s0 = await sim({ que: 'silencio' });
+    await until(async () => (await sim({})).eventos.includes('RUN_END'), 4000);
+    await go('ajustes');
+    await settle();
+    if ((await datosM.hilo(chatV.id)).get().mensajes.length !== 6 || !dice('voz-ultima').includes('no speech followed') || s0.frases !== (await sim({})).frases) fail('voz: un silencio mandó un mensaje, transcribió, o Settings no lo dice: «' + dice('voz-ultima') + '»');
+    // Whisper falla: tampoco entra nada, y se dice por qué.
+    await sim({ que: 'frase', texto: 'x', falla: 'Python was not found.' });
+    await until(() => dice('voz-ultima').includes('could not be transcribed'), 4000);
+    if (!dice('voz-ultima').includes('Python was not found.') || (await datosM.hilo(chatV.id)).get().mensajes.length !== 6) fail('voz: una transcripción fallida no se explica en Settings: «' + dice('voz-ultima') + '»');
+
+    // Un turno de voz va en MANUAL aunque la app esté en automático: lo que pide permiso, lo pide.
+    datosM.ponerModoTools('auto');
+    const pideEscribirV = (archivo) => 'TOOLS: [{"name":"fs_write","args":{"path":"' + archivo + '","content":"said out loud\\n"}}]';
+    await go('chat');
+    await sim({ que: 'frase', texto: pideEscribirV('voice-no.txt') });
+    await until(() => permiso(), 6000);
+    if (!permiso() || !datosM.turnoDeVoz(chatV.id)) fail('voz: con la app en automático, un turno de voz escribió sin pedir permiso');
+    {
+      const w = await window.rad.invoke('voz:ultimo-aviso');
+      if (!w || w.titulo !== agenteV.nombre + ' needs your permission' || w.chat !== chatV.id) fail('voz: al quedar esperando permiso no se pidió el aviso de Windows: ' + JSON.stringify(w));
+    }
+    [...(permiso()?.querySelectorAll('.rad-modal-actions .rad-button') ?? [])].find((b) => b.textContent === 'Decline')?.click();
+    await closed();
+    await quieto(chatV.id);
+    // Con «Let voice act», corre como en automático.
+    await go('ajustes');
+    campoV('voz-actua').click();
+    await until(() => tarjetaV.dataset.actua === 'si', 2000);
+    await settle();
+    if (!shown(campoV('voz-actua').closest('.dm-tarjeta').querySelector('p.dm-tarjeta-instr.rad-swap')).includes('automatic mode')) fail('voz: prender «Let voice act» no cambia lo que explica la tarjeta');
+    datosM.ponerModoTools('manual');
+    await go('chat');
+    const antesAct = (await datosM.hilo(chatV.id)).get().mensajes.length;
+    await sim({ que: 'frase', texto: pideEscribirV('voice-si.txt') });
+    await until(async () => (await datosM.hilo(chatV.id)).get().mensajes.length > antesAct, 6000);
+    await quieto(chatV.id);
+    {
+      const hilo = (await datosM.hilo(chatV.id)).get().mensajes;
+      const escribio = hilo.slice(antesAct).find((m) => m.rol === 'tool');
+      if (permiso() || !escribio || escribio.estado !== 'ok') fail('voz: con «Let voice act» y la app en manual, el turno de voz no corrió solo: ' + JSON.stringify(hilo.slice(antesAct).map((m) => [m.rol, m.estado])).slice(0, 200));
+    }
+    // (lo tipeado sigue el modo de la app: «Let voice act» es solo de la voz)
+    await go('ajustes');
+    campoV('voz-actua').click();
+    await until(() => tarjetaV.dataset.actua === 'no', 2000);
+
+    // Se corta la conexión y vuelve; se apaga y se desconecta.
+    await sim({ que: 'cortar' });
+    await until(() => tarjetaV.dataset.conexion === 'connecting', 3000);
+    if (tarjetaV.dataset.conexion !== 'connecting') fail('voz: al cortarse la conexión la tarjeta sigue diciendo que está conectada');
+    await sim({ que: 'volver' });
+    await until(() => tarjetaV.dataset.conexion === 'connected', 3000);
+    campoV('voz-activa').click();
+    await until(() => tarjetaV.dataset.conexion === 'off', 3000);
+    await settle();
+    {
+      const s = await sim({});
+      if (tarjetaV.dataset.conexion !== 'off' || s.suscripto !== null || !dice('voz-eco').startsWith('Off') || !(s.apagadas >= 1)) fail('voz: al apagarla no se desconectó, o no soltó a Whisper: ' + JSON.stringify({ ...s, eventos: undefined, datos: undefined }));
+      const n = (await datosM.hilo(chatV.id)).get().mensajes.length;
+      await sim({ que: 'frase', texto: 'nobody is listening' });
+      await sleep(300);
+      if ((await datosM.hilo(chatV.id)).get().mensajes.length !== n) fail('voz: apagada, igual mandó lo que se dijo');
+    }
+    // Queda prendida para la pasada 2: al reabrir la app se conecta sola.
+    campoV('voz-activa').click();
+    await until(() => tarjetaV.dataset.conexion === 'connected', 4000);
+    datosM.ponerModoTools(modoAntes);
+    await go('chat');
+    data.voz = 'apagada de fábrica, la llave cifrada y fuera de la interfaz, conectar, una frase a un chat de voz sin sacar al usuario de donde está, dos seguidas en orden, silencio y Whisper caído, manual aunque la app esté en automático, «Let voice act», corte y reconexión';
   }
 
   data.tools = `Toolsmith: ${tools().length} filas en el último chat; permiso, rechazo, dos rondas, confianza por chat, código, base propia, un job, dos capturas, argumentos malos y modo automático`;

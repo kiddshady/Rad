@@ -1,7 +1,7 @@
 {
   "name": "daimon",
   "productName": "BlackCode",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": true,
   "description": "BlackCode: an AI chat with several agents, each with its own provider, model, instructions and chats.",
   "author": "Kidd Shady · Umbrovex Systems",
@@ -19,7 +19,8 @@
     "@lydell/node-pty": "1.2.0-beta.14",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@rad/core": "*",
-    "@rad/skin-mono": "*"
+    "@rad/skin-mono": "*",
+    "esphome-client": "2.1.0"
   },
   "build": {
     "appId": "com.umbrovex.daimon",
@@ -61,7 +62,16 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "artifactName": "BlackCode-Setup-${version}.${ext}"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "motor",
+        "to": "motor",
+        "filter": [
+          "*.py"
+        ]
+      }
+    ]
   },
   "devDependencies": {
     "@xterm/addon-fit": "0.11.0",

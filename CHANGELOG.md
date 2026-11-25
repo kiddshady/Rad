@@ -1,5 +1,34 @@
 # Changelog
 
+## BlackCode 1.1.0 (2026-11-25)
+
+- **Voz: darle una orden a un agente hablándole a un Atom Echo.** Se dice la
+  palabra clave y lo que sigue entra a un chat como si se hubiera tipeado.
+  BlackCode ocupa el lugar que tenía Home Assistant: se conecta al Echo por su
+  API nativa de ESPHome (con `esphome-client`), se suscribe como asistente de
+  voz, recibe el audio del micrófono por esa misma conexión, decide dónde
+  termina la frase y le va avisando al Echo en qué va, que es lo que prende su
+  LED. El firmware del Echo no se toca. BlackCode sale hacia el Echo: no abre
+  ningún puerto. Viene apagada.
+- **La frase se transcribe en esta máquina, con Whisper.** Corre en el Python
+  del usuario (`motor/escucha_motor.py`, con `openai-whisper`): el modelo
+  empieza a cargar apenas el Echo oye la palabra clave, mientras todavía se
+  habla, y se suelta a los cinco minutos sin uso. El audio no se guarda. Lo que
+  Whisper inventa en un silencio («Gracias.», los subtítulos de Amara) se
+  descarta, y la palabra clave se saca del principio de la frase.
+- **Lo dicho va a un chat de voz del agente elegido**, sin cambiar lo que hay
+  en pantalla: un aviso dice qué se oyó y lleva al chat, y si nadie mira la
+  ventana hay un aviso de Windows con la respuesta. El mensaje lleva un
+  micrófono (es lo que Whisper entendió) y la fila del chat, otro. Tras media
+  hora sin hablar, la frase siguiente abre un chat nuevo.
+- **Un turno de voz va en manual** aunque la app esté en automático: lo que
+  pide permiso muestra su tarjeta y espera. «Let voice act» lo deja correr
+  solo; agendar una tarea y los servidores MCP con «preguntar» siguen
+  preguntando. La frase la pudo haber dicho un video.
+- Settings → Voice: la dirección del Echo, su llave (cifrada con
+  `safeStorage`; la interfaz solo sabe si está puesta), el agente, el idioma,
+  si Python tiene Whisper, y qué fue lo último que se oyó.
+
 ## BlackCode 1.0.1 (2026-11-25)
 
 - En Skills, una skill que espera aprobación ya no lleva el canto amarillo a

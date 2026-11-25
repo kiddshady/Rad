@@ -199,6 +199,16 @@ function checkDisk(data, report) {
     const b = JSON.parse(fs.readFileSync(path.join(dir, '_tareas_bandeja.json'), 'utf8')).lista ?? [];
     if (b.length < 5 || !b.some((r) => r.titulo === 'Smoke writer' && r.actuo === true)) failures.push(`la bandeja de las tareas guardó ${b.length} resultados`);
   } catch { failures.push('las tareas programadas no quedaron guardadas (falta _tareas.json o _tareas_bandeja.json)'); }
+  // la voz: quedó prendida, con su dirección y la llave del Echo cifrada (nunca en claro)
+  try {
+    const crudo = fs.readFileSync(path.join(dir, '_voz.json'), 'utf8');
+    const v = JSON.parse(crudo);
+    const llaveDeMentira = Buffer.alloc(32, 9).toString('base64');
+    if (v.activa !== true || v.host !== 'fake-atom.local' || v.actua !== false || typeof v.llave !== 'string' || v.llave.length < 20) failures.push(`la config de la voz guardada: ${JSON.stringify({ ...v, llave: typeof v.llave })}`);
+    if (crudo.includes(llaveDeMentira)) failures.push('la llave del Atom Echo quedó en claro en el disco');
+  } catch { failures.push('la config de la voz no quedó guardada (falta _voz.json)'); }
+  if (leer('voice-si.txt') !== 'said out loud\n') failures.push(`un turno de voz con «Let voice act» no dejó su archivo: ${JSON.stringify(leer('voice-si.txt'))}`);
+  if (leer('voice-no.txt') !== null) failures.push('un turno de voz sin permiso escribió su archivo');
   if (leer('task-si.txt') !== 'from a task\n') failures.push(`una tarea con «Let it act» no dejó su archivo: ${JSON.stringify(leer('task-si.txt'))}`);
   if (leer('task-no.txt') !== null) failures.push('una tarea de solo lectura escribió task-no.txt');
   const borrado = report.script?.chatBorrado;

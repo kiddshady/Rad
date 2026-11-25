@@ -640,6 +640,23 @@
   .dm-carpeta[data-falta] { color: var(--rad-warning); }
   /* …y la de inicio, en Settings */
   .dm-carpeta-inicio-fila { display: flex; align-items: center; gap: var(--rad-space-3); min-width: 0; }
+
+  /* ---------- La voz ---------- */
+  /* En Settings: el agente y el idioma van lado a lado; el estado de Whisper,
+     con su botón a la derecha. Lo último que se oyó no ocupa lugar si no hay. */
+  .dm-voz-par { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rad-space-4); align-items: start; }
+  .dm-voz-whisper { display: flex; align-items: center; gap: var(--rad-space-3); min-width: 0; }
+  .dm-voz-whisper .dm-estado { flex: 1; min-width: 0; }
+  .dm-voz-ultima { margin: 0; font-size: var(--rad-text-s); color: var(--rad-text-2); overflow-wrap: anywhere; user-select: text; }
+  .dm-voz-ultima[data-vacia] { display: none; }
+  /* En el chat: lo que se dijo (no se tipeó) lleva su marca debajo, y la fila
+     de un chat de voz, un micrófono delante del nombre. */
+  .dm-msg-voz { display: inline-flex; align-items: center; gap: var(--rad-space-1); font-size: var(--rad-text-xs, var(--rad-text-s)); color: var(--rad-text-3); }
+  .dm-msg-voz svg { width: 12px; height: 12px; flex: none; }
+  .dm-fila-voz { display: none; flex: none; color: var(--rad-text-3); line-height: 0; }
+  .dm-fila-voz svg { width: 12px; height: 12px; }
+  .dm-fila[data-voz] .dm-fila-voz { display: block; }
+  .dm-fila[aria-current] .dm-fila-voz { color: var(--rad-text-2); }
   .dm-carpeta-inicio { flex: 1; min-width: 0; font-size: var(--rad-text-s); color: var(--rad-text-1); overflow-wrap: anywhere; user-select: text; }
 
   /* ---------- Los adjuntos ---------- */
