@@ -1,5 +1,10 @@
 # Changelog
 
+## BlackCode 0.20.2 (2026-11-25)
+
+- El campo de las instrucciones de un agente (su system prompt) tiene el doble
+  de alto: 14 renglones en vez de 7.
+
 ## BlackCode 0.20.1 (2026-11-25) · núcleo 0.18.1
 
 - **Sobre la scrollbar de un campo de texto va la flecha**, no el cursor de

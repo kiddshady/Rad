@@ -240,6 +240,14 @@ else {
   modal().querySelector('[data-campo="modelo"][data-activo]').dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
   await frame();
   await pick('Haiku');
+  {
+    // El campo de las instrucciones: 14 renglones (el doble de antes), sin
+    // manija; y el formulario sigue entrando en la ventana, con sus botones.
+    const ti = modal().querySelector('[data-campo="instrucciones"]');
+    const renglon = parseFloat(getComputedStyle(ti).lineHeight);
+    if (ti.rows !== 14 || ti.offsetHeight < renglon * 14 || getComputedStyle(ti).resize !== 'none') fail(`el campo de instrucciones del agente mide ${ti.offsetHeight} px (${ti.rows} renglones de ${renglon} px, resize ${getComputedStyle(ti).resize}): tienen que ser 14 renglones, fijo`);
+    if (modal().offsetHeight > innerHeight) fail(`con el campo de instrucciones más alto, el formulario del agente no entra en la ventana (${modal().offsetHeight} de ${innerHeight} px)`);
+  }
   type(modal().querySelector('[data-campo="instrucciones"]'), INSTRUCCIONES);
   primary().click();
   await frame();

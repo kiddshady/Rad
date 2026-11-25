@@ -71,7 +71,10 @@ export function abrirAgente(agente = null) {
   const campoModelo = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: `dm-modelo-${n}` }, 'Model'), celda, nota);
   ponerProveedor();
 
-  const instrucciones = h('textarea', 'rad-input', { rows: '7', spellcheck: 'false', placeholder: 'Who this agent is, what it knows and how it answers.', 'data-campo': 'instrucciones' });
+  // (14 renglones: el doble de los 7 que tenía. Un system prompt es largo, y
+  // en 7 se escribía a ciegas: Fran, 25/11/2026. Si la ventana es baja, el
+  // formulario scrollea.)
+  const instrucciones = h('textarea', 'rad-input', { rows: '14', spellcheck: 'false', placeholder: 'Who this agent is, what it knows and how it answers.', 'data-campo': 'instrucciones' });
   instrucciones.value = agente?.instrucciones ?? '';
   const campoInstr = h('label', 'rad-field', {},
     h('span', 'rad-field-label', {}, 'Instructions'),
