@@ -17,11 +17,21 @@ const svg = (paths) => `<svg viewBox="0 0 16 16" stroke-width="1.5" stroke-linec
 
 export const ICONOS = {
   chat: svg('<path d="M2.5 4.5A1.5 1.5 0 0 1 4 3h8a1.5 1.5 0 0 1 1.5 1.5v5A1.5 1.5 0 0 1 12 11H7.5l-3 2.5V11H4a1.5 1.5 0 0 1-1.5-1.5z"/>'),
-  agentes: svg('<circle cx="6" cy="5.75" r="2.5"/><path d="M1.5 13c.4-2.2 2.2-3.5 4.5-3.5s4.1 1.3 4.5 3.5"/><path d="M10.6 3.4a2.5 2.5 0 0 1 0 4.7M12.2 9.9c1.2.5 2 1.6 2.3 3.1"/>'),
+  // Los agentes: el robotito de Umbra (el `robot` de su Icon.jsx; Fran lo pidió
+  // acá, nov 2026). Es su trazo tal cual: allá la grilla es de 24 con trazo de
+  // 2, así que va escalado a esta de 16, con el trazo compensado para que quede
+  // en el 1,5 de los demás. Cabeza cuadrada con antena, ojos de raya, orejas y
+  // hombros.
+  agentes: svg('<g transform="scale(.6667)" stroke-width="2.25"><rect x="5" y="5" width="14" height="11.5" rx="3.5"/><path d="M12 5V2.8"/><circle cx="12" cy="1.8" r="1.1" fill="currentColor" stroke="none"/><path d="M3.5 9.5v2.5M20.5 9.5v2.5M9.5 9.4v2.8M14.5 9.4v2.8"/><path d="M5.5 21v-1.5a2.5 2.5 0 0 1 2.5-2.5h8a2.5 2.5 0 0 1 2.5 2.5V21"/></g>'),
   ajustes: svg('<path d="M2.5 5h6M11.5 5h2M2.5 11h2M7.5 11h6"/><circle cx="10" cy="5" r="1.5"/><circle cx="6" cy="11" r="1.5"/>'),
   // (las pestañas de Settings que no tenían ícono: imágenes, integraciones, acerca de)
   imagen: svg('<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><circle cx="6" cy="6.5" r="1"/><path d="M3 11.5l3-3 2.5 2.5 2-2 2.5 2.5"/>'),
-  enchufe: svg('<path d="M6 2.5v3M10 2.5v3M4.5 5.5h7V8a3.5 3.5 0 0 1-7 0zM8 11.5v2"/>'),
+  // (el enchufe va en diagonal, como la llave y la herramienta que tiene al lado)
+  enchufe: svg('<g transform="translate(-.6 .6) rotate(45 8 8)"><path d="M6 2.5v3M10 2.5v3M4.5 5.5h7V8a3.5 3.5 0 0 1-7 0zM8 11.5v2"/></g>'),
+  // La voz: la onda de Verba (las cinco barras de su marca, con las mismas
+  // proporciones), en el trazo de acá. No es `canal`, que es el de los chats
+  // que entran solos.
+  onda: svg('<path d="M3 6.5v3M5.5 4.6v6.8M8 3v10M10.5 5.2v5.6M13 6.5v3"/>'),
   info: svg('<circle cx="8" cy="8" r="5.5"/><path d="M8 7.5V11"/><circle cx="8" cy="5.2" r=".6" fill="currentColor" stroke="none"/>'),
   mas: svg('<path d="M8 3v10M3 8h10"/>'),
   puntos: svg('<circle cx="3.5" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1.1" fill="currentColor" stroke="none"/>'),

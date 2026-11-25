@@ -4321,6 +4321,26 @@ else {
       await asentar();
       if (visibles() !== 'tools' || tituloM() !== 'Tools' || m.querySelectorAll('.dm-ajustes-titulo .rad-swap > *').length !== 1 || m.dataset.tab !== 'tools') fail('ajustes: después del cambio se ve «' + visibles() + '» y el título dice «' + m.querySelector('.dm-ajustes-titulo').textContent + '»');
       data.ajustesCambio = dice;
+      // Debajo del título no hay línea: en reposo no hay nada que esfumar, y lo que sube se esfuma (no se corta al aire).
+      {
+        const pT = panel('tools');
+        const fade = () => parseFloat(getComputedStyle(pT).getPropertyValue('--rad-fade-top')) || 0;
+        if (getComputedStyle(m.querySelector('.dm-ajustes-cabeza')).boxShadow !== 'none' || getComputedStyle(m.querySelector('.dm-ajustes-cabeza')).borderBottomWidth !== '0px') fail('ajustes: el título de la pestaña lleva una línea debajo');
+        if (!(pT.scrollHeight > pT.clientHeight + 40)) fail('ajustes: Tools ya no es más alta que el modal: la prueba del esfumado no prueba nada');
+        if (!pT.classList.contains('at-top') || fade() !== 0) fail('ajustes: en reposo, arriba, ya hay esfumado debajo del título (' + fade() + ' px)');
+        const primera = pT.querySelector('.dm-tarjeta').getBoundingClientRect().top - pT.getBoundingClientRect().top;
+        pT.scrollTop = 160;
+        const pasosF = new Set();
+        for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 200;) { pasosF.add(Math.round(fade())); await frame(); }
+        if (!(fade() > 8) || pT.classList.contains('at-top')) fail('ajustes: con la pestaña subida, debajo del título se corta al aire (esfumado de ' + fade() + ' px)');
+        else if (pasosF.size < 3) fail('ajustes: el esfumado de debajo del título aparece de golpe (' + [...pasosF].join(' → ') + ')');
+        if (primera < fade() - 0.5) fail('ajustes: en reposo el esfumado tocaría la primera tarjeta (está a ' + r2(primera) + ' px y el esfumado mide ' + fade() + ')');
+        if (!/gradient/.test(getComputedStyle(pT).maskImage || getComputedStyle(pT).webkitMaskImage || '')) fail('ajustes: la pestaña no tiene la máscara del esfumado');
+        if (parseFloat(getComputedStyle(pT).getPropertyValue('--rad-fade-bottom')) !== 0) fail('ajustes: abajo, contra el borde del modal, hay esfumado (ahí corta limpio)');
+        data.ajustesFade = [...pasosF].join(' → ') + ' px';
+        pT.scrollTop = 0;
+        await sleep(dur('base') + 120);
+      }
       // dos cambios seguidos: no queda ninguna a medio ver
       boton('voice').click();
       await sleep(40);
@@ -4400,6 +4420,28 @@ else {
       await sleep(dur('slow') + 220);
       if (!ajustesAbierto() || m.dataset.tab !== 'providers' || visibles() !== 'providers') fail('ajustes: «Go to Settings» no abrió en Providers (se ve «' + visibles() + '»)');
       if (!boton('providers').querySelector('svg g[transform]')) fail('ajustes: Providers no lleva la llave de Prism (la de contorno continuo, en diagonal)');
+      // Los íconos que pidió Fran: Voice con el suyo (la onda de Verba: cinco barras, la del medio la más alta), no el de
+      // los canales; el enchufe de Integrations en diagonal; y Agents, en la titlebar, con el robot de Umbra.
+      {
+        const dibujo = (el) => el?.querySelector('svg')?.innerHTML ?? '';
+        // (el ícono del grupo «Channels», no su flecha)
+        const canal = dibujo(chatView.querySelector('[data-grupo="canales"] .rad-icon:not(.dm-canales-chev)'));
+        if (!/<circle/.test(canal)) fail('ajustes: no encuentro el ícono de los canales para comparar (la prueba no prueba nada)');
+        const barras = (dibujo(boton('voice')).match(/M[\d.]+ [\d.]+v[\d.]+/g) ?? []).map((b) => Number(b.split('v')[1]));
+        if (!canal || dibujo(boton('voice')) === canal) fail('ajustes: Voice lleva el ícono de los canales');
+        if (barras.length !== 5 || Math.max(...barras) !== barras[2] || !(barras[0] < barras[1] && barras[4] < barras[3])) fail('ajustes: el ícono de Voice no es la onda de cinco barras (altos ' + barras.join() + ')');
+        if (!/rotate\(45 /.test(boton('integrations').querySelector('svg g')?.getAttribute('transform') ?? '')) fail('ajustes: el enchufe de Integrations no va en diagonal');
+        const robot = document.querySelector('.rad-tab[data-view="agentes"] svg');
+        if (!robot?.querySelector('rect[rx]') || robot.querySelectorAll('circle').length !== 1 || !robot.querySelector('g[transform^="scale"]')) fail('ajustes: Agents no lleva el robot de Umbra (cabeza, antena con su punta y hombros)');
+        // ninguno se sale de su caja de 16
+        for (const [nombre, el] of [['Voice', boton('voice')], ['Integrations', boton('integrations')], ['Agents', document.querySelector('.rad-tab[data-view="agentes"]')]]) {
+          const svg = el.querySelector('svg');
+          const c = svg.getBoundingClientRect();
+          const d = [...svg.querySelectorAll('path, rect, circle')].map((x) => x.getBoundingClientRect());
+          const fuera = Math.max(c.left - Math.min(...d.map((x) => x.left)), Math.max(...d.map((x) => x.right)) - c.right, c.top - Math.min(...d.map((x) => x.top)), Math.max(...d.map((x) => x.bottom)) - c.bottom);
+          if (fuera > 0.2) fail('ajustes: el ícono de ' + nombre + ' se sale ' + r2(fuera) + ' px de su caja');
+        }
+      }
       await go('chat');
       data.ajustes = 'modal de ' + Math.round(caja.width) + '×' + Math.round(caja.height) + ' sobre la vista, siete pestañas con sus tarjetas, cambio en orden, flechas, un modal encima, Esc, ×, clic afuera, recuerda la pestaña, y navegar lo cierra';
     }

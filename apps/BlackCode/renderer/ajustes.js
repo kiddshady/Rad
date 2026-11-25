@@ -4,6 +4,7 @@
 import { openModal, confirm } from '/@core/modal.js';
 import { reconcile } from '/@core/list.js';
 import { createSelect, setFieldError, wireControls } from '/@core/controls.js';
+import { wireScroll } from '/@core/scroll.js';
 import { swapText, ms, token, cancelAll, opacityNow, SAFETY_MS } from '/@core/motion.js';
 import { toast } from '/@core/toast.js';
 import { setBusy } from '/@core/busy.js';
@@ -1071,7 +1072,7 @@ export const PESTANAS = [
   { id: 'tools', nombre: 'Tools', icono: 'tool' },
   { id: 'images', nombre: 'Images', icono: 'imagen' },
   { id: 'integrations', nombre: 'Integrations', icono: 'enchufe' },
-  { id: 'voice', nombre: 'Voice', icono: 'canal' },
+  { id: 'voice', nombre: 'Voice', icono: 'onda' },
   { id: 'about', nombre: 'About', icono: 'info' },
 ];
 const esPestana = (id) => PESTANAS.some((p) => p.id === id);
@@ -1111,9 +1112,12 @@ function armar() {
   for (const p of PESTANAS) {
     const boton = h('button', 'dm-ajustes-tab', { type: 'button', role: 'tab', id: `dm-ajustes-tab-${p.id}`, 'data-tab': p.id, 'aria-selected': 'false', 'aria-controls': `dm-ajustes-panel-${p.id}`, tabindex: '-1' },
       icono(p.icono), h('span', '', {}, p.nombre));
-    const panel = h('div', 'dm-ajustes-panel', { role: 'tabpanel', id: `dm-ajustes-panel-${p.id}`, 'data-tab': p.id, 'aria-labelledby': `dm-ajustes-tab-${p.id}` },
+    // (`rad-scroll`: lo que sube se esfuma debajo del título, que no lleva
+    // línea. Abajo no: ahí el límite es el borde del modal.)
+    const panel = h('div', 'dm-ajustes-panel rad-scroll', { role: 'tabpanel', id: `dm-ajustes-panel-${p.id}`, 'data-tab': p.id, 'data-rad-line': 'bottom', 'aria-labelledby': `dm-ajustes-tab-${p.id}` },
       h('div', 'dm-ajustes-pila', {}, ...tarjetas[p.id]));
     panel.inert = true;
+    wireScroll(panel);
     boton.addEventListener('click', () => mostrar(p.id));
     nav.append(boton);
     celda.append(panel);

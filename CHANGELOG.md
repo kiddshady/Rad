@@ -1,5 +1,23 @@
 # Changelog
 
+## BlackCode 1.5.1 (2026-11-25)
+
+Retoques de Settings y tres íconos, pedidos por Fran al ver la 1.5.0.
+
+- **El título de la pestaña ya no lleva línea debajo.** Lo que sube se esfuma
+  ahí en vez de cortarse contra una raya (el `rad-scroll` del núcleo). En
+  reposo no hay esfumado, y el respiro de arriba mide lo mismo que él, así no
+  toca la primera tarjeta. Abajo, contra el borde del modal, sigue cortando
+  limpio.
+- **Voice tiene su ícono:** la onda de Verba (las cinco barras de su marca, con
+  sus proporciones). Llevaba el de los canales, que es el de los chats que
+  entran solos.
+- **Agents lleva el robotito de Umbra** (el `robot` de su `Icon.jsx`, tal cual:
+  escalado de su grilla de 24 a la de 16, con el trazo compensado), en la
+  titlebar y en «Manage agents».
+- **El enchufe de Integrations va en diagonal,** como la llave y la
+  herramienta que tiene arriba.
+
 ## BlackCode 1.5.0 (2026-11-25) · núcleo 0.20.0
 
 - **Settings es un modal con pestañas.** Era una página larga con doce
