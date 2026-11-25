@@ -511,6 +511,39 @@ menuBtn.click();
 await sleep(300);
 if (openMenus().length) fail('el click sobre el ancla volvió a abrir el menú');
 
+// 7b. Con un menú abierto, lo de atrás no scrollea: la rueda fuera del menú
+// se frena, y adentro pasa solo si el menú tiene para dónde ir. (Un evento de
+// rueda fabricado no scrollea nada: lo que se mira es si el núcleo lo frenó.)
+{
+  const rueda = (el, deltaY) => { const e = new WheelEvent('wheel', { deltaY, bubbles: true, cancelable: true }); el.dispatchEvent(e); return e.defaultPrevented; };
+  if (rueda(capas, 100)) fail('sin ningún menú abierto, la rueda está frenada');
+  menuBtn.click();
+  await sleep(250);
+  const m = openMenus()[0];
+  if (!m) fail('el menú no abrió (prueba de la rueda)');
+  else {
+    if (!rueda(capas, 100) || !rueda(document.body, -100)) fail('con un menú abierto, la rueda fuera del menú mueve lo de atrás');
+    const item = m.querySelector('.rad-menu-item');
+    // un menú corto no tiene qué scrollear: la rueda adentro no sigue de largo a la página
+    if (m.scrollHeight <= m.clientHeight && !rueda(item, 100)) fail('la rueda sobre un menú que no scrollea pasa de largo a la página');
+    // uno que sí scrollea: adentro anda, hasta su tope
+    m.style.maxHeight = '40px';
+    await frame();
+    if (m.scrollHeight <= m.clientHeight) fail('no se pudo armar un menú que scrollee para probar la rueda');
+    else {
+      m.scrollTop = 0;
+      if (rueda(item, 100)) fail('la rueda adentro de un menú que scrollea está frenada');
+      if (!rueda(item, -100)) fail('en el tope de arriba de un menú, la rueda hacia arriba pasa de largo a la página');
+      m.scrollTop = m.scrollHeight;
+      if (!rueda(item, 100)) fail('en el tope de abajo de un menú, la rueda hacia abajo pasa de largo a la página');
+      if (rueda(item, -100)) fail('en el tope de abajo de un menú, la rueda hacia arriba está frenada');
+    }
+    keyOn(m, 'Escape');
+    await sleep(300);
+    if (rueda(capas, 100)) fail('con el menú ya cerrado, la rueda sigue frenada');
+  }
+}
+
 // 8. Cerrar a mitad de la entrada: da vuelta la entrada desde donde iba.
 menuBtn.click();
 await frame();

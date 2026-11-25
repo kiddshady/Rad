@@ -352,6 +352,13 @@
     user-select: text;
   }
   textarea.rad-input { resize: none; display: block; }
+  /* Sobre la scrollbar de un campo de texto va la flecha, no el cursor de
+     texto. Chromium le pone `cursor: text` al textarea ENTERO, barra
+     incluida; con `auto` decide por zona: el de texto sobre lo escrito y la
+     flecha sobre la barra. Medido con el evento cursor-changed de Electron:
+     de fábrica, pasar del texto a la barra no cambia el cursor; con auto,
+     cambia a la flecha. */
+  textarea { cursor: auto; }
   .rad-input::-webkit-inner-spin-button,
   .rad-input::-webkit-outer-spin-button,
   .rad-input::-webkit-search-cancel-button { -webkit-appearance: none; margin: 0; }

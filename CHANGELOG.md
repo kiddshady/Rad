@@ -1,5 +1,19 @@
 # Changelog
 
+## BlackCode 0.20.1 (2026-11-25) · núcleo 0.18.1
+
+- **Sobre la scrollbar de un campo de texto va la flecha**, no el cursor de
+  texto. Era de Chromium, que le pone el cursor de texto al campo entero,
+  barra incluida. Va en el núcleo: vale para todo campo de varios renglones de
+  cualquier app de Rad.
+- **Con un menú abierto, lo de atrás no se mueve.** Al abrir un desplegable
+  (el de los modelos, por ejemplo) la página seguía scrolleando por debajo y
+  el menú quedaba flotando lejos de su botón. También va en el núcleo.
+- **About you** (Memory) tiene alto fijo, el doble que antes, y ya no trae la
+  manija de la esquina para estirarlo. Lo que no entra, scrollea.
+- Lo mismo los otros dos campos que tenían manija: el detalle de un recuerdo
+  y las instrucciones de una skill quedan de alto fijo.
+
 ## BlackCode 0.20.0 (2026-11-25)
 
 - **El nombre de un chat lo escribe un modelo.** Al mandar el primer mensaje,

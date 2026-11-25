@@ -2188,6 +2188,13 @@ else {
     await go('memoria');
     const vista = view('memoria');
     const areaCore = vista.querySelector('[data-campo="core"]');
+    {
+      // About you: alto fijo, sin manija para estirarlo; y sobre su scrollbar va
+      // la flecha (cursor auto: el de texto solo sobre lo escrito).
+      const cs = getComputedStyle(areaCore);
+      if (cs.resize !== 'none' || Math.round(areaCore.getBoundingClientRect().height) !== 264) fail('memoria: About you mide ' + Math.round(areaCore.getBoundingClientRect().height) + ' px con resize «' + cs.resize + '» (tiene que ser fijo, 264 px)');
+      if (cs.cursor !== 'auto' || getComputedStyle(area).cursor !== 'auto') fail('un campo de texto de varios renglones lleva el cursor «' + cs.cursor + '»: sobre su scrollbar quedaría el cursor de texto en vez de la flecha');
+    }
     const cuentaCore = () => shown(vista.querySelector('[data-tarjeta="core"] .dm-memoria-cuenta'));
     const guardadoM = () => shown(vista.querySelector('.dm-memoria-guardado'));
     if (!vista.querySelector('.dm-memoria-vacia')?.textContent.includes('Nothing remembered yet') || filasM().length) fail('memoria: la vista vacía no lo dice');
@@ -2206,6 +2213,10 @@ else {
     await frame();
     if (!modal()?.querySelector('.rad-field[data-invalid]')) fail('memoria: se puede guardar un recuerdo vacío');
     type(modal().querySelector('[data-campo="hecho"]'), 'Has a cat named Miso');
+    {
+      const d = modal().querySelector('[data-campo="detalle"]');
+      if (getComputedStyle(d).resize !== 'none' || d.offsetHeight !== 200) fail('memoria: el campo del detalle mide ' + d.offsetHeight + ' px con resize «' + getComputedStyle(d).resize + '» (tiene que ser fijo, 200 px)');
+    }
     type(modal().querySelector('[data-campo="detalle"]'), 'Miso is three years old and hates the vacuum cleaner.');
     primary().click();
     await closed();
@@ -2344,6 +2355,14 @@ else {
     const campoS = (c) => modal().querySelector('[data-campo="' + c + '"]');
     type(campoS('nombre'), 'Bad Name');
     type(campoS('descripcion'), 'Use it when I ask for a summary');
+    {
+      const cuerpoS = campoS('cuerpo');
+      const alto = cuerpoS.offsetHeight; // (el alto de maquetado: la ventana todavía está entrando, y su escala achica el rectángulo)
+      await sleep(dur('base') + 160);
+      if (getComputedStyle(cuerpoS).resize !== 'none' || alto !== Math.min(320, Math.round(innerHeight * 0.46))) fail('skills: el campo de las instrucciones mide ' + alto + ' px con resize «' + getComputedStyle(cuerpoS).resize + '» (tiene que ser fijo: 320 px, o el 46 % del alto de la ventana si es menos)');
+      const cajaM = modal().getBoundingClientRect();
+      if (cajaM.bottom > innerHeight || cajaM.top < 0) fail('skills: con el campo de alto fijo el formulario no entra en la ventana (' + Math.round(cajaM.top) + ' a ' + Math.round(cajaM.bottom) + ' de ' + innerHeight + ')');
+    }
     type(campoS('cuerpo'), '# Brief\n\nThree bullets, no more.');
     boton2('Save').click();
     await until(() => modal()?.querySelector('.rad-field[data-invalid]'), 2000);
@@ -2762,6 +2781,20 @@ else {
     await settle();
     if (shown(tarjetaI?.querySelector('.dm-estado-texto')) !== 'Venice offers 2 image models with your key.') fail('imágenes: Settings dice «' + shown(tarjetaI?.querySelector('.dm-estado-texto')) + '»');
     enIngles('en Settings, con las imágenes');
+    // Con el menú de los modelos abierto, la página de atrás no scrollea (Fran
+    // la vio correr por debajo, con el menú flotando lejos de su botón).
+    {
+      const rueda = (el) => { const e = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true }); el.dispatchEvent(e); return e.defaultPrevented; };
+      if (rueda(tarjetaI)) fail('imágenes: sin ningún menú abierto, la rueda está frenada');
+      tarjetaI?.querySelector('[data-campo="img-modelo"]')?.click();
+      await until(() => menus().length === 1, 2000);
+      await sleep(dur('base') + 80);
+      if (!menus().length || !rueda(tarjetaI) || !rueda(view('ajustes'))) fail('imágenes: con el menú de modelos abierto, la rueda mueve la página de atrás');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await until(() => menus().length === 0, 2000);
+      await settle();
+      if (rueda(tarjetaI)) fail('imágenes: cerrado el menú, la rueda quedó frenada');
+    }
     const filtroI = tarjetaI?.querySelector('[data-campo="img-filtro"]');
     const notaI = () => shown(tarjetaI?.querySelector('.rad-switch + .dm-tarjeta-instr'));
     if (!filtroI?.checked || datosM.ajustesImagenes().filtro !== true || !notaI().includes('blurs an image')) fail('imágenes: el filtro de contenido adulto no arranca prendido («' + notaI() + '»)');

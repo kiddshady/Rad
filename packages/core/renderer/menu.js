@@ -134,12 +134,23 @@ export function openMenu({ anchor, at, items, side = 'bottom', align = 'start', 
     close({ restoreFocus: false });
   };
   const onBlur = () => close({ restoreFocus: false });
+  // Con un menú abierto, lo de atrás no se mueve. La rueda fuera del menú no
+  // scrollea la página (el menú es fijo: quedaba flotando lejos de su botón
+  // mientras la vista corría por debajo), y adentro pasa solo si el menú
+  // tiene para dónde ir: en su tope, o si no scrollea, tampoco sigue de largo
+  // a la página. Fran lo vio en un select de 52 modelos, 25/11/2026.
+  const onWheel = (e) => {
+    if (!el.contains(e.target)) { e.preventDefault(); return; }
+    const tope = el.scrollHeight - el.clientHeight;
+    if (tope <= 0 || (e.deltaY < 0 && el.scrollTop <= 0) || (e.deltaY > 0 && el.scrollTop >= tope - 1)) e.preventDefault();
+  };
 
   function close({ restoreFocus = true } = {}) {
     if (closed) return;
     closed = true;
     popStack();
     document.removeEventListener('pointerdown', onOutside, true);
+    document.removeEventListener('wheel', onWheel, true);
     window.removeEventListener('blur', onBlur);
     window.removeEventListener('resize', onBlur);
     anchor?.setAttribute('aria-expanded', 'false');
@@ -179,6 +190,8 @@ export function openMenu({ anchor, at, items, side = 'bottom', align = 'start', 
   });
 
   document.addEventListener('pointerdown', onOutside, true);
+  // (no pasivo: tiene que poder frenar el scroll)
+  document.addEventListener('wheel', onWheel, { capture: true, passive: false });
   window.addEventListener('blur', onBlur);
   window.addEventListener('resize', onBlur);
   el.focus({ preventScroll: true });
