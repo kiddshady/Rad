@@ -1,5 +1,18 @@
 # Changelog
 
+## BlackCode 0.20.0 (2026-11-25)
+
+- **El nombre de un chat lo escribe un modelo.** Al mandar el primer mensaje,
+  el chat se llama como siempre (el comienzo del mensaje) y, un momento
+  después, un modelo le pone un título corto sobre el tema, en el idioma del
+  mensaje.
+- Es un pedido chico aparte, con un modelo barato: Claude Haiku para los
+  agentes de Anthropic, el del propio agente para los de Venice. Lee el primer
+  mensaje y los nombres de los adjuntos, no el resto de la conversación.
+- Se nombra una sola vez. Un chat renombrado a mano no se toca. Si el pedido
+  falla o tarda, queda el nombre de siempre.
+- Se apaga en Settings, tarjeta «Chat names».
+
 ## BlackCode 0.19.1 (2026-11-25)
 
 - **El agente ya no cree que inventó lo que dijo de una imagen.** En el turno

@@ -394,6 +394,30 @@ function tarjetaTools() {
   return tarjeta;
 }
 
+// El nombre de los chats: lo escribe un modelo, o es el comienzo del primer
+// mensaje. Es un pedido chico más por chat nuevo, así que se puede apagar.
+function tarjetaTitulos() {
+  const input = h('input', '', { type: 'checkbox', role: 'switch', id: 'dm-titulos', 'data-campo': 'titulos' });
+  const nota = h('p', 'dm-tarjeta-instr rad-swap');
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'titulos' },
+    h('h2', 'dm-tarjeta-nombre', {}, 'Chat names'),
+    h('p', 'dm-tarjeta-instr', {}, 'A new chat gets its name from its first message. A model can write that name: it reads the first message and the names of the files attached to it, and answers with a short title.'),
+    h('label', 'rad-switch', {}, input, h('span', 'rad-switch-track'), 'Let a model name new chats'),
+    nota);
+  wireControls(tarjeta);
+  const poner = () => {
+    const si = datosApp.titulosConModelo();
+    input.checked = si;
+    swapText(nota, si
+      ? 'One small extra request for each new chat: Claude Haiku for Anthropic agents, the agent’s own model for Venice agents. A chat you rename yourself keeps your name.'
+      : 'A new chat is named with the beginning of its first message.');
+  };
+  input.addEventListener('change', () => datosApp.ponerTitulosConModelo(input.checked));
+  poner();
+  datosApp.on('ajustes', poner);
+  return tarjeta;
+}
+
 // Generar imágenes (la tool generate_image): con qué modelo de Venice, y su
 // filtro de contenido adulto. Usa la llave de Venice de más arriba. La tool
 // nace apagada en los agentes porque gasta plata: acá se dice.
@@ -489,6 +513,7 @@ export function montarAjustes(el, { router }) {
     tarjetaBusqueda(),
     tarjetaTools(),
     tarjetaCarpeta(),
+    tarjetaTitulos(),
     tarjetaImagenes(),
     tarjetaSubagentes(),
     tarjetaAcerca()));

@@ -48,6 +48,25 @@ const destino = (prov) => path.join(data, `escrito-por-${prov}.txt`);
 // ---------- Las dos APIs, de mentira ----------
 const vistos = []; // { api, url, body }
 const sse = (res, type, d) => res.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...d })}\n\n`);
+// El pedido que le pone nombre a un chat (main/titulo.cjs): es un pedido
+// suelto, aparte del turno. Se reconoce por sus instrucciones.
+const TITULO = 'Tools and a written file';
+const esDeTitulo = (api, body) => (api === 'venice'
+  ? String(body?.messages?.[0]?.content ?? '').startsWith('You name conversations')
+  : (typeof body?.system === 'string' ? body.system : (body?.system ?? []).map((b) => b.text ?? '').join('')).startsWith('You name conversations'));
+function tituloDeAnthropic(res, body) {
+  sse(res, 'message_start', { message: { id: 'msg_titulo', type: 'message', role: 'assistant', model: body.model, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 0 } } });
+  sse(res, 'content_block_start', { index: 0, content_block: { type: 'text', text: '' } });
+  sse(res, 'content_block_delta', { index: 0, delta: { type: 'text_delta', text: `"${TITULO}."` } });
+  sse(res, 'content_block_stop', { index: 0 });
+  sse(res, 'message_delta', { delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 5 } });
+  sse(res, 'message_stop', {});
+}
+function tituloDeVenice(res) {
+  res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: `"${TITULO}."` } }] })}\n\n`);
+  res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 7, completion_tokens: 3 } })}\n\n`);
+  res.write('data: [DONE]\n\n');
+}
 function deAnthropic(res, body) {
   const ronda = body.messages.some((m) => Array.isArray(m.content) && m.content.some((b) => b.type === 'tool_result')) ? 2 : 1;
   const bloques = ronda === 1
@@ -92,9 +111,11 @@ const server = http.createServer((req, res) => {
     if (req.method === 'GET' && url.startsWith('/v1/models')) return json({ data: [], has_more: false, first_id: null, last_id: null });
     const body = raw ? JSON.parse(raw) : null;
     const api = url.startsWith('/venice/') ? 'venice' : 'anthropic';
-    vistos.push({ api, url, body });
+    const titulo = esDeTitulo(api, body);
+    vistos.push({ api, url, body, titulo });
     res.writeHead(200, { 'content-type': 'text/event-stream' });
-    (api === 'venice' ? deVenice : deAnthropic)(res, body);
+    if (titulo) (api === 'venice' ? tituloDeVenice : tituloDeAnthropic)(res, body);
+    else (api === 'venice' ? deVenice : deAnthropic)(res, body);
     res.end();
   });
 });
@@ -135,6 +156,10 @@ for (const [prov, modelo] of [['anthropic', datos.modeloInicial('anthropic')], [
   if (filas.join() !== 'fs_write:ok') failures.push(prov + ': las filas de tools son [' + filas.join() + '], se esperaba fs_write:ok');
   if (ultimo?.dataset.estado !== 'ok') failures.push(prov + ': la respuesta terminó en «' + ultimo?.dataset.estado + '»: ' + (ultimo?.textContent ?? '').slice(0, 200));
   if (!out[prov].cuenta.includes('1 tool')) failures.push(prov + ': el contador dice «' + out[prov].cuenta + '»');
+  // el nombre del chat lo escribió el modelo (un pedido aparte), y llegó limpio
+  for (let i = 0; i < 40 && datos.chat(c.id).titulo !== 'Tools and a written file'; i++) await sleep(100);
+  out[prov].titulo = datos.chat(c.id).titulo;
+  if (datos.chat(c.id).titulo !== 'Tools and a written file') failures.push(prov + ': el chat quedó llamándose «' + datos.chat(c.id).titulo + '», no como lo nombró el modelo');
 }
 return { failures, data: out };
 `;
@@ -178,7 +203,19 @@ const failures = [...(report.failures ?? [])];
 const total = report.script?.tools ?? 0;
 const textoDe = (content) => (typeof content === 'string' ? content : (content ?? []).map((b) => b.text ?? '').join('\n'));
 for (const api of ['anthropic', 'venice']) {
-  const pedidos = vistos.filter((v) => v.api === api).map((v) => v.body);
+  // El pedido que nombra el chat va aparte: uno por chat, con un modelo
+  // barato en Anthropic y el del agente en Venice, sin tools, y con el
+  // primer mensaje adentro.
+  {
+    const titulos = vistos.filter((v) => v.api === api && v.titulo).map((v) => v.body);
+    const t = titulos[0];
+    const mensaje = t ? textoDe((t.messages ?? []).filter((m) => m.role === 'user').at(-1)?.content) : '';
+    if (titulos.length !== 1) failures.push(`${api}: llegaron ${titulos.length} pedidos de nombre para el chat, se esperaba 1`);
+    else if (t.model !== (api === 'anthropic' ? 'claude-haiku-5-5' : 'mock-con-tools')) failures.push(`${api}: el nombre del chat se pidió con ${t.model}`);
+    else if ((t.tools ?? []).length) failures.push(`${api}: el pedido del nombre del chat llevó tools`);
+    else if (!mensaje.includes('Do you have tools? Write the file.')) failures.push(`${api}: el pedido del nombre no trae el primer mensaje: ${mensaje.slice(0, 120)}`);
+  }
+  const pedidos = vistos.filter((v) => v.api === api && !v.titulo).map((v) => v.body);
   if (pedidos.length !== 2) { failures.push(`${api}: llegaron ${pedidos.length} pedidos al servidor, se esperaban 2 (la llamada y su resultado)`); continue; }
   const [p1, p2] = pedidos;
   const nombres = (p1.tools ?? []).map((t) => t.name ?? t.function?.name);

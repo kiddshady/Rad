@@ -83,6 +83,15 @@ if (window.rad.skin.id !== 'mono') fail(`BlackCode abrió con la piel ${window.r
   if (carril !== 0) fail(`las scrollbars de las páginas no son flotantes: una sin estilo reserva ${carril} px (¿falta --enable-features=OverlayScrollbar al lanzar?)`);
 }
 
+// El nombre de un chat nuevo lo escribe un modelo (prendido de fábrica). Todo
+// el guion espera los nombres de siempre (el comienzo del primer mensaje),
+// así que acá se apaga; se prende y se prueba en su bloque (11p).
+{
+  const d = await import('/datos.js');
+  if (!(await window.rad.store.read('smoke')) && !d.titulosConModelo()) fail('los nombres de chat con un modelo no vienen prendidos de fábrica');
+  d.ponerTitulosConModelo(false);
+}
+
 // ---------- Segunda pasada: lo de la primera sigue ahí ----------
 const marker = await window.rad.store.read('smoke');
 if (marker?.pass === 1) {
@@ -2779,6 +2788,75 @@ else {
     for (const a of avisosI()) a.querySelector('.rad-toast-close, [aria-label="Close"], [aria-label="Dismiss"]')?.click();
     await settle();
     data.imagenes = 'apagada de fábrica, la tarjeta con el precio, dos imágenes desde su archivo, la ruta en el chat, guardar y mostrar, un prompt rechazado, el tope del turno, y Settings con el filtro y el modelo';
+  }
+
+  // 11p. El nombre de un chat lo escribe un modelo. El chat arranca con el
+  // nombre de siempre (el comienzo del primer mensaje) y, cuando el modelo
+  // contesta, lo releva su título. Se nombra una sola vez, lo que el usuario
+  // renombró a mano no se toca, y con el ajuste apagado queda el de siempre.
+  // (En el humo no hay modelo: el título se arma con las tres primeras palabras.)
+  {
+    const datosM = await import('/datos.js');
+    datosM.ponerModoTools('auto');
+    const listoT = async () => { await sleep(200); for (let i = 0; i < 400 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50); await settle(); };
+    const tituloDe = (id) => datosM.chat(id)?.titulo;
+    const enLaLista = () => shown(rows().find((f) => f.getAttribute('aria-current') === 'true')?.querySelector('.dm-fila-titulo'));
+    const nuevoT = async () => { chatView.querySelector('[data-accion="nuevo-chat"]').click(); await settle(); return datosM.chatActual().id; };
+    const manda = (texto) => { type(area, texto); key(area, 'Enter'); };
+    if (datosM.titulosConModelo()) fail('títulos: el guion los había apagado y figuran prendidos');
+    datosM.ponerTitulosConModelo(true);
+
+    // Primero el nombre de siempre, enseguida; después el del modelo.
+    const c1 = await nuevoT();
+    manda('A red fox in the snow at dawn');
+    await frame();
+    await sleep(60);
+    if (tituloDe(c1) !== 'A red fox in the snow at dawn') fail('títulos: mientras el modelo no contesta, el chat no lleva el nombre de siempre: «' + tituloDe(c1) + '»');
+    await until(() => tituloDe(c1) === 'Simulated title: A red fox', 4000);
+    await settle();
+    if (tituloDe(c1) !== 'Simulated title: A red fox' || enLaLista() !== 'Simulated title: A red fox') fail('títulos: el nombre que escribió el modelo no llegó al chat: «' + tituloDe(c1) + '» (en la lista: «' + enLaLista() + '»)');
+    if (datosM.chat(c1).auto !== true) fail('títulos: un chat nombrado por el modelo quedó marcado como renombrado a mano');
+    await listoT();
+    // El segundo mensaje no lo vuelve a nombrar.
+    manda('And now something about owls instead');
+    await listoT();
+    await sleep(500);
+    if (tituloDe(c1) !== 'Simulated title: A red fox') fail('títulos: el segundo mensaje volvió a nombrar el chat: «' + tituloDe(c1) + '»');
+
+    // Renombrarlo a mano mientras el modelo piensa: manda el usuario.
+    const c2 = await nuevoT();
+    manda('Something else entirely over here');
+    await frame();
+    datosM.renombrarChat(c2, 'Mine');
+    await sleep(900);
+    if (tituloDe(c2) !== 'Mine') fail('títulos: el nombre del modelo pisó el que el usuario le puso a mano: «' + tituloDe(c2) + '»');
+    await listoT();
+
+    // Apagado: queda el nombre de siempre.
+    datosM.ponerTitulosConModelo(false);
+    const c3 = await nuevoT();
+    manda('Plain old name stays here');
+    await sleep(900);
+    if (tituloDe(c3) !== 'Plain old name stays here') fail('títulos: con el ajuste apagado igual lo nombró un modelo: «' + tituloDe(c3) + '»');
+    await listoT();
+
+    // Settings: el interruptor, que es lo que se guarda.
+    await go('ajustes');
+    const tarjetaT = view('ajustes').querySelector('[data-tarjeta="titulos"]');
+    const interruptorT = tarjetaT?.querySelector('[data-campo="titulos"]');
+    const notaT = () => shown(tarjetaT?.querySelector('.rad-switch + .dm-tarjeta-instr'));
+    if (!interruptorT || interruptorT.checked || !notaT().includes('beginning of its first message')) fail('títulos: Settings no muestra el ajuste apagado («' + notaT() + '»)');
+    enIngles('en Settings, con los nombres de los chats');
+    interruptorT?.click();
+    await settle();
+    if (!datosM.titulosConModelo() || (await window.rad.store.read('titulos'))?.activo !== true || !notaT().includes('One small extra request')) fail('títulos: prenderlo en Settings no quedó guardado («' + notaT() + '»)');
+    // (queda apagado: el resto del guion y la pasada 2 esperan los nombres de siempre)
+    interruptorT?.click();
+    await settle();
+    if (datosM.titulosConModelo() || (await window.rad.store.read('titulos'))?.activo !== false) fail('títulos: apagarlo en Settings no quedó guardado');
+    await go('chat');
+    datosM.ponerModoTools('manual');
+    data.titulos = 'el nombre de siempre primero y el del modelo después, una sola vez, sin pisar el que puso el usuario, apagado no nombra, y el interruptor de Settings';
   }
 
   // Cambiarle las tools a un agente que YA existía, desde su formulario.

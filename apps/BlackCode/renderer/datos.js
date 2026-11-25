@@ -33,7 +33,7 @@ const GUARDAR_CADA_MS = 1500;
 const TITULO_MAX = 46;
 const TITULO_NUEVO = 'New chat';
 
-let agentes, busqueda, delegados, imagenesDoc;
+let agentes, busqueda, delegados, imagenesDoc, titulosDoc;
 let chats;
 let ui;
 let catalogo = { proveedores: [] }; // los proveedores con sus modelos
@@ -57,7 +57,8 @@ const avisar = (tipo, detalle = {}) => { for (const fn of oyentes.get(tipo) ?? [
 
 // ---------- Arranque ----------
 export async function abrir() {
-  [imagenesDoc, delegados, busqueda, agentes, chats, ui, catalogo, herramientas] = await Promise.all([
+  [titulosDoc, imagenesDoc, delegados, busqueda, agentes, chats, ui, catalogo, herramientas] = await Promise.all([
+    openDoc('titulos', { activo: true }),
     openDoc('imagenes', { modelo: '', filtro: true }),
     openDoc('subagentes', { proveedor: null, modelo: '' }),
     openDoc('busqueda', { proveedor: 'duckduckgo' }),
@@ -139,6 +140,29 @@ export function sumarToolsNuevas(lista, conocidas, todas) {
   });
   return cambio ? out : null;
 }
+// ---------- El nombre de los chats ----------
+/** ¿El nombre de un chat nuevo lo escribe un modelo? (Settings; prendido de fábrica.) */
+export const titulosConModelo = () => titulosDoc.get().activo !== false;
+export function ponerTitulosConModelo(si) {
+  titulosDoc.patch({ activo: si === true });
+  avisar('ajustes');
+}
+// El chat ya tiene su nombre de siempre (el comienzo del primer mensaje); un
+// modelo lee ese mensaje y contesta con un título sobre el tema, que lo
+// releva cuando llega. Si falla, o tarda, queda el de siempre. Y si mientras
+// tanto el usuario lo renombró, manda él.
+async function nombrar(chatId, que) {
+  const antes = chat(chatId);
+  const a = antes && agente(antes.agente);
+  if (!a || !antes.auto) return;
+  const provisorio = antes.titulo;
+  const r = await window.rad.invoke('chat:titular', { proveedor: a.proveedor, modelo: a.modelo, ...que }).catch(() => null);
+  const c = chat(chatId);
+  if (!r?.ok || typeof r.titulo !== 'string' || !r.titulo || !c || !c.auto || c.titulo !== provisorio) return;
+  chats.update((v) => { const x = v.lista.find((y) => y.id === chatId); if (x) x.titulo = r.titulo; return v; });
+  avisar('chats');
+}
+
 // ---------- Las imágenes (generate_image) ----------
 /** Lo elegido en Settings: con qué modelo de Venice se generan ('' = el que
  *  Venice marque como predeterminado) y si va su filtro de contenido adulto.
@@ -440,6 +464,8 @@ export async function enviar(chatId, texto, adjuntos = null) {
     if (x.auto && primero) x.titulo = titular(limpio || archivos[0]?.name || (imagenes.length ? 'Image' : ''));
     return v;
   });
+  // …y, si está prendido, un modelo le escribe uno mejor mientras llega la respuesta
+  if (primero && titulosConModelo()) nombrar(chatId, { texto: limpio, archivos: archivos.map((f) => f.name), imagenes: imagenes.length });
 
   const pedido = nuevoId();
   respuestas.set(chatId, { pedido, mensaje: suyo, doc, pensando: false, guardado: Date.now() });

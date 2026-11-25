@@ -302,6 +302,16 @@ function wire(rad, { llave }) {
 
   // (la carpeta del catálogo es la de inicio, no la última por donde anduvo un agente)
   rad.handle('chat:tools', () => ({ ...herramientas.catalogo(), carpeta: carpetaInicio }));
+  // El nombre de un chat, puesto por un modelo (ver titulo.cjs). Es un pedido
+  // suelto, sin tools ni sesión, al mismo `responder` de un turno. La
+  // interfaz lo pide una vez, con el primer mensaje, si el usuario lo tiene
+  // prendido en Settings.
+  const titular = require('./titulo.cjs').crear({
+    responder: (proveedor, pedido, opciones) => RESPONDER[proveedor](pedido, opciones),
+    getKey: (proveedor) => (RESPONDER[proveedor] ? llave.leer(rad.store, proveedor) : null),
+    deMentira: llave.SIMULADO,
+  });
+  rad.handle('chat:titular', (que) => titular(que && typeof que === 'object' ? que : {}));
 
   // ---------- Las notas ----------
   // Los canales de su vista. Los cuerpos son los de NeonCode (notas.cjs): cada

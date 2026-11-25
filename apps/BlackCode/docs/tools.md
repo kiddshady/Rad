@@ -603,6 +603,10 @@ para arreglarlos de a uno, con su prueba:
 - `-browser.mjs`: las de NeonCode sobre un Electron de mentira (no abre
   ninguna ventana), más los runners y los canales de BlackCode. Las que allá miraban
   la interfaz de NeonCode no vinieron: la de BlackCode la prueba el humo.
+- `tools/test-blackcode-titulo.mjs`: el nombre de un chat puesto por un modelo, con un
+  `responder` de mentira (qué se le manda, con qué modelo, cómo se limpia lo que
+  contesta, el corte y el plazo). El humo en modo real lo prueba de punta a
+  punta contra las dos APIs de mentira.
 - `tools/test-blackcode-imagenes.mjs`: `generate_image` contra un servidor local que
   hace de Venice (los modelos, el pedido, los errores, el tope del turno, qué
   archivos se dejan leer).
