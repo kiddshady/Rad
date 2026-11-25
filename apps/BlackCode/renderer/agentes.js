@@ -90,9 +90,11 @@ export function abrirAgente(agente = null) {
   const filas = datos.gruposTools().map((g) => {
     const input = h('input', '', { type: 'checkbox', role: 'switch', 'data-grupo': g.id });
     input.checked = g.tools.some((t) => elegidas.has(t));
-    return { g, input, nodo: h('label', 'rad-switch', {}, input, h('span', 'rad-switch-track'), h('span', 'dm-tools-grupo', {}, g.nombre, h('small', '', {}, g.tools.join(', ')))) };
+    return { g, input, nodo: h('label', 'rad-switch', {}, input, h('span', 'rad-switch-track'), h('span', 'dm-tools-grupo', {}, g.nombre, h('small', '', {}, g.mcp ? datos.detalleMcp(g) : g.tools.join(', ')))) };
   });
-  const toolsElegidas = () => filas.filter((f) => f.input.checked).flatMap((f) => f.g.tools);
+  // (la marca de un servidor MCP apagado no tiene fila: el agente la conserva)
+  const sinFila = [...elegidas].filter((t) => datos.esMarcaMcp(t) && !filas.some((f) => f.g.tools.includes(t)));
+  const toolsElegidas = () => [...filas.filter((f) => f.input.checked).flatMap((f) => f.g.tools), ...sinFila];
   const ponerTools = () => {
     const modelo = selects.get(actual)?.select.value;
     const acepta = !modelo || datos.modeloConTools(actual, modelo);
@@ -219,4 +221,5 @@ export function montarAgentes(el, { router }) {
   datos.on('agentes', dibujar);
   datos.on('chats', dibujar);
   datos.on('modelos', dibujar);
+  datos.on('tools', dibujar);
 }

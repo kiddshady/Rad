@@ -1248,6 +1248,53 @@
   /* (de alto fijo y sin manija; en una ventana baja se achica para que el formulario entre) */
   .dm-skill-cuerpo { resize: none; height: min(320px, 46vh); font-size: var(--rad-text-s); line-height: 1.55; }
   .dm-skill-revision-que { color: var(--rad-text-2); }
+
+  /* Los servidores MCP, en Settings: uno debajo del otro, separados por una
+     línea. Cada uno dice dónde corre, cómo está y qué tools trae. */
+  .dm-mcp-lista { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); }
+  .dm-mcp-fila {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--rad-space-2);
+    min-width: 0;
+    padding: var(--rad-space-3);
+    border-radius: var(--rad-radius-m);
+    box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line);
+  }
+  .dm-mcp-fila + .dm-mcp-fila { margin-top: var(--rad-space-2); }
+  .dm-mcp-fila [hidden] { display: none; }
+  .dm-mcp-cabeza { display: flex; align-items: center; gap: var(--rad-space-1); min-width: 0; }
+  .dm-mcp-cabeza .dm-skill-nombre { font-size: var(--rad-text-m); font-weight: var(--rad-weight-strong); overflow-wrap: anywhere; }
+  .dm-mcp-donde { color: var(--rad-text-3); font-size: var(--rad-text-xs); overflow-wrap: anywhere; user-select: text; }
+  .dm-mcp-fila .dm-estado-texto { overflow-wrap: anywhere; user-select: text; }
+  .dm-mcp-tools {
+    color: var(--rad-text-2);
+    font-size: var(--rad-text-xs);
+    overflow-wrap: anywhere;
+    user-select: text;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+  }
+  .dm-mcp-secretos { overflow-wrap: anywhere; }
+  .dm-mcp-interruptores { display: flex; flex-wrap: wrap; gap: var(--rad-space-2) var(--rad-space-5); }
+  .dm-mcp-fila[data-estado='off'] .dm-skill-nombre { color: var(--rad-text-3); }
+  .dm-mcp-acciones { display: flex; flex-wrap: wrap; gap: var(--rad-space-2); }
+  /* El formulario: lo de un servidor local y lo de uno remoto se relevan
+     desplegándose (el que no va queda en alto 0, inerte). */
+  .rad-modal:has(.dm-mcp-form) { --rad-modal-width: 600px; }
+  .dm-mcp-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-3); min-width: 0; }
+  /* (align-self: con el margen negativo, estirada en su fila mediria lo que el margen le saca) */
+  .dm-mcp-parte { display: grid; align-self: start; grid-template-rows: 0fr; margin-top: calc(var(--rad-space-3) * -1); transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out), margin-top var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-mcp-parte[data-abierto] { grid-template-rows: 1fr; margin-top: 0; }
+  .dm-mcp-parte-in { min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-3); opacity: 0; transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out); }
+  .dm-mcp-parte[data-abierto] .dm-mcp-parte-in { opacity: 1; transition-delay: calc(var(--rad-dur-base) / 2); }
+  .dm-mcp-area, .dm-mcp-json { resize: none; font-size: var(--rad-text-s); line-height: 1.55; white-space: pre; overflow-wrap: normal; }
+  .dm-mcp-json { height: min(300px, 44vh); }
+  /* (la aclaración del interruptor es una frase, no nombres de tools: va en la fuente de la interfaz) */
+  .dm-mcp-form .dm-tools-grupo small { font-family: var(--rad-font-ui); }
   .dm-skill-propuesta {
     margin: 0;
     max-height: 34vh;

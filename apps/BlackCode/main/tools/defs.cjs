@@ -567,11 +567,20 @@ const GRUPOS = [
 ];
 
 const porNombre = new Map(TOOL_DEFS.map((t) => [t.name, t]));
-const existe = (name) => porNombre.has(name);
+// Las tools que NO están escritas acá: las de los servidores MCP que conectó
+// el usuario (main/mcp.cjs). Aparecen y desaparecen con sus servidores, así
+// que van en una lista aparte que se reemplaza entera. Mismo formato:
+// { name, description, parameters }.
+let dinamicas = new Map();
+function ponerDinamicas(lista) {
+  dinamicas = new Map((Array.isArray(lista) ? lista : []).filter((t) => t && typeof t.name === 'string' && !porNombre.has(t.name)).map((t) => [t.name, t]));
+}
+const defDe = (name) => porNombre.get(name) ?? dinamicas.get(name);
+const existe = (name) => porNombre.has(name) || dinamicas.has(name);
 
 /** El formato de OpenAI (Venice): { type: 'function', function: { … } }. */
 const paraOpenAI = (names) => names.filter(existe).map((n) => {
-  const t = porNombre.get(n);
+  const t = defDe(n);
   return { type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } };
 });
 
@@ -580,7 +589,7 @@ const paraOpenAI = (names) => names.filter(existe).map((n) => {
  *  de minutos. A cambio la API ya no los valida: lo hace validar(), antes de
  *  correr la tool. */
 const paraAnthropic = (names) => names.filter(existe).map((n) => {
-  const t = porNombre.get(n);
+  const t = defDe(n);
   return { name: t.name, description: t.description, input_schema: t.parameters, eager_input_streaming: true };
 });
 
@@ -592,10 +601,11 @@ const paraAnthropic = (names) => names.filter(existe).map((n) => {
  * Devuelve null si están bien, o el motivo.
  */
 function validar(name, args) {
-  const t = porNombre.get(name);
+  const t = defDe(name);
   if (!t) return null; // una tool desconocida la rechaza el despachador, con su mensaje
   if (!args || typeof args !== 'object' || Array.isArray(args)) return 'the arguments are not a JSON object';
-  const { properties = {}, required = [] } = t.parameters;
+  // (el esquema de una tool de MCP lo escribió su servidor: puede venir sin estas dos)
+  const { properties = {}, required = [] } = t.parameters ?? {};
   for (const k of required) if (args[k] === undefined || args[k] === null) return `missing required argument "${k}"`;
   const es = { string: (v) => typeof v === 'string', number: (v) => typeof v === 'number', integer: (v) => typeof v === 'number',
     boolean: (v) => typeof v === 'boolean', array: Array.isArray, object: (v) => v && typeof v === 'object' && !Array.isArray(v) };
@@ -610,4 +620,4 @@ function validar(name, args) {
   return null;
 }
 
-module.exports = { TOOL_DEFS, GRUPOS, existe, paraOpenAI, paraAnthropic, validar };
+module.exports = { TOOL_DEFS, GRUPOS, existe, paraOpenAI, paraAnthropic, validar, ponerDinamicas };

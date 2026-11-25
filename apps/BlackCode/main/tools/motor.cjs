@@ -46,6 +46,12 @@ function registrar(runners) {
   }
 }
 const registradas = () => Object.keys(TOOL_RUNNERS);
+/** Cambia de una vez todos los runners cuyo nombre empieza con `prefijo`: las
+ *  tools de los servidores MCP (`mcp_`), que aparecen y desaparecen con ellos. */
+function reemplazar(prefijo, runners) {
+  for (const k of Object.keys(TOOL_RUNNERS)) if (k.startsWith(prefijo)) delete TOOL_RUNNERS[k];
+  for (const [k, fn] of Object.entries(runners ?? {})) if (k.startsWith(prefijo) && typeof fn === 'function') TOOL_RUNNERS[k] = fn;
+}
 /** Las tools de ESTA corrida: las que el agente tiene prendidas y existen. */
 function activeToolNames(run) {
   let names = Array.isArray(run?.tools) ? run.tools.filter((n) => n in TOOL_RUNNERS) : [];
@@ -58,7 +64,9 @@ function activeToolNames(run) {
   if (run?.subagent) {
     names = names.filter((n) => n !== 'delegate' && n !== 'schedule' && n !== 'remember' && n !== 'create_skill'
       // (ni genera imágenes: gasta plata del usuario, y la pide quien habla con él)
-      && n !== 'generate_image');
+      && n !== 'generate_image'
+      // (ni usa servidores MCP: son código de terceros, que conecta y autoriza el usuario)
+      && !n.startsWith('mcp_'));
     if (run.subagent.access !== 'full') names = names.filter((n) => READ_ROUND_TOOLS.has(n));
     // El browser es UNO, compartido con el padre y el usuario, y todas sus tools
     // trabajan sobre la pestaña activa. Dos hijos a la vez con browser_navigate
@@ -569,7 +577,7 @@ function anotarRechazo(run, name, args, out) {
 }
 
 module.exports = {
-  registrar, configurar, registradas, activeToolNames, runTool, anotarRechazo, argsDigest, failedOut,
+  registrar, reemplazar, configurar, registradas, activeToolNames, runTool, anotarRechazo, argsDigest, failedOut,
   thrashCheck, thrashRecord, thrashState, thrashOf, congelarRutas, rondaEsLectura,
   READ_ROUND_TOOLS, BROWSER_ACTION_TOOLS, IDEMPOTENT_TOOLS, THRASH, CHIP_CHARS, DELEGATE_CHIP_CHARS,
 };

@@ -10,6 +10,7 @@ and under which license.
 | KaTeX fonts | `renderer/vendor/katex/fonts/` | OFL-1.1 — © Khan Academy and other contributors |
 | [Roboto Mono](https://github.com/googlefonts/RobotoMono) | `@rad/fonts` | OFL-1.1 — © The Roboto Mono Project Authors |
 | [xterm.js](https://xtermjs.org) | `renderer/vendor/xterm/` (module, fit addon, stylesheet), modified | MIT — © The xterm.js authors, © Christopher Jeffrey |
+| [Model Context Protocol SDK](https://github.com/modelcontextprotocol/typescript-sdk) | `node_modules/@modelcontextprotocol/sdk` and its dependencies | MIT — © Anthropic, PBC |
 | [@lydell/node-pty](https://github.com/lydell/node-pty) | `node_modules/@lydell/` (with its prebuilt binaries) | MIT — © Christopher Jeffrey, © Daniel Imms, © Microsoft Corporation, © Simon Lydell |
 
 The tool icons in `renderer/iconos-tools.js` came with the tools from NeonCode.

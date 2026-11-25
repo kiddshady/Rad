@@ -140,6 +140,11 @@ export function vistaDe(vista) {
   else if (vista.mode === 'toobig') frase('The file is too large to preview the change.', 'warning');
   else if (vista.mode === 'fail') frase(vista.error, 'warning');
   else if (vista.mode === 'nothing') frase('There is nothing at that path.', 'warning');
+  // una tool de un servidor MCP: de quién es, y por qué pregunta
+  else if (vista.mode === 'mcp') {
+    frase(`${vista.tool}, a tool of the MCP server “${vista.servidor}”. It is not part of BlackCode: what it does is up to that server.`);
+    if (vista.siempre) frase('This server is set to ask before each call.');
+  }
   // generar una imagen sale plata: con qué modelo, cuántas y cuánto
   else if (vista.mode === 'imagen') {
     frase(`${vista.cuantas} image${vista.cuantas === 1 ? '' : 's'} with ${vista.modelo}${vista.aspecto ? `, ${vista.aspecto}` : ''}${vista.resolucion ? `, ${vista.resolucion}` : ''}.`);
@@ -172,7 +177,7 @@ export function abrirPermiso(chatId, pide) {
   const confiar = h('input', '', { type: 'checkbox', id: `dm-confiar-${pide.callId}` });
   const args = h('dl', 'dm-permiso-args');
   for (const [k, v] of Object.entries(pide.args ?? {})) {
-    args.append(h('dt', '', {}, k), h('dd', 'rad-mono', {}, String(v)));
+    args.append(h('dt', '', {}, k), h('dd', 'rad-mono', {}, typeof v === 'string' ? v : JSON.stringify(v)));
   }
   const vista = vistaDe(pide.vista);
   const cuerpo = h('div', 'dm-permiso', {},

@@ -48,7 +48,8 @@ const SMOKE_URL = `http://127.0.0.1:${servidor.address().port}/`;
 // traza: una excepción del guion dice en qué línea fue.
 function armarGuion(carpeta) {
   let fuente = fs.readFileSync(SCRIPT, 'utf8');
-  const cabeza = `const SMOKE_URL = ${JSON.stringify(SMOKE_URL)};`;
+  // (…y dónde está el servidor MCP de mentira, que la app lanza con node)
+  const cabeza = `const SMOKE_URL = ${JSON.stringify(SMOKE_URL)}; const SMOKE_MCP = ${JSON.stringify(path.join(ROOT, 'tools', 'fake-mcp-server.cjs').replace(/\\/g, '/'))};`;
   if (process.env.RAD_SMOKE_TRAZA) {
     fuente = fuente.replace('const failures = [];', 'var failures = [];');
     fuente = `${cabeza} try {\n${fuente}\n} catch (e) { return { failures: [...failures, 'TRAZA (línea del guion = la del error menos 2): ' + (e.stack || e)], data: {} }; }`;
@@ -183,6 +184,12 @@ function checkDisk(data, report) {
     const exportadas = fs.existsSync(path.join(taller, 'exports')) ? fs.readdirSync(path.join(taller, 'exports')).filter((f) => /^image-.*\.png$/.test(f)) : [];
     if (exportadas.length !== 1 || !esPng(path.join(taller, 'exports', exportadas[0]))) failures.push(`«Save as…» de una imagen generada dejó ${exportadas.length} archivos en exports`);
   }
+  // los servidores MCP: quedó el del humo, con su variable cifrada (que no esté en claro lo mira el repaso de arriba), y no el que se quitó
+  try {
+    const m = JSON.parse(fs.readFileSync(path.join(dir, '_mcp.json'), 'utf8'));
+    const s = m.servidores ?? [];
+    if (s.length !== 1 || s[0].nombre !== 'Smoke' || typeof s[0].secreto !== 'string' || s[0].secreto.length < 20 || s[0].preguntar !== false || s[0].activo !== true || 'env' in s[0]) failures.push(`los servidores MCP guardados: ${JSON.stringify(s).slice(0, 300)}`);
+  } catch { failures.push('los servidores MCP no quedaron guardados (falta _mcp.json)'); }
   const borrado = report.script?.chatBorrado;
   if (!borrado) failures.push('el guion no dijo qué chat borró');
   else if (files.some((f) => f.startsWith(`chat-${borrado}.`))) failures.push(`el documento del chat borrado sigue en el disco: ${files.filter((f) => f.startsWith(`chat-${borrado}.`)).join(', ')}`);

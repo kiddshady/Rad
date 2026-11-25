@@ -38,6 +38,7 @@ let chats;
 let ui;
 let catalogo = { proveedores: [] }; // los proveedores con sus modelos
 let herramientas = { grupos: [], carpeta: '' }; // las tools que hay, por grupo
+let servidoresMcp = { disponible: true, servidores: [] }; // los servidores MCP, con su estado y sin sus secretos
 const hilos = new Map();      // id del chat -> promesa de su documento
 const respuestas = new Map(); // id del chat -> { pedido, mensaje, doc, pensando, guardado }
 const porPedido = new Map();  // id del pedido -> id del chat
@@ -68,6 +69,10 @@ export async function abrir() {
     window.rad.invoke('chat:modelos'),
     window.rad.invoke('chat:tools'),
   ]);
+  {
+    const m = await window.rad.invoke('mcp:lista').catch(() => null);
+    if (m && Array.isArray(m.servidores)) { servidoresMcp = m; podarMcp(); }
+  }
   // Hasta la 0.1.1 la interfaz estaba en castellano: un chat todavía sin
   // nombre propio se había guardado como «Chat nuevo».
   if (chats.get().lista.some((c) => c.auto && c.titulo === 'Chat nuevo')) {
@@ -87,6 +92,35 @@ export async function abrir() {
   window.rad.on('chat:evento', alLlegar);
   // La lista de modelos de Venice llega después, cuando el main la trae.
   window.rad.on('chat:modelos', (nuevo) => { catalogo = nuevo; avisar('modelos'); });
+  // Los servidores MCP conectan, se caen y se quitan con la app abierta: llega
+  // su estado y, detrás, el catálogo de tools con un grupo por servidor.
+  window.rad.on('mcp:estado', (lista) => {
+    if (!Array.isArray(lista)) return;
+    servidoresMcp = { ...servidoresMcp, servidores: lista };
+    podarMcp();
+    avisar('mcp');
+  });
+  window.rad.on('chat:tools', (nuevo) => { if (Array.isArray(nuevo?.grupos)) { herramientas = nuevo; avisar('tools'); } });
+}
+
+// ---------- Los servidores MCP ----------
+// Un agente no guarda las tools de un servidor (cambian con él): guarda una
+// marca, `mcp:<id del servidor>`, y el proceso principal la cambia por las
+// tools que ese servidor ofrece en el momento del pedido.
+export const MARCA_MCP = 'mcp:';
+export const esMarcaMcp = (t) => typeof t === 'string' && t.startsWith(MARCA_MCP);
+/** { disponible, servidores: [{ id, nombre, tipo, comando, args, url, env, headers, preguntar, activo, estado, tools, cortadas, error }] } */
+export const mcp = () => servidoresMcp;
+/** Lo que dice un grupo de un servidor MCP debajo de su nombre. */
+export const detalleMcp = (g) => (g.mcp.estado === 'connected' ? `${g.mcp.cuenta} tool${g.mcp.cuenta === 1 ? '' : 's'} from this server`
+  : g.mcp.estado === 'connecting' ? 'connecting' : 'not connected: it adds no tools until it connects');
+// Un servidor que se quitó se lleva su marca de los agentes que lo tenían.
+// (Uno APAGADO no: al prenderlo vuelve a los mismos agentes.)
+function podarMcp() {
+  const vivos = new Set(servidoresMcp.servidores.map((s) => `${MARCA_MCP}${s.id}`));
+  if (!agentes.get().lista.some((a) => toolsDe(a).some((t) => esMarcaMcp(t) && !vivos.has(t)))) return;
+  agentes.update((v) => { for (const a of v.lista) if (Array.isArray(a.tools)) a.tools = a.tools.filter((t) => !esMarcaMcp(t) || vivos.has(t)); return v; });
+  avisar('agentes');
 }
 
 // ---------- Proveedores y modelos ----------
@@ -178,10 +212,13 @@ export function ponerImagenes(cambio) {
 export const conMemoria = (a) => toolsDe(a).some((t) => t === 'remember' || t === 'recall');
 /** Cuántas tools viajan de verdad en un pedido de ese agente: las que tiene
  *  prendidas, o ninguna si su modelo no las acepta. */
-export const toolsQueViajan = (a) => (a && modeloConTools(a.proveedor, a.modelo) ? toolsDe(a).length : 0);
+export const toolsQueViajan = (a) => (a && modeloConTools(a.proveedor, a.modelo)
+  // (la marca de un servidor MCP vale por las tools que ese servidor ofrece ahora)
+  ? toolsDe(a).reduce((n, t) => n + (esMarcaMcp(t) ? (herramientas.grupos.find((g) => g.id === t)?.mcp?.cuenta ?? 0) : 1), 0) : 0);
 /** Cambia las tools de un agente sin tocar nada más (el menú de la conversación). */
 export function ponerTools(id, tools) {
-  const validas = new Set(herramientas.grupos.flatMap((g) => g.tools));
+  // (la marca de un servidor MCP apagado no tiene grupo, pero se conserva)
+  const validas = new Set([...herramientas.grupos.flatMap((g) => g.tools), ...servidoresMcp.servidores.map((s) => `${MARCA_MCP}${s.id}`)]);
   agentes.update((v) => {
     const a = v.lista.find((x) => x.id === id);
     if (a) a.tools = [...new Set(tools)].filter((t) => validas.has(t));

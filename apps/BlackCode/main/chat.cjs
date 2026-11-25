@@ -215,6 +215,22 @@ function wire(rad, { llave }) {
     // la corrida sabe si su modelo ve (lo anota el pedido, más abajo)
     modeloVe: (run) => run?.ve === true,
   };
+  // ---------- Los servidores MCP ----------
+  // Su configuración va en un documento reservado (`_mcp`: la interfaz no lo
+  // puede leer) y sus secretos —variables de entorno y encabezados, que suelen
+  // ser llaves— cifrados con safeStorage, como las llaves de las APIs. A la
+  // interfaz le llega el estado sin esos valores. Ver main/mcp.cjs.
+  const DOC_MCP = '_mcp';
+  let avisarMcp = () => {}; // se arma más abajo, con el catálogo de tools
+  const { safeStorage } = require('electron');
+  const mcp = require('./mcp.cjs').crear({
+    leer: () => rad.store.read(DOC_MCP),
+    escribir: (doc) => rad.store.write(DOC_MCP, doc),
+    cifrar: (texto) => { try { return safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(texto).toString('base64') : null; } catch { return null; } },
+    descifrar: (blob) => { try { return safeStorage.decryptString(Buffer.from(String(blob), 'base64')); } catch { return null; } },
+    alCambiar: () => avisarMcp(),
+  });
+  const paraMcp = { mcp };
   // generate_image: la llave de Venice (la misma de los agentes de Venice), lo
   // que el usuario eligió en Settings (el modelo y el filtro de contenido
   // adulto) y, en el humo, sin red.
@@ -231,7 +247,7 @@ function wire(rad, { llave }) {
       ...paraElCanvas,
       ...paraElNavegador,
       ...paraLaBusqueda,
-      ...paraLosSubagentes, ...paraLaMemoria, ...paraLasImagenes,
+      ...paraLosSubagentes, ...paraLaMemoria, ...paraLasImagenes, ...paraMcp,
       abrirAfuera: (u) => anotar(`url ${u}`),
       trash: (ruta) => fs.promises.rename(ruta, path.join(taller, '.trash', `${Date.now()}-${path.basename(ruta)}`)),
       // y no miran la pantalla de nadie: capturan una de mentira
@@ -249,11 +265,16 @@ function wire(rad, { llave }) {
     const carpeta = path.join(path.dirname(rad.store.dir), 'tools');
     fs.mkdirSync(carpeta, { recursive: true });
     const { desktopCapturer, screen } = require('electron');
-    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, ...paraLosSubagentes, ...paraLaMemoria, ...paraLasImagenes, abrirAfuera: (u) => shell.openExternal(u) });
+    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, ...paraLosSubagentes, ...paraLaMemoria, ...paraLasImagenes, ...paraMcp, abrirAfuera: (u) => shell.openExternal(u) });
     herramientas.setCwd(rad.store.read(DOC_TOOLS)?.carpeta);
   }
   // Al salir, lo que quedó corriendo en segundo plano se mata.
   require('electron').app.on('before-quit', () => herramientas.cerrar());
+  // Los servidores MCP activos se conectan al abrir la app, de a uno y sin
+  // frenar nada (un local puede tardar: npx baja el paquete la primera vez).
+  // Al salir se cierran: los locales son procesos hijos.
+  mcp.conectarActivos().catch(() => {});
+  require('electron').app.on('before-quit', () => { mcp.cerrar().catch(() => {}); });
   // La terminal del panel: una shell del USUARIO, que abre donde están
   // trabajando las tools. Ninguna tool llega a ella (ver terminal.cjs). En el
   // humo es una shell sin el profile de nadie.
@@ -301,7 +322,11 @@ function wire(rad, { llave }) {
   }));
 
   // (la carpeta del catálogo es la de inicio, no la última por donde anduvo un agente)
-  rad.handle('chat:tools', () => ({ ...herramientas.catalogo(), carpeta: carpetaInicio }));
+  const catalogoTools = () => ({ ...herramientas.catalogo(), carpeta: carpetaInicio });
+  rad.handle('chat:tools', catalogoTools);
+  // Un servidor MCP conectó, se cayó, se quitó o cambió: a la interfaz le llega
+  // su estado (sin secretos) y el catálogo de tools, que trae un grupo por servidor.
+  avisarMcp = () => { rad.send('mcp:estado', mcp.lista()); rad.send('chat:tools', catalogoTools()); };
   // El nombre de un chat, puesto por un modelo (ver titulo.cjs). Es un pedido
   // suelto, sin tools ni sesión, al mismo `responder` de un turno. La
   // interfaz lo pide una vez, con el primer mensaje, si el usuario lo tiene
@@ -366,6 +391,14 @@ function wire(rad, { llave }) {
     };
     for (const [canal, fn] of Object.entries(canales)) rad.handle(`browser:${canal}`, async (arg) => (await nav[fn](arg)) ?? null);
   }
+
+  // ---------- Los servidores MCP, para Settings ----------
+  rad.handle('mcp:lista', () => ({ disponible: mcp.disponible(), servidores: mcp.lista() }));
+  rad.handle('mcp:guardar', (entrada) => mcp.guardar(entrada && typeof entrada === 'object' ? entrada : {}));
+  rad.handle('mcp:quitar', (id) => mcp.quitar(String(id ?? '')));
+  rad.handle('mcp:ajustar', (que) => mcp.ajustar(String(que?.id ?? ''), que && typeof que === 'object' ? que : {}));
+  rad.handle('mcp:reconectar', async (id) => { await mcp.reconectar(String(id ?? '')); return { ok: true }; });
+  rad.handle('mcp:pegar', (crudo) => mcp.pegar(typeof crudo === 'string' ? crudo.slice(0, 200000) : ''));
 
   // ---------- Las imágenes generadas ----------
   // Lo que generate_image guarda son archivos; la interfaz los pide por su
@@ -517,7 +550,8 @@ function wire(rad, { llave }) {
         // todos; uno de Venice, solo si Venice lo declara (ante la duda, no:
         // no ofrecerla a uno que ve solo le quita una tool)
         tools: pedido.proveedor === 'anthropic' || elModelo?.vision === true ? pedido.tools : pedido.tools.filter((n) => n !== 'screen_capture'),
-        confirma: () => pedido.modo !== 'auto' && !confiados.has(pedido.chat),
+        // (las tools de un servidor MCP con «preguntar» piden permiso también en automático)
+        confirma: (name) => (pedido.modo !== 'auto' || mcp.pregunta(name)) && !confiados.has(pedido.chat),
         // los runners avisan sin saber su callId: se lo pone la corrida
         notify(canal, datos) {
           const callId = datos.callId ?? this._callId;
@@ -541,7 +575,7 @@ function wire(rad, { llave }) {
               pendientes.delete(callId);
               resolve(permitir);
             });
-            avisar('confirmar', { callId, name, label: herramientas.argsDigest(name, args), args: recortar(args), vista, ...(quien?.sub ? { sub: quien.sub } : {}) });
+            avisar('confirmar', { callId, name, label: String(name).startsWith('mcp_') ? '' : herramientas.argsDigest(name, args), args: recortar(args), vista, ...(quien?.sub ? { sub: quien.sub } : {}) });
           });
         },
       });

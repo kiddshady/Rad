@@ -78,10 +78,16 @@ function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confir
     tools: tools.filter((n) => defs.existe(n) && motor.registradas().includes(n)),
     stopped: null,
     notify: notify ?? (() => {}),
-    needsConfirm: typeof confirma === 'function' ? () => confirma() === true : () => confirma,
+    // (con el nombre de la tool: las de un servidor MCP pueden pedir permiso aunque la app esté en automático)
+    needsConfirm: typeof confirma === 'function' ? (name, args) => confirma(name, args) === true : () => confirma,
     confirm: confirm ?? (async () => false),
   };
   const nombres = motor.activeToolNames(run);
+  // Las definiciones se toman UNA vez, al empezar el turno: las de MCP pueden
+  // cambiar si su servidor se cae o se reconecta, y que la lista de tools
+  // cambie a mitad de un turno lo rompe (en Anthropic invalida lo ya pensado).
+  const defsAnthropic = defs.paraAnthropic(nombres);
+  const defsOpenAI = defs.paraOpenAI(nombres);
   let cobradas = 0;
   let vueltas = 0;
 
@@ -90,8 +96,8 @@ function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confir
     /** ¿Este turno tiene tools? Sin ninguna, el proveedor conversa como siempre. */
     activa: nombres.length > 0,
     nombres,
-    paraAnthropic: () => defs.paraAnthropic(nombres),
-    paraOpenAI: () => defs.paraOpenAI(nombres),
+    paraAnthropic: () => structuredClone(defsAnthropic),
+    paraOpenAI: () => structuredClone(defsOpenAI),
 
     /** El system de un turno con tools: las instrucciones del agente, el
      *  entorno, y el protocolo de tools. La línea de puente va acá y no en las

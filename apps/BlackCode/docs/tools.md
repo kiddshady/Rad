@@ -69,6 +69,10 @@ Images es el único grupo **opcional**: gasta plata del usuario en cada llamada,
 así que no entra en «todas» (un agente nuevo nace sin él, y a los que ya
 existen no se les suma). Se prende a mano, por agente.
 
+Desde la 0.21.0 hay además **un grupo opcional por cada servidor MCP**
+conectado («MCP: <nombre>»), con las tools que ese servidor ofrezca. Ver «Los
+servidores MCP».
+
 La pantalla va sola en su grupo: es lo más privado que una tool puede mirar
 (lo que haya abierto, sin elegir qué), y se prende aparte de todo lo demás.
 
@@ -267,6 +271,10 @@ escribe qué hizo de verdad y qué quedó sin hacer, y el contador lo dice.
 Dos modos, en Settings: **manual** (pregunta antes de cada llamada; es el de
 fábrica) y **automático** (no pregunta nunca). En manual, la tarjeta tiene «no
 preguntar más en este chat», que dura hasta cerrar la app.
+
+La excepción son las tools de un servidor MCP con «Ask before each call»
+prendido (así nace cada servidor): preguntan también en automático. «No
+preguntar más en este chat» vale también para ellas.
 
 **No hay más rejas que esa.** No hay límite de carpetas ni filtro de comandos:
 una tool puede leer o escribir cualquier ruta que pueda el usuario de Windows y
@@ -483,6 +491,59 @@ el contexto y el cuerpo a pedido.
   correr. Tampoco vino que cada skill sea una tool propia (`skill_<nombre>`,
   con la lista de tools cambiando a mitad de un turno) ni `list_skills`.
 
+## Los servidores MCP
+
+Desde la 0.21.0. Un servidor MCP les suma tools a los agentes. Es **código de
+terceros** que el usuario conecta en Settings (tarjeta «MCP servers»). El
+cliente es el SDK oficial (`@modelcontextprotocol/sdk`) y la lógica vino de
+NeonCode: está en `main/mcp.cjs`, que no sabe nada de Electron (recibe dónde
+guardar y con qué cifrar) y por eso se prueba con node pelado.
+
+**Dos clases.** Local: un comando (`npx`, `uvx`, `node`, una ruta) y sus
+argumentos; es un proceso hijo de la app, por stdio, que arranca en la carpeta
+del usuario y se cierra al salir. Remoto: una dirección https (http solo para
+esta PC), primero por Streamable HTTP y, si el servidor es de los de antes, por
+SSE. No hay OAuth: un remoto se autentica con encabezados.
+
+**Los secretos.** Las variables de entorno de un local y los encabezados de un
+remoto suelen ser llaves. Se guardan cifrados con `safeStorage` en el
+documento `_mcp` (reservado: la interfaz no lo puede leer), como un solo
+bloque por servidor. A la interfaz le llegan **solo los nombres**. Al cambiar
+un servidor, el formulario muestra `NOMBRE=<saved>`: ese valor viaja como
+`null` y quiere decir «el que ya estaba». Sin cifrado disponible, un servidor
+con secretos no se guarda.
+
+**Las tools.** Viajan al modelo como `mcp_<servidor>_<tool>`: lo que no entra
+en `[a-zA-Z0-9_-]` se cambia por `_`, lo que pasa de 64 se corta con un hash,
+y dos que quedan iguales se desambiguan (el nombre real se usa para llamarla).
+La descripción va marcada (`[MCP server "nombre"] …`) y cortada a 900
+caracteres. De un servidor se ofrecen las primeras 80. El resultado se pasa a
+texto (una imagen o un audio, a un rótulo) y se corta a 8000. Las definiciones
+no están en `defs.cjs`: `defs.ponerDinamicas` y `motor.reemplazar('mcp_', …)`
+las cambian todas juntas cada vez que un servidor conecta, se cae o se quita, y
+una sesión toma las suyas una sola vez al empezar el turno (que la lista de
+tools cambie a mitad de un turno lo rompe).
+
+**El grupo.** Cada servidor activo es un grupo opcional. El agente no guarda
+las tools de un servidor (cambian con él) sino una marca, `mcp:<id>`, que
+`index.cjs` cambia por las tools de ese momento al armar la sesión. Apagar un
+servidor deja la marca en los agentes; quitarlo se la lleva.
+
+**El permiso.** Cada servidor tiene «Ask before each call», prendido al
+agregarlo. `chat.cjs` le pregunta a `mcp.pregunta(nombre)` en cada llamada:
+con eso prendido hay tarjeta aunque la app esté en automático. La tarjeta dice
+de qué servidor es la tool (`mcp.vista`).
+
+**Los subagentes** no reciben tools de MCP (`activeToolNames`).
+
+**El estado.** `connecting`, `connected` o `error` (con el motivo). Un servidor
+que se muere después de conectar pasa a error y deja de ofrecer sus tools; no
+se reintenta solo: se reconecta desde la tarjeta. Al abrir la app se conectan
+todos los activos a la vez.
+
+**Lo que no hay:** OAuth, recursos y prompts de MCP, sampling, y atender el
+aviso de que un servidor cambió su lista de tools (hay que reconectarlo).
+
 ## La terminal del panel no es una tool
 
 Desde la 0.14.0 hay una terminal al lado de la conversación (`main/terminal.cjs`,
@@ -500,7 +561,7 @@ lleva a la del chat que se vea en ese momento).
   `fs.cjs`, sin nada enchufado).
 - Mandar un mensaje a mitad del turno (steer).
 - Búsqueda en chats.
-- MCP, tareas programadas.
+- Tareas programadas.
 - Dónde guardar secretos para `http_request` (`{{secret:NOMBRE}}`): un pedido
   con un secreto falla diciendo que no está.
 - Con qué busca `web_search` se elige en Settings (tarjeta «Web search», desde
@@ -607,6 +668,12 @@ para arreglarlos de a uno, con su prueba:
   `responder` de mentira (qué se le manda, con qué modelo, cómo se limpia lo que
   contesta, el corte y el plazo). El humo en modo real lo prueba de punta a
   punta contra las dos APIs de mentira.
+- `tools/test-blackcode-mcp.mjs`: los servidores MCP contra uno de mentira
+  (`tools/fake-mcp-server.cjs`, hecho con el lado servidor del SDK): uno local
+  por stdio y uno remoto por HTTP con token, los dos en esta PC. Mira los
+  nombres, los secretos cifrados, el permiso, las marcas, el tope, lo que pasa
+  cuando el servidor se muere y el JSON pegado. El humo lo recorre desde
+  Settings (bloque 11q) y comprueba que reconecte al reabrir la app.
 - `tools/test-blackcode-imagenes.mjs`: `generate_image` contra un servidor local que
   hace de Venice (los modelos, el pedido, los errores, el tope del turno, qué
   archivos se dejan leer).
@@ -646,7 +713,8 @@ instalado. Ante la duda entre dos niveles, el de arriba. Los retoques chicos
 salen juntos en una versión, no una por cada uno.
 
 Ninguna toca la red ni gasta un token. Lo que no está probado es un modelo de
-verdad pidiendo tools, ni un modelo de Venice recibiendo una imagen.
+verdad pidiendo tools, ni un modelo de Venice recibiendo una imagen, ni un
+servidor MCP que no sea el de mentira.
 
 ## Sumar una tool
 

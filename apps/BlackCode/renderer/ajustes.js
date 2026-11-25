@@ -1,6 +1,7 @@
 // La vista de ajustes: una llave por proveedor, y de qué está hecha la app.
 
-import { confirm } from '/@core/modal.js';
+import { openModal, confirm } from '/@core/modal.js';
+import { reconcile } from '/@core/list.js';
 import { createSelect, setFieldError, wireControls } from '/@core/controls.js';
 import { swapText } from '/@core/motion.js';
 import { toast } from '/@core/toast.js';
@@ -8,7 +9,7 @@ import { setBusy } from '/@core/busy.js';
 import * as llave from './llave.js';
 import * as actualizacion from './actualizacion.js';
 import * as datosApp from './datos.js';
-import { h } from './piezas.js';
+import { h, icono } from './piezas.js';
 
 const PROVEEDORES = [
   {
@@ -505,6 +506,213 @@ function tarjetaCarpeta() {
   return tarjeta;
 }
 
+// Los servidores MCP: tools de terceros para los agentes. Un servidor es un
+// comando que corre en esta PC (stdio) o una dirección (HTTP). Sus variables
+// de entorno y sus encabezados suelen ser llaves: el proceso principal los
+// guarda cifrados y acá solo llegan sus NOMBRES. Al cambiar un servidor, un
+// valor escrito como GUARDADO quiere decir «el que ya estaba».
+const GUARDADO = '<saved>';
+const MCP_VACIO = '_vacio';
+const renglones = (t) => String(t ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+/** «NOMBRE=valor» por renglón → { out } o { error }. */
+function pares(texto, separador) {
+  const out = {};
+  for (const l of renglones(texto)) {
+    const i = l.search(separador);
+    if (i <= 0) return { error: `“${l.slice(0, 40)}” is not a name and a value.` };
+    const v = l.slice(i + 1).trim();
+    out[l.slice(0, i).trim()] = v === GUARDADO ? null : v;
+  }
+  return { out };
+}
+function tarjetaMcp() {
+  const pedir = (canal, ...args) => window.rad.invoke(canal, ...args);
+  const lista = h('div', 'dm-mcp-lista', { role: 'list' });
+  const bNuevo = h('button', 'rad-button', { type: 'button', 'data-accion': 'mcp-nuevo' }, 'Add server');
+  const bPegar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'mcp-pegar' }, 'Paste JSON');
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'mcp' },
+    h('h2', 'dm-tarjeta-nombre', {}, 'MCP servers'),
+    h('p', 'dm-tarjeta-instr', {}, 'An MCP server gives your agents more tools. It is someone else’s code, running on this PC or at a remote address: add only the ones you trust. Its tools are off on every agent until you turn its group on for that agent.'),
+    lista,
+    h('div', 'dm-mcp-acciones', {}, bNuevo, bPegar));
+
+  // ---------- El formulario ----------
+  function abrirServidor(s = null) {
+    const campo = (rotulo, control, pista) => h('label', 'rad-field', {}, h('span', 'rad-field-label', {}, rotulo), control, pista ? h('span', 'rad-field-hint', {}, pista) : null);
+    const area = (attrs) => h('textarea', 'rad-input rad-mono dm-mcp-area', { spellcheck: 'false', autocomplete: 'off', ...attrs });
+    const nombre = h('input', 'rad-input', { type: 'text', maxlength: '60', autocomplete: 'off', spellcheck: 'false', 'data-autofocus': !s, 'data-campo': 'mcp-nombre', placeholder: 'filesystem' });
+    const comando = h('input', 'rad-input rad-mono', { type: 'text', maxlength: '400', autocomplete: 'off', spellcheck: 'false', 'data-campo': 'mcp-comando', placeholder: 'npx' });
+    const args = area({ rows: '3', 'data-campo': 'mcp-args', placeholder: '-y\n@modelcontextprotocol/server-filesystem\nC:\\Users\\me\\Documents' });
+    const env = area({ rows: '2', 'data-campo': 'mcp-env', placeholder: 'API_KEY=value' });
+    const url = h('input', 'rad-input rad-mono', { type: 'text', maxlength: '2000', autocomplete: 'off', spellcheck: 'false', 'data-campo': 'mcp-url', placeholder: 'https://example.com/mcp' });
+    const headers = area({ rows: '2', 'data-campo': 'mcp-headers', placeholder: 'Authorization: Bearer value' });
+    const preguntar = h('input', '', { type: 'checkbox', role: 'switch', 'data-campo': 'mcp-preguntar' });
+    nombre.value = s?.nombre ?? '';
+    comando.value = s?.comando ?? '';
+    args.value = (s?.args ?? []).join('\n');
+    env.value = (s?.env ?? []).map((k) => `${k}=${GUARDADO}`).join('\n');
+    url.value = s?.url ?? '';
+    headers.value = (s?.headers ?? []).map((k) => `${k}: ${GUARDADO}`).join('\n');
+    preguntar.checked = s ? s.preguntar : true;
+
+    const secreto = 'Stored encrypted and never shown again.' + (s ? ` ${GUARDADO} keeps the value already stored.` : '');
+    const campos = {
+      nombre: campo('Name', nombre),
+      comando: campo('Command', comando, 'The program that starts the server: npx, uvx, node, python or a path.'),
+      args: campo('Arguments', args, 'One per line.'),
+      env: campo('Environment variables', env, `One per line, NAME=value. ${secreto}`),
+      url: campo('Address', url, 'An https address. http only for a server on this PC.'),
+      headers: campo('Headers', headers, `One per line, Name: value. ${secreto}`),
+    };
+    const hueco = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-mcp-tipo-rotulo' }, 'Where it runs'));
+    const parteLocal = h('div', 'dm-mcp-parte', {}, h('div', 'dm-mcp-parte-in', {}, campos.comando, campos.args, campos.env));
+    const parteRemota = h('div', 'dm-mcp-parte', {}, h('div', 'dm-mcp-parte-in', {}, campos.url, campos.headers));
+    const ponerTipo = (t) => {
+      parteLocal.toggleAttribute('data-abierto', t === 'local');
+      parteRemota.toggleAttribute('data-abierto', t === 'remoto');
+      parteLocal.inert = t !== 'local';
+      parteRemota.inert = t !== 'remoto';
+    };
+    const tipo = createSelect({
+      options: [{ value: 'local', label: 'On this PC (a command)' }, { value: 'remoto', label: 'At a remote address' }],
+      value: s?.tipo ?? 'local',
+      onChange: ponerTipo,
+    });
+    tipo.el.setAttribute('aria-labelledby', 'dm-mcp-tipo-rotulo');
+    tipo.el.dataset.campo = 'mcp-tipo';
+    hueco.append(tipo.el);
+    ponerTipo(s?.tipo ?? 'local');
+    const form = h('div', 'dm-mcp-form', {}, campos.nombre, hueco, parteLocal, parteRemota,
+      h('label', 'rad-switch', {}, preguntar, h('span', 'rad-switch-track'), h('span', 'dm-tools-grupo', {}, 'Ask before each call', h('small', '', {}, 'Its tools wait for your answer, also when tools run without asking.'))));
+    wireControls(form);
+    const guardar = async () => {
+      for (const c of Object.values(campos)) setFieldError(c, null);
+      const local = tipo.value === 'local';
+      const secretos = local ? pares(env.value, /=/) : pares(headers.value, /[:=]/);
+      if (secretos.error) { setFieldError(local ? campos.env : campos.headers, secretos.error); return false; }
+      const r = await pedir('mcp:guardar', {
+        id: s?.id, nombre: nombre.value, tipo: tipo.value, preguntar: preguntar.checked, activo: s ? s.activo : true,
+        ...(local ? { comando: comando.value, args: renglones(args.value), env: secretos.out } : { url: url.value, headers: secretos.out }),
+      }).catch((e) => ({ ok: false, error: String(e?.message ?? e) }));
+      if (r?.ok) return true;
+      const c = campos[r?.campo] ?? campos.nombre;
+      setFieldError(c, r?.error ?? 'Could not save the server.');
+      c.querySelector('.rad-input')?.focus();
+      return false;
+    };
+    const modal = openModal({
+      title: s ? 'Change MCP server' : 'Add MCP server',
+      body: form,
+      actions: [{ id: 'cancel', label: 'Cancel' }, { id: 'ok', label: 'Save', variant: 'primary', close: false, onClick: () => { guardar().then((bien) => { if (bien) modal.close('ok'); }); } }],
+    });
+    return modal;
+  }
+
+  // ---------- Pegar el JSON de las instrucciones de un servidor ----------
+  function abrirPegar() {
+    const texto = h('textarea', 'rad-input rad-mono dm-mcp-json', { rows: '12', spellcheck: 'false', autocomplete: 'off', 'data-autofocus': true, 'data-campo': 'mcp-json',
+      placeholder: '{\n  "mcpServers": {\n    "filesystem": {\n      "command": "npx",\n      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\\\Users\\\\me\\\\Documents"]\n    }\n  }\n}' });
+    const campoJson = h('label', 'rad-field', {}, h('span', 'rad-field-label', {}, 'Configuration'), texto,
+      h('span', 'rad-field-hint', {}, 'The "mcpServers" block from a server’s instructions. What comes in "env" and "headers" is stored encrypted. Each server is added set to ask before each call.'));
+    const form = h('div', 'dm-mcp-form', {}, campoJson);
+    wireControls(form);
+    const agregar = async () => {
+      setFieldError(campoJson, null);
+      const r = await pedir('mcp:pegar', texto.value).catch((e) => ({ agregados: [], errores: [String(e?.message ?? e)] }));
+      if (r.agregados?.length) toast({ text: `Added ${r.agregados.join(', ')}.`, kind: 'success' });
+      if (!r.errores?.length) return true;
+      setFieldError(campoJson, r.errores.join(' '));
+      return false;
+    };
+    const modal = openModal({
+      title: 'Paste MCP servers',
+      body: form,
+      actions: [{ id: 'cancel', label: 'Cancel' }, { id: 'ok', label: 'Add', variant: 'primary', close: false, onClick: () => { agregar().then((bien) => { if (bien) modal.close('ok'); }); } }],
+    });
+    return modal;
+  }
+
+  async function quitar(s) {
+    const si = await confirm({ title: 'Remove this server?', text: `“${s.nombre}” will be removed from BlackCode, with its stored variables, and from the agents that use it.`, confirmLabel: 'Remove', danger: true });
+    if (si) await pedir('mcp:quitar', s.id);
+  }
+
+  // ---------- La lista ----------
+  const TONOS = { connected: 'success', connecting: 'warning', error: 'danger' };
+  const estadoDe = (s) => {
+    if (!s.activo) return 'Turned off';
+    if (s.estado === 'connected') return `Connected · ${s.tools.length} tool${s.tools.length === 1 ? '' : 's'}${s.cortadas ? ` (${s.cortadas} more are not offered)` : ''}`;
+    if (s.estado === 'connecting') return 'Connecting';
+    if (s.estado === 'error') return `Could not connect: ${s.error ?? 'unknown error'}`;
+    return 'Not connected';
+  };
+  const dondeDe = (s) => (s.tipo === 'remoto' ? s.url : [s.comando, ...s.args].join(' '));
+  const secretosDe = (s) => {
+    const nombres = s.tipo === 'remoto' ? s.headers : s.env;
+    return nombres.length ? `${s.tipo === 'remoto' ? 'headers' : 'variables'} stored encrypted: ${nombres.join(', ')}` : '';
+  };
+  const fila = (s) => {
+    if (s.id === MCP_VACIO) { const p = h('p', 'dm-memoria-vacia rad-swap'); swapText(p, s.texto); return p; }
+    const yo = () => datosApp.mcp().servidores.find((x) => x.id === nodo.dataset.radKey) ?? datosApp.mcp().servidores.find((x) => x.id === s.id);
+    const activo = h('input', '', { type: 'checkbox', role: 'switch', 'data-accion': 'mcp-activo' });
+    const preguntar = h('input', '', { type: 'checkbox', role: 'switch', 'data-accion': 'mcp-preguntar' });
+    const reconectar = h('button', 'rad-iconbutton', { type: 'button', 'data-accion': 'mcp-reconectar', 'aria-label': 'Reconnect', 'data-rad-tip': 'Reconnect' }, icono('recargar'));
+    const editar = h('button', 'rad-iconbutton', { type: 'button', 'data-accion': 'mcp-editar', 'aria-label': 'Change', 'data-rad-tip': 'Change' }, icono('lapiz'));
+    const borrar = h('button', 'rad-iconbutton', { type: 'button', 'data-accion': 'mcp-quitar', 'aria-label': 'Remove', 'data-rad-tip': 'Remove' }, icono('tacho'));
+    const nodo = h('div', 'dm-mcp-fila', { role: 'listitem' },
+      h('div', 'dm-mcp-cabeza', {},
+        h('div', 'dm-skill-textos', {}, h('span', 'dm-skill-nombre'), h('span', 'dm-mcp-donde rad-mono')),
+        reconectar, editar, borrar),
+      h('p', 'dm-estado', { role: 'status' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), h('span', 'dm-estado-texto rad-swap')),
+      h('span', 'dm-mcp-tools rad-mono'),
+      h('span', 'dm-memoria-de dm-mcp-secretos'),
+      h('div', 'dm-mcp-interruptores', {},
+        h('label', 'rad-switch', {}, activo, h('span', 'rad-switch-track'), 'On'),
+        h('label', 'rad-switch', {}, preguntar, h('span', 'rad-switch-track'), 'Ask before each call')));
+    activo.addEventListener('change', () => { const x = yo(); if (x) pedir('mcp:ajustar', { id: x.id, activo: activo.checked }); });
+    preguntar.addEventListener('change', () => { const x = yo(); if (x) pedir('mcp:ajustar', { id: x.id, preguntar: preguntar.checked }); });
+    reconectar.addEventListener('click', () => { const x = yo(); if (x) pedir('mcp:reconectar', x.id); });
+    editar.addEventListener('click', () => { const x = yo(); if (x) abrirServidor(x); });
+    borrar.addEventListener('click', () => { const x = yo(); if (x) quitar(x); });
+    wireControls(nodo);
+    ponerFila(nodo, s);
+    return nodo;
+  };
+  const texto = (el, t) => { if (el.textContent !== t) el.textContent = t; el.hidden = !t; };
+  function ponerFila(nodo, s) {
+    if (s.id === MCP_VACIO) { swapText(nodo, s.texto); return; }
+    nodo.dataset.servidor = s.nombre;
+    nodo.dataset.estado = s.activo ? s.estado : 'off';
+    texto(nodo.querySelector('.dm-skill-nombre'), s.nombre);
+    texto(nodo.querySelector('.dm-mcp-donde'), dondeDe(s));
+    const estado = nodo.querySelector('.dm-estado');
+    const tono = s.activo ? (TONOS[s.estado] ?? '') : '';
+    if (tono) estado.dataset.tono = tono; else delete estado.dataset.tono;
+    swapText(estado.querySelector('.dm-estado-texto'), estadoDe(s));
+    texto(nodo.querySelector('.dm-mcp-tools'), s.activo && s.estado === 'connected' ? s.tools.join(', ') : '');
+    texto(nodo.querySelector('.dm-mcp-secretos'), secretosDe(s));
+    const a = nodo.querySelector('[data-accion="mcp-activo"]');
+    if (a.checked !== s.activo) a.checked = s.activo;
+    const p = nodo.querySelector('[data-accion="mcp-preguntar"]');
+    if (p.checked !== s.preguntar) p.checked = s.preguntar;
+    nodo.querySelector('[data-accion="mcp-reconectar"]').hidden = !s.activo || s.estado === 'connecting';
+    setBusy(nodo, s.activo && s.estado === 'connecting');
+  }
+  function pintar() {
+    const m = datosApp.mcp();
+    const orden = [...m.servidores].sort((a, b) => a.nombre.localeCompare(b.nombre));
+    reconcile(lista, orden.length ? orden : [{ id: MCP_VACIO, texto: m.disponible ? 'No servers yet.' : 'This build has no MCP support.' }], { key: (s) => s.id, create: fila, update: ponerFila });
+    tarjeta.dataset.servidores = String(orden.length);
+    bNuevo.disabled = !m.disponible;
+    bPegar.disabled = !m.disponible;
+  }
+  bNuevo.addEventListener('click', () => abrirServidor());
+  bPegar.addEventListener('click', () => abrirPegar());
+  pintar();
+  datosApp.on('mcp', pintar);
+  return tarjeta;
+}
+
 export function montarAjustes(el, { router }) {
 
   el.append(h('div', 'dm-pagina', {},
@@ -515,6 +723,7 @@ export function montarAjustes(el, { router }) {
     tarjetaCarpeta(),
     tarjetaTitulos(),
     tarjetaImagenes(),
+    tarjetaMcp(),
     tarjetaSubagentes(),
     tarjetaAcerca()));
 

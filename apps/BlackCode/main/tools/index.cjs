@@ -30,6 +30,15 @@ const skills = require('./skills.cjs');
 const imagenes = require('./imagenes.cjs');
 
 let listo = false;
+let mcpApp = null; // los servidores MCP de la app (main/mcp.cjs), o null
+
+// Las tools de MCP no están escritas en defs.cjs ni tienen un runner propio:
+// cada vez que un servidor conecta, se cae o se quita, se reemplazan todas.
+function sincronizarMcp() {
+  const specs = mcpApp ? mcpApp.specs() : [];
+  defs.ponerDinamicas(specs.map((s) => ({ name: s.name, description: s.description, parameters: s.parameters })));
+  motor.reemplazar('mcp_', Object.fromEntries(specs.map((s) => [s.name, (run, a) => mcpApp.correr(s.name, run, a)])));
+}
 
 /**
  * Deja las tools listas para usar. Lo que cada familia necesita de la app:
@@ -51,10 +60,11 @@ let listo = false;
  *                      modelo corre un hijo de `delegate` y cómo se lo llama
  *   memoria            la memoria de la app (main/memoria.cjs): remember y recall
  *   skills             las skills de la app (main/skills.cjs): skill y create_skill
+ *   mcp                los servidores MCP (main/mcp.cjs): sus tools, sus grupos y su runner
  *   imagenes           { getKey(), ajustes(), deMentira }: la llave de Venice, lo
  *                      elegido en Settings y si es el humo (generate_image)
  */
-function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null, skills: skillsApp = null, imagenes: imagenesApp = null } = {}) {
+function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null, skills: skillsApp = null, imagenes: imagenesApp = null, mcp: mcpDeLaApp = null } = {}) {
   archivos.configurar({ trash });
   web.configurar({ getKey, getSecret, webSearch });
   abrir.configurar({ shell });
@@ -79,6 +89,11 @@ function iniciar({ carpeta = null, trash = null, shell = null, capturador = null
   });
   if (memoriaApp) memoria.configurar({ memoria: memoriaApp });
   if (skillsApp) skills.configurar({ skills: skillsApp });
+  if (mcpDeLaApp && mcpDeLaApp !== mcpApp) {
+    mcpApp = mcpDeLaApp;
+    mcpApp.on('cambio', sincronizarMcp);
+    sincronizarMcp();
+  }
   if (imagenesApp) imagenes.configurar({ ...imagenesApp, ...(carpeta ? { carpeta } : {}), ...(modeloVe ? { modeloVe } : {}) });
   motor.configurar({ classifyOsTarget: abrir.classifyOsTarget });
   // el hijo de `delegate` es una sesión como la de cualquier turno
@@ -106,7 +121,9 @@ function catalogo() {
   const hay = new Set(motor.registradas());
   return {
     // (`opcional`: no entra en «todas las tools» de un agente; ver defs.cjs)
-    grupos: defs.GRUPOS.map((g) => ({ id: g.id, nombre: g.nombre, tools: g.tools.filter((n) => hay.has(n)), ...(g.opcional ? { opcional: true } : {}) })).filter((g) => g.tools.length),
+    grupos: defs.GRUPOS.map((g) => ({ id: g.id, nombre: g.nombre, tools: g.tools.filter((n) => hay.has(n)), ...(g.opcional ? { opcional: true } : {}) })).filter((g) => g.tools.length)
+      // …y un grupo por servidor MCP activo: opcional, con una marca en vez de la lista de sus tools
+      .concat(mcpApp ? mcpApp.grupos() : []),
     carpeta: base.getCwd(),
   };
 }
@@ -119,6 +136,8 @@ async function vistaPrevia(run, name, args) {
     if (name === 'canvas') return ['edit', 'update', 'delete'].includes(args?.action) ? lienzo.canvasPreview(args) : null;
     // generar una imagen sale plata: la tarjeta dice con qué modelo y cuánto
     if (name === 'generate_image') return await imagenes.vista(args);
+    // una tool de un servidor MCP: de cuál es (es código de terceros)
+    if (typeof name === 'string' && name.startsWith('mcp_')) return mcpApp ? mcpApp.vista(name) : null;
     return await archivos.preview(run, name, args);
   } catch { return null; }
 }
@@ -138,6 +157,9 @@ module.exports = {
   trabajosVivos,
   // la sesión de un turno, con los jobs vivos ya puestos en su system prompt
   crearSesion(opciones) {
+    // Un agente guarda `mcp:<servidor>`, no las tools de ese servidor: acá se
+    // cambia cada marca por las que el servidor ofrece hoy.
+    if (mcpApp && Array.isArray(opciones?.tools)) opciones = { ...opciones, tools: mcpApp.expandir(opciones.tools) };
     // Si la base de las notas no abrió, sus dos tools no se ofrecen: el modelo
     // las pediría y fallarían siempre. (Se decide acá, antes del turno: que la
     // lista de tools cambie a mitad de un turno lo rompe.)

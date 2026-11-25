@@ -111,7 +111,7 @@ export function montarChat(el, { router }) {
       { separator: true },
       // «Todas» son las de siempre: un grupo opcional (Images, que gasta plata
       // en cada llamada) no se prende de rebote. Si ya estaba prendido, sigue.
-      { id: 'todas', label: 'Turn all on', onSelect: () => datos.ponerTools(a.id, grupos.flatMap((g) => (g.opcional ? g.tools.filter((t) => tiene.has(t)) : g.tools))) },
+      { id: 'todas', label: 'Turn all on', onSelect: () => datos.ponerTools(a.id, [...grupos.flatMap((g) => (g.opcional ? g.tools.filter((t) => tiene.has(t)) : g.tools)), ...[...tiene].filter(datos.esMarcaMcp)]) },
       { id: 'ninguna', label: 'Turn all off', onSelect: () => datos.ponerTools(a.id, []) },
     ];
   }, { align: 'end' });
@@ -576,6 +576,7 @@ export function montarChat(el, { router }) {
 
   datos.on('agentes', () => { ponerCabeza(); ponerAviso(); dibujarMensajes(); });
   datos.on('modelos', ponerCabeza);
+  datos.on('tools', ponerCabeza);
   datos.on('seleccion', () => lienzo.alCambiarDeChat());
   datos.on('chats', () => lienzo.alCambiarDeChat());
   lienzo.alCambiarDeChat();

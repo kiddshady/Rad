@@ -70,12 +70,14 @@ const DE_TOOL = {
 };
 
 /** El nombre del ícono de una tool, o null si no tiene uno propio. */
-export const iconoDeTool = (tool) => DE_TOOL[tool] ?? null;
+// (las tools de un servidor MCP se llaman `mcp_<servidor>_<tool>`: todas llevan el enchufe)
+const nombreDe = (tool) => DE_TOOL[tool] ?? (typeof tool === 'string' && tool.startsWith('mcp_') ? 'plug' : null);
+export const iconoDeTool = (tool) => nombreDe(tool);
 
 /** El ícono de una tool en su caja, como icono() de piezas.js. Una tool sin
  *  ícono propio lleva el genérico: la llave fija. */
 export function iconoTool(tool, extra = '') {
-  const nombre = DE_TOOL[tool];
+  const nombre = nombreDe(tool);
   if (!nombre) return icono('tool', extra);
   const caja = h('span', `rad-icon ${extra}`.trim(), { 'data-icono': nombre });
   caja.innerHTML = `<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${PATHS[nombre]}"/></svg>`;

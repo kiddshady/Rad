@@ -159,6 +159,17 @@ if (marker?.pass === 1) {
   if (await window.rad.store.read(`chat-${marker.chatVenice}`) !== undefined) fail('el documento del chat del agente de Venice sigue ahí');
   await go('chat');
   if (shown(chatView.querySelector('.dm-agente-nombre')) !== 'BlackCode') fail('después de borrar el agente abierto no quedó elegido el otro');
+  // El servidor MCP que quedó guardado se conectó solo al abrir la app, con
+  // su variable (que la interfaz sigue sin ver) y sin «Ask before each call».
+  {
+    const datosM = await import('/datos.js');
+    const s = () => datosM.mcp().servidores.find((x) => x.nombre === 'Smoke');
+    await until(() => s()?.estado === 'connected', 25000);
+    if (datosM.mcp().servidores.length !== 1 || s()?.estado !== 'connected' || s().tools.length !== 11) fail('mcp: al reabrir la app el servidor guardado no se conectó: ' + JSON.stringify(datosM.mcp().servidores.map((x) => [x.nombre, x.estado, x.error])));
+    else if (s().preguntar !== false || s().env.join() !== 'FAKE_MCP_SECRET' || JSON.stringify(datosM.mcp()).includes('no-es-una-llave')) fail('mcp: al reabrir, el servidor no volvió como se dejó: ' + JSON.stringify(s()));
+    if (datosM.gruposTools().find((g) => g.mcp)?.mcp.cuenta !== 11) fail('mcp: al reabrir no está el grupo del servidor con sus 11 tools');
+    data.mcp = 'el servidor guardado se conectó solo al abrir';
+  }
   data.persistencia = `3 agentes (uno de Venice), el chat con 4 mensajes (la frenada con ${marker.frenado} caracteres), llaves: Anthropic ${llave.anthropic?.estado}, Venice ${llave.venice?.estado}`;
   window.rad.store.write('smoke', { pass: 2 });
   return { failures, data };
@@ -2924,6 +2935,248 @@ else {
     await guardar();
     data.toolsAlEditar = tarjeta();
     if (tarjeta() !== 'Tools: Files') fail(`volver a prenderle un grupo dejó la tarjeta en «${tarjeta()}»`);
+  }
+
+  // 11q. Los servidores MCP: tools de terceros. Se agregan en Settings (un
+  // comando de esta PC o una dirección), sus variables se guardan cifradas y
+  // la interfaz solo ve sus nombres, cada servidor es un grupo opcional que
+  // nace apagado en todos los agentes, y con «Ask before each call» sus tools
+  // piden permiso aunque la app esté en automático. El servidor del humo es
+  // uno de mentira que corre acá (tools/fake-mcp-server.cjs).
+  {
+    const datosM = await import('/datos.js');
+    const SECRETO = 'mcp-humo-de-blackcode-no-es-una-llave-2222';
+    const agenteM = datosM.agenteActual();
+    const susToolsM = datosM.toolsDe(agenteM);
+    const modoAntes = datosM.modoTools();
+    const cuantas = () => Number(/· (\d+) tools?$/.exec(statusRight())?.[1] ?? -1);
+    const listoM = async () => { await sleep(200); for (let i = 0; i < 400 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50); await settle(); };
+    const salidaM = (name) => fila(name)?.querySelector('.dm-tool-pre').textContent ?? '';
+    const servidor = (nombre) => datosM.mcp().servidores.find((s) => s.nombre === nombre);
+    const avisosM = () => [...document.querySelectorAll('.rad-toast')].filter((n) => !n.hasAttribute('data-rad-leaving')).map((n) => n.textContent);
+    const antes = cuantas();
+
+    await go('ajustes');
+    const tarjetaM = view('ajustes').querySelector('[data-tarjeta="mcp"]');
+    const filaM = (nombre) => alive(tarjetaM.querySelectorAll('.dm-mcp-fila')).find((f) => f.dataset.servidor === nombre);
+    if (!tarjetaM) fail('mcp: Settings no tiene la tarjeta de servidores');
+    if (tarjetaM.dataset.servidores !== '0' || !tarjetaM.querySelector('.dm-mcp-lista').textContent.includes('No servers yet.')) fail('mcp: sin servidores la tarjeta dice «' + tarjetaM.querySelector('.dm-mcp-lista').textContent + '»');
+    if (datosM.gruposTools().some((g) => g.mcp)) fail('mcp: hay un grupo de MCP sin ningún servidor');
+
+    // El formulario. Lo de un servidor local y lo de uno remoto se relevan desplegándose.
+    tarjetaM.querySelector('[data-accion="mcp-nuevo"]').click();
+    await until(() => modal(), 2000);
+    await sleep(dur('slow') + 120);
+    const formM = modal();
+    const campoM = (c) => formM.querySelector('[data-campo="' + c + '"]');
+    const errorDe = (c) => { const f = campoM(c).closest('.rad-field'); return f.hasAttribute('data-invalid') ? f.textContent : ''; };
+    const [parteLocal, parteRemota] = formM.querySelectorAll('.dm-mcp-parte');
+    if (!parteLocal.hasAttribute('data-abierto') || parteLocal.inert || parteRemota.hasAttribute('data-abierto') || !parteRemota.inert || parteRemota.offsetHeight !== 0) fail('mcp: el formulario no abre con lo de un servidor local a la vista y lo del remoto plegado (' + parteRemota.offsetHeight + ' px)');
+    campoM('mcp-tipo').click();
+    await until(() => menus().length === 1, 2000);
+    await sleep(dur('base') + 80);
+    {
+      const item = [...menus()[0].querySelectorAll('.rad-menu-item')].find((i) => i.textContent.includes('At a remote address'));
+      item.click();
+      const altos = [];
+      for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 200;) { altos.push(parteRemota.offsetHeight); await frame(); }
+      await settle();
+      const final = parteRemota.offsetHeight;
+      if (!(final > 80) || parteLocal.offsetHeight !== 0 || !parteLocal.inert || parteRemota.inert) fail('mcp: al elegir «remote» no quedó lo del remoto abierto y lo del local plegado e inerte (' + final + ' y ' + parteLocal.offsetHeight + ' px)');
+      if (!altos.some((a) => a > 4 && a < final - 4)) fail('mcp: lo del servidor remoto aparece de golpe, sin desplegarse: ' + [...new Set(altos)].join(' → '));
+      data.mcpDespliegue = [...new Set(altos)].slice(0, 8).join(' → ') + ' … ' + final + ' px';
+    }
+    // un remoto por http a otra máquina no vale
+    type(campoM('mcp-nombre'), 'Far');
+    type(campoM('mcp-url'), 'http://example.com/mcp');
+    primary().click();
+    await until(() => errorDe('mcp-url'), 2000);
+    if (!errorDe('mcp-url').includes('https')) fail('mcp: un remoto por http no dio su error en el campo de la dirección: «' + errorDe('mcp-url') + '»');
+    enIngles('en el formulario de un servidor MCP');
+    campoM('mcp-tipo').click();
+    await until(() => menus().length === 1, 2000);
+    await sleep(dur('base') + 80);
+    await pick('On this PC');
+    // sin nombre, sin comando, y una variable mal escrita: cada error en su campo
+    type(campoM('mcp-nombre'), '');
+    primary().click();
+    await until(() => errorDe('mcp-nombre'), 2000);
+    if (!errorDe('mcp-nombre').includes('Give the server a name.')) fail('mcp: sin nombre el formulario dijo «' + errorDe('mcp-nombre') + '»');
+    type(campoM('mcp-nombre'), 'Smoke');
+    primary().click();
+    await until(() => errorDe('mcp-comando'), 2000);
+    if (!errorDe('mcp-comando').includes('needs a command') || errorDe('mcp-nombre')) fail('mcp: sin comando el error no quedó en el campo del comando');
+    type(campoM('mcp-comando'), 'node');
+    type(campoM('mcp-args'), SMOKE_MCP);
+    type(campoM('mcp-env'), 'esto no es una variable');
+    primary().click();
+    await until(() => errorDe('mcp-env'), 2000);
+    if (!errorDe('mcp-env').includes('is not a name and a value') || datosM.mcp().servidores.length) fail('mcp: una variable mal escrita no dio su error, o se guardó igual');
+    type(campoM('mcp-env'), 'FAKE_MCP_SECRET=' + SECRETO);
+    primary().click();
+    await closed();
+    // La fila: conectando (con su anillo) y después conectado, con sus tools.
+    await until(() => filaM('Smoke'), 3000);
+    const vioConectando = await until(() => filaM('Smoke')?.dataset.estado === 'connecting' || filaM('Smoke')?.dataset.estado === 'connected', 3000);
+    await until(() => filaM('Smoke')?.dataset.estado === 'connected', 20000);
+    await settle();
+    const fS = filaM('Smoke');
+    if (!vioConectando || fS?.dataset.estado !== 'connected') fail('mcp: el servidor del humo no conectó: ' + (fS?.querySelector('.dm-estado-texto').textContent ?? '(sin fila)'));
+    if (shown(fS?.querySelector('.dm-estado-texto')) !== 'Connected · 11 tools' || fS.querySelector('.dm-estado').dataset.tono !== 'success') fail('mcp: la fila dice «' + shown(fS?.querySelector('.dm-estado-texto')) + '»');
+    if (!fS.querySelector('.dm-mcp-tools').textContent.startsWith('echo, add, whoami') || !fS.querySelector('.dm-mcp-donde').textContent.startsWith('node ')) fail('mcp: la fila no dice qué tools trae o qué corre');
+    if (fS.querySelector('.rad-busy') && fS.getAttribute('aria-busy') === 'true') fail('mcp: conectado, la fila sigue con el anillo de trabajo');
+    if (!fS.querySelector('[data-accion="mcp-activo"]').checked || !fS.querySelector('[data-accion="mcp-preguntar"]').checked) fail('mcp: el servidor no nació prendido y preguntando');
+    // El secreto: en la interfaz solo su nombre.
+    if (fS.querySelector('.dm-mcp-secretos').textContent !== 'variables stored encrypted: FAKE_MCP_SECRET') fail('mcp: la fila dice de las variables: «' + fS.querySelector('.dm-mcp-secretos').textContent + '»');
+    if (document.documentElement.outerHTML.includes(SECRETO) || JSON.stringify(datosM.mcp()).includes(SECRETO) || JSON.stringify(await window.rad.invoke('mcp:lista')).includes(SECRETO)) fail('mcp: el valor de una variable llegó a la interfaz');
+    if (await window.rad.store.read('_mcp').then(() => true, () => false)) fail('mcp: la interfaz puede leer el documento de los servidores');
+    enIngles('en la tarjeta de servidores MCP');
+
+    // Es un grupo opcional y nace apagado: el agente con «todas» no lo tiene.
+    const grupoM = datosM.gruposTools().find((g) => g.mcp);
+    if (!grupoM || grupoM.nombre !== 'MCP: Smoke' || !grupoM.opcional || grupoM.tools.length !== 1 || !datosM.esMarcaMcp(grupoM.tools[0]) || grupoM.mcp.cuenta !== 11) fail('mcp: el grupo del servidor: ' + JSON.stringify(grupoM ?? null));
+    if (datosM.todasLasTools().some(datosM.esMarcaMcp) || datosM.toolsDe(datosM.agenteActual()).some(datosM.esMarcaMcp)) fail('mcp: el servidor nació prendido en un agente');
+    await go('chat');
+    if (cuantas() !== antes) fail('mcp: agregar un servidor le cambió las tools al agente: ' + antes + ' → ' + cuantas());
+    datosM.ponerModoTools('auto');
+    chatView.querySelector('[data-accion="nuevo-chat"]').click();
+    await settle();
+    await pedir([[{ name: 'mcp_smoke_echo', args: { text: 'before turning it on' } }]]);
+    await listoM();
+    if (permiso() || fila('mcp_smoke_echo')?.dataset.estado === 'ok') fail('mcp: con el grupo apagado la tool corrió igual');
+
+    // Prendido desde el menú de tools del chat: el agente suma las 11.
+    chatView.querySelector('[data-accion="tools"]').click();
+    await until(() => menus().length === 1, 2000);
+    await sleep(dur('base') + 80);
+    if (!(await pick('MCP: Smoke'))) fail('mcp: el menú de tools del chat no trae el grupo del servidor');
+    await until(() => cuantas() === antes + 11, 2000);
+    if (cuantas() !== antes + 11) fail('mcp: con el grupo prendido la barra dice ' + cuantas() + ' tools, se esperaban ' + (antes + 11));
+    if (datosM.toolsDe(datosM.agenteActual()).filter(datosM.esMarcaMcp).join() !== grupoM.tools[0]) fail('mcp: el agente no guardó la marca del servidor sino ' + JSON.stringify(datosM.toolsDe(datosM.agenteActual()).filter((t) => String(t).startsWith('mcp'))));
+
+    // En AUTOMÁTICO pide permiso igual: el servidor está en «Ask before each call».
+    chatView.querySelector('[data-accion="nuevo-chat"]').click();
+    await settle();
+    await pedir([[{ name: 'mcp_smoke_echo', args: { text: 'hola' } }]]);
+    await until(() => permiso(), 6000);
+    const tarjetaP = permiso();
+    const dice = tarjetaP?.textContent ?? '(sin tarjeta)';
+    if (!dice.includes('Allow mcp_smoke_echo?') || !dice.includes('echo, a tool of the MCP server “Smoke”') || !dice.includes('This server is set to ask before each call.') || !dice.includes('hola')) fail('mcp: en automático no pidió permiso, o la tarjeta no dice de qué servidor es: ' + dice.slice(0, 260));
+    if (dice.includes(' on smoke_echo')) fail('mcp: la tarjeta repite el nombre de la tool en la frase');
+    if (fila('mcp_smoke_echo')) fail('mcp: la fila apareció antes de contestar la tarjeta');
+    enIngles('con la tarjeta de permiso de una tool de MCP');
+    primary()?.click();
+    await closed();
+    await listoM();
+    if (fila('mcp_smoke_echo')?.dataset.estado !== 'ok' || salidaM('mcp_smoke_echo') !== 'echo: hola') fail('mcp: la llamada quedó en «' + fila('mcp_smoke_echo')?.dataset.estado + '» con «' + salidaM('mcp_smoke_echo').slice(0, 120) + '»');
+    if (fila('mcp_smoke_echo')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'plug') fail('mcp: la fila de una tool de MCP no lleva el enchufe');
+    // …cada llamada. Y al servidor le llegó su variable. Rechazada, no corre.
+    await pedir([[{ name: 'mcp_smoke_whoami', args: {} }]]);
+    await until(() => permiso(), 6000);
+    if (!permiso()) fail('mcp: la segunda llamada no volvió a pedir permiso');
+    primary()?.click();
+    await closed();
+    await listoM();
+    if (salidaM('mcp_smoke_whoami') !== 'secret: got ' + SECRETO.length + ' characters') fail('mcp: al servidor no le llegó su variable: «' + salidaM('mcp_smoke_whoami') + '»');
+    await pedir([[{ name: 'mcp_smoke_boom', args: {} }]]);
+    await until(() => permiso(), 6000);
+    [...(permiso()?.querySelectorAll('.rad-modal-actions .rad-button') ?? [])].find((b) => b.textContent === 'Decline')?.click();
+    await closed();
+    await listoM();
+    if (fila('mcp_smoke_boom')?.dataset.estado === 'ok' || !salidaM('mcp_smoke_boom').includes('declined')) fail('mcp: una llamada rechazada quedó en «' + fila('mcp_smoke_boom')?.dataset.estado + '»: ' + salidaM('mcp_smoke_boom').slice(0, 120));
+
+    // Sin «Ask before each call», en automático corre sola.
+    await go('ajustes');
+    filaM('Smoke').querySelector('[data-accion="mcp-preguntar"]').click();
+    await until(() => servidor('Smoke')?.preguntar === false, 3000);
+    if (servidor('Smoke')?.preguntar !== false || servidor('Smoke')?.estado !== 'connected') fail('mcp: apagar «Ask before each call» no quedó guardado, o desconectó el servidor');
+    await go('chat');
+    await pedir([[{ name: 'mcp_smoke_echo', args: { text: 'again' } }]]);
+    await listoM();
+    if (permiso() || salidaM('mcp_smoke_echo') !== 'echo: again') fail('mcp: sin «Ask before each call» y en automático, la llamada pidió permiso o no corrió: «' + salidaM('mcp_smoke_echo') + '»');
+    // …y en manual pregunta, como cualquier tool.
+    datosM.ponerModoTools('manual');
+    await pedir([[{ name: 'mcp_smoke_echo', args: { text: 'manual' } }]]);
+    await until(() => permiso(), 6000);
+    if (!permiso() || permiso().textContent.includes('This server is set to ask before each call.')) fail('mcp: en manual no pidió permiso, o la tarjeta dice que el servidor pregunta siempre');
+    primary()?.click();
+    await closed();
+    await listoM();
+    datosM.ponerModoTools('auto');
+
+    // Cambiarlo: el formulario no trae el valor guardado, y guardarlo sin tocar lo conserva.
+    await go('ajustes');
+    filaM('Smoke').querySelector('[data-accion="mcp-editar"]').click();
+    await until(() => modal(), 2000);
+    await sleep(dur('slow') + 120);
+    if (modal().querySelector('[data-campo="mcp-env"]').value !== 'FAKE_MCP_SECRET=<saved>' || modal().outerHTML.includes(SECRETO)) fail('mcp: el formulario de un servidor guardado muestra «' + modal().querySelector('[data-campo="mcp-env"]').value + '»');
+    if (modal().querySelector('[data-campo="mcp-preguntar"]').checked) fail('mcp: el formulario no trae «Ask before each call» como quedó (apagado)');
+    primary().click();
+    await closed();
+    await until(() => filaM('Smoke')?.dataset.estado === 'connecting', 2000);
+    await until(() => filaM('Smoke')?.dataset.estado === 'connected', 20000);
+    await go('chat');
+    await pedir([[{ name: 'mcp_smoke_whoami', args: {} }]]);
+    await listoM();
+    if (salidaM('mcp_smoke_whoami') !== 'secret: got ' + SECRETO.length + ' characters') fail('mcp: guardar el servidor sin tocar la variable la perdió: «' + salidaM('mcp_smoke_whoami') + '»');
+    if (cuantas() !== antes + 11) fail('mcp: cambiar el servidor le sacó el grupo al agente (' + cuantas() + ' tools)');
+
+    // Apagado: su grupo se va y sus tools también; el agente conserva la marca y al prenderlo vuelve.
+    await go('ajustes');
+    filaM('Smoke').querySelector('[data-accion="mcp-activo"]').click();
+    await until(() => filaM('Smoke')?.dataset.estado === 'off', 3000);
+    await settle();
+    if (shown(filaM('Smoke').querySelector('.dm-estado-texto')) !== 'Turned off' || !filaM('Smoke').querySelector('.dm-mcp-tools').hidden || !filaM('Smoke').querySelector('[data-accion="mcp-reconectar"]').hidden) fail('mcp: apagado, la fila dice «' + shown(filaM('Smoke').querySelector('.dm-estado-texto')) + '»');
+    if (datosM.gruposTools().some((g) => g.mcp) || cuantas() !== antes) fail('mcp: apagado el servidor sigue su grupo, o el agente sigue contando sus tools (' + cuantas() + ')');
+    if (!datosM.toolsDe(datosM.agenteActual()).includes(grupoM.tools[0])) fail('mcp: apagar el servidor le sacó la marca al agente');
+    // (cambiarle otras tools al agente con el servidor apagado no pierde la marca)
+    datosM.ponerTools(datosM.agenteActual().id, datosM.toolsDe(datosM.agenteActual()));
+    if (!datosM.toolsDe(datosM.agenteActual()).includes(grupoM.tools[0])) fail('mcp: cambiar las tools del agente con el servidor apagado perdió la marca');
+    filaM('Smoke').querySelector('[data-accion="mcp-activo"]').click();
+    await until(() => filaM('Smoke')?.dataset.estado === 'connected', 20000);
+    await until(() => cuantas() === antes + 11, 3000);
+    if (cuantas() !== antes + 11) fail('mcp: al prender el servidor de nuevo el agente no recuperó sus tools (' + cuantas() + ')');
+
+    // Pegar el JSON de las instrucciones de un servidor.
+    tarjetaM.querySelector('[data-accion="mcp-pegar"]').click();
+    await until(() => modal(), 2000);
+    await sleep(dur('slow') + 120);
+    const campoJ = modal().querySelector('[data-campo="mcp-json"]');
+    type(campoJ, '{ this is not json');
+    primary().click();
+    await until(() => campoJ.closest('.rad-field').hasAttribute('data-invalid'), 2000);
+    if (!campoJ.closest('.rad-field').textContent.includes('That is not valid JSON.') || !modal()) fail('mcp: pegar algo que no es JSON no dio su error');
+    enIngles('en el formulario de pegar servidores MCP');
+    type(campoJ, JSON.stringify({ mcpServers: { Gone: { command: 'node', args: ['-e', 'process.exit(3)'], env: { GONE_KEY: 'otra-' + SECRETO } } } }));
+    primary().click();
+    await closed();
+    await until(() => filaM('Gone')?.dataset.estado === 'error', 20000);
+    await settle();
+    if (!avisosM().some((t) => t.includes('Added Gone.'))) fail('mcp: pegar un servidor no avisó que lo agregó: ' + JSON.stringify(avisosM()));
+    if (filaM('Gone')?.dataset.estado !== 'error' || !shown(filaM('Gone').querySelector('.dm-estado-texto')).startsWith('Could not connect: ') || filaM('Gone').querySelector('.dm-estado').dataset.tono !== 'danger') fail('mcp: un servidor que no arranca quedó en «' + filaM('Gone')?.dataset.estado + '»: ' + shown(filaM('Gone')?.querySelector('.dm-estado-texto')));
+    if (!servidor('Gone')?.preguntar || servidor('Gone').env.join() !== 'GONE_KEY') fail('mcp: el servidor pegado no nació preguntando, o no guardó su variable');
+    if (tarjetaM.dataset.servidores !== '2') fail('mcp: la tarjeta cuenta ' + tarjetaM.dataset.servidores + ' servidores');
+    // Quitarlo se lo lleva también del agente que lo tenía.
+    const marcaGone = datosM.gruposTools().find((g) => g.nombre === 'MCP: Gone')?.tools[0];
+    datosM.ponerTools(datosM.agenteActual().id, [...datosM.toolsDe(datosM.agenteActual()), marcaGone]);
+    if (!marcaGone || !datosM.toolsDe(datosM.agenteActual()).includes(marcaGone) || cuantas() !== antes + 11) fail('mcp: un servidor sin conectar no figura como grupo, o le suma tools al agente (' + cuantas() + ')');
+    filaM('Gone').querySelector('[data-accion="mcp-quitar"]').click();
+    await until(() => modal(), 2000);
+    if (!modal()?.textContent.includes('Remove this server?')) fail('mcp: quitar un servidor no pidió confirmación');
+    primary().click();
+    await closed();
+    await until(() => !filaM('Gone'), 3000);
+    await settle();
+    if (filaM('Gone') || servidor('Gone') || tarjetaM.dataset.servidores !== '1') fail('mcp: el servidor quitado sigue en la lista');
+    if (datosM.toolsDe(datosM.agenteActual()).includes(marcaGone) || !datosM.toolsDe(datosM.agenteActual()).includes(grupoM.tools[0])) fail('mcp: quitar un servidor no le sacó su marca al agente, o le sacó la del otro');
+
+    // «Smoke» queda guardado (sin preguntar) para la pasada 2; el agente vuelve a sus tools.
+    datosM.ponerTools(agenteM.id, susToolsM);
+    datosM.ponerModoTools(modoAntes);
+    await go('chat');
+    await settle();
+    if (cuantas() !== antes) fail('mcp: al devolverle sus tools el agente quedó con ' + cuantas());
+    data.mcp = 'un servidor local por el formulario (11 tools, su variable cifrada), grupo opcional apagado de fábrica, permiso en automático, sin preguntar corre solo, cambiarlo conserva el secreto, apagar y prender, pegar JSON, quitar';
   }
 
   data.tools = `Toolsmith: ${tools().length} filas en el último chat; permiso, rechazo, dos rondas, confianza por chat, código, base propia, un job, dos capturas, argumentos malos y modo automático`;

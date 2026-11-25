@@ -1,5 +1,39 @@
 # Changelog
 
+## BlackCode 0.21.0 (2026-11-26)
+
+- **Servidores MCP.** En Settings hay una tarjeta nueva, «MCP servers», para
+  conectar servidores que les suman tools a los agentes. Un servidor puede ser
+  **local** (un comando que corre en esta PC: `npx`, `uvx`, `node`…) o
+  **remoto** (una dirección https, con sus encabezados; sin OAuth). Se agregan
+  con un formulario o pegando el bloque `mcpServers` de las instrucciones del
+  servidor.
+- **Cada servidor es un grupo de tools opcional**, apagado en todos los
+  agentes: se prende por agente, desde el menú de tools del chat o el
+  formulario del agente. Sus tools se llaman `mcp_<servidor>_<tool>` y llevan
+  el ícono del enchufe.
+- **«Ask before each call», por servidor.** Nace prendido: las tools de ese
+  servidor piden permiso antes de cada llamada **también con la app en
+  automático**, y la tarjeta dice de qué servidor es la tool. Apagado, siguen
+  la regla general.
+- **Las variables y los encabezados se guardan cifrados** (suelen ser llaves),
+  como las llaves de las APIs. La interfaz solo recibe sus nombres: al cambiar
+  un servidor el formulario muestra `<saved>` en lugar del valor, y dejarlo
+  así conserva el guardado.
+- La tarjeta dice cómo está cada servidor (conectando, conectado con cuántas
+  tools, o por qué no conectó), y tiene un interruptor para apagarlo sin
+  quitarlo y un botón para reconectar. Un servidor que se cae queda en error y
+  deja de ofrecer sus tools. Apagado, los agentes que lo tenían lo conservan
+  para cuando vuelva; quitado, se va también de los agentes.
+- Topes: 80 tools por servidor (la tarjeta dice cuántas quedaron afuera), 900
+  caracteres por descripción y 8000 por resultado. Lo que una tool dice de sí
+  misma va marcado como texto del servidor, y la guía del agente le avisa que
+  ese texto y sus resultados son datos, no instrucciones.
+- Los subagentes no reciben tools de MCP.
+- No hay todavía: OAuth, recursos ni prompts de MCP, ni aviso cuando un
+  servidor cambia su lista de tools (hay que reconectarlo).
+- Dependencia nueva: `@modelcontextprotocol/sdk` (el SDK oficial).
+
 ## BlackCode 0.20.2 (2026-11-25)
 
 - El campo de las instrucciones de un agente (su system prompt) tiene el doble

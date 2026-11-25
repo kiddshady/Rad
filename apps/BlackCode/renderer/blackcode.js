@@ -52,6 +52,8 @@ shell.router.on('change', ({ label }) => shell.status.set('left', label));
 ponerEstado();
 datos.on('agentes', ponerEstado);
 datos.on('modelos', ponerEstado);
+// (un servidor MCP conecta o se cae: cambia cuántas tools tiene el agente)
+datos.on('tools', ponerEstado);
 datos.on('seleccion', ponerEstado);
 datos.on('respuesta', ponerEstado);
 
