@@ -78,7 +78,23 @@ function limpiar(pedido) {
     // (un mensaje del usuario puede venir sin texto si trae imágenes)
     .filter((m) => m && (m.rol === 'tool' ? typeof m.tool === 'string' : ROLES.has(m.rol) && typeof m.texto === 'string' && (m.texto.trim() || imagenesDe(m).length)))
     .map((m) => {
-      if (m.rol === 'tool') return { role: 'tool', tool: m.tool, content: String(m.texto ?? ''), status: m.estado };
+      // (`dejo`: las rutas de los archivos que dejó esa llamada; van al registro)
+      if (m.rol === 'tool') {
+        const saved = (Array.isArray(m.dejo) ? m.dejo : []).filter((p) => typeof p === 'string' && p && p.length <= 400).slice(0, 8);
+        // (`detalle`: lo que generate_image dejó anotado para los turnos
+        // siguientes. El prompt va ENTERO en vez del recorte de la fila, y lo
+        // demás, como datos sueltos.)
+        const d = m.detalle && typeof m.detalle === 'object' ? m.detalle : null;
+        const corto = (x, n) => (typeof x === 'string' && x ? x.slice(0, n) : '');
+        const facts = d ? [
+          corto(d.modelo, 80) && `model ${corto(d.modelo, 80)}`,
+          corto(d.aspecto, 12),
+          corto(d.resolucion, 8),
+          Number.isSafeInteger(d.semilla) && `seed ${d.semilla}`,
+          d.visto === true ? 'you looked at it' : 'you did not look at it',
+        ].filter(Boolean) : [];
+        return { role: 'tool', tool: m.tool, content: corto(d?.prompt, 2000) || String(m.texto ?? ''), status: m.estado, ...(facts.length ? { facts } : {}), ...(saved.length ? { saved } : {}) };
+      }
       const images = imagenesDe(m);
       return { role: m.rol, content: m.texto, ...(images.length ? { images } : {}) };
     }))
@@ -499,7 +515,7 @@ function wire(rad, { llave }) {
           if (canal === 'tool:activity') avisar('tool', { callId, kind: datos.kind, label: datos.label, ...(datos.sub ? { sub: datos.sub, subN: datos.subN || 0 } : {}) });
           else if (canal === 'tool:result') avisar('tool-fin', { callId, status: datos.status, ms: datos.ms, out: datos.out, outCut: datos.outCut });
           else if (canal === 'canvas:opened') avisar('canvas', { canvas: datos.canvas });
-          else if (canal === 'tool:artifact') avisar('tool-imagenes', { callId, imagenes: (datos.images || []).slice(0, IMAGENES_MAX) });
+          else if (canal === 'tool:artifact') avisar('tool-imagenes', { callId, imagenes: (datos.images || []).slice(0, IMAGENES_MAX), ...(datos.detalle && typeof datos.detalle === 'object' ? { detalle: datos.detalle } : {}) });
         },
         // La tarjeta: se le manda a la interfaz qué se va a correr (y, si es
         // un archivo, qué cambia) y se espera la respuesta. Un Stop la cierra.

@@ -392,7 +392,12 @@ const conAdjuntos = (m) => Boolean(m.imagenes?.length || m.archivos?.length);
 // hizo el agente está en la fila de `delegate`, que viaja como cualquiera.
 const viaja = (m) => (m.rol === 'tool' ? m.estado !== 'run' && !m.sub : (m.texto.trim() || conAdjuntos(m)) && m.estado !== 'error' && m.estado !== 'rechazo');
 const alViaje = (m) => {
-  if (m.rol === 'tool') return { rol: 'tool', tool: m.tool, texto: m.texto, estado: m.estado };
+  if (m.rol === 'tool') {
+    // Los archivos que dejó la llamada (las imágenes generadas): el registro
+    // que recibe el modelo en los turnos siguientes dice dónde quedaron.
+    const dejo = (Array.isArray(m.imagenes) ? m.imagenes : []).map((im) => im.archivo).filter(Boolean);
+    return { rol: 'tool', tool: m.tool, texto: m.texto, estado: m.estado, ...(dejo.length ? { dejo } : {}), ...(m.detalle ? { detalle: m.detalle } : {}) };
+  }
   if (m.rol !== 'user' || !conAdjuntos(m)) return { rol: m.rol, texto: m.texto };
   return { rol: 'user', texto: paraElModelo(m), ...(m.imagenes?.length ? { imagenes: m.imagenes } : {}) };
 };
@@ -508,6 +513,8 @@ function alLlegar(ev) {
   } else if (ev.tipo === 'tool-imagenes') {
     const fila = r.doc.get().mensajes.find((m) => m.rol === 'tool' && m.id === ev.callId);
     if (fila && Array.isArray(ev.imagenes)) fila.imagenes = ev.imagenes.map(({ name, dataUrl, archivo }) => (archivo ? { name, archivo } : { name, dataUrl })); // (las de generate_image van por su archivo, no adentro del chat)
+    // …y lo que la tool anotó para los turnos siguientes (el prompt entero, el modelo, la semilla)
+    if (fila && ev.detalle && typeof ev.detalle === 'object') fila.detalle = ev.detalle;
     bajar(r);
     avisar('mensajes', { chat: chatId });
   } else if (ev.tipo === 'canvas') {

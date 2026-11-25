@@ -170,7 +170,10 @@ function traceLines(rows, compact) {
   }
   return pick.map((p) => (p.gap
     ? `… (+${p.gap} earlier steps omitted — first ${TRACE_HEAD} and most recent shown) …`
-    : `${p.i + 1}. ${neutralize(p.r.tool)}(${neutralize(p.r.content || '')}) -> ${st(p.r)}`)).join('\n');
+    // (`saved`: los archivos que dejó la llamada —las imágenes de
+    // generate_image—. El resultado no viaja entre turnos, pero DÓNDE quedó lo
+    // que se hizo es justo lo que el turno siguiente necesita para seguir.)
+    : `${p.i + 1}. ${neutralize(p.r.tool)}(${neutralize(p.r.content || '')}) -> ${st(p.r)}${Array.isArray(p.r.facts) && p.r.facts.length ? ` · ${p.r.facts.map(neutralize).join(' · ')}` : ''}${Array.isArray(p.r.saved) && p.r.saved.length ? ` · saved: ${p.r.saved.map(neutralize).join(', ')}` : ''}`)).join('\n');
 }
 
 function toolsRanBlock(rows, compact) {
@@ -185,6 +188,12 @@ function toolsRanBlock(rows, compact) {
     : '';
   return `<tools_ran>\n`
     + 'Record from the BlackCode app, not from the user and not from you: these tools ran before the reply that follows.'
+    // Lo que sigue lo agregó BlackCode (0.19.1). El registro trae la llamada
+    // y cómo terminó, no lo que devolvió. Sin decirlo, un modelo cuidadoso
+    // lee su respuesta anterior (que citaba una ruta, un tamaño), busca eso
+    // en el registro, no lo encuentra y concluye que lo inventó: Opus 5.5 se
+    // retractó de una ruta que era cierta (Fran, 25/11/2026).
+    + ' It lists each call and how it ended, not what it returned: you saw every result at the time, and it is not repeated here.'
     + `${bloqueadas}\n`
     + traceLines(rows, compact) + '\n</tools_ran>';
 }

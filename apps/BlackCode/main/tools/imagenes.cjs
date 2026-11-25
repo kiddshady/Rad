@@ -55,11 +55,12 @@ let deps = {
   deMentira: false,            // el humo: sin red, con una imagen armada acá
   pedir: (...a) => fetch(...a),
   ahora: () => Date.now(),
+  azar: () => Math.random(),
 };
 
 /** Lo que este módulo necesita de afuera (ver arriba). Lo que no venga queda como estaba. */
 function configurar(d = {}) {
-  for (const k of ['getKey', 'ajustes', 'modeloVe', 'pedir', 'ahora']) if (typeof d[k] === 'function') deps[k] = d[k];
+  for (const k of ['getKey', 'ajustes', 'modeloVe', 'pedir', 'ahora', 'azar']) if (typeof d[k] === 'function') deps[k] = d[k];
   if (typeof d.carpeta === 'string' && d.carpeta.trim()) deps.carpeta = path.resolve(d.carpeta);
   if (typeof d.deMentira === 'boolean') deps.deMentira = d.deMentira;
   cache = null;
@@ -296,6 +297,11 @@ async function runGenerateImage(run, a = {}) {
 
   run.notify('tool:activity', { reqId: run.reqId, kind: 'generate_image', label: p.prompt.slice(0, 80) });
   const filtro = deps.ajustes()?.filtro !== false;
+  // La semilla. Si el agente no pasó una y pide UNA imagen, la elige la tool:
+  // así queda anotada y esa imagen se puede repetir o variar después (Venice
+  // no devuelve la que usó). Con varias variantes no se manda: con la misma
+  // semilla no hay garantía de que salgan distintas.
+  const semilla = p.semilla ?? (p.cuantas === 1 ? Math.floor(deps.azar() * 999999999) + 1 : null);
   const cuerpo = {
     model: modelo.id,
     prompt: p.prompt,
@@ -303,7 +309,7 @@ async function runGenerateImage(run, a = {}) {
     ...(p.aspecto ? { aspect_ratio: p.aspecto } : {}),
     ...(p.resolucion ? { resolution: p.resolucion } : {}),
     ...(p.estilo ? { style_preset: p.estilo } : {}),
-    ...(p.semilla !== null ? { seed: p.semilla } : {}),
+    ...(semilla !== null ? { seed: semilla } : {}),
     variants: p.cuantas,
     safe_mode: filtro,
     hide_watermark: true,
@@ -321,10 +327,18 @@ async function runGenerateImage(run, a = {}) {
     return `error: the image was generated but could not be saved — ${err.message}`;
   }
   run._imagenes = hechas + guardadas.length;
-  run.notify('tool:artifact', { reqId: run.reqId, images: guardadas.map((g) => ({ name: g.name, archivo: g.archivo })) });
   // El modelo solo la ve si la pidió, y si ve.
   const mira = a?.look === true;
   const ve = mira && deps.modeloVe(run);
+  // `detalle` es lo que el agente va a necesitar en los turnos SIGUIENTES,
+  // cuando ya no tenga este resultado a la vista: el prompt entero (para
+  // mejorarlo hay que volver a mandarlo completo), con qué se hizo, la
+  // semilla y si la miró. Va con la fila del chat y vuelve en el registro.
+  run.notify('tool:artifact', {
+    reqId: run.reqId,
+    images: guardadas.map((g) => ({ name: g.name, archivo: g.archivo })),
+    detalle: { prompt: p.prompt, modelo: modelo.id, aspecto: p.aspecto, resolucion: p.resolucion, semilla, visto: ve },
+  });
   if (ve) for (const g of guardadas) (run._capturas ??= []).push(`data:${MIME[g.ext]};base64,${g.buf.toString('base64')}`);
 
   const precio = precioDe(modelo, p.resolucion);
@@ -335,6 +349,7 @@ async function runGenerateImage(run, a = {}) {
     r.borrosa ? 'Venice blurred the result: its filter classed it as adult content. (The user can turn that filter off in Settings.)' : null,
     r.infraccion ? 'Venice flagged the result as against its terms: the image may be blacked out.' : null,
     precio !== null ? `Cost: about $${(precio * guardadas.length).toFixed(2)} of the user's Venice balance.` : null,
+    semilla !== null ? `Seed: ${semilla}. The same seed with the same prompt and model gives this image again.` : null,
     mira ? (ve ? `${guardadas.length === 1 ? 'It is' : 'They are'} attached below for you to look at.` : 'You asked to look at it, but this model cannot see images.') : 'You did not get the image itself: say what you asked for, not what it looks like. Pass look: true next time if you need to check it.',
   ];
   return renglones.filter(Boolean).join('\n');

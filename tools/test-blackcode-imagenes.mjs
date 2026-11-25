@@ -66,7 +66,7 @@ const ajustes = { modelo: '', filtro: true };
 let llave = LLAVE;
 let ve = false;
 let reloj = Date.parse('2026-11-25T15:04:05');
-I.configurar({ getKey: () => llave, ajustes: () => ajustes, carpeta: dir, modeloVe: () => ve, ahora: () => reloj, deMentira: false });
+I.configurar({ getKey: () => llave, ajustes: () => ajustes, carpeta: dir, modeloVe: () => ve, ahora: () => reloj, azar: () => 0.5, deMentira: false });
 
 // Una corrida de mentira, que anota lo que la tool avisa.
 function corrida() {
@@ -147,6 +147,9 @@ try {
     ok('…y que no la vio', texto.includes('You did not get the image itself') && !run._capturas, texto);
     ok('avisa de la actividad con el prompt', run.avisos.some(([c, d]) => c === 'tool:activity' && d.kind === 'generate_image' && d.label === 'A red fox in the snow'));
     ok('cuenta las imágenes del turno', run._imagenes === 2);
+    // lo que queda anotado para los turnos siguientes
+    ok('deja anotado el prompt ENTERO, el modelo, el formato, la semilla y que no la miró', JSON.stringify(artefacto.detalle) === JSON.stringify({ prompt: 'A red fox in the snow', modelo: 'alfa-image', aspecto: '16:9', resolucion: '', semilla: 7, visto: false }), JSON.stringify(artefacto.detalle));
+    ok('le dice la semilla al agente', texto.includes('Seed: 7.'), texto);
     // otra en el mismo segundo no pisa a la anterior
     const { run: otra } = await generar({ prompt: 'again' });
     const a3 = otra.avisos.find(([c]) => c === 'tool:artifact')[1].images[0].archivo;
@@ -159,13 +162,20 @@ try {
     ok('con resolución, el precio es el de esa resolución', texto.includes('Cost: about $0.09') && visto.generar[0].resolution === '2K', texto);
     const { texto: t2 } = await generar({ prompt: 'p', model: 'sin-precio' });
     ok('un modelo sin precio publicado no inventa un costo', !t2.includes('Cost:') && t2.startsWith('Generated 1 image with Beta sin precio'), t2);
-    ok('lo que no se pasa no viaja', !('aspect_ratio' in visto.generar[1]) && !('negative_prompt' in visto.generar[1]) && !('seed' in visto.generar[1]) && !('style_preset' in visto.generar[1]) && visto.generar[1].variants === 1, JSON.stringify(visto.generar[1]));
+    ok('lo que no se pasa no viaja', !('aspect_ratio' in visto.generar[1]) && !('negative_prompt' in visto.generar[1]) && !('style_preset' in visto.generar[1]) && visto.generar[1].variants === 1, JSON.stringify(visto.generar[1]));
+    // la semilla: si el agente no pasó una y pide UNA imagen, la elige la tool y la dice
+    ok('una imagen sin semilla: la tool elige una, la manda y la dice', visto.generar[1].seed === 499999999 + 1 - 0 || (Number.isSafeInteger(visto.generar[1].seed) && visto.generar[1].seed > 0 && t2.includes(`Seed: ${visto.generar[1].seed}.`)), `${visto.generar[1].seed} · ${t2}`);
+    ok('…y es la misma que le dice', t2.includes(`Seed: ${visto.generar[1].seed}.`), t2);
+    const antesV = visto.generar.length;
+    const { texto: t3 } = await generar({ prompt: 'p', variants: 3 });
+    ok('con varias variantes no manda semilla (saldrían iguales) ni dice una', !('seed' in visto.generar[antesV]) && !t3.includes('Seed:'), JSON.stringify(visto.generar[antesV]));
   }
 
   // ---------- 5. mirar lo que generó ----------
   {
     ve = true;
     const { texto, run } = await generar({ prompt: 'p', look: true, variants: 2 });
+    ok('…y queda anotado que la miró', run.avisos.find(([c]) => c === 'tool:artifact')[1].detalle.visto === true);
     ok('con look y un modelo que ve, recibe las imágenes', run._capturas?.length === 2 && run._capturas.every((u) => u.startsWith('data:image/webp;base64,')) && texto.includes('attached below for you to look at'), texto);
     ve = false;
     const { texto: t2, run: r2 } = await generar({ prompt: 'p', look: true });
@@ -307,6 +317,21 @@ try {
     ok('la interfaz solo recibe archivos de la carpeta de imágenes', /const esta = \(archivo\) => img\.esMia\(archivo\)/.test(chat) && chat.includes("rad.handle('imagenes:ver', (archivo) => img.leer(archivo));"));
     const datos = fs.readFileSync(path.join(APP, 'renderer', 'datos.js'), 'utf8');
     ok('un agente nuevo nace sin las tools de un grupo opcional', datos.includes('herramientas.grupos.filter((g) => !g.opcional).flatMap((g) => g.tools)'));
+    // Entre turnos el modelo no vuelve a ver el resultado de una tool: recibe
+    // un registro de qué corrió. Para una imagen, ese registro dice dónde quedó.
+    const { foldToolRows } = require(path.join(APP, 'main', 'tools', 'guardas.cjs'));
+    const plegado = foldToolRows([
+      { role: 'user', content: 'make a fox' },
+      { role: 'tool', tool: 'generate_image', content: 'A red fox', status: 'ok', facts: ['model flux-3', '16:9', 'seed 42', 'you did not look at it'], saved: ['C:\\datos\\images\\2026-11\\image-1.webp', 'C:\\datos\\images\\2026-11\\image-2.webp'] },
+      { role: 'tool', tool: 'fs_read', content: 'notes.md', status: 'ok' },
+      { role: 'assistant', content: 'Done.' },
+    ]);
+    const registro = plegado.find((m) => m.appRecord)?.content ?? '';
+    ok('el registro entre turnos dice dónde quedaron las imágenes', registro.includes('1. generate_image(A red fox) -> ok · model flux-3 · 16:9 · seed 42 · you did not look at it · saved: C:\\datos\\images\\2026-11\\image-1.webp, C:\\datos\\images\\2026-11\\image-2.webp'), registro);
+    ok('…y una llamada que no dejó archivos queda como siempre', registro.includes('2. fs_read(notes.md) -> ok\n') || registro.includes('2. fs_read(notes.md) -> ok<') || /2\. fs_read\(notes\.md\) -> ok\s*\n?<\/tools_ran>/.test(registro), registro);
+    ok('…y avisa que NO trae lo que devolvió cada tool (si no, el modelo cree que inventó lo que dijo)', registro.includes('It lists each call and how it ended, not what it returned'), registro.slice(0, 300));
+    ok('el registro lleva el prompt entero (no el recorte de la fila) y los datos de la imagen', chat.includes("content: corto(d?.prompt, 2000) || String(m.texto ?? '')") && chat.includes("d.visto === true ? 'you looked at it' : 'you did not look at it'") && datos.includes('...(m.detalle ? { detalle: m.detalle } : {})'));
+    ok('la interfaz manda esas rutas con la fila', datos.includes("const dejo = (Array.isArray(m.imagenes) ? m.imagenes : []).map((im) => im.archivo).filter(Boolean);") && chat.includes('(Array.isArray(m.dejo) ? m.dejo : [])'));
     ok('la fila del chat guarda la ruta de la imagen, no la imagen', datos.includes('(archivo ? { name, archivo } : { name, dataUrl })'));
   }
 } finally {

@@ -2710,6 +2710,13 @@ else {
       for (let i = 0; i < 60 && !filaG?.imagenes; i++) { filaG = ((await window.rad.store.read('chat-' + idI))?.mensajes ?? []).find((m) => m.tool === 'generate_image'); if (!filaG?.imagenes) await sleep(100); }
       if (filaG?.imagenes?.length !== 2 || !filaG.imagenes.every((im) => typeof im.archivo === 'string' && /images[\\/]\d{4}-\d{2}[\\/]image-.*\.png$/.test(im.archivo) && !('dataUrl' in im)) || JSON.stringify(filaG).includes('base64')) fail('imágenes: el chat guardó ' + JSON.stringify(filaG?.imagenes ?? null).slice(0, 200) + ': tiene que ir la ruta del archivo, no la imagen');
     }
+    // En el turno siguiente el agente no vuelve a ver el resultado: lo que
+    // recibe de esa llamada es su registro, que tiene que decir dónde quedaron.
+    {
+      const viaje = datosM.historialDe((await datosM.hilo(datosM.chatActual().id)).get().mensajes).find((m) => m.tool === 'generate_image' && m.estado === 'ok');
+      if (viaje?.detalle?.prompt !== 'A red fox in the snow' || viaje.detalle.modelo !== 'sim-image' || viaje.detalle.aspecto !== '16:9' || viaje.detalle.visto !== false) fail('imágenes: al turno siguiente no viaja con qué se hizo la imagen (el prompt entero, el modelo, si la miró): ' + JSON.stringify(viaje?.detalle ?? null));
+      if (viaje?.dejo?.length !== 2 || !viaje.dejo.every((p) => /image-.*\.png$/.test(p))) fail('imágenes: al turno siguiente no viaja dónde quedaron las imágenes: ' + JSON.stringify(viaje ?? null).slice(0, 200));
+    }
     // Tocar una imagen abre su menú; guardarla y mostrarla en su carpeta andan.
     gs[0]?.click();
     await until(() => menus().length === 1, 2000);

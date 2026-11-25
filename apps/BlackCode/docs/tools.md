@@ -342,6 +342,20 @@ todo su catálogo de modelos de imagen.
 - **El modelo no recibe la imagen**, salvo que pase `look: true` y vea: el que
   la juzga es el usuario, y mandársela cuesta tokens. El resultado se lo dice
   («no describas lo que no miraste»).
+- **Lo que queda para los turnos siguientes.** Entre turnos el modelo no
+  vuelve a ver el resultado de ninguna tool: recibe un registro de qué corrió
+  (`<tools_ran>`, en `guardas.cjs`). Para una imagen eso no alcanzaba: Opus
+  5.5 dijo la ruta y el formato (los había visto), y al turno siguiente, sin
+  encontrarlos en el registro, se retractó creyendo que los había inventado.
+  Desde la 0.19.1 la tool deja un `detalle` con la fila (el prompt ENTERO, el
+  modelo, el formato, la semilla y si la miró) y el registro lo lleva, junto
+  con la ruta de cada archivo: `generate_image(<prompt>) -> ok · model … ·
+  16:9 · seed … · you did not look at it · saved: <ruta>`. Y el encabezado
+  del registro dice, para todas las tools, que trae la llamada y no lo que
+  devolvió.
+- **La semilla.** Si el agente no pasa una y pide una sola imagen, la elige
+  la tool y se la dice: Venice no devuelve la que usó, y sin ella no se puede
+  repetir ni variar una imagen que gustó. Con varias variantes no se manda.
 - **Los errores de Venice se traducen**: sin saldo (402), prompt rechazado (422,
   con el `suggested_prompt` si vino), demasiados pedidos (429), modelo sin
   lugar (503), modelo solo para Pro.

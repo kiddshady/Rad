@@ -1,5 +1,17 @@
 # Changelog
 
+## BlackCode 0.19.1 (2026-11-25)
+
+- **El agente ya no cree que inventó lo que dijo de una imagen.** En el turno
+  siguiente a generar una, el agente solo veía que la tool había corrido, sin
+  la ruta ni el formato que él mismo había dicho, y se retractaba. Ahora le
+  queda anotado el prompt entero, el modelo, el formato, la semilla, si la
+  miró y dónde se guardó.
+- El registro de lo que corrió en turnos anteriores avisa, para todas las
+  tools, que no trae lo que devolvió cada una.
+- Cada imagen suelta queda con su semilla: la elige la app si el agente no
+  pasó una, para poder repetirla o variarla después.
+
 ## BlackCode 0.19.0 (2026-11-25)
 
 - **Generar imágenes.** Tool nueva, `generate_image`: el agente genera una
