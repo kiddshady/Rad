@@ -57,6 +57,13 @@ function arrancar() {
   const NO_VIAJA = new Set(['.venv', 'Cache', 'Code Cache', 'GPUCache', 'DawnCache', 'DawnGraphiteCache', 'DawnWebGPUCache', 'Service Worker']);
   rad.adoptData('Nix', { also: ['tools', 'Partitions'], skip: (ruta) => NO_VIAJA.has(path.basename(ruta)) }) || rad.adoptData('Daimon');
 
+  // La bandeja del sistema: cerrar la ventana no cierra BlackCode, la esconde
+  // (así las tareas programadas siguen corriendo). Fran lo pidió el 25/11/2026.
+  // El ícono va sin baldosa y cambia con la barra de Windows (main/bandeja.cjs).
+  // Se puede apagar en Settings: con el documento `fondo` en { bandeja: false },
+  // cerrar la ventana vuelve a cerrar la app.
+  const bandeja = require('./main/bandeja.cjs').crear({ dir: path.join(__dirname, 'build'), alCambiar: () => rad.tray?.refresh() });
+
   let pedidos = null;
   llave.wire(rad, { alCambiar: (proveedor) => pedidos?.alCambiarLlave(proveedor) });
   pedidos = chat.wire(rad, { llave });
@@ -84,5 +91,14 @@ function arrancar() {
     // Se actualiza desde kiddshady/daimon-releases (build.publish del
     // package.json). Solo la app instalada: abierta desde el repo no busca nada.
     updates: true,
+    tray: {
+      icon: () => bandeja.icono(),
+      tooltip: 'BlackCode',
+      keep: () => rad.store.read('fondo')?.bandeja !== false,
+    },
+  }).then(() => {
+    // ¿La barra de Windows es clara u oscura? Se mira al abrir y cada vez que cambia el tema.
+    bandeja.mirar();
+    require('electron').nativeTheme.on('updated', () => { bandeja.mirar(); });
   });
 }

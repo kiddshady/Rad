@@ -12,6 +12,7 @@ import { montarMemoria } from './memoria.js';
 import { montarSkills, revisarSkill } from './skills.js';
 import { toast } from '/@core/toast.js';
 import { montarAjustes } from './ajustes.js';
+import { montarTareas, ponerPunto, abrirResultado } from './tareas.js';
 import { ICONOS } from './piezas.js';
 
 // La interfaz se arma después de leer los datos: el arranque espera.
@@ -23,6 +24,7 @@ const views = [
   { id: 'notas', label: 'Notes', icon: ICONOS.nota, scroll: false, mount: (el, router) => montarNotas(el, { router }) },
   { id: 'memoria', label: 'Memory', icon: ICONOS.memoria, mount: (el) => montarMemoria(el) },
   { id: 'skills', label: 'Skills', icon: ICONOS.skills, mount: (el) => montarSkills(el) },
+  { id: 'tareas', label: 'Tasks', icon: ICONOS.reloj, mount: (el, router) => montarTareas(el, { router }) },
   { id: 'agentes', label: 'Agents', icon: ICONOS.agentes, mount: (el, router) => montarAgentes(el, { router }) },
   { id: 'ajustes', label: 'Settings', icon: ICONOS.ajustes, mount: (el, router) => montarAjustes(el, { router }) },
 ];
@@ -65,6 +67,21 @@ window.rad.on('skills:evento', (ev) => {
     text: `An agent proposed a skill: “${ev.propuesta}”. No agent can use it until you approve it.`,
     duration: 12000,
     action: { label: 'Review', onClick: () => { shell.router.go('skills'); revisarSkill(ev.propuesta); } },
+  });
+});
+
+// Las tareas programadas: el punto de su pestaña dice que hay resultados sin
+// leer (también antes de abrirla), el aviso de Windows trae al resultado, y si
+// un agente borra una tarea se le dice al usuario, que la puede recuperar.
+ponerPunto();
+window.rad.on('tareas:evento', () => ponerPunto());
+window.rad.on('tareas:abrir', (ev) => { shell.router.go('tareas'); if (ev?.id) abrirResultado(ev.id); });
+window.rad.on('tareas:borrada', (ev) => {
+  if (!ev?.id) return;
+  toast({
+    text: `An agent deleted the task “${ev.titulo}”.`,
+    duration: 12000,
+    action: { label: 'Undo', onClick: () => window.rad.invoke('tareas:restaurar', ev.id) },
   });
 });
 

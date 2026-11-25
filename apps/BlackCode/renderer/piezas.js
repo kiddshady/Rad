@@ -26,6 +26,8 @@ export const ICONOS = {
   lapiz: svg('<path d="M10.5 2.5l3 3-8 8h-3v-3z"/>'),
   tacho: svg('<path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.5 9h6l.5-9"/>'),
   chevron: svg('<path d="M4.5 6.5 8 10l3.5-3.5"/>'),
+  // (el mismo, hacia arriba: subir un agente en la lista)
+  subir: svg('<path d="M4.5 9.5 8 6l3.5 3.5"/>'),
   llave: svg('<circle cx="5.25" cy="10.75" r="2.75"/><path d="M7.3 8.7l6.2-6.2M11 5l2 2M9.2 6.8l1.6 1.6"/>'),
   cerrar: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
   copiar: svg('<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>'),

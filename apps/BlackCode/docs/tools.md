@@ -63,6 +63,7 @@ agente. La barra de estado repite la cuenta.
 | Subagents | `delegate` |
 | Memory | `remember`, `recall` |
 | Skills | `skill`, `create_skill` |
+| Tasks | `schedule` |
 | Images (opcional) | `generate_image` |
 
 Images es el único grupo **opcional**: gasta plata del usuario en cada llamada,
@@ -275,6 +276,9 @@ preguntar más en este chat», que dura hasta cerrar la app.
 La excepción son las tools de un servidor MCP con «Ask before each call»
 prendido (así nace cada servidor): preguntan también en automático. «No
 preguntar más en este chat» vale también para ellas.
+
+Y `schedule` cuando crea o borra una tarea: pregunta **siempre**, y ahí «no
+preguntar más en este chat» no cuenta (ver «Las tareas programadas»).
 
 **No hay más rejas que esa.** No hay límite de carpetas ni filtro de comandos:
 una tool puede leer o escribir cualquier ruta que pueda el usuario de Windows y
@@ -588,6 +592,67 @@ todos los activos a la vez.
 **Lo que no hay:** OAuth, recursos y prompts de MCP, sampling, y atender el
 aviso de que un servidor cambió su lista de tools (hay que reconectarlo).
 
+## Las tareas programadas
+
+Desde la 1.0.0. Un pedido que un agente corre solo, a una hora o cada tanto;
+el resultado cae en una bandeja (la pestaña Tasks). La idea vino de NeonCode
+(`computeNextRun`, `runTask`, `tickScheduler`); el módulo es
+`main/tareas.cjs`, que no sabe de Electron ni de modelos (recibe dónde
+guardar, el reloj y cómo se corre una tarea) y se prueba con node pelado.
+
+**La tarea.** `{ id, titulo, prompt, agente, spec, actuar, activa, de,
+proxima, ultima, corridas }`. Es de un AGENTE: corre con su modelo, sus
+instrucciones, su memoria y sus skills. `spec` dice cuándo: `once` (en
+`minutos`, o a la próxima vez que sean las `a`), `every` (cada `minutos`,
+5 como mínimo) o `daily` (todos los días a las `a`). La próxima corrida de
+una diaria se calcula corriendo el día y no sumando 24 horas (el día que
+cambia la hora dura 23 o 25).
+
+**El latido** (`tic`, cada 30 s y una vez a los 3 s de abrir). Corre lo que
+venció, de a una, y nunca encima de un turno de chat (`activos.size`). Después
+de correr, la próxima se cuenta desde ese momento: por eso lo que faltó con
+la app cerrada corre UNA vez al abrirla. «Run now» corre una tarea sin tocar
+su horario. Una `once` queda apagada después de correr.
+
+**La corrida** (`correrTarea`, en `chat.cjs`). El mismo camino que un turno de
+chat: un solo mensaje con el pedido, y una sesión de tools con `tarea: {
+actuar }`. Nadie mira, así que nada pide permiso: **lo que no puede correr
+solo no está entre sus tools** (`activeToolNames`). Nunca: `schedule` (una
+tarea que agenda tareas es un runaway), `delegate`, `generate_image` (gasta
+plata) y `canvas` (es de un chat). Sin «Let it act», solo las de lectura
+(`READ_ROUND_TOOLS`, menos la pantalla). Las de un servidor MCP que pregunta
+antes de cada llamada se sacan antes de armar la sesión. El system lleva una
+nota (`TASK_NOTE`): nadie contesta, y el último mensaje es el resultado. Hay
+un reloj de INACTIVIDAD de cinco minutos (no de duración): sin él, una
+respuesta que nunca cierra dejaba colgadas todas las tareas hasta reiniciar.
+
+**El resultado.** `{ titulo, prompt, agente, salida, pasos, error, cortada,
+actuo, manual, ts, leida }`, en una bandeja de hasta 100. `pasos` es qué
+tools corrió: sin interfaz que muestre filas, es el único registro de lo que
+una corrida desatendida ejecutó. Al terminar sale un aviso de Windows (en el
+humo no), que al tocarlo trae la app a la pestaña. «Continue in a chat» arma
+un chat nuevo de ese agente con el pedido y el resultado adentro.
+
+**La tool `schedule`** (`main/tools/agenda.cjs`): `create`, `list`, `delete`.
+La tarea queda a nombre del agente que la pide (`run.agente`) y de solo
+lectura: «Let it act» lo prende el usuario, no es un parámetro. Crear y
+borrar piden permiso SIEMPRE (`confirma` en `chat.cjs`): ni el modo
+automático ni «no preguntar más en este chat» lo saltean. Si un agente borra
+una, la app avisa con «Undo» (diez minutos).
+
+**Dónde se guarda.** `_tareas` y `_tareas_bandeja`, documentos reservados: el
+único que los escribe es el proceso principal, y la pestaña pide cada cosa por
+su canal (`tareas:leer|guardar|activar|quitar|restaurar|correr|frenar|…`).
+
+**La bandeja del sistema.** Para que las tareas corran con la ventana cerrada,
+la app queda en la bandeja (`rad.start({ tray })`, del núcleo). El ícono lo
+elige `main/bandeja.cjs` según la barra de Windows (que no sigue el tema de
+las apps: se lee `SystemUsesLightTheme` del registro). Se apaga en Settings:
+el documento `fondo`, `{ bandeja: false }`.
+
+**Lo que no hay:** días de la semana, una fecha exacta, arrancar con Windows,
+y reintentos cuando una corrida falla.
+
 ## La terminal del panel no es una tool
 
 Desde la 0.14.0 hay una terminal al lado de la conversación (`main/terminal.cjs`,
@@ -605,7 +670,6 @@ lleva a la del chat que se vea en ese momento).
   `fs.cjs`, sin nada enchufado).
 - Mandar un mensaje a mitad del turno (steer).
 - Búsqueda en chats.
-- Tareas programadas.
 - Dónde guardar secretos para `http_request` (`{{secret:NOMBRE}}`): un pedido
   con un secreto falla diciendo que no está.
 - Con qué busca `web_search` se elige en Settings (tarjeta «Web search», desde
@@ -718,6 +782,12 @@ para arreglarlos de a uno, con su prueba:
   nombres, los secretos cifrados, el permiso, las marcas, el tope, lo que pasa
   cuando el servidor se muere y el JSON pegado. El humo lo recorre desde
   Settings (bloque 11q) y comprueba que reconecte al reabrir la app.
+- `tools/test-blackcode-tareas.mjs`: las tareas programadas con el reloj en la
+  mano (cuándo corre cada una, el latido, lo que faltó con la app cerrada,
+  correr ahora y frenar, la bandeja), la tool `schedule`, qué tools tiene una
+  corrida sin nadie mirando y el ícono de la bandeja. `tools/test-core-tray.mjs`
+  prueba la bandeja del núcleo con un Electron de mentira. En el humo (bloque
+  11r) el reloj de las tareas se adelanta por un canal que solo existe ahí.
 - `tools/test-blackcode-imagenes.mjs`: `generate_image` contra un servidor local que
   hace de Venice (los modelos, el pedido, los errores, el tope del turno, qué
   archivos se dejan leer).
@@ -746,8 +816,8 @@ encuentra nada. Se elige según lo que se tocó (acordado con Fran el 25/11/2026
 
 | Nivel | Qué se tocó | Qué corre | Tarda |
 |---|---|---|---|
-| 1 | Estético o de interfaz: CSS, un ícono, un botón | `npm run control:blackcode:1`: tests y UNA pasada del humo | ~8 min |
-| 2 | Comportamiento: una tool, datos que se guardan, el proceso principal | `npm run control:blackcode:2`: tests, el humo con sus dos pasadas y el modo real | ~15 min |
+| 1 | Estético o de interfaz: CSS, un ícono, un botón | `npm run control:blackcode:1`: tests y UNA pasada del humo | ~12 min |
+| 2 | Comportamiento: una tool, datos que se guardan, el proceso principal | `npm run control:blackcode:2`: tests, el humo con sus dos pasadas y el modo real | ~20 min |
 | 3 | Lo que puede romperse instalado: una dependencia, el arranque, el actualizador, archivos en una carpeta nueva | `npm run control:blackcode:3`: lo anterior, empaquetar y el humo del `.exe` | ~30 min |
 
 Una pasada del humo ya recorre la app entera: es la que encuentra que un

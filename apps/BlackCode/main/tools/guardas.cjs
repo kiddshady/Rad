@@ -25,7 +25,7 @@ function toolGuidance(names, run = null, confirma = true) {
   if (has('db_query')) lines.push('- `db_query`: your own private SQLite database for structured data worth keeping (lists, logs, trackers). Create tables as you need them; it persists across chats and scheduled runs.');
   if (has('sqlite_query')) lines.push('- `sqlite_query`: read or write an EXISTING SQLite file anywhere on disk. Use `readonly: true` unless you actually mean to change the data — a bad UPDATE here does not undo. For your own scratch data use db_query, not this.');
   if (has('http_request')) lines.push('- `http_request`: call any HTTP API (methods, headers, body) when `fetch` is not enough. Never put a real API key in the arguments: write the placeholder {{secret:NAME}} and tell the user to store the value in Settings. Check the HTTP status before trusting a response body.');
-  if (has('schedule')) lines.push("- `schedule`: schedule a reminder or recurring background job ('remind me tomorrow', 'every morning do X').");
+  if (has('schedule')) lines.push("- `schedule`: schedule a reminder or recurring background job ('remind me tomorrow', 'every morning do X'). Its result lands in the user's Tasks tab, not in this chat: say so. Creating or deleting a task always asks the user first.");
   if (has('shell_exec')) lines.push("- `shell_exec` / `cmd_exec`: run a PowerShell / cmd.exe command on the user's Windows machine. The working directory persists between calls.");
   if (has('job_start')) lines.push("- `job_start` / `job_output` / `job_kill`: for anything that runs longer than a quick command or never ends on its own — a dev server, a long build, a watcher, a scan, a download. job_start returns at once with a job id; read what it printed with job_output (each read returns only what is NEW since the last one; `wait` + `until` block until a line like \"ready\" appears or the job exits). Jobs keep running after your turn ends and across chats, so stop the ones you no longer need with job_kill. Never use shell_exec for a server: it blocks until the process exits and is killed after 120 s.");
   if (has('screen_capture')) lines.push("- `screen_capture`: take a screenshot of the user's screen or of one window and LOOK at it. Use it when the user asks you to look at something on their screen, or to check how a UI you changed actually renders. The user sees every capture in the chat. To look at an app you started with job_start, pass `job` (its id) instead of guessing the title, plus `wait` if it may still be opening. To read small text, capture a `region` of a previous full capture (coordinates in that image's pixel space): the crop comes back at native resolution.");
@@ -417,8 +417,17 @@ const SUBAGENT_NOTE = [
   'Keep it dense: the report goes straight into that agent\'s context. No greetings, no recap of the brief, no offers of further help.',
 ].join('\n');
 
+// Lo que una corrida de una tarea programada sabe de sí misma. Va en su system
+// (sesion.cjs), o con las instrucciones si el agente corre sin tools.
+const TASK_NOTE = [
+  '## This is a scheduled task',
+  'You are running unattended: the user scheduled this and is not here. Nobody can answer a question or approve anything, so do not ask: do what the task says with what you have, and say plainly what you could not do.',
+  'Your final message is the result, and the only thing the user will read: it lands in their Tasks inbox, outside any chat. Make it complete and self-contained, and lead with what they asked for.',
+].join('\n');
+const TASK_READONLY_NOTE = 'This run is read-only: you can search and read, but not write, run or send anything. If the task needs that, say so in the result: the user can allow it for this task ("Let it act", in the Tasks tab).';
+
 module.exports = {
-  SUBAGENT_NOTE,
+  SUBAGENT_NOTE, TASK_NOTE, TASK_READONLY_NOTE,
   APP_TAG, toolGuidance, turnLedger, withTail, TURN_START_NOTE, FINAL_ROUND_NOTE, LEDGER_MAX,
   foldToolRows, toolsRanBlock, traceLines, neutralize, salvageCalls, stripAppBlocks,
 };

@@ -28,6 +28,7 @@ const delegar = require('./delegar.cjs');
 const memoria = require('./memoria.cjs');
 const skills = require('./skills.cjs');
 const imagenes = require('./imagenes.cjs');
+const agenda = require('./agenda.cjs');
 
 let listo = false;
 let mcpApp = null; // los servidores MCP de la app (main/mcp.cjs), o null
@@ -61,10 +62,11 @@ function sincronizarMcp() {
  *   memoria            la memoria de la app (main/memoria.cjs): remember y recall
  *   skills             las skills de la app (main/skills.cjs): skill y create_skill
  *   mcp                los servidores MCP (main/mcp.cjs): sus tools, sus grupos y su runner
+ *   tareas             { tareas, agentes() }: las tareas programadas (main/tareas.cjs) y los agentes, para schedule
  *   imagenes           { getKey(), ajustes(), deMentira }: la llave de Venice, lo
  *                      elegido en Settings y si es el humo (generate_image)
  */
-function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null, skills: skillsApp = null, imagenes: imagenesApp = null, mcp: mcpDeLaApp = null } = {}) {
+function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null, skills: skillsApp = null, imagenes: imagenesApp = null, mcp: mcpDeLaApp = null, tareas: tareasApp = null } = {}) {
   archivos.configurar({ trash });
   web.configurar({ getKey, getSecret, webSearch });
   abrir.configurar({ shell });
@@ -94,6 +96,7 @@ function iniciar({ carpeta = null, trash = null, shell = null, capturador = null
     mcpApp.on('cambio', sincronizarMcp);
     sincronizarMcp();
   }
+  if (tareasApp) agenda.configurar(tareasApp);
   if (imagenesApp) imagenes.configurar({ ...imagenesApp, ...(carpeta ? { carpeta } : {}), ...(modeloVe ? { modeloVe } : {}) });
   motor.configurar({ classifyOsTarget: abrir.classifyOsTarget });
   // el hijo de `delegate` es una sesión como la de cualquier turno
@@ -101,7 +104,7 @@ function iniciar({ carpeta = null, trash = null, shell = null, capturador = null
   if (listo) return;
   motor.registrar({
     ...archivos.runners, ...comandos.runners, ...trabajos.runners, ...busqueda.runners,
-    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners, ...delegar.runners, ...memoria.runners, ...imagenes.runners, ...skills.runners,
+    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners, ...delegar.runners, ...memoria.runners, ...imagenes.runners, ...skills.runners, ...agenda.runners,
   });
   listo = true;
 }
@@ -136,6 +139,8 @@ async function vistaPrevia(run, name, args) {
     if (name === 'canvas') return ['edit', 'update', 'delete'].includes(args?.action) ? lienzo.canvasPreview(args) : null;
     // generar una imagen sale plata: la tarjeta dice con qué modelo y cuánto
     if (name === 'generate_image') return await imagenes.vista(args, run);
+    // agendar o borrar una tarea: qué es y cada cuánto corre
+    if (name === 'schedule') return agenda.vista(run, args);
     // una tool de un servidor MCP: de cuál es (es código de terceros)
     if (typeof name === 'string' && name.startsWith('mcp_')) return mcpApp ? mcpApp.vista(name) : null;
     return await archivos.preview(run, name, args);
@@ -200,6 +205,10 @@ module.exports = {
   // las imágenes generadas: sus modelos (Settings) y leer un archivo para mostrarlo
   imagenes,
   argsDigest: motor.argsDigest,
+  // ¿esa llamada a schedule cambia algo? (crear o borrar: piden permiso siempre; listar, no)
+  agendaPide: (args) => agenda.accionDe(args) !== 'list',
+  // lo que una tarea programada sabe de sí misma cuando corre sin tools
+  notaDeTarea: require('./guardas.cjs').TASK_NOTE,
   plegar: require('./guardas.cjs').foldToolRows,
   getCwd: base.getCwd,
   setCwd: base.setCwd,

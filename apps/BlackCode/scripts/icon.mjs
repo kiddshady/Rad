@@ -17,8 +17,9 @@
 // ningún trazo baja de un píxel ni un nodo de dos: no es otro dibujo, es que
 // más fino que eso no se pinta.
 //
-// Escribe build/icon.png (1024) y build/icon.ico (16 a 256). Para volver a
-// hornearlo: npm run icon -w daimon.
+// Escribe build/icon.png (1024) y build/icon.ico (16 a 256), y el ícono de la
+// bandeja del sistema (build/tray.ico y build/tray-dark.ico; ver más abajo).
+// Para volver a hornearlo: npm run icon -w daimon.
 //   --sueltos       además deja cada tamaño suelto en build/
 //   --hoja <dir>    no toca build/: deja en <dir> cada variante de color a
 //                   varios tamaños, para elegir mirándolas en chico
@@ -26,7 +27,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hexToRgb, rasterizeGlow, gradient, gradientStops, sdSegment, sdCircle, encodePNG, encodeICO, ICO_SIZES } from '../../../tools/icon-kit.mjs';
+import { hexToRgb, rasterizeGlow, rasterizeBare, gradient, gradientStops, sdSegment, sdCircle, encodePNG, encodeICO, ICO_SIZES } from '../../../tools/icon-kit.mjs';
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -117,6 +118,33 @@ const glow = (v) => (s) => v.resplandor.map((g) => ({ sigma: g.sigma * unit(s), 
 
 const draw = (size, nombre = VARIANTE) => { const v = VARIANTES[nombre]; return rasterizeGlow(size, v.baldosa, glyph(v, size), glow(v)); };
 
+// ---------- El ícono de la bandeja del sistema ----------
+//
+// Fran lo pidió el 25/11/2026: simplificado, y SIN baldosa (es la excepción a
+// la regla de sus íconos: en la bandeja va suelto sobre la barra, como los del
+// sistema). Es el mismo dibujo con lo que a 16 px se lee: el núcleo y los seis
+// agentes. El contorno y los rayos se van, porque a ese tamaño lo convertían en
+// un asterisco. Ocupa el lienzo entero (no hay baldosa que le pida margen) y
+// es de un solo color, sin resplandor.
+//
+// Son dos archivos porque la barra de Windows puede ser oscura o clara:
+// tray.ico (dibujo claro, para la barra oscura) y tray-dark.ico (dibujo
+// oscuro, para la clara). La app elige cuál según el tema de Windows.
+const TRAY_SIZES = [16, 20, 24, 32, 40, 48, 64];
+const TRAY_CLARO = hexToRgb('#ffffff');
+const TRAY_OSCURO = hexToRgb('#141414');
+const trayGlyph = (size, tinta) => () => {
+  const px = 1 / size;
+  const nodo = Math.max(0.085, 1.2 * px);      // el radio de un agente: nunca menos de 1,2 px
+  const nucleo = Math.max(0.15, 2 * px);       // …y el del núcleo, nunca menos de 2
+  const radio = 0.5 - nodo - 0.5 * px;         // los agentes llegan al borde del lienzo
+  return [
+    ...VERTICES.map(([x, y]) => { const k = radio / RADIO; return { color: tinta, sd: (u, v) => sdCircle(u - x * k, v - y * k, nodo) }; }),
+    { color: tinta, sd: (u, v) => sdCircle(u, v, nucleo) },
+  ];
+};
+const drawTray = (size, tinta) => rasterizeBare(size, trayGlyph(size, tinta));
+
 const hoja = process.argv.indexOf('--hoja');
 if (hoja > 0) {
   const dir = path.resolve(process.argv[hoja + 1]);
@@ -130,9 +158,12 @@ if (hoja > 0) {
   fs.mkdirSync(out, { recursive: true });
   fs.writeFileSync(path.join(out, 'icon.png'), encodePNG(1024, draw(1024)));
   fs.writeFileSync(path.join(out, 'icon.ico'), encodeICO(ICO_SIZES.map((size) => ({ size, rgba: draw(size) }))));
+  fs.writeFileSync(path.join(out, 'tray.ico'), encodeICO(TRAY_SIZES.map((size) => ({ size, rgba: drawTray(size, TRAY_CLARO) }))));
+  fs.writeFileSync(path.join(out, 'tray-dark.ico'), encodeICO(TRAY_SIZES.map((size) => ({ size, rgba: drawTray(size, TRAY_OSCURO) }))));
   // Para mirarlo en chico, al lado de otros: cada tamaño del .ico, suelto.
   if (process.argv.includes('--sueltos')) {
     for (const size of [16, 24, 32, 48, 64, 256]) fs.writeFileSync(path.join(out, `icon-${size}.png`), encodePNG(size, draw(size)));
+    for (const size of [16, 24, 32]) fs.writeFileSync(path.join(out, `tray-${size}.png`), encodePNG(size, drawTray(size, TRAY_CLARO)));
   }
-  console.log(`ícono: build/icon.png (1024) y build/icon.ico (${ICO_SIZES.join(', ')}), variante ${VARIANTE}`);
+  console.log(`ícono: build/icon.png (1024) y build/icon.ico (${ICO_SIZES.join(', ')}), variante ${VARIANTE}; bandeja: build/tray.ico y build/tray-dark.ico (${TRAY_SIZES.join(', ')})`);
 }

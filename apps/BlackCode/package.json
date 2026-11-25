@@ -1,7 +1,7 @@
 {
   "name": "daimon",
   "productName": "BlackCode",
-  "version": "0.22.0",
+  "version": "1.0.0",
   "private": true,
   "description": "BlackCode: an AI chat with several agents, each with its own provider, model, instructions and chats.",
   "author": "Kidd Shady · Umbrovex Systems",
@@ -43,6 +43,8 @@
       "renderer/**/*",
       "build/icon.ico",
       "build/icon.png",
+      "build/tray.ico",
+      "build/tray-dark.ico",
       "package.json"
     ],
     "asarUnpack": [

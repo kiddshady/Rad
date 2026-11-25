@@ -108,6 +108,9 @@ async function check() {
 /** Instala lo que ya se bajó. En el humo, sin volver a abrir la app. */
 function install() {
   if (!updater || last?.state !== 'ready') return false;
+  // (quitAndInstall cierra las ventanas ANTES de before-quit: con bandeja, ese
+  // cierre se frenaría y la actualización no se instalaría nunca)
+  require('./tray.cjs').allowQuit();
   updater.quitAndInstall(true, !process.env.RAD_SMOKE);
   return true;
 }

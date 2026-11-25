@@ -1,5 +1,50 @@
 # Changelog
 
+## BlackCode 1.0.0 (2026-11-25) · núcleo 0.19.0
+
+La primera versión 1.0: con las tareas programadas quedó hecho lo que estaba
+planeado para la app (tools, memoria, skills, navegador, imágenes, MCP y tareas).
+
+- **Tareas programadas.** Hay una pestaña nueva, **Tasks**: un pedido que un
+  agente corre solo, una vez (en un rato o a una hora), cada tanto, o todos los
+  días a una hora. Cada corrida deja su resultado en la bandeja de esa
+  pestaña, con un aviso de Windows y un punto en la pestaña mientras haya
+  algo sin leer. Un resultado se abre entero y se puede seguir en un chat.
+- **La tarea es de un agente:** corre con su modelo, sus instrucciones, su
+  memoria y sus skills, en un contexto nuevo (no recuerda ningún chat).
+- **Sin nadie mirando, la corrida solo lee** (busca, lee archivos, notas y
+  memoria). Cada tarea tiene un interruptor, «Let it act», para darle lo que
+  tiene el agente. Ni con eso genera imágenes, usa un servidor MCP que
+  pregunta antes de cada llamada, agenda otra tarea ni lanza subagentes.
+- **Un agente puede crearlas** con la tool nueva `schedule` («recordame
+  mañana», «todas las mañanas resumime…»), listarlas y borrarlas. Crear y
+  borrar piden permiso **siempre**: también en automático y aunque el chat
+  esté en «no preguntar más». Lo que crea un agente nace de solo lectura. Si
+  un agente borra una tarea, la app avisa y deja deshacerlo.
+- Una tarea no arranca mientras hay una respuesta en curso, ni corren dos a
+  la vez. Lo que tocaba con la app cerrada corre **una vez** al abrirla, no
+  una por cada vez que faltó. «Run now» corre una tarea ya sin mover su
+  horario. Si el proveedor se queda cinco minutos sin mandar nada, la corrida
+  se corta y lo dice. «Cada tanto» tiene un piso de 5 minutos.
+- **BlackCode queda en la bandeja del sistema.** Cerrar la ventana ya no
+  cierra la app: la esconde, y las tareas siguen corriendo. Vuelve con un clic
+  en su ícono; se sale desde el menú de ese ícono. Se puede apagar en Settings
+  («Keep running in the tray when the window is closed»).
+- **Ícono de bandeja propio**, simplificado y sin baldosa: el núcleo y los
+  seis agentes, sin el contorno ni los rayos, que a 16 px lo volvían un
+  asterisco. Es claro u oscuro según la barra de Windows.
+- **Núcleo 0.19.0:** `rad.start({ tray: { icon, tooltip, keep } })` le pone
+  bandeja a cualquier app de Rad, y `rad.tray` la maneja (mostrar, esconder,
+  salir). El actualizador avisa antes de instalar, porque cierra las ventanas
+  antes de `before-quit`. Sin `tray`, todo sigue como estaba.
+- La tool `schedule` va en un grupo nuevo, Tasks, que no es opcional: los
+  agentes que tenían todas las tools la reciben.
+- **Los agentes se pueden cambiar de lugar.** En la pestaña Agents cada uno
+  tiene «Move up» y «Move down»; ese orden es también el del menú de agentes
+  del chat.
+- El tope de una pasada del humo pasó de 8 a 15 minutos: con MCP, la edición
+  de imágenes y las tareas, la primera pasada ya tardaba 8.
+
 ## BlackCode 0.22.0 (2026-11-25)
 
 - **Editar una imagen que ya existe.** `generate_image` tiene un parámetro

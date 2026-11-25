@@ -152,6 +152,17 @@ export function vistaDe(vista) {
     frase(`Sent to Venice: ${(vista.entradas ?? []).map((e) => `${e.rotulo}${e.ancho ? ` (${e.ancho}×${e.alto})` : ''}`).join(', ')}.`);
     frase(typeof vista.total === 'number' ? `About $${vista.total.toFixed(2)} of your Venice balance.` : 'It is paid from your Venice balance. Venice does not publish a price for this model.');
   }
+  // agendar o borrar una tarea programada: qué es, quién la corre y cada cuánto
+  else if (vista.mode === 'tarea') {
+    if (vista.accion === 'delete') frase(`Deletes the scheduled task “${vista.titulo}” (${vista.cuando}, run by ${vista.agente}).`);
+    else {
+      frase(`Schedules “${vista.titulo}”: ${vista.cuando}, run by ${vista.agente}.`);
+      frase('It runs on its own and read-only: it can search and read, not change anything, unless you turn on “Let it act” for it in the Tasks tab.');
+      const pedido = h('p', 'dm-permiso-pedido', {});
+      pedido.textContent = vista.prompt;
+      caja.append(h('p', 'rad-field-label', {}, 'What it will be asked'), pedido);
+    }
+  }
   // generar una imagen sale plata: con qué modelo, cuántas y cuánto
   else if (vista.mode === 'imagen') {
     frase(`${vista.cuantas} image${vista.cuantas === 1 ? '' : 's'} with ${vista.modelo}${vista.aspecto ? `, ${vista.aspecto}` : ''}${vista.resolucion ? `, ${vista.resolucion}` : ''}.`);
@@ -191,7 +202,7 @@ export function abrirPermiso(chatId, pide) {
     h('p', 'dm-permiso-que', pide.sub ? { 'data-sub': String(pide.sub) } : {}, pide.sub ? (pide.sub === true ? 'A subagent wants to run ' : `Subagent ${pide.sub} wants to run `) : 'The agent wants to run ', h('strong', 'rad-mono', {}, pide.name), pide.label ? ' on ' : '.', pide.label ? h('strong', '', {}, pide.label) : null, pide.label ? '.' : null),
     vista,
     // con un diff a la vista, los argumentos crudos repiten lo mismo en feo
-    pide.vista?.mode === 'diff' || pide.vista?.mode === 'new' ? null : (args.childElementCount ? args : null),
+    pide.vista?.mode === 'diff' || pide.vista?.mode === 'new' || pide.vista?.mode === 'tarea' ? null : (args.childElementCount ? args : null),
     h('label', 'rad-check', {}, confiar, h('span', 'rad-check-box'), 'Don’t ask again in this chat'));
   wireControls(cuerpo);
 

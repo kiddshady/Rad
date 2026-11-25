@@ -63,7 +63,9 @@ function armarGuion(carpeta) {
 // RAD_SMOKE_TIMEOUT (ms) lo estira y RAD_SMOKE_KEEP=1 deja la carpeta de datos
 // para mirarla: las dos son para depurar un guion que se cuelga.
 // (480 s desde la 0.14.0: con la terminal, la manija y el chat largo la primera pasada ronda los cinco minutos)
-const TIMEOUT_MS = Number(process.env.RAD_SMOKE_TIMEOUT) || 480000;
+// (la primera pasada tarda unos 8 minutos desde que recorre MCP, la edición de
+// imágenes y las tareas programadas: el tope va con margen)
+const TIMEOUT_MS = Number(process.env.RAD_SMOKE_TIMEOUT) || 900000;
 // Todas las llaves que escribe el guion en Ajustes llevan esta marca. No son
 // llaves: son textos con su forma, para comprobar que lo que se guarda no
 // queda en claro.
@@ -190,6 +192,15 @@ function checkDisk(data, report) {
     const s = m.servidores ?? [];
     if (s.length !== 1 || s[0].nombre !== 'Smoke' || typeof s[0].secreto !== 'string' || s[0].secreto.length < 20 || s[0].preguntar !== false || s[0].activo !== true || 'env' in s[0]) failures.push(`los servidores MCP guardados: ${JSON.stringify(s).slice(0, 300)}`);
   } catch { failures.push('los servidores MCP no quedaron guardados (falta _mcp.json)'); }
+  // las tareas programadas: quedó la del agente que no se borró (las del agente de prueba se fueron con él), con su bandeja, y lo que escribió la que podía actuar (y no lo de la que no)
+  try {
+    const t = JSON.parse(fs.readFileSync(path.join(dir, '_tareas.json'), 'utf8')).lista ?? [];
+    if (t.length !== 1 || t[0].titulo !== 'Smoke keeper' || t[0].activa !== true) failures.push(`las tareas guardadas: ${JSON.stringify(t).slice(0, 300)}`);
+    const b = JSON.parse(fs.readFileSync(path.join(dir, '_tareas_bandeja.json'), 'utf8')).lista ?? [];
+    if (b.length < 5 || !b.some((r) => r.titulo === 'Smoke writer' && r.actuo === true)) failures.push(`la bandeja de las tareas guardó ${b.length} resultados`);
+  } catch { failures.push('las tareas programadas no quedaron guardadas (falta _tareas.json o _tareas_bandeja.json)'); }
+  if (leer('task-si.txt') !== 'from a task\n') failures.push(`una tarea con «Let it act» no dejó su archivo: ${JSON.stringify(leer('task-si.txt'))}`);
+  if (leer('task-no.txt') !== null) failures.push('una tarea de solo lectura escribió task-no.txt');
   const borrado = report.script?.chatBorrado;
   if (!borrado) failures.push('el guion no dijo qué chat borró');
   else if (files.some((f) => f.startsWith(`chat-${borrado}.`))) failures.push(`el documento del chat borrado sigue en el disco: ${files.filter((f) => f.startsWith(`chat-${borrado}.`)).join(', ')}`);

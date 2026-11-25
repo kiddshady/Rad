@@ -527,6 +527,30 @@ function tarjetaCarpeta() {
   return tarjeta;
 }
 
+// La bandeja del sistema: cerrar la ventana no cierra BlackCode, la esconde, y
+// las tareas programadas siguen corriendo. Se puede apagar.
+function tarjetaFondo() {
+  const input = h('input', '', { type: 'checkbox', role: 'switch', 'data-campo': 'bandeja' });
+  const nota = h('p', 'dm-tarjeta-instr rad-swap');
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'fondo' },
+    h('h2', 'dm-tarjeta-nombre', {}, 'In the background'),
+    h('label', 'rad-switch', {}, input, h('span', 'rad-switch-track'), 'Keep running in the tray when the window is closed'),
+    nota);
+  wireControls(tarjeta);
+  const poner = () => {
+    const si = datosApp.enBandeja();
+    input.checked = si;
+    swapText(nota, si
+      ? 'Closing the window hides BlackCode in the system tray, and scheduled tasks keep running. Click its icon there to bring it back; quit from that icon’s menu.'
+      : 'Closing the window quits BlackCode. Scheduled tasks only run while it is open, and the ones that were due run when you open it again.');
+    tarjeta.dataset.bandeja = si ? 'si' : 'no';
+  };
+  input.addEventListener('change', () => datosApp.ponerEnBandeja(input.checked));
+  poner();
+  datosApp.on('ajustes', poner);
+  return tarjeta;
+}
+
 // Los servidores MCP: tools de terceros para los agentes. Un servidor es un
 // comando que corre en esta PC (stdio) o una dirección (HTTP). Sus variables
 // de entorno y sus encabezados suelen ser llaves: el proceso principal los
@@ -745,6 +769,7 @@ export function montarAjustes(el, { router }) {
     tarjetaTitulos(),
     tarjetaImagenes(),
     tarjetaMcp(),
+    tarjetaFondo(),
     tarjetaSubagentes(),
     tarjetaAcerca()));
 

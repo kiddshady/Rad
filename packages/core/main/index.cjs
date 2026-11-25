@@ -12,6 +12,7 @@
 //   rad.send('notas:cambiaron', datos);               // avisarle al renderer
 //   rad.store.read('ajustes');                        // el mismo store del renderer
 //   rad.adoptData('Nombre viejo', { also: ['tools'] }); // si la app cambió de nombre
+//   rad.tray?.show();                                 // con rad.start({ tray }): ver tray.cjs
 //
 // Hay que requerirlo antes de app.whenReady(): registra el esquema rad:// en
 // el momento de cargarse, y Electron solo lo acepta antes de ready.
@@ -23,6 +24,7 @@ const { createWindow, wireWindowIpc } = require('./window.cjs');
 const { Store, adopt, adoptSecrets } = require('./store.cjs');
 const smoke = require('./smoke.cjs');
 const updater = require('./updater.cjs');
+const tray = require('./tray.cjs');
 const contract = require('../contract/tokens.cjs');
 const pkg = require('../package.json');
 
@@ -232,8 +234,13 @@ function start(options) {
     updater.setup({ enabled: options.updates !== false });
     const appInfo = { name: options.window?.title ?? app.getName(), version: app.getVersion() };
     const win = createWindow({ ...options, store: getStore(), appInfo, fonts, lang });
+    // Con bandeja, cerrar la ventana la esconde y la app sigue viva (tray.cjs).
+    // En el humo no se crea el ícono, pero esconder y mostrar andan igual.
+    const bandeja = options.tray ? tray.attach(win, { ...options.tray, lang, name: appInfo.name, headless: Boolean(process.env.RAD_SMOKE) }) : null;
     app.on('second-instance', () => {
       if (win.isDestroyed()) return;
+      // (escondida en la bandeja, abrir la app de nuevo la trae de vuelta)
+      if (bandeja) { bandeja.show(); return; }
       if (win.isMinimized()) win.restore();
       win.focus();
     });
@@ -248,6 +255,8 @@ module.exports = {
   send,
   adoptData,
   get store() { return getStore(); },
+  /** La bandeja del sistema de esta app, si se pidió con rad.start({ tray }): { show, hide, quit, visible, refresh, iconOk }. */
+  get tray() { return tray.current; },
   version: pkg.version,
   contract,
 };

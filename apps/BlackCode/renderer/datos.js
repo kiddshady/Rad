@@ -38,6 +38,7 @@ let chats;
 let ui;
 let catalogo = { proveedores: [] }; // los proveedores con sus modelos
 let herramientas = { grupos: [], carpeta: '' }; // las tools que hay, por grupo
+let fondoDoc; // { bandeja }: ¿cerrar la ventana deja la app en la bandeja del sistema?
 let servidoresMcp = { disponible: true, servidores: [] }; // los servidores MCP, con su estado y sin sus secretos
 const hilos = new Map();      // id del chat -> promesa de su documento
 const respuestas = new Map(); // id del chat -> { pedido, mensaje, doc, pensando, guardado }
@@ -69,6 +70,7 @@ export async function abrir() {
     window.rad.invoke('chat:modelos'),
     window.rad.invoke('chat:tools'),
   ]);
+  fondoDoc = await openDoc('fondo', { bandeja: true });
   {
     const m = await window.rad.invoke('mcp:lista').catch(() => null);
     if (m && Array.isArray(m.servidores)) { servidoresMcp = m; podarMcp(); }
@@ -230,6 +232,14 @@ export function ponerTools(id, tools) {
 
 /** Con qué busca web_search: 'duckduckgo' (sin llave), 'tavily' o 'brave'. Lo
  *  lee el proceso principal de este mismo documento. */
+/** ¿Cerrar la ventana deja la app viva en la bandeja del sistema? (Lo lee el
+ *  proceso principal de este mismo documento, cada vez que se cierra la ventana.) */
+export const enBandeja = () => fondoDoc.get().bandeja !== false;
+export function ponerEnBandeja(si) {
+  fondoDoc.patch({ bandeja: si === true });
+  avisar('ajustes');
+}
+
 export const BUSCADORES = ['duckduckgo', 'tavily', 'brave'];
 export const buscador = () => (BUSCADORES.includes(busqueda.get().proveedor) ? busqueda.get().proveedor : 'duckduckgo');
 export function ponerBuscador(id) {
@@ -279,6 +289,17 @@ export function editarAgente(id, { nombre, proveedor: prov, modelo, instruccione
   avisar('agentes');
 }
 
+/** Mueve un agente un lugar hacia arriba (-1) o hacia abajo (+1). El orden de
+ *  la lista es el de la pestaña Agents y el del menú de agentes del chat. */
+export function moverAgente(id, hacia) {
+  const i = listaAgentes().findIndex((a) => a.id === id);
+  const j = i + (hacia < 0 ? -1 : 1);
+  if (i < 0 || j < 0 || j >= listaAgentes().length) return false;
+  agentes.update((v) => { const [a] = v.lista.splice(i, 1); v.lista.splice(j, 0, a); return v; });
+  avisar('agentes');
+  return true;
+}
+
 /** Borra un agente con todos sus chats. El último no se borra. */
 export async function borrarAgente(id) {
   if (listaAgentes().length <= 1 || !agente(id)) return false;
@@ -295,6 +316,8 @@ export async function borrarAgente(id) {
   avisar('chats');
   avisar('seleccion');
   window.rad.invoke('canvas:huerfanos', suyos.map((c) => c.id)).catch(() => {});
+  // (sus tareas programadas se van con él)
+  window.rad.invoke('tareas:sin-agente', id).catch(() => {});
   await Promise.all(suyos.map((c) => removeDoc(`chat-${c.id}`)));
   return true;
 }
@@ -323,6 +346,22 @@ export function crearChat(agenteId) {
   avisar('chats');
   elegirChat(nuevo.id);
   return nuevo;
+}
+
+/** Sigue en un chat lo que dejó una tarea programada: un chat nuevo de ese
+ *  agente, con el pedido y el resultado ya adentro. null si el agente ya no está. */
+export async function chatDeTarea({ agente: agenteId, titulo, prompt, salida }) {
+  const a = agente(agenteId);
+  if (!a) return null;
+  const c = crearChat(agenteId);
+  const doc = await hilo(c.id);
+  const v = doc.get();
+  v.mensajes.push({ id: nuevoId(), rol: 'user', texto: String(prompt ?? '') }, { id: nuevoId(), rol: 'assistant', texto: String(salida ?? ''), estado: 'ok', modelo: a.modelo });
+  doc.set(v);
+  chats.update((x) => { Object.assign(x.lista.find((y) => y.id === c.id), { titulo: titular(String(titulo || prompt || '')), auto: false, cuenta: 2, tocado: Date.now() }); return x; });
+  avisar('chats');
+  avisar('mensajes', { chat: c.id });
+  return c;
 }
 
 export function elegirChat(id) {
@@ -514,7 +553,7 @@ export async function enviar(chatId, texto, adjuntos = null) {
 
   try {
     await window.rad.invoke('chat:enviar', {
-      id: pedido, chat: chatId, proveedor: a.proveedor, modelo: a.modelo, instrucciones: a.instrucciones, mensajes: historial,
+      id: pedido, chat: chatId, agente: a.id, proveedor: a.proveedor, modelo: a.modelo, instrucciones: a.instrucciones, mensajes: historial,
       tools, modo: modoTools(),
       // la memoria de la app: la ve el agente que tiene prendido su grupo
       // Memory, también si su modelo no acepta tools

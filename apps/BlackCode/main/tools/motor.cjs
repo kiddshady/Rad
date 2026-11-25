@@ -61,6 +61,17 @@ function activeToolNames(run) {
   // lectura, que son las mismas que no gastan presupuesto (READ_ROUND_TOOLS).
   // El filtro es fijo para todo el turno del hijo, así que no le cambia la lista
   // de tools detrás de un bloque thinking.
+  // Una TAREA PROGRAMADA corre sin nadie mirando: no hay a quién pedirle
+  // permiso, así que lo que no puede correr solo directamente no está. Nunca:
+  // agendar otra tarea (una tarea que agenda tareas es un runaway), lanzar
+  // subagentes, generar imágenes (gasta plata) ni el canvas (es de un chat, y
+  // acá no hay). Y, salvo que el usuario le haya prendido «Let it act» a esa
+  // tarea, solo las de lectura; la pantalla tampoco, que es lo más privado.
+  // (Los servidores MCP que preguntan los saca chat.cjs antes de armar la sesión.)
+  if (run?.tarea) {
+    names = names.filter((n) => n !== 'schedule' && n !== 'delegate' && n !== 'generate_image' && n !== 'canvas');
+    if (!run.tarea.actuar) names = names.filter((n) => READ_ROUND_TOOLS.has(n) && n !== 'screen_capture');
+  }
   if (run?.subagent) {
     names = names.filter((n) => n !== 'delegate' && n !== 'schedule' && n !== 'remember' && n !== 'create_skill'
       // (ni genera imágenes: gasta plata del usuario, y la pide quien habla con él)

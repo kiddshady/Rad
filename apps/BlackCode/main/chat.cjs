@@ -65,7 +65,7 @@ const IMAGENES_MAX = 4;
 const ESPERA_MODELOS_MS = 8000;
 
 function limpiar(pedido) {
-  const { id, chat = '', proveedor = 'anthropic', modelo, instrucciones, mensajes, tools = [], modo = 'manual', memoria = false, carpeta = '' } = pedido ?? {};
+  const { id, chat = '', agente = '', proveedor = 'anthropic', modelo, instrucciones, mensajes, tools = [], modo = 'manual', memoria = false, carpeta = '' } = pedido ?? {};
   if (typeof id !== 'string' || !id) throw new Error('[blackcode] el pedido no trae id');
   if (!RESPONDER[proveedor]) throw new Error(`[blackcode] proveedor desconocido: ${JSON.stringify(proveedor)}`);
   if (typeof modelo !== 'string' || !modelo) throw new Error('[blackcode] el pedido no trae modelo');
@@ -105,6 +105,8 @@ function limpiar(pedido) {
   return {
     id,
     chat: String(chat ?? ''),
+    // de qué agente es el turno (la tool schedule le deja la tarea a él)
+    agente: typeof agente === 'string' ? agente : '',
     proveedor,
     modelo,
     instrucciones: typeof instrucciones === 'string' ? instrucciones.trim() : '',
@@ -233,6 +235,39 @@ function wire(rad, { llave }) {
     alCambiar: () => avisarMcp(),
   });
   const paraMcp = { mcp };
+  // ---------- Las tareas programadas ----------
+  // Un pedido que un agente corre solo, a una hora o cada tanto; el resultado
+  // queda en una bandeja (la pestaña Tasks). Las tareas y sus resultados van
+  // en documentos reservados: el único que los escribe es este proceso. Ver
+  // main/tareas.cjs; cómo corre cada una, en correrTarea, más abajo.
+  const losAgentes = () => (Array.isArray(rad.store.read('agentes')?.lista) ? rad.store.read('agentes').lista : []);
+  let corrimiento = 0; // (el humo adelanta el reloj de las tareas; en la app es 0)
+  let ultimoAviso = null; // el último aviso de Windows que se mandó (o se habría mandado, en el humo)
+  const tareas = require('./tareas.cjs').crear({
+    leer: () => rad.store.read('_tareas'),
+    escribir: (doc) => rad.store.write('_tareas', doc),
+    leerBandeja: () => rad.store.read('_tareas_bandeja'),
+    escribirBandeja: (doc) => rad.store.write('_tareas_bandeja', doc),
+    correr: (tarea, o) => correrTarea(tarea, o),
+    // una tarea no compite con un turno de chat en curso
+    ocupado: () => activos.size > 0,
+    existeAgente: (id) => losAgentes().some((a) => a.id === id),
+    ahora: () => Date.now() + corrimiento,
+    alCambiar: (que) => rad.send('tareas:evento', { que }),
+    // Terminó una corrida: un aviso de Windows, que al tocarlo trae la app a la pestaña Tasks.
+    alTerminar: (r) => {
+      // (el resultado es markdown: en el aviso va sin sus marcas)
+      const cuerpo = (r.error ? `It failed: ${r.error}` : r.salida || 'It finished with no text.').replace(/^#+\s*/gm, '').replace(/[*_`]/g, '').replace(/\s+/g, ' ').slice(0, 220);
+      ultimoAviso = { id: r.id, titulo: `BlackCode · ${r.titulo}`, cuerpo };
+      if (taller) return; // (en el humo no se le manda un aviso de verdad al usuario)
+      const { Notification } = require('electron');
+      if (!Notification.isSupported()) return;
+      const aviso = new Notification({ title: ultimoAviso.titulo, body: cuerpo, silent: false });
+      aviso.on('click', () => { rad.tray?.show(); rad.send('tareas:abrir', { id: r.id }); });
+      aviso.show();
+    },
+  });
+  const paraLasTareas = { tareas: { tareas, agentes: losAgentes, alBorrar: (t) => rad.send('tareas:borrada', { id: t.id, titulo: t.titulo }) } };
   // generate_image: la llave de Venice (la misma de los agentes de Venice), lo
   // que el usuario eligió en Settings (el modelo y el filtro de contenido
   // adulto) y, en el humo, sin red.
@@ -249,7 +284,7 @@ function wire(rad, { llave }) {
       ...paraElCanvas,
       ...paraElNavegador,
       ...paraLaBusqueda,
-      ...paraLosSubagentes, ...paraLaMemoria, ...paraLasImagenes, ...paraMcp,
+      ...paraLosSubagentes, ...paraLaMemoria, ...paraLasImagenes, ...paraMcp, ...paraLasTareas,
       abrirAfuera: (u) => anotar(`url ${u}`),
       trash: (ruta) => fs.promises.rename(ruta, path.join(taller, '.trash', `${Date.now()}-${path.basename(ruta)}`)),
       // y no miran la pantalla de nadie: capturan una de mentira
@@ -267,7 +302,7 @@ function wire(rad, { llave }) {
     const carpeta = path.join(path.dirname(rad.store.dir), 'tools');
     fs.mkdirSync(carpeta, { recursive: true });
     const { desktopCapturer, screen } = require('electron');
-    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, ...paraLosSubagentes, ...paraLaMemoria, ...paraLasImagenes, ...paraMcp, abrirAfuera: (u) => shell.openExternal(u) });
+    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, ...paraLosSubagentes, ...paraLaMemoria, ...paraLasImagenes, ...paraMcp, ...paraLasTareas, abrirAfuera: (u) => shell.openExternal(u) });
     herramientas.setCwd(rad.store.read(DOC_TOOLS)?.carpeta);
   }
   // Al salir, lo que quedó corriendo en segundo plano se mata.
@@ -277,6 +312,10 @@ function wire(rad, { llave }) {
   // Al salir se cierran: los locales son procesos hijos.
   mcp.conectarActivos().catch(() => {});
   require('electron').app.on('before-quit', () => { mcp.cerrar().catch(() => {}); });
+  // El latido de las tareas programadas: cada 30 s, y una vez a los 3 s de
+  // abrir (lo que tocaba con la app cerrada corre ahí, una vez).
+  tareas.arrancar();
+  require('electron').app.on('before-quit', () => { tareas.parar(); tareas.frenar(); });
   // La terminal del panel: una shell del USUARIO, que abre donde están
   // trabajando las tools. Ninguna tool llega a ella (ver terminal.cjs). En el
   // humo es una shell sin el profile de nadie.
@@ -574,7 +613,8 @@ function wire(rad, { llave }) {
         // no ofrecerla a uno que ve solo le quita una tool)
         tools: pedido.proveedor === 'anthropic' || elModelo?.vision === true ? pedido.tools : pedido.tools.filter((n) => n !== 'screen_capture'),
         // (las tools de un servidor MCP con «preguntar» piden permiso también en automático)
-        confirma: (name) => (pedido.modo !== 'auto' || mcp.pregunta(name)) && !confiados.has(pedido.chat),
+        // …y agendar o borrar una tarea pide permiso SIEMPRE: ni el modo automático ni «no preguntar más en este chat» lo saltean
+        confirma: (name, args) => (name === 'schedule' && herramientas.agendaPide(args)) || ((pedido.modo !== 'auto' || mcp.pregunta(name)) && !confiados.has(pedido.chat)),
         // los runners avisan sin saber su callId: se lo pone la corrida
         notify(canal, datos) {
           const callId = datos.callId ?? this._callId;
@@ -606,6 +646,8 @@ function wire(rad, { llave }) {
       sesion.run.ve = ve;
       // las imágenes adjuntas del chat, para editarlas (generate_image con input_images)
       sesion.run.adjuntas = adjuntas;
+      // de qué agente es este turno: una tarea que agende queda a su nombre
+      sesion.run.agente = pedido.agente;
       // lo que un subagente hereda de esta corrida, y con qué modelo va a
       // hablar (se lo dice la guía de delegate)
       Object.assign(sesion.run, { proveedor: pedido.proveedor, modelo: pedido.modelo, instrucciones: pedido.instrucciones });
@@ -652,6 +694,111 @@ function wire(rad, { llave }) {
       .finally(() => { activos.delete(pedido.id); });
     return { ok: true };
   });
+
+  // ---------- Una tarea programada, corriendo ----------
+  // El mismo camino que un turno de chat, sin nadie mirando: el agente de la
+  // tarea (su modelo, sus instrucciones, su memoria y sus skills), un solo
+  // mensaje con el pedido, y nada que pida permiso: lo que no puede correr solo
+  // no está entre sus tools (motor.cjs). Se corta si el proveedor se queda
+  // mudo: sin ese reloj, una respuesta que nunca cierra dejaría colgadas TODAS
+  // las tareas hasta reiniciar la app (le pasó a NeonCode). Es de inactividad
+  // y no de duración: una búsqueda larga es legítima.
+  const TAREA_MUDA_MS = 5 * 60 * 1000;
+  async function correrTarea(tarea, { signal }) {
+    const agente = (rad.store.read('agentes')?.lista ?? []).find((a) => a.id === tarea.agente);
+    if (!agente) return { error: 'The agent of this task no longer exists.' };
+    const nombre = String(agente.nombre ?? '');
+    if (!RESPONDER[agente.proveedor]) return { agente: nombre, error: 'The provider of that agent is not available.' };
+    const elModelo = proveedores().proveedores.find((p) => p.id === agente.proveedor)?.modelos.find((m) => m.id === agente.modelo);
+    const ve = agente.proveedor === 'anthropic' || elModelo?.vision === true;
+    const control = new AbortController();
+    const alFrenar = () => control.abort();
+    if (signal.aborted) control.abort(); else signal.addEventListener('abort', alFrenar, { once: true });
+    let reloj = null;
+    let muda = false;
+    const toque = () => { clearTimeout(reloj); reloj = setTimeout(() => { muda = true; control.abort(); }, TAREA_MUDA_MS); };
+    const id = 'task-' + tarea.id + '-' + Date.now().toString(36);
+    const actuar = tarea.actuar === true;
+    const pedido = { id, chat: '', proveedor: agente.proveedor, modelo: agente.modelo, instrucciones: String(agente.instrucciones ?? '').trim(), mensajes: [{ rol: 'user', texto: tarea.prompt }], tools: [], modo: 'auto' };
+    // Las tools del agente, sin las de un servidor MCP que pregunta antes de
+    // cada llamada (acá no hay quién conteste).
+    const suyas = mcp.expandir(Array.isArray(agente.tools) ? agente.tools.filter((t) => typeof t === 'string') : []).filter((n) => !mcp.pregunta(n));
+    let sesion = null;
+    if (suyas.length && elModelo?.tools !== false) {
+      sesion = herramientas.crearSesion({
+        reqId: id,
+        convoId: '',
+        ac: control,
+        cwd: carpetaInicio,
+        tools: ve ? suyas : suyas.filter((n) => n !== 'screen_capture'),
+        tarea: { actuar },
+        confirma: false,
+        // (sin interfaz que mostrar filas: cada aviso cuenta como señal de vida)
+        notify() { toque(); },
+      });
+      sesion.run.ve = ve;
+      Object.assign(sesion.run, { proveedor: agente.proveedor, modelo: agente.modelo, instrucciones: pedido.instrucciones });
+      if (!sesion.activa) sesion = null;
+    }
+    const tiene = (t) => Array.isArray(agente.tools) && agente.tools.includes(t);
+    if (tiene('remember') || tiene('recall')) {
+      const bloque = memoria.bloque({ recall: sesion?.nombres.includes('recall') === true, remember: sesion?.nombres.includes('remember') === true });
+      if (sesion) sesion.run.memoria = bloque;
+      else if (bloque) pedido.instrucciones = [pedido.instrucciones, bloque].filter(Boolean).join('\n\n');
+    }
+    if (sesion?.nombres.includes('skill')) sesion.run.skills = skills.bloque();
+    // (sin tools, lo que la corrida sabe de sí misma va con las instrucciones)
+    if (!sesion) pedido.instrucciones = [pedido.instrucciones, herramientas.notaDeTarea].filter(Boolean).join('\n\n');
+
+    let texto = '';
+    let error = null;
+    const opciones = { signal: control.signal, onPensando: toque, onTexto: (t) => { texto += t; toque(); }, sesion };
+    toque();
+    try {
+      if (llave.SIMULADO) await simulado.responder(pedido, opciones);
+      else {
+        const key = llave.leer(rad.store, agente.proveedor);
+        if (!key) throw new Error('The ' + NOMBRES[agente.proveedor] + ' key is missing. Paste it in Settings.');
+        await RESPONDER[agente.proveedor](pedido, { ...opciones, key });
+      }
+    } catch (err) {
+      // (el corte lo declara la app: no se disfraza de error del proveedor)
+      if (!muda && !signal.aborted) error = String(err?.message ?? err);
+    } finally {
+      clearTimeout(reloj);
+      signal.removeEventListener('abort', alFrenar);
+    }
+    if (muda) error = 'It was cut after ' + (TAREA_MUDA_MS / 60000) + ' minutes with no activity from the provider.';
+    return {
+      agente: nombre,
+      salida: texto.trim(),
+      // sin interfaz que muestre filas, esto es el único registro de lo que una corrida desatendida ejecutó
+      pasos: sesion ? sesion.resumen().map(({ name, args, status }) => ({ name, label: herramientas.argsDigest(name, args), status })) : [],
+      error,
+      cortada: muda ? 'idle' : signal.aborted ? 'stopped' : sesion?.run.stopped === 'maxrounds' ? 'maxrounds' : null,
+    };
+  }
+
+  // ---------- Las tareas, para la pestaña Tasks ----------
+  const estadoTareas = () => ({ tareas: tareas.lista(), resultados: tareas.resultados(), sinLeer: tareas.sinLeer(), corriendo: tareas.corriendo(), aviso: ultimoAviso });
+  rad.handle('tareas:leer', estadoTareas);
+  rad.handle('tareas:guardar', (e) => (e?.id ? tareas.cambiar(String(e.id), e) : tareas.agregar({ ...e, de: 'user' })).then((r) => (r.ok ? { ok: true, id: r.tarea.id } : r)));
+  rad.handle('tareas:activar', (que) => tareas.activar(String(que?.id ?? ''), que?.activa === true));
+  rad.handle('tareas:quitar', (id) => tareas.quitar(String(id ?? '')).then((r) => ({ ok: r.ok })));
+  rad.handle('tareas:restaurar', (id) => tareas.restaurar(String(id ?? '')));
+  rad.handle('tareas:correr', (id) => { const r = tareas.correrAhora(String(id ?? '')); r.trabajo?.catch(() => {}); return { ok: r.ok, ...(r.error ? { error: r.error } : {}) }; });
+  rad.handle('tareas:frenar', () => tareas.frenar());
+  rad.handle('tareas:leida', (id) => tareas.marcarLeida(String(id ?? '')));
+  rad.handle('tareas:leidas', () => tareas.marcarTodas());
+  rad.handle('tareas:quitar-resultado', (id) => tareas.quitarResultado(String(id ?? '')));
+  rad.handle('tareas:vaciar', () => tareas.vaciarBandeja());
+  rad.handle('tareas:sin-agente', (id) => tareas.alBorrarAgente(String(id ?? '')).then(() => ({ ok: true })));
+  // (solo en el humo: corre el reloj de las tareas hacia adelante y late una vez)
+  if (taller) rad.handle('tareas:adelantar', async (minutos) => { corrimiento += (Number(minutos) || 0) * 60000; return { corrieron: await tareas.tic() }; });
+
+  // ---------- La bandeja del sistema, para Settings ----------
+  rad.handle('bandeja:estado', () => ({ hay: Boolean(rad.tray), visible: rad.tray?.visible() ?? true, icono: rad.tray?.iconOk() ?? false }));
+  rad.handle('bandeja:mostrar', () => { rad.tray?.show(); return { ok: Boolean(rad.tray) }; });
 
   rad.handle('chat:frenar', (id) => {
     activos.get(id)?.abort();

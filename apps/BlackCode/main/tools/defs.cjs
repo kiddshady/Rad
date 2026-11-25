@@ -539,6 +539,28 @@ const TOOL_DEFS = [{
     },
     required: ['prompt'],
   },
+}, {
+  // (de NeonCode; acá la tarea es del agente que la crea, y crear o borrar pide permiso siempre)
+  name: 'schedule',
+  description: 'Manage the user\'s scheduled tasks. action "create" (the default) schedules a task that YOU run later, unattended: when it fires, your prompt runs in a fresh context, with no memory of this chat, and the result lands in the user\'s Tasks tab, not here. Use it for reminders and recurring jobs ("remind me tomorrow", "every morning summarize X"). You know the current date and time from the system prompt. '
+    + 'A scheduled run can search and read, but not write, run or send anything, unless the user allows it for that task. Creating or deleting a task always asks the user first. '
+    + 'action "list" shows every task with its id, cadence and next run. action "delete" removes one task by id: only when the user asks, "list" first to get the id, and if more than one could match, ask which.',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['create', 'list', 'delete'], description: 'create a task (default); list the scheduled tasks; or delete one by id.' },
+      id: { type: 'string', description: 'For "delete": the task id, as "list" shows it.' },
+      title: { type: 'string', description: 'Short label for the task.' },
+      prompt: { type: 'string', description: 'The instruction to run when the task fires. Write it self-contained: the run knows nothing of this chat.' },
+      kind: { type: 'string', enum: ['once', 'every', 'daily'], description: '"once" = one time; "every" = repeat by minutes; "daily" = every day at a time.' },
+      minutes_from_now: { type: 'number', description: 'For kind "once": how many minutes from now to fire.' },
+      at: { type: 'string', description: 'For kind "daily" (or an absolute "once"): time of day as "HH:MM", 24 hours.' },
+      every_minutes: { type: 'number', description: 'For kind "every": interval in minutes, 5 at the least.' },
+    },
+    // nada obligatorio en el esquema: título, prompt y kind lo son solo para
+    // «create», y eso lo valida la tool con el motivo (list y delete no los llevan)
+    required: [],
+  },
 }];
 
 // Los grupos con que se prenden y se apagan en un agente.
@@ -565,6 +587,8 @@ const GRUPOS = [
   // Generar imágenes gasta plata del usuario en cada llamada. Por eso el
   // grupo es OPCIONAL: no entra en «todas las tools» con que nace un agente
   // ni se les suma solo a los que ya existen. Se prende a mano, por agente.
+  // Las tareas programadas: el agente las crea, las lista y las borra (con permiso, siempre).
+  { id: 'tasks', nombre: 'Tasks', tools: ['schedule'] },
   { id: 'images', nombre: 'Images', tools: ['generate_image'], opcional: true },
 ];
 

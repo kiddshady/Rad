@@ -170,6 +170,18 @@ if (marker?.pass === 1) {
     if (datosM.gruposTools().find((g) => g.mcp)?.mcp.cuenta !== 11) fail('mcp: al reabrir no está el grupo del servidor con sus 11 tools');
     data.mcp = 'el servidor guardado se conectó solo al abrir';
   }
+  // Las tareas programadas vuelven con la app: la que quedó, su bandeja y lo ya leído.
+  {
+    const e = await window.rad.invoke('tareas:leer');
+    const t = e.tareas.find((x) => x.titulo === 'Smoke keeper');
+    if (e.tareas.length !== 1 || !t || !t.activa || t.spec.kind !== 'daily' || t.spec.a !== '09:00' || t.corridas !== 0 || t.actuar !== false) fail('tareas: al reabrir la app las tareas no volvieron como se dejaron: ' + JSON.stringify(e.tareas).slice(0, 300));
+    if (!(e.resultados.length >= 5) || e.sinLeer !== e.resultados.filter((r) => !r.leida).length || e.corriendo) fail('tareas: al reabrir, la bandeja trae ' + e.resultados.length + ' resultados y ' + e.sinLeer + ' sin leer');
+    // (el punto de la pestaña está desde el arranque, sin haber abierto Tasks)
+    await until(() => document.querySelector('.rad-tab[data-view="tareas"]')?.hasAttribute('data-pendiente') === (e.sinLeer > 0), 3000);
+    if (document.querySelector('.rad-tab[data-view="tareas"]')?.hasAttribute('data-pendiente') !== (e.sinLeer > 0)) fail('tareas: al reabrir, el punto de la pestaña no dice si hay resultados sin leer (' + e.sinLeer + ')');
+    if ((await window.rad.invoke('bandeja:estado')).icono !== true || (await window.rad.store.read('fondo'))?.bandeja !== true) fail('bandeja: al reabrir no está el ícono de la bandeja, o el ajuste no volvió');
+    data.tareas = 'la tarea, su bandeja y el ajuste de la bandeja volvieron';
+  }
   data.persistencia = `3 agentes (uno de Venice), el chat con 4 mensajes (la frenada con ${marker.frenado} caracteres), llaves: Anthropic ${llave.anthropic?.estado}, Venice ${llave.venice?.estado}`;
   window.rad.store.write('smoke', { pass: 2 });
   return { failures, data };
@@ -202,7 +214,7 @@ if (window.rad.lang !== 'en' || document.documentElement.lang !== 'en') fail(`Bl
 const ventana = [...document.querySelectorAll('.rad-winbtn')].map((b) => b.getAttribute('aria-label')).join(', ');
 if (ventana !== 'Minimize, Maximize, Close') fail(`los botones de la ventana dicen: ${ventana}`);
 const riel = [...document.querySelectorAll('.rad-tab')].map((b) => b.textContent.trim() || b.getAttribute('aria-label') || b.getAttribute('data-rad-tip')).join(', ');
-if (riel !== 'Chat, Notes, Memory, Skills, Agents, Settings') fail(`las vistas se llaman: ${riel}`);
+if (riel !== 'Chat, Notes, Memory, Skills, Tasks, Agents, Settings') fail(`las vistas se llaman: ${riel}`);
 enIngles('al arrancar');
 // Las vistas van como pestañas en la titlebar, sin rail y sin el nombre de
 // la app: lo primero de la barra son las pestañas, alineadas con la hoja, y
@@ -210,7 +222,7 @@ enIngles('al arrancar');
 {
   const tabs = [...document.querySelectorAll('.rad-titlebar > .rad-tabs > .rad-tab')];
   const stage = document.querySelector('.rad-stage').getBoundingClientRect();
-  if (document.querySelector('.rad-rail') || tabs.length !== 6) fail(`las vistas no están en la titlebar (${tabs.length} pestañas, rail: ${Boolean(document.querySelector('.rad-rail'))})`);
+  if (document.querySelector('.rad-rail') || tabs.length !== 7) fail(`las vistas no están en la titlebar (${tabs.length} pestañas, rail: ${Boolean(document.querySelector('.rad-rail'))})`);
   if (document.querySelector('.rad-titlebar-title') || /BlackCode/.test(document.querySelector('.rad-titlebar').textContent)) fail('la titlebar sigue mostrando el nombre de la app');
   if (tabs.length && Math.abs(tabs[0].getBoundingClientRect().left - stage.left) > 1) fail(`la primera pestaña empieza en ${r2(tabs[0].getBoundingClientRect().left)} y la hoja en ${r2(stage.left)}`);
   if (stage.width < window.innerWidth - 24) fail(`sin rail, la hoja mide ${r2(stage.width)} en una ventana de ${window.innerWidth}`);
@@ -794,7 +806,7 @@ else {
   const form = modal();
   type(form.querySelector('[data-campo="nombre"]'), 'Toolsmith');
   const interruptores = [...form.querySelectorAll('[data-campo="tools"] input[role="switch"]')];
-  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas,notes,subagents,memory,skills,images' || !interruptores.every((i) => i.checked === (i.dataset.grupo !== 'images'))) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
+  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas,notes,subagents,memory,skills,tasks,images' || !interruptores.every((i) => i.checked === (i.dataset.grupo !== 'images'))) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
   // un agente nuevo nace con todas prendidas (menos Images, que gasta plata y es opcional): se le apaga la web
   for (const i of interruptores) if (i.dataset.grupo === 'web') i.click();
   enIngles('en el formulario con tools');
@@ -802,13 +814,13 @@ else {
   await closed();
   await settle();
   const herrero = cards().at(-1);
-  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Browser, Desktop, Screen, Canvas, Notes, Subagents, Memory, Skills') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
-  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Browser, Desktop, Screen, Canvas, Notes, Subagents, Memory, Skills') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Browser, Desktop, Screen, Canvas, Notes, Subagents, Memory, Skills, Tasks') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Browser, Desktop, Screen, Canvas, Notes, Subagents, Memory, Skills, Tasks') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
   herrero.querySelector('[data-accion="abrir"]').click();
   await sleep(dur('base') + 260);
   await until(() => statusRight().includes('Toolsmith'), 3000);
-  // todas (32) menos las tres de la web
-  if (!statusRight().endsWith('· 29 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
+  // todas (33) menos las tres de la web
+  if (!statusRight().endsWith('· 30 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
 
   // Escribir un archivo. En modo manual (el de fábrica) primero pide permiso:
   // la tarjeta dice qué va a correr y qué va a cambiar, y hasta que no se
@@ -976,19 +988,19 @@ else {
     const abrir = async () => { boton.click(); await until(() => menus().length > 0, 2000); await sleep(dur('base') + 60); };
     await abrir();
     const filasMenu = [...menus()[0].querySelectorAll('.rad-menu-item')].map((i) => i.textContent.trim());
-    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Notes,Subagents,Memory,Skills,Images,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
+    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Notes,Subagents,Memory,Skills,Tasks,Images,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
     await pick('Turn all off');
     if (dice() !== 'Tools: off' || boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· no tools')) fail(`apagar todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     await pick('Turn all on');
-    if (dice() !== '32 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 32 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
+    if (dice() !== '33 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 33 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     const marcadas = [...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].length;
     // («todas» no prende Images: es opcional, porque gasta plata en cada llamada)
-    if (marcadas !== 13 || menus()[0].querySelector('.rad-menu-item[aria-checked="true"]')?.parentElement.querySelectorAll('.rad-menu-item[aria-checked]').length !== 14) fail(`con todas prendidas el menú marca ${marcadas} grupos de 14 (tienen que ser 13: Images no entra en «todas»)`);
+    if (marcadas !== 14 || menus()[0].querySelector('.rad-menu-item[aria-checked="true"]')?.parentElement.querySelectorAll('.rad-menu-item[aria-checked]').length !== 15) fail(`con todas prendidas el menú marca ${marcadas} grupos de 15 (tienen que ser 13: Images no entra en «todas»)`);
     if ([...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].some((i) => i.textContent.trim() === 'Images')) fail('«Turn all on» prendió Images, que gasta plata: es opcional');
     await pick('Web');
-    if (dice() !== '29 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
+    if (dice() !== '30 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
     // y las recibe el modelo: el pedido siguiente corre una de esas tools
     // (en modo manual, que es como quedó: pide permiso y se le da)
     await pedir([[{ name: 'fs_read', args: { paths: ['note.txt'] } }]]);
@@ -996,7 +1008,7 @@ else {
     primary()?.click();
     await until(() => !composer.querySelector('.rad-busy') && ultimo()?.dataset.estado === 'ok' && cuenta() === '1 tool · 1 done', 20000);
     if (cuenta() !== '1 tool · 1 done') fail(`después de prender las tools desde la conversación, el contador dice «${cuenta()}»`);
-    data.toolsEnElChat = `${antes} → Tools: off → 32 tools → 29 tools`;
+    data.toolsEnElChat = `${antes} → Tools: off → 33 tools → 30 tools`;
   }
 
   // 11c. El canvas: el agente deja un documento en el panel de al lado, lo
@@ -3029,7 +3041,7 @@ else {
     const guardar = async () => { primary().click(); await closed(); await settle(); };
     await editar();
     if (!sw('files')?.checked || !sw('screen')?.checked) fail('el formulario de un agente con todas las tools no las muestra prendidas');
-    for (const g of ['commands', 'code', 'data', 'web', 'browser', 'desktop', 'canvas', 'notes', 'subagents', 'memory', 'skills']) sw(g).click();
+    for (const g of ['commands', 'code', 'data', 'web', 'browser', 'desktop', 'canvas', 'notes', 'subagents', 'memory', 'skills', 'tasks']) sw(g).click();
     await guardar();
     if (tarjeta() !== 'Tools: Files, Screen') fail(`apagarle grupos a un agente desde su formulario dejó la tarjeta en «${tarjeta()}»`);
     await editar();
@@ -3287,6 +3299,311 @@ else {
     data.mcp = 'un servidor local por el formulario (11 tools, su variable cifrada), grupo opcional apagado de fábrica, permiso en automático, sin preguntar corre solo, cambiarlo conserva el secreto, apagar y prender, pegar JSON, quitar';
   }
 
+  // 11r. Las tareas programadas y la bandeja del sistema. Una tarea es un
+  // pedido que un agente corre solo; el resultado cae en la pestaña Tasks. Sin
+  // nadie mirando la corrida solo lee, salvo «Let it act». Un agente las puede
+  // crear con schedule, que pide permiso SIEMPRE. Y cerrar la ventana no cierra
+  // la app: la esconde en la bandeja. (En el humo el reloj de las tareas se
+  // adelanta por un canal que solo existe acá, y no se pone ningún ícono.)
+  {
+    const datosM = await import('/datos.js');
+    const modoAntes = datosM.modoTools();
+    const agenteT = datosM.agenteActual();
+    const leerT = () => window.rad.invoke('tareas:leer');
+    const tab = document.querySelector('.rad-tab[data-view="tareas"]');
+    const avisosT = () => [...document.querySelectorAll('.rad-toast')].filter((n) => !n.hasAttribute('data-rad-leaving'));
+    const listoT = async () => { await sleep(200); for (let i = 0; i < 400 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50); await settle(); };
+    const elegir = async (boton, rotulo) => { boton.click(); await until(() => menus().length === 1, 2000); await sleep(dur('base') + 80); return pick(rotulo); };
+
+    if (!tab || tab.hasAttribute('data-pendiente')) fail('tareas: no está la pestaña Tasks, o arranca con el punto de sin leer');
+    await go('tareas');
+    const vistaT = view('tareas');
+    const filaT = (titulo) => alive(vistaT.querySelectorAll('.dm-tarea-fila')).find((f) => f.dataset.tarea === titulo);
+    const filasR = () => alive(vistaT.querySelectorAll('.dm-tarea-resultado-fila'));
+    if (!vistaT.querySelector('[data-tarjeta="tareas"]').textContent.includes('No tasks yet.') || !vistaT.querySelector('[data-tarjeta="resultados"]').textContent.includes('Nothing yet.')) fail('tareas: la pestaña vacía no lo dice');
+    enIngles('en la pestaña Tasks vacía');
+
+    // El formulario: los errores van a su campo, y «cuándo» cambia qué se pide.
+    vistaT.querySelector('[data-accion="tarea-nueva"]').click();
+    await until(() => modal(), 2000);
+    await sleep(dur('slow') + 120);
+    const formT = modal();
+    const campoT = (c) => formT.querySelector('[data-campo="' + c + '"]');
+    const errorT = (c) => { const f = campoT(c).closest('.rad-field'); return f.hasAttribute('data-invalid') ? f.textContent : ''; };
+    const [parteLapso, parteHora] = formT.querySelectorAll('.dm-mcp-parte');
+    if (!parteLapso.hasAttribute('data-abierto') || parteHora.offsetHeight !== 0 || !parteHora.inert) fail('tareas: el formulario no abre pidiendo «en cuánto», con la hora plegada (' + parteHora.offsetHeight + ' px)');
+    primary().click();
+    await until(() => errorT('tarea-titulo'), 2000);
+    if (!errorT('tarea-titulo').includes('Give the task a name.')) fail('tareas: sin nombre el formulario dijo «' + errorT('tarea-titulo') + '»');
+    type(campoT('tarea-titulo'), 'Smoke daily');
+    primary().click();
+    await until(() => errorT('tarea-prompt'), 2000);
+    if (!errorT('tarea-prompt').includes('Write what the agent has to do.') || errorT('tarea-titulo')) fail('tareas: sin pedido el error no quedó en su campo');
+    type(campoT('tarea-prompt'), 'Give me the daily summary.');
+    {
+      campoT('tarea-cuando').click();
+      await until(() => menus().length === 1, 2000);
+      await sleep(dur('base') + 80);
+      [...menus()[0].querySelectorAll('.rad-menu-item')].find((i) => i.textContent.includes('Every day')).click();
+      const altos = [];
+      for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 200;) { altos.push(parteHora.offsetHeight); await frame(); }
+      await settle();
+      const final = parteHora.offsetHeight;
+      if (!(final > 20) || parteLapso.offsetHeight !== 0 || !parteLapso.inert || parteHora.inert) fail('tareas: al elegir «Every day» no quedó la hora a la vista y la cantidad plegada (' + final + ' y ' + parteLapso.offsetHeight + ' px)');
+      if (!altos.some((a) => a > 2 && a < final - 2)) fail('tareas: la hora aparece de golpe, sin desplegarse: ' + [...new Set(altos)].join(' → '));
+    }
+    type(campoT('tarea-hora'), '25:00');
+    primary().click();
+    await until(() => errorT('tarea-cuando'), 2000);
+    if (!errorT('tarea-cuando').includes('needs a time of day')) fail('tareas: una hora imposible no dio su error: «' + errorT('tarea-cuando') + '»');
+    enIngles('en el formulario de una tarea');
+    type(campoT('tarea-hora'), '09:00');
+    if (campoT('tarea-actuar').checked) fail('tareas: «Let it act» nace prendido');
+    primary().click();
+    await closed();
+    await until(() => filaT('Smoke daily'), 3000);
+    await settle();
+    const fD = filaT('Smoke daily');
+    if (!fD || fD.dataset.estado !== 'activa' || !shown(fD.querySelector('.dm-skill-descripcion')).startsWith('every day at 09:00 · next run ') || !fD.querySelector('.dm-memoria-de').textContent.includes(agenteT.nombre + ' · read-only')) fail('tareas: la tarea nueva figura como «' + (fD ? shown(fD.querySelector('.dm-skill-descripcion')) + ' / ' + fD.querySelector('.dm-memoria-de').textContent : '(sin fila)') + '»');
+    if (!fD.querySelector('[data-accion="tarea-activa"]').checked || !fD.querySelector('[data-accion="tarea-frenar"]').hidden) fail('tareas: la tarea nueva no nace prendida, o muestra Stop sin estar corriendo');
+
+    // «Run now»: la fila trabaja, y el resultado cae en la bandeja con su aviso.
+    fD.querySelector('[data-accion="tarea-correr"]').click();
+    const vioCorrer = await until(() => filaT('Smoke daily')?.dataset.estado === 'corriendo' && !filaT('Smoke daily').querySelector('[data-accion="tarea-frenar"]').hidden, 3000);
+    await until(() => filasR().length === 1 && filaT('Smoke daily')?.dataset.estado === 'activa', 20000);
+    await settle();
+    if (!vioCorrer) fail('tareas: mientras corre, la fila no lo muestra (ni el botón Stop)');
+    const r1 = filasR()[0];
+    if (!r1 || !r1.hasAttribute('data-sin-leer') || r1.dataset.resultado !== 'Smoke daily' || !r1.textContent.includes('Give me the daily summary.') || r1.textContent.includes('##') || r1.textContent.includes('**')) fail('tareas: el resultado no cayó en la bandeja, o trae las marcas del markdown: ' + (r1?.textContent ?? '(sin fila)').slice(0, 200));
+    if (!tab.hasAttribute('data-pendiente') || getComputedStyle(tab, '::after').opacity !== '1') fail('tareas: con un resultado sin leer la pestaña no lleva su punto');
+    {
+      const e = await leerT();
+      if (e.aviso?.titulo !== 'BlackCode · Smoke daily' || !e.aviso.cuerpo.includes('Give me the daily summary.') || e.aviso.cuerpo.includes('#')) fail('tareas: el aviso de Windows que se habría mandado: ' + JSON.stringify(e.aviso));
+      if (e.sinLeer !== 1 || e.tareas[0].corridas !== 1 || e.resultados[0].manual !== true || e.resultados[0].actuo !== false) fail('tareas: después de correr a mano: ' + JSON.stringify({ sinLeer: e.sinLeer, corridas: e.tareas[0].corridas, r: e.resultados[0] }).slice(0, 300));
+      // (correr a mano no mueve el horario: sigue siendo a las 09:00)
+      if (new Date(e.tareas[0].proxima).getHours() !== 9 || new Date(e.tareas[0].proxima).getMinutes() !== 0) fail('tareas: «Run now» movió el horario de la tarea');
+    }
+    if (shown(vistaT.querySelector('.dm-memoria-cuenta')) !== '1 new of 1') fail('tareas: la cuenta de la bandeja dice «' + shown(vistaT.querySelector('.dm-memoria-cuenta')) + '»');
+
+    // Sin nadie mirando la corrida solo LEE: una tarea que pide escribir no escribe.
+    const pideEscribir = (archivo) => 'TOOLS: [{"name":"fs_write","args":{"path":"' + archivo + '","content":"from a task\\n"}}]';
+    await window.rad.invoke('tareas:guardar', { titulo: 'Smoke writer', prompt: pideEscribir('task-no.txt'), agente: agenteT.id, spec: { kind: 'every', minutos: 60 } });
+    await until(() => filaT('Smoke writer'), 3000);
+    await window.rad.invoke('tareas:correr', (await leerT()).tareas.find((t) => t.titulo === 'Smoke writer').id);
+    await until(() => filasR().length === 2 && !vistaT.querySelector('.dm-pagina').hasAttribute('data-corriendo'), 20000);
+    {
+      const r = (await leerT()).resultados[0];
+      if (r.titulo !== 'Smoke writer' || r.pasos.some((p) => p.name === 'fs_write' && p.status === 'ok')) fail('tareas: una corrida de solo lectura escribió un archivo: ' + JSON.stringify(r.pasos));
+    }
+    // Con «Let it act» (prendido desde el formulario de la tarea), sí.
+    filaT('Smoke writer').querySelector('[data-accion="tarea-editar"]').click();
+    await until(() => modal(), 2000);
+    await sleep(dur('slow') + 120);
+    if (modal().querySelector('[data-campo="tarea-titulo"]').value !== 'Smoke writer' || modal().querySelector('[data-campo="tarea-numero"]').value !== '1' || !modal().querySelector('[data-campo="tarea-unidad"]').textContent.includes('hours')) fail('tareas: el formulario de una tarea guardada no trae lo suyo (60 minutos tienen que leerse «1 hours»)');
+    type(modal().querySelector('[data-campo="tarea-prompt"]'), pideEscribir('task-si.txt'));
+    modal().querySelector('[data-campo="tarea-actuar"]').click();
+    primary().click();
+    await closed();
+    await until(() => filaT('Smoke writer')?.querySelector('.dm-memoria-de').textContent.includes('allowed to act'), 3000);
+    if (!filaT('Smoke writer')?.querySelector('.dm-memoria-de').textContent.includes('allowed to act')) fail('tareas: prender «Let it act» no quedó a la vista en la fila');
+    filaT('Smoke writer').querySelector('[data-accion="tarea-correr"]').click();
+    await until(() => filasR().length === 3 && !vistaT.querySelector('.dm-pagina').hasAttribute('data-corriendo'), 20000);
+    {
+      const r = (await leerT()).resultados[0];
+      if (!r.actuo || !r.pasos.some((p) => p.name === 'fs_write' && p.status === 'ok')) fail('tareas: con «Let it act» la corrida no pudo escribir: ' + JSON.stringify(r.pasos));
+    }
+
+    // El reloj: a su hora corre sola, y lo que faltó con la app cerrada corre UNA vez.
+    {
+      const antes = (await leerT()).tareas.find((t) => t.titulo === 'Smoke daily');
+      const un = await window.rad.invoke('tareas:adelantar', 24 * 60);
+      await until(() => filasR().length >= 4, 5000);
+      const e1 = await leerT();
+      const d1 = e1.tareas.find((t) => t.titulo === 'Smoke daily');
+      if (!(un.corrieron >= 1) || d1.corridas !== antes.corridas + 1 || !(d1.proxima > antes.proxima) || e1.resultados.find((r) => r.titulo === 'Smoke daily').manual !== false) fail('tareas: adelantando un día la diaria no corrió sola una vez: ' + JSON.stringify({ un, corridas: [antes.corridas, d1.corridas] }));
+      const tres = await window.rad.invoke('tareas:adelantar', 3 * 24 * 60);
+      const d2 = (await leerT()).tareas.find((t) => t.titulo === 'Smoke daily');
+      if (d2.corridas !== d1.corridas + 1) fail('tareas: después de tres días sin correr, la diaria corrió ' + (d2.corridas - d1.corridas) + ' veces (tenía que ser una): ' + JSON.stringify(tres));
+      // apagada no corre
+      filaT('Smoke writer').querySelector('[data-accion="tarea-activa"]').click();
+      await until(() => filaT('Smoke writer')?.dataset.estado === 'apagada', 3000);
+      const nW = (await leerT()).tareas.find((t) => t.titulo === 'Smoke writer').corridas;
+      await window.rad.invoke('tareas:adelantar', 5 * 60);
+      if ((await leerT()).tareas.find((t) => t.titulo === 'Smoke writer').corridas !== nW || !shown(filaT('Smoke writer').querySelector('.dm-skill-descripcion')).endsWith('paused')) fail('tareas: una tarea apagada corrió igual, o no figura en pausa');
+    }
+    await settle();
+
+    // Un resultado se abre entero, queda leído, y se puede seguir en un chat.
+    const chatsAntes = rows().length;
+    filasR().find((f) => f.dataset.resultado === 'Smoke daily').click();
+    await until(() => modal()?.dataset.resultado, 2000);
+    await sleep(dur('slow') + 120);
+    const ventanaR = modal();
+    if (!ventanaR?.querySelector('.dm-tarea-salida')?.textContent.includes('Give me the daily summary.') || !ventanaR.textContent.includes(agenteT.nombre) || !ventanaR.textContent.includes('read-only')) fail('tareas: el resultado abierto no trae su texto, su agente o cómo corrió: ' + (ventanaR?.textContent ?? '(sin ventana)').slice(0, 200));
+    if (!ventanaR?.querySelector('.dm-tarea-salida h2, .dm-tarea-salida strong')) fail('tareas: el resultado abierto no se ve como markdown');
+    enIngles('con un resultado abierto');
+    [...ventanaR.querySelectorAll('.rad-modal-actions .rad-button')].find((b) => b.textContent === 'Continue in a chat').click();
+    await closed();
+    await until(() => document.querySelector('.rad-tab[aria-current="page"]')?.dataset.view === 'chat' && msgs().length === 2, 4000);
+    await settle();
+    if (msgs().length !== 2 || msgs()[0].dataset.rol !== 'user' || msgs()[0].textContent !== 'Give me the daily summary.' || msgs()[1].dataset.rol !== 'assistant' || !msgs()[1].textContent.includes('Give me the daily summary.')) fail('tareas: «Continue in a chat» no abrió un chat con el pedido y el resultado (' + msgs().length + ' mensajes)');
+    if (rows().length !== chatsAntes + 1 || shown(rows().find((f) => f.getAttribute('aria-current') === 'true')?.querySelector('.dm-fila-titulo')) !== 'Smoke daily') fail('tareas: el chat que sigue a la tarea no lleva su nombre');
+    await go('tareas');
+    await until(() => filasR().some((f) => !f.hasAttribute('data-sin-leer')), 3000);
+    if (filasR().filter((f) => !f.hasAttribute('data-sin-leer')).length !== 1) fail('tareas: abrir un resultado no lo dejó leído');
+    vistaT.querySelector('[data-accion="tareas-leidas"]').click();
+    await until(() => !tab.hasAttribute('data-pendiente'), 3000);
+    await sleep(dur('base') + 120);
+    if (tab.hasAttribute('data-pendiente') || getComputedStyle(tab, '::after').opacity !== '0' || filasR().some((f) => f.hasAttribute('data-sin-leer')) || !vistaT.querySelector('[data-accion="tareas-leidas"]').disabled) fail('tareas: «Mark all read» no apagó el punto de la pestaña o dejó resultados sin leer');
+
+    // Un agente agenda con schedule: pide permiso SIEMPRE, también en automático
+    // y aunque el chat esté en «no preguntar más».
+    datosM.ponerModoTools('auto');
+    await go('chat');
+    chatView.querySelector('[data-accion="nuevo-chat"]').click();
+    await settle();
+    await pedir([[{ name: 'schedule', args: { title: 'Remind me', prompt: 'Say hi to the user', kind: 'once', minutes_from_now: 45 } }]]);
+    await until(() => permiso(), 6000);
+    const diceS = permiso()?.textContent ?? '(sin tarjeta)';
+    if (!diceS.includes('Allow schedule?') || !diceS.includes('Schedules “Remind me”: once, in 45 minutes, run by ' + agenteT.nombre + '.') || !diceS.includes('read-only') || !diceS.includes('What it will be asked') || !diceS.includes('Say hi to the user')) fail('tareas: en automático schedule no pidió permiso, o la tarjeta no dice qué agenda: ' + diceS.slice(0, 300));
+    if (permiso()?.querySelector('.dm-permiso-args')) fail('tareas: la tarjeta de schedule repite los argumentos crudos');
+    enIngles('con la tarjeta de permiso de schedule');
+    permiso()?.querySelector('input[type="checkbox"]')?.click(); // «Don’t ask again in this chat»
+    primary()?.click();
+    await closed();
+    await listoT();
+    {
+      const creada = (await leerT()).tareas.find((t) => t.titulo === 'Remind me');
+      if (!creada || creada.de !== 'agent' || creada.actuar !== false || creada.agente !== agenteT.id || fila('schedule')?.dataset.estado !== 'ok') fail('tareas: lo que agendó el agente: ' + JSON.stringify(creada ?? null));
+      if (!fila('schedule')?.querySelector('.dm-tool-pre').textContent.includes('Tasks tab, not in this chat')) fail('tareas: schedule no le dice al agente dónde cae el resultado');
+    }
+    await pedir([[{ name: 'schedule', args: { title: 'Second one', prompt: 'x', kind: 'daily', at: '10:00' } }]]);
+    await until(() => permiso(), 6000);
+    if (!permiso()) fail('tareas: con «no preguntar más en este chat», schedule dejó de pedir permiso');
+    [...(permiso()?.querySelectorAll('.rad-modal-actions .rad-button') ?? [])].find((b) => b.textContent === 'Decline')?.click();
+    await closed();
+    await listoT();
+    if ((await leerT()).tareas.some((t) => t.titulo === 'Second one')) fail('tareas: una tarea rechazada se agendó igual');
+    // listar no cambia nada: no pregunta
+    await pedir([[{ name: 'schedule', args: { action: 'list' } }]]);
+    await listoT();
+    if (permiso() || !fila('schedule')?.querySelector('.dm-tool-pre').textContent.includes('"Remind me" · once, in 45 minutes · agent ' + agenteT.nombre)) fail('tareas: listar pidió permiso, o no trae la tarea: ' + (fila('schedule')?.querySelector('.dm-tool-pre').textContent ?? '').slice(0, 200));
+    // borrar pregunta, y la app avisa con «Undo»
+    const idR = (await leerT()).tareas.find((t) => t.titulo === 'Remind me')?.id;
+    await pedir([[{ name: 'schedule', args: { action: 'delete', id: idR } }]]);
+    await until(() => permiso(), 6000);
+    if (!(permiso()?.textContent ?? '').includes('Deletes the scheduled task “Remind me”')) fail('tareas: borrar una tarea desde el agente no pidió permiso diciendo cuál: ' + (permiso()?.textContent ?? '(sin tarjeta)').slice(0, 200));
+    primary()?.click();
+    await closed();
+    await listoT();
+    await until(() => avisosT().some((n) => n.textContent.includes('An agent deleted the task “Remind me”.')), 3000);
+    const avisoB = avisosT().find((n) => n.textContent.includes('An agent deleted the task “Remind me”.'));
+    if (!avisoB || (await leerT()).tareas.some((t) => t.id === idR)) fail('tareas: el agente borró una tarea y no se avisó, o no se borró');
+    [...(avisoB?.querySelectorAll('button') ?? [])].find((b) => b.textContent.trim() === 'Undo')?.click();
+    for (let i = 0; i < 40 && !(await leerT()).tareas.some((t) => t.id === idR); i++) await sleep(50);
+    if (!(await leerT()).tareas.some((t) => t.id === idR)) fail('tareas: «Undo» no devolvió la tarea que borró el agente');
+
+    // Borrar desde la pestaña, con su confirmación.
+    await go('tareas');
+    await until(() => filaT('Remind me'), 3000);
+    filaT('Remind me')?.querySelector('[data-accion="tarea-borrar"]').click();
+    await until(() => modal(), 2000);
+    if (!modal()?.textContent.includes('Delete this task?')) fail('tareas: borrar una tarea no pidió confirmación');
+    primary()?.click();
+    await closed();
+    await until(() => !filaT('Remind me'), 3000);
+    filaT('Smoke writer').querySelector('[data-accion="tarea-borrar"]').click();
+    await until(() => modal(), 2000);
+    primary().click();
+    await closed();
+    await until(() => !filaT('Smoke writer'), 3000);
+    await settle();
+    if (alive(vistaT.querySelectorAll('.dm-tarea-fila')).length !== 1 || !filaT('Smoke daily')) fail('tareas: después de borrar quedaron ' + alive(vistaT.querySelectorAll('.dm-tarea-fila')).length + ' tareas (tenía que quedar «Smoke daily»)');
+    for (const a of avisosT()) a.querySelector('.rad-toast-close, [aria-label="Close"], [aria-label="Dismiss"]')?.click();
+
+    // La bandeja del sistema: cerrar la ventana la esconde, y la app sigue viva.
+    await go('ajustes');
+    const tarjetaF = view('ajustes').querySelector('[data-tarjeta="fondo"]');
+    const notaF = () => shown(tarjetaF?.querySelector('.dm-tarjeta-instr'));
+    if (!tarjetaF?.querySelector('[data-campo="bandeja"]').checked || !notaF().includes('hides BlackCode in the system tray') || datosM.enBandeja() !== true) fail('bandeja: Settings no arranca con «Keep running in the tray» prendido («' + notaF() + '»)');
+    enIngles('en Settings, con la bandeja');
+    {
+      const b0 = await window.rad.invoke('bandeja:estado');
+      if (!b0.hay || !b0.visible || !b0.icono) fail('bandeja: la app no tiene bandeja, o su ícono no se puede leer: ' + JSON.stringify(b0));
+      [...document.querySelectorAll('.rad-winbtn')].find((b) => b.getAttribute('aria-label') === 'Close').click();
+      let b1 = null;
+      for (let i = 0; i < 40; i++) { b1 = await window.rad.invoke('bandeja:estado'); if (!b1.visible) break; await sleep(50); }
+      if (b1.visible) fail('bandeja: cerrar la ventana no la escondió');
+      // (escondida, la app sigue contestando: no se cerró)
+      if ((await leerT()).tareas.length !== 1) fail('bandeja: con la ventana escondida la app no contesta');
+      await window.rad.invoke('bandeja:mostrar');
+      let b2 = null;
+      for (let i = 0; i < 40; i++) { b2 = await window.rad.invoke('bandeja:estado'); if (b2.visible) break; await sleep(50); }
+      if (!b2.visible) fail('bandeja: la ventana no volvió de la bandeja');
+      await sleep(400);
+    }
+    // …y se puede apagar: lo lee el proceso principal de este documento.
+    tarjetaF.querySelector('[data-campo="bandeja"]').click();
+    await settle();
+    if ((await window.rad.store.read('fondo'))?.bandeja !== false || !notaF().includes('quits BlackCode')) fail('bandeja: apagar «Keep running in the tray» no quedó guardado, o no se dice («' + notaF() + '»)');
+    tarjetaF.querySelector('[data-campo="bandeja"]').click();
+    await settle();
+    if ((await window.rad.store.read('fondo'))?.bandeja !== true) fail('bandeja: volver a prenderla no quedó guardado');
+
+    // Una tarea de un agente que NO se va, para la pasada 2: las de este agente de prueba se van con él.
+    await window.rad.invoke('tareas:guardar', { titulo: 'Smoke keeper', prompt: 'Keep this one.', agente: datosM.listaAgentes()[0].id, spec: { kind: 'daily', a: '09:00' } });
+    datosM.ponerModoTools(modoAntes);
+    await go('chat');
+    data.tareas = 'una tarea por el formulario, correrla ya, solo lectura y «Let it act», el reloj (una vez por lo que faltó), el resultado en un chat, schedule con permiso siempre, borrar con Undo, y la bandeja del sistema';
+  }
+
+  // 11s. Cambiar de lugar a los agentes (Fran tenía dos al revés). En la
+  // pestaña Agents cada tarjeta sube o baja un lugar, viajando hasta su sitio;
+  // ese orden es el del menú de agentes del chat, y queda guardado.
+  {
+    const datosM = await import('/datos.js');
+    await go('agentes');
+    const nombres = () => cards().map((c) => shown(c.querySelector('.dm-tarjeta-nombre')));
+    const guardados = async () => ((await window.rad.store.read('agentes'))?.lista ?? []).map((a) => a.nombre);
+    const orden0 = nombres();
+    const boton = (i, cual) => cards()[i].querySelector('[data-accion="' + cual + '"]');
+    if (orden0.length < 3) fail('mover: se esperaban al menos tres agentes para probar el orden, hay ' + orden0.length);
+    if (boton(0, 'subir').getAttribute('aria-disabled') !== 'true' || boton(0, 'bajar').getAttribute('aria-disabled') === 'true' || boton(orden0.length - 1, 'bajar').getAttribute('aria-disabled') !== 'true' || boton(orden0.length - 1, 'subir').getAttribute('aria-disabled') === 'true') fail('mover: el primero puede subir o el último bajar');
+    boton(0, 'subir').click();
+    await settle();
+    if (nombres().join() !== orden0.join()) fail('mover: subir al primero cambió el orden');
+    // El primero baja un lugar: la tarjeta viaja, no salta.
+    const primera = cards()[0];
+    const y0 = primera.getBoundingClientRect().top;
+    boton(0, 'bajar').click();
+    const pasos = [];
+    for (const t0 = performance.now(); performance.now() - t0 < dur('slow') + 300;) { pasos.push(Math.round(primera.getBoundingClientRect().top)); await frame(); }
+    await settle();
+    const y1 = Math.round(primera.getBoundingClientRect().top);
+    const esperado = [orden0[1], orden0[0], ...orden0.slice(2)];
+    if (nombres().join() !== esperado.join()) fail('mover: bajar al primero dejó «' + nombres().join(', ') + '» y no «' + esperado.join(', ') + '»');
+    if (!(y1 > y0 + 20) || !pasos.some((y) => y > y0 + 3 && y < y1 - 3)) fail('mover: la tarjeta salta a su lugar en vez de viajar (' + Math.round(y0) + ' → ' + [...new Set(pasos)].slice(0, 8).join(' → ') + ' → ' + y1 + ')');
+    data.moverAgente = Math.round(y0) + ' → ' + [...new Set(pasos)].slice(0, 6).join(' → ') + ' … ' + y1;
+    if ((await guardados()).join() !== esperado.join() || datosM.listaAgentes().map((a) => a.nombre).join() !== esperado.join()) fail('mover: el orden nuevo no quedó guardado: ' + (await guardados()).join(', '));
+    if (cards()[0].querySelector('[data-accion="subir"]').getAttribute('aria-disabled') !== 'true' || cards()[1].querySelector('[data-accion="subir"]').getAttribute('aria-disabled') === 'true') fail('mover: después de mover, los botones no dicen quién es el primero');
+    enIngles('en la pestaña Agents, con los botones de orden');
+    // …y el menú de agentes del chat sigue ese orden.
+    await go('chat');
+    chatView.querySelector('[data-accion="agente"]').click();
+    await until(() => menus().length === 1, 2000);
+    await sleep(dur('base') + 80);
+    const delMenu = [...menus()[0].querySelectorAll('.rad-menu-item')].map((i) => i.textContent.trim()).filter((t) => esperado.includes(t));
+    if (delMenu.join() !== esperado.join()) fail('mover: el menú de agentes del chat no sigue el orden nuevo: ' + delMenu.join(', '));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await until(() => menus().length === 0, 2000);
+    // Vuelve a su lugar (la pasada 2 espera el orden de antes).
+    await go('agentes');
+    cards()[1].querySelector('[data-accion="subir"]').click();
+    await settle();
+    if (nombres().join() !== orden0.join() || (await guardados()).join() !== orden0.join()) fail('mover: subirlo de vuelta no dejó el orden de antes: ' + nombres().join(', '));
+    await go('chat');
+  }
+
   data.tools = `Toolsmith: ${tools().length} filas en el último chat; permiso, rechazo, dos rondas, confianza por chat, código, base propia, un job, dos capturas, argumentos malos y modo automático`;
 
   // El agente de prueba se va, con sus chats, y vuelve a quedar Galen abierto
@@ -3298,6 +3615,12 @@ else {
   await closed();
   await settle();
   if (cards().length !== 3) fail(`después de borrar al agente con tools quedan ${cards().length} tarjetas`);
+  // (sus tareas programadas se fueron con él; la del agente que queda, no)
+  {
+    let quedan = null;
+    for (let i = 0; i < 40; i++) { quedan = (await window.rad.invoke('tareas:leer')).tareas.map((t) => t.titulo); if (quedan.join() === 'Smoke keeper') break; await sleep(50); }
+    if (quedan.join() !== 'Smoke keeper') fail('tareas: al borrar un agente sus tareas no se fueron con él, o se fue la de otro: ' + quedan.join(', '));
+  }
   await go('chat');
   chatView.querySelector('[data-accion="agente"]').click();
   await frame();

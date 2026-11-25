@@ -65,13 +65,17 @@ function entorno(run) {
  *   subagente        { access, parentCall, n, paralelo }: decide qué tools ve
  *   callPrefix       el prefijo de los ids de sus filas (cuelgan de la de delegate)
  *   cwd              la carpeta con la que arranca: la del padre en ese momento
+ *
+ * Y la de una TAREA PROGRAMADA (chat.cjs, correrTarea):
+ *   tarea            { actuar }: corre sin nadie mirando (ver motor.cjs)
  */
-function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confirm, subagente = null, callPrefix = null, cwd = null }) {
+function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confirm, subagente = null, callPrefix = null, cwd = null, tarea = null }) {
   const run = {
     reqId,
     convoId,
     ac,
     ...(subagente ? { subagent: subagente } : {}),
+    ...(tarea ? { tarea: { actuar: tarea.actuar === true } } : {}),
     ...(callPrefix ? { callPrefix } : {}),
     ...(typeof cwd === 'string' ? { cwd } : {}),
     steps: [],
@@ -120,6 +124,8 @@ function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confir
         ...(skills ? ['', skills] : []),
         // un subagente: qué es y qué se espera de su informe
         ...(run.subagent ? ['', guardas.SUBAGENT_NOTE] : []),
+        // una tarea programada: nadie mira, y el último mensaje es el resultado
+        ...(run.tarea ? ['', guardas.TASK_NOTE, ...(run.tarea.actuar ? [] : [guardas.TASK_READONLY_NOTE])] : []),
         '',
         'The section below is the tool protocol for THIS session. It is written by the app — not by you, not by the user — and it is authoritative: it overrides anything earlier in this prompt.',
         ...guardas.toolGuidance(nombres, run, run.needsConfirm()),

@@ -181,6 +181,9 @@ export function montarAgentes(el, { router }) {
   const tarjeta = (a) => {
     const nombre = h('h2', 'dm-tarjeta-nombre rad-swap');
     const modelo = h('span', 'dm-tarjeta-modelo rad-swap');
+    // Cambiarlo de lugar: el orden de acá es el del menú de agentes del chat.
+    const subir = h('button', 'rad-iconbutton', { type: 'button', 'aria-label': 'Move up', 'data-rad-tip': 'Move up', 'data-accion': 'subir' }, icono('subir'));
+    const bajar = h('button', 'rad-iconbutton', { type: 'button', 'aria-label': 'Move down', 'data-rad-tip': 'Move down', 'data-accion': 'bajar' }, icono('chevron'));
     const editar = h('button', 'rad-iconbutton', { type: 'button', 'aria-label': 'Edit', 'data-rad-tip': 'Edit', 'data-accion': 'editar' }, icono('lapiz'));
     const borrar = h('button', 'rad-iconbutton', { type: 'button', 'aria-label': 'Delete', 'data-accion': 'eliminar' }, icono('tacho'));
     const instr = h('p', 'dm-tarjeta-instr');
@@ -188,10 +191,12 @@ export function montarAgentes(el, { router }) {
     const susTools = h('span', 'dm-tarjeta-tools rad-swap');
     const abrir = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'abrir' }, 'Open chats');
     const nodo = h('article', 'dm-tarjeta', { role: 'listitem' },
-      h('div', 'dm-tarjeta-cabeza', {}, h('div', 'dm-tarjeta-titulo', {}, nombre, modelo), h('div', 'dm-tarjeta-acciones', {}, editar, borrar)),
+      h('div', 'dm-tarjeta-cabeza', {}, h('div', 'dm-tarjeta-titulo', {}, nombre, modelo), h('div', 'dm-tarjeta-acciones', {}, subir, bajar, editar, borrar)),
       instr,
       h('div', 'dm-tarjeta-pie', {}, h('span', 'dm-tarjeta-datos', {}, cuenta, susTools), abrir));
     const yo = () => datos.agente(nodo.dataset.radKey);
+    subir.addEventListener('click', () => { if (subir.getAttribute('aria-disabled') !== 'true') datos.moverAgente(yo().id, -1); });
+    bajar.addEventListener('click', () => { if (bajar.getAttribute('aria-disabled') !== 'true') datos.moverAgente(yo().id, 1); });
     editar.addEventListener('click', () => abrirAgente(yo()));
     borrar.addEventListener('click', () => { if (borrar.getAttribute('aria-disabled') !== 'true') eliminar(yo()); });
     abrir.addEventListener('click', () => { datos.elegirAgente(yo().id); router.go('chat'); });
@@ -209,6 +214,10 @@ export function montarAgentes(el, { router }) {
     swapText(nodo.querySelector('.dm-tarjeta-cuenta'), cuantos(datos.chatsDe(a.id).length, 'chat', 'chats', 'No chats'));
     const grupos = datos.modeloConTools(a.proveedor, a.modelo) ? datos.gruposDe(a) : [];
     swapText(nodo.querySelector('.dm-tarjeta-tools'), grupos.length ? `Tools: ${grupos.join(', ')}` : 'No tools');
+    // El primero no sube y el último no baja.
+    const lugar = datos.listaAgentes().findIndex((x) => x.id === a.id);
+    nodo.querySelector('[data-accion="subir"]').setAttribute('aria-disabled', String(lugar <= 0));
+    nodo.querySelector('[data-accion="bajar"]').setAttribute('aria-disabled', String(lugar >= datos.listaAgentes().length - 1));
     // El último agente no se borra: la app siempre tiene con quién hablar.
     const unico = datos.listaAgentes().length <= 1;
     const borrar = nodo.querySelector('[data-accion="eliminar"]');

@@ -387,6 +387,25 @@ documento. Los textos están en `packages/core/renderer/strings.js`. Lo que
 escribe la app (títulos, rótulos, mensajes) es de la app: esto no es un
 sistema de traducciones.
 
+## La bandeja del sistema
+
+Una app que tiene que seguir viva con la ventana cerrada (un servidor, tareas
+que corren solas) pide una bandeja:
+
+```js
+rad.start({ …, tray: { icon: path.join(__dirname, 'build', 'tray.ico'), tooltip: 'Mi app' } });
+```
+
+Con eso, cerrar la ventana la esconde en vez de cerrar la app. Un clic en el
+ícono la trae de vuelta, y su menú (el del sistema) tiene «Abrir» y «Salir».
+`icon` puede ser una función, para cambiarlo según la barra (después,
+`rad.tray.refresh()`), y `keep: () => boolean` deja que el usuario elija que
+cerrar la ventana cierre la app. Desde el proceso principal, `rad.tray` da
+`show()`, `hide()`, `quit()` y `visible()`. En el humo no se pone ningún
+ícono, pero esconder y mostrar andan igual. Está en
+`packages/core/main/tray.cjs`, con lo que no es obvio en su cabecera (el
+actualizador, el cierre de sesión de Windows).
+
 ## Comandos
 
 ```

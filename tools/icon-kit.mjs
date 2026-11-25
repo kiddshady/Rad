@@ -111,6 +111,15 @@ export function rasterize(size, tile, glyph) {
   return toBytes(size, sample(size, [tileLayer(tile), ...glyph(scale)]));
 }
 
+/**
+ * Dibuja SOLO el glifo, sobre transparente y sin baldosa: para el ícono de la
+ * bandeja del sistema, que va suelto sobre la barra. `glyph()` devuelve las
+ * capas como en rasterize, con x e y en fracción del lienzo.
+ */
+export function rasterizeBare(size, glyph) {
+  return toBytes(size, sample(size, glyph()));
+}
+
 const drawingScale = (size) => (size < 64 ? 0.68 : 0.62);
 const tileLayer = (tile) => ({ color: tile, sd: (x, y) => sdRoundRect(x, y, 0.5, 0.19) });
 
