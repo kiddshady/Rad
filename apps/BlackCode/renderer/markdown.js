@@ -27,6 +27,8 @@ const ITEM = /^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$/;
 const QUOTE = /^ {0,3}>\s?(.*)$/;
 const TABLE_SEP = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
 const INDENTED = /^\s{2,}\S/;
+// ¿Acá empieza una tabla? Un renglón con | y, debajo, el de los guiones.
+const abreTabla = (l, sig) => l.includes('|') && sig !== undefined && sig.includes('-') && TABLE_SEP.test(sig);
 const startsBlock = (l) => FENCE.test(l) || HEADING.test(l) || HR.test(l) || QUOTE.test(l) || Boolean(abreBloque(l));
 
 /** El texto partido en bloques: [{ tipo, … }]. */
@@ -100,7 +102,7 @@ export function bloques(texto) {
       continue;
     }
 
-    if (linea.includes('|') && i + 1 < lineas.length && lineas[i + 1].includes('-') && TABLE_SEP.test(lineas[i + 1])) {
+    if (abreTabla(linea, lineas[i + 1])) {
       const celdas = (l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
       const cabeza = celdas(linea);
       const filas = [];
@@ -137,7 +139,11 @@ export function bloques(texto) {
 
     const parrafo = [linea];
     i++;
-    while (i < lineas.length && lineas[i].trim() && !startsBlock(lineas[i]) && !ITEM.test(lineas[i])) { parrafo.push(lineas[i]); i++; }
+    // Una tabla corta el párrafo aunque no haya una línea en blanco antes: los
+    // modelos la escriben pegada a su título («**Teoría**» y, debajo, la
+    // tabla), y sin esto salía entera como texto, con sus barras. (Así lo
+    // hace también el markdown de GitHub.)
+    while (i < lineas.length && lineas[i].trim() && !startsBlock(lineas[i]) && !ITEM.test(lineas[i]) && !abreTabla(lineas[i], lineas[i + 1])) { parrafo.push(lineas[i]); i++; }
     out.push({ tipo: 'parrafo', texto: parrafo.join('\n') });
   }
   return out;

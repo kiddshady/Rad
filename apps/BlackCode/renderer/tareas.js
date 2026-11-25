@@ -193,7 +193,7 @@ export function montarTareas(el, { router }) {
     if (t.id === VACIO) { const p = h('p', 'dm-memoria-vacia rad-swap'); swapText(p, t.texto); return p; }
     const yo = () => estado.tareas.find((x) => x.id === (nodo.dataset.radKey ?? t.id));
     const activa = h('input', '', { type: 'checkbox', role: 'switch', 'aria-label': 'On', 'data-accion': 'tarea-activa' });
-    const correr = h('button', 'rad-iconbutton', { type: 'button', 'data-accion': 'tarea-correr', 'aria-label': 'Run now', 'data-rad-tip': 'Run now' }, icono('enviar'));
+    const correr = h('button', 'rad-iconbutton', { type: 'button', 'data-accion': 'tarea-correr', 'aria-label': 'Run now', 'data-rad-tip': 'Run now' }, icono('correr'));
     const frenar = h('button', 'rad-iconbutton', { type: 'button', 'data-accion': 'tarea-frenar', 'aria-label': 'Stop', 'data-rad-tip': 'Stop' }, icono('frenar'));
     const editar = h('button', 'rad-iconbutton', { type: 'button', 'data-accion': 'tarea-editar', 'aria-label': 'Change', 'data-rad-tip': 'Change' }, icono('lapiz'));
     const quitar = h('button', 'rad-iconbutton', { type: 'button', 'data-accion': 'tarea-borrar', 'aria-label': 'Delete', 'data-rad-tip': 'Delete' }, icono('tacho'));

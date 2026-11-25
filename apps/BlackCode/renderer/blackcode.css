@@ -1222,8 +1222,7 @@
   .dm-memoria-detalle { resize: none; height: 200px; line-height: 1.55; }
 
   /* ---------- Las skills ---------- */
-  /* Una página como Memory: la lista, y los formularios en modales. Lo que
-     espera la aprobación del usuario lleva un canto que lo marca. */
+  /* Una página como Memory: la lista, y los formularios en modales. */
   .dm-skills-acciones { flex: none; display: flex; align-items: center; gap: var(--rad-space-2); }
   .dm-skills-lista { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-1); }
   .dm-skill-fila {
@@ -1237,7 +1236,7 @@
   }
   .dm-skill-fila:hover { background: var(--rad-tint-hover); }
   .dm-skill-fila [hidden] { display: none; }
-  .dm-skill-fila[data-pendiente] { box-shadow: inset 2px 0 0 var(--rad-warning); }
+  /* (una skill en revisión no lleva ninguna marca de color: el botón Review y su pie ya lo dicen) */
   .dm-skill-textos { flex: 1; min-width: 0; display: grid; gap: calc(var(--rad-space-1) / 2); }
   .dm-skill-nombre { color: var(--rad-text-1); font-size: var(--rad-text-s); user-select: text; transition: color var(--rad-dur-fast) var(--rad-ease-out); }
   .dm-skill-descripcion { color: var(--rad-text-2); overflow-wrap: anywhere; user-select: text; transition: color var(--rad-dur-fast) var(--rad-ease-out); }

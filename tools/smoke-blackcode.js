@@ -432,6 +432,21 @@ else {
     if (picked.includes('Copy')) fail('la selección se lleva el botón de copiar');
     const t = thread();
     if (t.scrollHeight - t.clientHeight - t.scrollTop > 2) fail(`la conversación no quedó al fondo: faltan ${Math.round(t.scrollHeight - t.clientHeight - t.scrollTop)} px`);
+    // Una tabla pegada al renglón de arriba, sin línea en blanco (Zac la
+    // escribió así y salió entera como texto, con sus barras): es una tabla.
+    {
+      const { bloques, pintar } = await import('/markdown.js');
+      const pegada = '**Theory (2 units)**\n| Unit | Size |\n|---|---|\n| U1 Amino acids | 301 KB |\n| U2 Folding | 191 KB |\n\nAfter the table.';
+      const b = bloques(pegada);
+      if (b.map((x) => x.tipo).join() !== 'parrafo,tabla,parrafo' || b[0].texto !== '**Theory (2 units)**' || b[1].cabeza.join() !== 'Unit,Size' || b[1].filas.length !== 2 || b[2].texto !== 'After the table.') fail('markdown: una tabla pegada al renglón de arriba no sale como tabla: ' + JSON.stringify(b).slice(0, 300));
+      const caja = document.createElement('div');
+      pintar(caja, pegada);
+      if (caja.querySelectorAll('table').length !== 1 || caja.querySelectorAll('tbody tr').length !== 2 || caja.textContent.includes('|') || !caja.querySelector('strong')) fail('markdown: la tabla pegada se dibuja con sus barras: ' + caja.textContent.slice(0, 120));
+      // …y lo que no es una tabla sigue siendo un párrafo
+      if (bloques('a | b\nc | d').map((x) => x.tipo).join() !== 'parrafo' || bloques('one line\nanother line').length !== 1) fail('markdown: un párrafo con barras se partió sin ser una tabla');
+      // (mientras llega: el renglón de los títulos solo, todavía sin sus guiones, es texto)
+      if (bloques('**Theory**\n| Unit | Size |').map((x) => x.tipo).join() !== 'parrafo') fail('markdown: un renglón con barras, sin los guiones todavía, se tomó como tabla');
+    }
     data.markdown = `título, negrita, ${md.querySelectorAll('ul > li').length} items, código ${has('.dm-codigo-lang').textContent}, tabla de ${md.querySelectorAll('.dm-tabla tbody tr').length} filas`;
   }
 }
@@ -2456,6 +2471,9 @@ else {
     if (!sale('create_skill', -1).startsWith('Proposed a change to the skill "brief". The current version stays in use') || !sale('skill', -1).endsWith('Three bullets, no more.')) fail('skills: proponer un cambio pisó la versión vigente: ' + sale('create_skill', -1).slice(0, 90) + ' / ' + sale('skill', -1).slice(-40));
     await go('skills');
     await until(() => filaS('brief')?.hasAttribute('data-pendiente'), 3000);
+    // (en revisión no lleva ningún canto de color: Fran lo sacó, con Review y el pie alcanza)
+    await sleep(dur('base') + 80);
+    if (getComputedStyle(filaS('brief')).boxShadow !== 'none' || filaS('brief').querySelector('[data-accion="skill-revisar"]').hidden) fail('skills: una skill en revisión lleva un canto de color (' + getComputedStyle(filaS('brief')).boxShadow + '), o perdió su botón Review');
     if (!pieS('brief').includes('an agent proposed a change') || filaS('brief').querySelector('.rad-switch').hidden) fail('skills: una skill con un cambio propuesto no lo dice, o perdió su interruptor: ' + pieS('brief'));
     filaS('brief').querySelector('[data-accion="skill-revisar"]').click();
     await until(() => modal()?.dataset.skill === 'brief', 3000);
@@ -3366,6 +3384,12 @@ else {
     const fD = filaT('Smoke daily');
     if (!fD || fD.dataset.estado !== 'activa' || !shown(fD.querySelector('.dm-skill-descripcion')).startsWith('every day at 09:00 · next run ') || !fD.querySelector('.dm-memoria-de').textContent.includes(agenteT.nombre + ' · read-only')) fail('tareas: la tarea nueva figura como «' + (fD ? shown(fD.querySelector('.dm-skill-descripcion')) + ' / ' + fD.querySelector('.dm-memoria-de').textContent : '(sin fila)') + '»');
     if (!fD.querySelector('[data-accion="tarea-activa"]').checked || !fD.querySelector('[data-accion="tarea-frenar"]').hidden) fail('tareas: la tarea nueva no nace prendida, o muestra Stop sin estar corriendo');
+    // («Run now» es un triángulo de play, relleno como el cuadrado de Stop; no la flecha de mandar)
+    {
+      const dibujo = fD.querySelector('[data-accion="tarea-correr"] svg path');
+      const caja = dibujo?.getBBox();
+      if (!dibujo || dibujo.getAttribute('fill') !== 'currentColor' || !/z$/i.test(dibujo.getAttribute('d')) || !(caja.width > 4 && caja.height > 5) || fD.querySelector('[data-accion="tarea-correr"] svg').innerHTML === chatView.querySelector('.dm-enviar svg')?.innerHTML) fail('tareas: «Run now» no lleva el triángulo de play: ' + (dibujo?.getAttribute('d') ?? '(sin dibujo)'));
+    }
 
     // «Run now»: la fila trabaja, y el resultado cae en la bandeja con su aviso.
     fD.querySelector('[data-accion="tarea-correr"]').click();

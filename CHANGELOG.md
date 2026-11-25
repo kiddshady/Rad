@@ -1,5 +1,15 @@
 # Changelog
 
+## BlackCode 1.0.1 (2026-11-25)
+
+- En Skills, una skill que espera aprobación ya no lleva el canto amarillo a
+  la izquierda: con el botón Review y su pie («proposed by an agent · not in
+  use until you approve it») alcanza.
+- En Tasks, «Run now» es un triángulo de play (era la flecha de mandar).
+- **Una tabla pegada al renglón de arriba se dibuja como tabla.** Si el modelo
+  la escribía sin una línea en blanco antes (un título en negrita y, debajo,
+  la tabla), salía entera como texto, con sus barras. Fran lo vio en un chat.
+
 ## BlackCode 1.0.0 (2026-11-25) · núcleo 0.19.0
 
 La primera versión 1.0: con las tareas programadas quedó hecho lo que estaba

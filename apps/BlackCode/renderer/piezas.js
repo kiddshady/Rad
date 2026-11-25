@@ -23,6 +23,8 @@ export const ICONOS = {
   puntos: svg('<circle cx="3.5" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1.1" fill="currentColor" stroke="none"/>'),
   enviar: svg('<path d="M8 13V3.5M4 7.5l4-4 4 4"/>'),
   frenar: svg('<rect x="4" y="4" width="8" height="8" rx="1.75" fill="currentColor" stroke="none"/>'),
+  // (su pareja: correr. Relleno como el de frenar; el trazo redondea las puntas)
+  correr: svg('<path d="M5.25 3.75v8.5L12 8z" fill="currentColor"/>'),
   lapiz: svg('<path d="M10.5 2.5l3 3-8 8h-3v-3z"/>'),
   tacho: svg('<path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.5 9h6l.5-9"/>'),
   chevron: svg('<path d="M4.5 6.5 8 10l3.5-3.5"/>'),
