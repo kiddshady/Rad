@@ -637,6 +637,32 @@ alive().forEach((t) => t._radClose?.());
 await sleep(450);
 if (document.querySelector('.rad-toast')) fail('quedaron toasts en el DOM');
 
+// 10b. Un toast con un modal abierto: va por encima de su velo, se ve y se
+// puede tocar. (La pila de toasts se crea una vez; un modal abierto después
+// quedaba encima por orden de llegada.)
+{
+  modalBtn.click();
+  await sleep(dur('slow') + 160);
+  capas.querySelector('[data-demo="toast"][data-kind="info"]').click();
+  await sleep(dur('slow') + 200);
+  const t = alive()[0];
+  const r = t?.getBoundingClientRect();
+  const arriba = t ? document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) : null;
+  if (!t) fail('con un modal abierto no salió el toast');
+  else if (arriba?.closest('.rad-toast') !== t) fail(`con un modal abierto, el toast queda debajo de «${arriba?.className}»: no se ve ni se puede tocar`);
+  t?.querySelector('.rad-toast-close')?.click();
+  await sleep(450);
+  if (t?.isConnected) fail('el toast sobre un modal no se pudo cerrar');
+  if (!document.querySelector('.rad-modal')) fail('cerrar el toast cerró el modal de atrás');
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  await sleep(dur('slow') + 200);
+  // (la vitrina avisa con un toast cómo se cerró el modal: se limpia)
+  alive().forEach((x) => x._radClose?.());
+  await sleep(450);
+  if (document.querySelector('.rad-toast') || document.querySelector('.rad-modal-layer')) fail('después de probar el toast sobre un modal quedó algo abierto');
+  data.toastSobreModal = 'encima del velo, y se cierra';
+}
+
 // 11. Tooltip: espera la primera vez, sale enseguida la siguiente.
 const tips = capas.querySelectorAll('.rad-iconbutton');
 const tipEl = () => [...document.querySelectorAll('.rad-tooltip')].find((t) => t.dataset.state === 'open' && !t.hasAttribute('data-rad-leaving'));

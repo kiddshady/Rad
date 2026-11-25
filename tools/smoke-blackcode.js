@@ -4270,6 +4270,16 @@ else {
   // de cerrarlo, que recuerde la pestaña, y que ir a una vista lo cierre.
   {
     await go('chat');
+    // (un aviso ANTES de abrir Settings: la pila de avisos se crea con el primero, y el caso que falló es el de una pila que
+    // ya existía cuando se abrió el modal. Más abajo se prueba que uno nuevo salga por encima.)
+    {
+      const { toast } = await import('/@core/toast.js');
+      toast({ text: 'Smoke notice before Settings' });
+      await sleep(dur('slow') + 120);
+      [...document.querySelectorAll('.rad-toast')].forEach((t) => t._radClose?.());
+      await sleep(dur('slow') + 200);
+      if (!document.querySelector('.rad-overlays .rad-toasts')) fail('ajustes: no quedó la pila de avisos armada antes de abrir Settings (la prueba del aviso no probaría nada)');
+    }
     const tabS = document.querySelector('.rad-tab[data-view="ajustes"]');
     if (ajustesAbierto()) fail('ajustes: sigue abierto después de ir al chat');
     if (document.querySelector('.rad-view[data-view="ajustes"]')) fail('ajustes: sigue habiendo una vista de Settings detrás del modal');
@@ -4370,6 +4380,30 @@ else {
       const t4 = m.dataset.tab + '/' + document.activeElement?.dataset?.tab;
       if ([t1, t2, t3, t4].join() !== 'about/about,general/general,about/about,general/general') fail('ajustes: las flechas recorren las pestañas así: ' + [t1, t2, t3, t4].join());
       if (tabs.filter((t) => t.getAttribute('tabindex') === '0').map((t) => t.dataset.tab).join() !== 'general') fail('ajustes: el Tab entra a la lista de pestañas por más de una, o por otra que la que se ve');
+      // Un aviso con Settings abierto (el de «Check for updates», el de una llave guardada): va por encima del modal,
+      // se ve y se puede tocar. Quedaba debajo del velo.
+      {
+        const { toast } = await import('/@core/toast.js');
+        let tocado = 0;
+        toast({ text: 'Smoke notice over Settings', action: { label: 'Touch', onClick: () => { tocado++; } } });
+        await sleep(dur('slow') + 200);
+        const aviso = [...document.querySelectorAll('.rad-toast')].find((t) => t.textContent.includes('Smoke notice over Settings') && !t.hasAttribute('data-rad-leaving'));
+        const caja = aviso?.getBoundingClientRect();
+        const boton = [...(aviso?.querySelectorAll('button') ?? [])].find((b) => b.textContent.trim() === 'Touch');
+        const bc = boton?.getBoundingClientRect();
+        if (!aviso || !boton) fail('ajustes: con Settings abierto no salió el aviso');
+        else {
+          const enElCentro = document.elementFromPoint(caja.left + caja.width / 2, caja.top + caja.height / 2);
+          if (enElCentro?.closest('.rad-toast') !== aviso) fail('ajustes: con Settings abierto, un aviso queda debajo de «' + (enElCentro?.className ?? '') + '»: no se ve ni se puede tocar');
+          // el clic, por donde lo daría el mouse: lo recibe lo que esté arriba en ese punto
+          document.elementFromPoint(bc.left + bc.width / 2, bc.top + bc.height / 2)?.click();
+          await sleep(dur('base') + 200);
+          if (tocado !== 1) fail('ajustes: el botón de un aviso sobre Settings no se puede tocar (lo recibió otra cosa)');
+          if (!ajustesAbierto()) fail('ajustes: tocar un aviso cerró Settings');
+        }
+        [...document.querySelectorAll('.rad-toast')].forEach((t) => t._radClose?.());
+        await sleep(dur('slow') + 200);
+      }
       // Un modal encima de Settings (el formulario de un servidor MCP): Esc cierra ese, no Settings.
       await go('ajustes', 'integrations');
       m.querySelector('[data-accion="mcp-nuevo"]').click();

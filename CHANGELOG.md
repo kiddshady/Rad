@@ -1,5 +1,17 @@
 # Changelog
 
+## BlackCode 1.5.2 (2026-11-25) · núcleo 0.20.1
+
+- **Los avisos se ven con Settings abierto.** Desde que Settings es un modal,
+  el aviso de «Check for updates» (y cualquier otro: una llave guardada, una
+  tarea que terminó) salía por debajo de su velo: ni se veía ni se podía
+  tocar. Lo vio Fran al actualizar a la 1.5.1.
+- **Núcleo 0.20.1:** la pila de toasts va por encima de lo demás que flota
+  (`z-index` propio en la capa de overlays; el tooltip, más arriba todavía).
+  En la capa mandaba el orden de llegada, pero la pila se crea una sola vez,
+  así que cualquier modal abierto después la tapaba. Pasaba con todos los
+  modales; con uno que queda abierto mientras se trabaja, se nota.
+
 ## BlackCode 1.5.1 (2026-11-25)
 
 Retoques de Settings y tres íconos, pedidos por Fran al ver la 1.5.0.

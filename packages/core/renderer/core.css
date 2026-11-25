@@ -548,7 +548,7 @@
     pointer-events: none;
     user-select: none;
   }
-  .rad-overlays > .rad-tooltip { pointer-events: none; }
+  .rad-overlays > .rad-tooltip { pointer-events: none; z-index: 2; }
 
   .rad-menu {
     display: flex;
@@ -603,9 +603,16 @@
     flex-wrap: wrap;
   }
 
-  /* Toasts: abajo a la derecha, por encima de la statusbar. */
+  /* Toasts: abajo a la derecha, por encima de la statusbar. Y por encima de
+     lo demás que flota: en la capa manda el orden de llegada (lo último que
+     se abre queda encima), pero la pila de toasts se crea una sola vez, así
+     que un modal abierto después la tapaba con su velo y el aviso ni se veía
+     ni se podía tocar (Fran, BlackCode 1.5.1: «Check for updates» desde el
+     modal de Settings). Un aviso es de la app entera, no de la vista de
+     atrás. Solo el tooltip va más arriba. */
   .rad-toasts {
     position: fixed;
+    z-index: 1;
     right: var(--rad-space-4);
     bottom: calc(var(--rad-statusbar-height) + var(--rad-space-3));
     width: var(--rad-toast-width);
