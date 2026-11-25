@@ -1,5 +1,24 @@
 # Changelog
 
+## BlackCode 0.16.0 (2026-11-24)
+
+- **Skills.** Procedimientos que el usuario les deja a sus agentes: cómo
+  quiere un informe, los pasos para publicar una app. Vista nueva, Skills,
+  para escribirlas, importarlas de un `.md` (el formato de las skills de
+  Claude Code), cambiarlas, apagarlas y borrarlas.
+- El agente con el grupo Skills prendido ve la lista en cada chat (el nombre
+  y cuándo usarla) y carga las instrucciones de la que le sirve con la tool
+  `skill`. Los que tenían todas las tools lo reciben prendido.
+- **Lo que escribe un agente no queda en uso.** Con `create_skill` propone
+  una skill, o un cambio a una que existe; el usuario recibe un aviso, la
+  revisa (un cambio se ve con su diff) y la aprueba o la descarta. Mientras
+  tanto la versión vigente sigue en uso. El agente no aprueba, apaga ni borra.
+- Vienen de las skills de NeonCode 1.11.3, pero solo las de instrucciones. No
+  vinieron las de código (un `.js` escrito por el modelo que corría adentro
+  de la app con todos los permisos): para ejecutar código están `run_code` y
+  los comandos, que piden permiso.
+- Son 32 tools en 13 grupos.
+
 ## BlackCode 0.15.0 (2026-11-24)
 
 - **Memoria.** Lo que la app recuerda del usuario de un chat a otro, y de un

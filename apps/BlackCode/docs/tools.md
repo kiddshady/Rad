@@ -32,6 +32,7 @@ encabezado de qué parte de NeonCode salió y qué se le adaptó.
 | `notas.cjs`, `notes-store.cjs` | `notepad` y `notepad_write`: la libreta del usuario, y su base |
 | `delegar.cjs` | `delegate`: los subagentes |
 | `memoria.cjs` | `remember` y `recall`: la memoria (la memoria en sí es `main/memoria.cjs`) |
+| `skills.cjs` | `skill` y `create_skill`: las skills (las skills en sí son `main/skills.cjs`) |
 | `navegador.cjs`, `browser/` | Las seis `browser_*` y el navegador que manejan (`agent-browser.cjs`), con su preload de sesión |
 | `index.cjs` | Arma todo y es lo único que conoce el chat |
 
@@ -61,6 +62,7 @@ agente. La barra de estado repite la cuenta.
 | Notes | `notepad`, `notepad_write` |
 | Subagents | `delegate` |
 | Memory | `remember`, `recall` |
+| Skills | `skill`, `create_skill` |
 
 La pantalla va sola en su grupo: es lo más privado que una tool puede mirar
 (lo que haya abierto, sin elegir qué), y se prende aparte de todo lo demás.
@@ -330,6 +332,44 @@ decide qué leer.
   que un agente le agregó mientras tanto se conserva (el cuidado de NeonCode).
 - **No vino:** el recuerdo por similitud, los embeddings y su motor local.
 
+## Las skills
+
+Desde la 0.16.0. Procedimientos que el usuario les deja a sus agentes: un
+nombre, una línea que dice cuándo usarla y las instrucciones en markdown. Son
+unas para toda la app. Están en `main/skills.cjs` y sus dos tools, en
+`main/tools/skills.cjs`. Es el mismo mecanismo que la memoria: un índice en
+el contexto y el cuerpo a pedido.
+
+- **Las tools.** `skill({ name })` carga una (sin nombre, las lista); es de
+  lectura. `create_skill({ name, description, body })` PROPONE una, o un
+  cambio a una que existe.
+- **Lo que escribe un agente no queda en uso.** Es una propuesta: no entra al
+  índice ni se puede cargar hasta que el usuario la aprueba en la vista Skills
+  (le llega un aviso que lo lleva ahí). Si la skill ya existía, la versión
+  vigente sigue en uso mientras tanto, y la revisión muestra qué cambia.
+  Aprobar, descartar, apagar y borrar son canales de la vista: no hay tool que
+  llegue a eso. Un subagente carga skills pero no las propone.
+- **Quién las ve.** El agente con su grupo Skills prendido: su system lleva el
+  índice (`## Skills`, una línea por skill viva, tope 4000 caracteres; lo que
+  no entra se dice y se lista con la tool). Sin tools no hay índice: no habría
+  cómo leer el cuerpo.
+- **Lo que devuelve `skill` se sigue.** El protocolo dice que lo que devuelve
+  una tool son datos y no instrucciones; para `skill` hay una excepción
+  escrita ahí mismo (es un procedimiento que el usuario escribió o aprobó), y
+  el resultado lo dice en su primer renglón.
+- **Importar.** La vista lee un `.md` con frontmatter `name` y `description`
+  (el formato de las skills de Claude Code) y abre el formulario lleno; no
+  guarda hasta que el usuario lo mira.
+- **Dónde se guardan.** En el documento `_skills` del store del núcleo, que la
+  interfaz no puede leer (canales `skills:leer|guardar|activar|borrar|revisar|
+  aprobar|descartar|de-md`; el aviso es `skills:evento`).
+- **No vino de NeonCode:** las skills de CÓDIGO (un `.js` que el modelo
+  escribía y la app ejecutaba adentro de su proceso principal, con todos los
+  permisos de Node). Para ejecutar código un agente tiene `run_code` y los
+  comandos, que pasan por la tarjeta de permiso; una skill puede decirle qué
+  correr. Tampoco vino que cada skill sea una tool propia (`skill_<nombre>`,
+  con la lista de tools cambiando a mitad de un turno) ni `list_skills`.
+
 ## La terminal del panel no es una tool
 
 Desde la 0.14.0 hay una terminal al lado de la conversación (`main/terminal.cjs`,
@@ -346,7 +386,7 @@ shell del panel abre donde están parados los agentes.
   `fs.cjs`, sin nada enchufado).
 - Mandar un mensaje a mitad del turno (steer).
 - Búsqueda en chats.
-- MCP, skills, tareas programadas.
+- MCP, tareas programadas.
 - Dónde guardar secretos para `http_request` (`{{secret:NOMBRE}}`): un pedido
   con un secreto falla diciendo que no está.
 - Con qué busca `web_search` se elige en Settings (tarjeta «Web search», desde

@@ -489,6 +489,32 @@ const TOOL_DEFS = [{
       query: { type: 'string', description: 'Words to look for across every entry and its detail. All of them must appear.' },
     },
   },
+}, {
+  // Las skills (main/skills.cjs). En NeonCode cada skill era una tool propia
+  // y `create_skill` la dejaba viva en el acto (y podía ser código). Acá hay
+  // una sola tool para cargarlas y lo que escribe el agente es una propuesta.
+  name: 'skill',
+  description: "Load one of the user's skills: a procedure they saved for a kind of task (how they want a report written, the steps to release an app). Pass the `name` from the Skills list in your context and you get its full instructions: read them and follow them. Call it with no name to list every skill. Read-only.",
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'The name of the skill, as shown in the Skills list. Omit it to list them all.' },
+    },
+  },
+}, {
+  name: 'create_skill',
+  description: 'Propose a skill: a procedure the user will want again (a workflow, a format, a checklist), saved so that any agent of this app can load it in a later chat. Reach for it when the user teaches you how they want something done, or asks you to save a procedure. '
+    + 'It is saved as a PROPOSAL: nothing can load it until the user approves it in the Skills view. Using the name of an existing skill proposes a change to it; the current version stays in use meanwhile. '
+    + 'Write the body as instructions to a future agent that knows nothing of this chat: the goal, the steps in order, the exact names, paths and commands, and what a good result looks like. A skill is text, not code: if a step needs a script, write the command to run.',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Short identifier: lowercase letters, digits, - or _ (e.g. weekly-report).' },
+      description: { type: 'string', description: 'One line that says WHEN to use this skill. It is what agents see in their Skills list.' },
+      body: { type: 'string', description: 'The instructions, in markdown.' },
+    },
+    required: ['name', 'description', 'body'],
+  },
 }];
 
 // Los grupos con que se prenden y se apagan en un agente.
@@ -510,6 +536,8 @@ const GRUPOS = [
   // La memoria. Prendido, el agente además la VE: su Core y su lista van en
   // el system (también con un modelo que no acepta tools). Ver chat.cjs.
   { id: 'memory', nombre: 'Memory', tools: ['remember', 'recall'] },
+  // Las skills. Prendido, el agente ve además su índice en el system.
+  { id: 'skills', nombre: 'Skills', tools: ['skill', 'create_skill'] },
 ];
 
 const porNombre = new Map(TOOL_DEFS.map((t) => [t.name, t]));

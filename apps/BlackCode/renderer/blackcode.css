@@ -1121,6 +1121,48 @@
   .dm-memoria-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-3); min-width: 0; }
   .dm-memoria-detalle { resize: vertical; min-height: 120px; line-height: 1.55; }
 
+  /* ---------- Las skills ---------- */
+  /* Una página como Memory: la lista, y los formularios en modales. Lo que
+     espera la aprobación del usuario lleva un canto que lo marca. */
+  .dm-skills-acciones { flex: none; display: flex; align-items: center; gap: var(--rad-space-2); }
+  .dm-skills-lista { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-1); }
+  .dm-skill-fila {
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    min-width: 0;
+    padding: var(--rad-space-2) var(--rad-space-1) var(--rad-space-2) var(--rad-space-3);
+    border-radius: var(--rad-radius-m);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-base) var(--rad-ease-out);
+  }
+  .dm-skill-fila:hover { background: var(--rad-tint-hover); }
+  .dm-skill-fila [hidden] { display: none; }
+  .dm-skill-fila[data-pendiente] { box-shadow: inset 2px 0 0 var(--rad-warning); }
+  .dm-skill-textos { flex: 1; min-width: 0; display: grid; gap: calc(var(--rad-space-1) / 2); }
+  .dm-skill-nombre { color: var(--rad-text-1); font-size: var(--rad-text-s); user-select: text; transition: color var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-skill-descripcion { color: var(--rad-text-2); overflow-wrap: anywhere; user-select: text; transition: color var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-skill-fila[data-apagada] .dm-skill-nombre, .dm-skill-fila[data-apagada] .dm-skill-descripcion { color: var(--rad-text-3); }
+  /* El formulario y la revisión. */
+  .rad-modal:has(.dm-skill-form), .rad-modal:has(.dm-skill-revision) { --rad-modal-width: 640px; }
+  .dm-skill-form, .dm-skill-revision { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-3); min-width: 0; }
+  .dm-skill-cuerpo { resize: vertical; min-height: 200px; max-height: 46vh; font-size: var(--rad-text-s); line-height: 1.55; }
+  .dm-skill-revision-que { color: var(--rad-text-2); }
+  .dm-skill-propuesta {
+    margin: 0;
+    max-height: 34vh;
+    padding: var(--rad-space-3);
+    border-radius: var(--rad-radius-m);
+    background: color-mix(in srgb, var(--rad-surface-0) 62%, transparent);
+    box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line);
+    font-size: var(--rad-text-s);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
+    --rad-fade: var(--rad-space-3);
+    --rad-a-scroll-inset: var(--rad-space-1);
+  }
+
   /* La biblioteca: todos los canvas, también los de la papelera. */
   .rad-modal:has(.dm-biblio) { --rad-modal-width: 560px; }
   .dm-biblio { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-3); min-width: 0; }

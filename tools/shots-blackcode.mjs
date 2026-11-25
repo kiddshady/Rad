@@ -189,6 +189,19 @@ const SCENES = {
     for (const [hecho, detalle] of [['Uses PowerShell 7 with a profile of their own', ''], ['Is building a chat app with several agents', 'It runs on a framework of their own. The agents have tools, a canvas, a browser and a terminal.'], ['Has the Biochemistry final in December: an oral exam', ''], ['Prefers dark interfaces, with every change animated', '']]) await window.rad.invoke('memoria:agregar', { hecho, detalle });
     await go('memoria');
     await sleep(900);`,
+  // Las skills: dos del usuario, una apagada, y una propuesta de un agente esperando.
+  skills: `
+    datos.ponerModoTools('auto');
+    const guardar = (nombre, descripcion, cuerpo) => window.rad.invoke('skills:guardar', { nombre, descripcion, cuerpo });
+    await guardar('release-app', 'Use it when I ask to publish a new version of one of my apps', '# Release\\n\\n1. Run the tests.\\n2. Bump the version.\\n3. Write the changelog.');
+    await guardar('study-summary', 'Use it when I ask for a summary to study from', 'Short sections, one idea each.');
+    await guardar('old-format', 'Use it for reports in the old format', 'Not used any more.');
+    await window.rad.invoke('skills:activar', { nombre: 'old-format', activa: false });
+    const c = datos.crearChat(blackcode.id);
+    await datos.enviar(c.id, 'TOOLS: ' + JSON.stringify([{ name: 'create_skill', args: { name: 'weekly-report', description: 'Use it when I ask for the weekly report', body: '# Weekly report\\n\\n1. Read the notes of the week.\\n2. Three bullets per project.' } }]));
+    await quietos();
+    await go('skills');
+    await sleep(900);`,
   // La terminal: la shell del panel (en las capturas, cmd y no la del usuario).
   terminal: `
     await charla(blackcode, 'Names for the app', 'Give me some name ideas.');

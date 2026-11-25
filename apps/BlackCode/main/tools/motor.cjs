@@ -56,7 +56,7 @@ function activeToolNames(run) {
   // El filtro es fijo para todo el turno del hijo, así que no le cambia la lista
   // de tools detrás de un bloque thinking.
   if (run?.subagent) {
-    names = names.filter((n) => n !== 'delegate' && n !== 'schedule' && n !== 'remember');
+    names = names.filter((n) => n !== 'delegate' && n !== 'schedule' && n !== 'remember' && n !== 'create_skill');
     if (run.subagent.access !== 'full') names = names.filter((n) => READ_ROUND_TOOLS.has(n));
     // El browser es UNO, compartido con el padre y el usuario, y todas sus tools
     // trabajan sobre la pestaña activa. Dos hijos a la vez con browser_navigate
@@ -93,7 +93,7 @@ function activeToolNames(run) {
 // `screen_capture` y `job_output` también son lectura: mirar la pantalla no la
 // cambia, y leer la salida de un job tampoco cambia el job.
 const READ_ROUND_TOOLS = new Set(['fs_read', 'code_search', 'chat_search', 'rag_search',
-  'notepad', 'recall', 'list_skills', 'web_search', 'fetch', 'browser_read', 'screen_capture', 'job_output']);
+  'notepad', 'recall', 'skill', 'list_skills', 'web_search', 'fetch', 'browser_read', 'screen_capture', 'job_output']);
 
 // Las del browser que CAMBIAN la pestaña (todas menos browser_read). Ver el
 // filtro de subagentes en paralelo en activeToolNames.
@@ -204,6 +204,7 @@ function argsDigest(name, args) {
       return cut([a.action, a.action === 'list' && a.scope === 'all' ? 'library' : null, a.title].filter(Boolean).join(' '));
     }
     case 'create_skill': return cut([a.type, a.name].filter(Boolean).join(' '));
+    case 'skill': return cut(a.name || 'all skills');
     case 'list_skills': return 'my skills';
     default: {
       // skill_<nombre>: el chip dice la SKILL, no su JSON de args — que para las
@@ -267,7 +268,7 @@ const failedOut = (out, name) => {
 // `action`). En los tres, equivocarse hacia adentro sería bloquear una escritura
 // legítima porque devolvió dos veces la misma confirmación.
 const IDEMPOTENT_TOOLS = new Set([
-  'fs_read', 'web_search', 'chat_search', 'rag_search', 'code_search', 'notepad', 'recall', 'fetch', 'list_skills',
+  'fs_read', 'web_search', 'chat_search', 'rag_search', 'code_search', 'notepad', 'recall', 'skill', 'fetch', 'list_skills',
 ]);
 
 const THRASH = {

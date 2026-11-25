@@ -26,6 +26,7 @@ const navegador = require('./navegador.cjs');
 const notas = require('./notas.cjs');
 const delegar = require('./delegar.cjs');
 const memoria = require('./memoria.cjs');
+const skills = require('./skills.cjs');
 
 let listo = false;
 
@@ -48,8 +49,9 @@ let listo = false;
  *   subagentes         { destino(run), responder(pedido, opciones) }: con qué
  *                      modelo corre un hijo de `delegate` y cómo se lo llama
  *   memoria            la memoria de la app (main/memoria.cjs): remember y recall
+ *   skills             las skills de la app (main/skills.cjs): skill y create_skill
  */
-function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null } = {}) {
+function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null, skills: skillsApp = null } = {}) {
   archivos.configurar({ trash });
   web.configurar({ getKey, getSecret, webSearch });
   abrir.configurar({ shell });
@@ -73,13 +75,14 @@ function iniciar({ carpeta = null, trash = null, shell = null, capturador = null
     ...(avisar ? { broadcast: avisar } : {}),
   });
   if (memoriaApp) memoria.configurar({ memoria: memoriaApp });
+  if (skillsApp) skills.configurar({ skills: skillsApp });
   motor.configurar({ classifyOsTarget: abrir.classifyOsTarget });
   // el hijo de `delegate` es una sesión como la de cualquier turno
   delegar.configurar({ crearSesion: (opciones) => module.exports.crearSesion(opciones), ...(subagentes ?? {}) });
   if (listo) return;
   motor.registrar({
     ...archivos.runners, ...comandos.runners, ...trabajos.runners, ...busqueda.runners,
-    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners, ...delegar.runners, ...memoria.runners,
+    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners, ...delegar.runners, ...memoria.runners, ...skills.runners,
   });
   listo = true;
 }
@@ -133,7 +136,7 @@ module.exports = {
     // lista de tools cambie a mitad de un turno lo rompe.)
     const sinNotas = Array.isArray(opciones?.tools) && opciones.tools.some((n) => n === 'notepad' || n === 'notepad_write') && !notas.lista();
     // (lo mismo con la memoria, si la app no la configuró)
-    const fuera = new Set([...(sinNotas ? ['notepad', 'notepad_write'] : []), ...(memoria.lista() ? [] : ['remember', 'recall'])]);
+    const fuera = new Set([...(sinNotas ? ['notepad', 'notepad_write'] : []), ...(memoria.lista() ? [] : ['remember', 'recall']), ...(skills.lista() ? [] : ['skill', 'create_skill'])]);
     const s = sesion.crear(fuera.size && Array.isArray(opciones?.tools) ? { ...opciones, tools: opciones.tools.filter((n) => !fuera.has(n)) } : opciones);
     const sistema = s.sistema;
     // …y los canvas que este chat tiene abiertos: su cuerpo no viaja en la
@@ -158,7 +161,7 @@ module.exports = {
     };
     // …y lo que la app recuerda del usuario: el texto lo deja en la corrida
     // quien arma el turno (chat.cjs), una vez, al empezar
-    s.sistema = (instrucciones) => sistema(instrucciones, { trabajos: trabajosVivos(), canvas: canvas(), navegador: delNavegador(), memoria: typeof s.run.memoria === 'string' ? s.run.memoria : '' });
+    s.sistema = (instrucciones) => sistema(instrucciones, { trabajos: trabajosVivos(), canvas: canvas(), navegador: delNavegador(), memoria: typeof s.run.memoria === 'string' ? s.run.memoria : '', skills: typeof s.run.skills === 'string' ? s.run.skills : '' });
     return s;
   },
   // el canvas y el navegador, para los canales que usan sus paneles

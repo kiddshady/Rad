@@ -116,7 +116,16 @@ function wire(rad, { llave }) {
     escribir: (doc) => { rad.store.write(DOC_MEMORIA, doc).catch(() => {}); },
     alCambiar: () => rad.send('memoria:evento', {}),
   });
-  const paraLaMemoria = { memoria };
+  // Las skills: procedimientos que el usuario les deja a sus agentes. Como la
+  // memoria, en un documento que la interfaz no lee. Cuando un agente propone
+  // una, la interfaz se entera para avisarle al usuario que hay algo que revisar.
+  const DOC_SKILLS = '_skills';
+  const skills = require('./skills.cjs').crear({
+    leer: () => rad.store.read(DOC_SKILLS),
+    escribir: (doc) => { rad.store.write(DOC_SKILLS, doc).catch(() => {}); },
+    alCambiar: (aviso) => rad.send('skills:evento', { propuesta: aviso?.propuesta ?? null }),
+  });
+  const paraLaMemoria = { memoria, skills };
   // El canvas: los títulos de los chats (para su biblioteca) salen del
   // documento que guarda la interfaz, y cuando el agente borra uno se avisa
   // fuera del turno (el panel puede estar mirando otro chat).
@@ -267,6 +276,18 @@ function wire(rad, { llave }) {
   rad.handle('memoria:agregar', (que) => memoria.agregar({ hecho: que?.hecho, detalle: que?.detalle, de: 'user' }));
   rad.handle('memoria:editar', (que) => memoria.editar(String(que?.id ?? ''), { hecho: que?.hecho, detalle: que?.detalle }));
   rad.handle('memoria:borrar', (id) => memoria.borrar(String(id ?? '')));
+
+  // ---------- Las skills ----------
+  // Los canales de su vista. Aprobar y descartar una propuesta son del
+  // usuario: no hay tool que llegue a esos dos.
+  rad.handle('skills:leer', () => skills.estado());
+  rad.handle('skills:guardar', (que) => skills.guardar({ nombre: que?.nombre, descripcion: que?.descripcion, cuerpo: que?.cuerpo, original: que?.original ?? null }));
+  rad.handle('skills:activar', (que) => skills.activar(String(que?.nombre ?? ''), que?.activa === true));
+  rad.handle('skills:borrar', (nombre) => skills.borrar(String(nombre ?? '')));
+  rad.handle('skills:revisar', (nombre) => skills.revisar(String(nombre ?? '')));
+  rad.handle('skills:aprobar', (nombre) => skills.aprobar(String(nombre ?? '')));
+  rad.handle('skills:descartar', (nombre) => skills.descartar(String(nombre ?? '')));
+  rad.handle('skills:de-md', (que) => require('./skills.cjs').deMd(que?.texto, que?.archivo));
 
   // ---------- El navegador ----------
   // Los canales de su panel. Los cuerpos son los de NeonCode (navegador.cjs).
@@ -448,6 +469,9 @@ function wire(rad, { llave }) {
       if (sesion) sesion.run.memoria = bloque;
       else if (bloque) pedido.instrucciones = [pedido.instrucciones, bloque].filter(Boolean).join('\n\n');
     }
+    // Las skills: su índice va en el system del agente que puede cargarlas (la
+    // tool `skill`). Sin tools no hay cómo leer el cuerpo de una, así que no va.
+    if (sesion?.nombres.includes('skill')) sesion.run.skills = skills.bloque();
     const corrio = () => (sesion ? { tools: sesion.resumen(), agotado: sesion.run.stopped === 'maxrounds' } : {});
 
     const opciones = {

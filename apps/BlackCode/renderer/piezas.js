@@ -36,6 +36,8 @@ export const ICONOS = {
   carpeta: svg('<path d="M2.5 5A1.5 1.5 0 0 1 4 3.5h2.4L8 5h4a1.5 1.5 0 0 1 1.5 1.5v5A1.5 1.5 0 0 1 12 13H4a1.5 1.5 0 0 1-1.5-1.5z"/>'),
   carpetaMas: svg('<path d="M2.5 5A1.5 1.5 0 0 1 4 3.5h2.4L8 5h4a1.5 1.5 0 0 1 1.5 1.5v5A1.5 1.5 0 0 1 12 13H4a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M8 7.5v3.5M6.25 9.25h3.5"/>'),
   pin: svg('<path d="M6 2.5h4l-.6 4 2.1 2.1V10h-7V8.6l2.1-2.1zM8 10v3.5"/>'),
+  // las skills: una chispa
+  skills: svg('<path d="M8 2.5c0 3 2.5 5.5 5.5 5.5-3 0-5.5 2.5-5.5 5.5 0-3-2.5-5.5-5.5-5.5 3 0 5.5-2.5 5.5-5.5z"/>'),
   // la memoria: un chip
   memoria: svg('<rect x="4.5" y="4.5" width="7" height="7" rx="1.25"/><path d="M6.5 2.5v2M9.5 2.5v2M6.5 11.5v2M9.5 11.5v2M2.5 6.5h2M2.5 9.5h2M11.5 6.5h2M11.5 9.5h2"/>'),
   // el navegador

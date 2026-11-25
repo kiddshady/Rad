@@ -9,6 +9,8 @@ import { montarChat } from './chat.js';
 import { montarAgentes } from './agentes.js';
 import { montarNotas } from './notas.js';
 import { montarMemoria } from './memoria.js';
+import { montarSkills, revisarSkill } from './skills.js';
+import { toast } from '/@core/toast.js';
 import { montarAjustes } from './ajustes.js';
 import { ICONOS } from './piezas.js';
 
@@ -20,6 +22,7 @@ const views = [
   { id: 'chat', label: 'Chat', icon: ICONOS.chat, scroll: false, mount: (el, router) => montarChat(el, { router }) },
   { id: 'notas', label: 'Notes', icon: ICONOS.nota, scroll: false, mount: (el, router) => montarNotas(el, { router }) },
   { id: 'memoria', label: 'Memory', icon: ICONOS.memoria, mount: (el) => montarMemoria(el) },
+  { id: 'skills', label: 'Skills', icon: ICONOS.skills, mount: (el) => montarSkills(el) },
   { id: 'agentes', label: 'Agents', icon: ICONOS.agentes, mount: (el, router) => montarAgentes(el, { router }) },
   { id: 'ajustes', label: 'Settings', icon: ICONOS.ajustes, mount: (el, router) => montarAjustes(el, { router }) },
 ];
@@ -51,6 +54,17 @@ datos.on('agentes', ponerEstado);
 datos.on('modelos', ponerEstado);
 datos.on('seleccion', ponerEstado);
 datos.on('respuesta', ponerEstado);
+
+// Un agente propuso una skill: no se puede usar hasta que el usuario la
+// apruebe, así que se le avisa, esté en la vista que esté.
+window.rad.on('skills:evento', (ev) => {
+  if (!ev?.propuesta) return;
+  toast({
+    text: `An agent proposed a skill: “${ev.propuesta}”. No agent can use it until you approve it.`,
+    duration: 12000,
+    action: { label: 'Review', onClick: () => { shell.router.go('skills'); revisarSkill(ev.propuesta); } },
+  });
+});
 
 // El aviso de versión nueva (no baja nada solo, y no dice «estás al día»).
 wireUpdates({ name: 'BlackCode' });

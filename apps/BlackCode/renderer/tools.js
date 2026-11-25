@@ -91,7 +91,7 @@ const bytes = (n) => (n < 1024 ? `${n} bytes` : n < 1048576 ? `${Math.round(n / 
 
 // Lo que va a pasar con un archivo, para la tarjeta: el diff de un cambio, o
 // una frase cuando no hay diff que mostrar.
-function vistaDe(vista) {
+export function vistaDe(vista) {
   if (!vista) return null;
   const caja = h('div', 'dm-permiso-vista');
   if (vista.target) caja.append(h('p', 'dm-permiso-ruta rad-mono', {}, vista.target));

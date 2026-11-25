@@ -96,7 +96,7 @@ function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confir
     /** El system de un turno con tools: las instrucciones del agente, el
      *  entorno, y el protocolo de tools. La línea de puente va acá y no en las
      *  instrucciones, que son del usuario y se pueden reescribir enteras. */
-    sistema(instrucciones, { trabajos = '', canvas = '', navegador = '', memoria = '' } = {}) {
+    sistema(instrucciones, { trabajos = '', canvas = '', navegador = '', memoria = '', skills = '' } = {}) {
       return [
         ...(instrucciones ? [instrucciones, ''] : []),
         entorno(run),
@@ -110,6 +110,8 @@ function crear({ reqId, convoId, ac, tools = [], confirma = true, notify, confir
         // lo que la app recuerda del usuario (el bloque trae sus títulos). Va
         // antes del protocolo de tools, que tiene que quedar último
         ...(memoria ? ['', memoria] : []),
+        // las skills del usuario: el índice (el cuerpo de cada una se carga con `skill`)
+        ...(skills ? ['', skills] : []),
         // un subagente: qué es y qué se espera de su informe
         ...(run.subagent ? ['', guardas.SUBAGENT_NOTE] : []),
         '',

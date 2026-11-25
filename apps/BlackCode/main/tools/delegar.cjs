@@ -131,6 +131,8 @@ async function correrSubagente(padre, { brief, i, n, padreCall, destino, access 
     sesion.run.ve = destino.ve === true;
     // lo que la app recuerda del usuario: el hijo es una copia del agente
     sesion.run.memoria = padre.memoria ?? '';
+    // …y las skills del usuario (un hijo puede cargarlas, no proponerlas)
+    sesion.run.skills = sesion.nombres.includes('skill') ? (padre.skills ?? '') : '';
     // el texto del hijo no sale a ningún lado: se junta por rondas, y la última
     // es el informe
     const cerrar = sesion.cerrarRonda;

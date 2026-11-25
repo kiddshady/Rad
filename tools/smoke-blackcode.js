@@ -155,7 +155,7 @@ if (window.rad.lang !== 'en' || document.documentElement.lang !== 'en') fail(`Bl
 const ventana = [...document.querySelectorAll('.rad-winbtn')].map((b) => b.getAttribute('aria-label')).join(', ');
 if (ventana !== 'Minimize, Maximize, Close') fail(`los botones de la ventana dicen: ${ventana}`);
 const riel = [...document.querySelectorAll('.rad-tab')].map((b) => b.textContent.trim() || b.getAttribute('aria-label') || b.getAttribute('data-rad-tip')).join(', ');
-if (riel !== 'Chat, Notes, Memory, Agents, Settings') fail(`las vistas se llaman: ${riel}`);
+if (riel !== 'Chat, Notes, Memory, Skills, Agents, Settings') fail(`las vistas se llaman: ${riel}`);
 enIngles('al arrancar');
 // Las vistas van como pestañas en la titlebar, sin rail y sin el nombre de
 // la app: lo primero de la barra son las pestañas, alineadas con la hoja, y
@@ -163,7 +163,7 @@ enIngles('al arrancar');
 {
   const tabs = [...document.querySelectorAll('.rad-titlebar > .rad-tabs > .rad-tab')];
   const stage = document.querySelector('.rad-stage').getBoundingClientRect();
-  if (document.querySelector('.rad-rail') || tabs.length !== 5) fail(`las vistas no están en la titlebar (${tabs.length} pestañas, rail: ${Boolean(document.querySelector('.rad-rail'))})`);
+  if (document.querySelector('.rad-rail') || tabs.length !== 6) fail(`las vistas no están en la titlebar (${tabs.length} pestañas, rail: ${Boolean(document.querySelector('.rad-rail'))})`);
   if (document.querySelector('.rad-titlebar-title') || /BlackCode/.test(document.querySelector('.rad-titlebar').textContent)) fail('la titlebar sigue mostrando el nombre de la app');
   if (tabs.length && Math.abs(tabs[0].getBoundingClientRect().left - stage.left) > 1) fail(`la primera pestaña empieza en ${r2(tabs[0].getBoundingClientRect().left)} y la hoja en ${r2(stage.left)}`);
   if (stage.width < window.innerWidth - 24) fail(`sin rail, la hoja mide ${r2(stage.width)} en una ventana de ${window.innerWidth}`);
@@ -739,7 +739,7 @@ else {
   const form = modal();
   type(form.querySelector('[data-campo="nombre"]'), 'Toolsmith');
   const interruptores = [...form.querySelectorAll('[data-campo="tools"] input[role="switch"]')];
-  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas,notes,subagents,memory' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
+  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas,notes,subagents,memory,skills' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
   // un agente nuevo nace con todas prendidas: se le apaga la web
   for (const i of interruptores) if (i.dataset.grupo === 'web') i.click();
   enIngles('en el formulario con tools');
@@ -747,13 +747,13 @@ else {
   await closed();
   await settle();
   const herrero = cards().at(-1);
-  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Browser, Desktop, Screen, Canvas, Notes, Subagents, Memory') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
-  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Browser, Desktop, Screen, Canvas, Notes, Subagents, Memory') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(herrero.querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Browser, Desktop, Screen, Canvas, Notes, Subagents, Memory, Skills') fail(`la tarjeta del agente dice «${shown(herrero.querySelector('.dm-tarjeta-tools'))}»`);
+  if (shown(cards()[0].querySelector('.dm-tarjeta-tools')) !== 'Tools: Files, Commands, Code, Databases, Web, Browser, Desktop, Screen, Canvas, Notes, Subagents, Memory, Skills') fail(`el agente de fábrica no nació con todas las tools: «${shown(cards()[0].querySelector('.dm-tarjeta-tools'))}»`);
   herrero.querySelector('[data-accion="abrir"]').click();
   await sleep(dur('base') + 260);
   await until(() => statusRight().includes('Toolsmith'), 3000);
-  // todas (30) menos las tres de la web
-  if (!statusRight().endsWith('· 27 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
+  // todas (32) menos las tres de la web
+  if (!statusRight().endsWith('· 29 tools')) fail(`la barra de estado no dice cuántas tools tiene el agente: «${statusRight()}»`);
 
   // Escribir un archivo. En modo manual (el de fábrica) primero pide permiso:
   // la tarjeta dice qué va a correr y qué va a cambiar, y hasta que no se
@@ -921,17 +921,17 @@ else {
     const abrir = async () => { boton.click(); await until(() => menus().length > 0, 2000); await sleep(dur('base') + 60); };
     await abrir();
     const filasMenu = [...menus()[0].querySelectorAll('.rad-menu-item')].map((i) => i.textContent.trim());
-    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Notes,Subagents,Memory,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
+    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Notes,Subagents,Memory,Skills,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
     await pick('Turn all off');
     if (dice() !== 'Tools: off' || boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· no tools')) fail(`apagar todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     await pick('Turn all on');
-    if (dice() !== '30 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 30 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
+    if (dice() !== '32 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 32 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     const marcadas = [...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].length;
-    if (marcadas !== 12) fail(`con todas prendidas el menú marca ${marcadas} grupos de 12`);
+    if (marcadas !== 13) fail(`con todas prendidas el menú marca ${marcadas} grupos de 13`);
     await pick('Web');
-    if (dice() !== '27 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
+    if (dice() !== '29 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
     // y las recibe el modelo: el pedido siguiente corre una de esas tools
     // (en modo manual, que es como quedó: pide permiso y se le da)
     await pedir([[{ name: 'fs_read', args: { paths: ['note.txt'] } }]]);
@@ -939,7 +939,7 @@ else {
     primary()?.click();
     await until(() => !composer.querySelector('.rad-busy') && ultimo()?.dataset.estado === 'ok' && cuenta() === '1 tool · 1 done', 20000);
     if (cuenta() !== '1 tool · 1 done') fail(`después de prender las tools desde la conversación, el contador dice «${cuenta()}»`);
-    data.toolsEnElChat = `${antes} → Tools: off → 30 tools → 27 tools`;
+    data.toolsEnElChat = `${antes} → Tools: off → 32 tools → 29 tools`;
   }
 
   // 11c. El canvas: el agente deja un documento en el panel de al lado, lo
@@ -2104,6 +2104,172 @@ else {
     data.memoria = 'texto fijo guardado solo, agregar a mano con detalle, remember (y repetido), recall por id y por palabras, core, la memoria en el system del turno siguiente, la carrera del texto fijo, buscar, cambiar, borrar, grupo apagado y modelo sin tools';
   }
 
+  // 11m. Las skills: procedimientos que el usuario les deja a sus agentes. El
+  // usuario las escribe e importa en su vista; el agente ve el índice en el
+  // system y carga la que le sirve con `skill`; y lo que el agente escribe con
+  // `create_skill` es una PROPUESTA que no se puede usar hasta que el usuario la
+  // aprueba. El proveedor de mentira dice cuántas skills le llegaron en el índice.
+  {
+    const datosM = await import('/datos.js');
+    datosM.ponerModoTools('auto');
+    const sk = async () => (await window.rad.invoke('skills:leer')).skills;
+    const filasS = () => alive(view('skills').querySelectorAll('.dm-skill-fila'));
+    const filaS = (nombre) => filasS().find((f) => f.querySelector('.dm-skill-nombre').textContent === nombre);
+    const nombresS = () => filasS().map((f) => f.querySelector('.dm-skill-nombre').textContent).join();
+    const pieS = (nombre) => filaS(nombre)?.querySelector('.dm-memoria-de').textContent ?? '';
+    const boton2 = (texto) => [...(modal()?.querySelectorAll('.rad-button') ?? [])].find((b) => b.textContent === texto);
+    const listo3 = async () => { await sleep(200); for (let i = 0; i < 400 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50); await settle(); };
+    const eco = () => ultimo()?.textContent ?? '';
+    const sale = (name, n) => fila(name, n)?.querySelector('.dm-tool-pre').textContent ?? '';
+    const avisosS = () => [...document.querySelectorAll('.rad-toast')].filter((n) => !n.hasAttribute('data-rad-leaving'));
+    const pregunta = async (texto) => { type(area, texto); key(area, 'Enter'); await listo3(); };
+    if ((await sk()).length) fail('skills: no arranca vacía');
+    let leyo = false;
+    try { await window.rad.store.read('_skills'); leyo = true; } catch { /* es lo esperado */ }
+    if (leyo) fail('skills: la interfaz pudo leer el documento reservado de las skills');
+
+    // La vista, vacía; y el formulario no deja guardar cualquier cosa.
+    await go('skills');
+    const vista = view('skills');
+    if (!vista.querySelector('.dm-memoria-vacia')?.textContent.includes('No skills yet') || filasS().length) fail('skills: la vista vacía no lo dice');
+    enIngles('en la vista Skills');
+    vista.querySelector('[data-accion="skill-nueva"]').click();
+    await until(() => modal(), 2000);
+    const campoS = (c) => modal().querySelector('[data-campo="' + c + '"]');
+    type(campoS('nombre'), 'Bad Name');
+    type(campoS('descripcion'), 'Use it when I ask for a summary');
+    type(campoS('cuerpo'), '# Brief\n\nThree bullets, no more.');
+    boton2('Save').click();
+    await until(() => modal()?.querySelector('.rad-field[data-invalid]'), 2000);
+    if (!modal()?.querySelector('.rad-field[data-invalid] [data-campo="nombre"]') || (await sk()).length) fail('skills: un nombre inválido no marca su campo, o se guardó igual');
+    type(campoS('nombre'), 'brief');
+    boton2('Save').click();
+    await closed();
+    await until(() => filasS().length === 1, 3000);
+    if (nombresS() !== 'brief' || pieS('brief') !== 'written by you' || !filaS('brief').querySelector('[data-accion="skill-activa"]').checked || filaS('brief').hasAttribute('data-pendiente')) fail('skills: la skill escrita a mano no quedó en uso: ' + nombresS() + ' / ' + pieS('brief'));
+
+    // El agente la ve en su índice y la carga.
+    await go('chat');
+    chatView.querySelector('[data-accion="nuevo-chat"]').click();
+    await settle();
+    await pregunta('Which skills do you have?');
+    if (!eco().includes('skills in the list: 1')) fail('skills: al modelo no le llegó el índice: ' + (/skills in the list[^\n]*/.exec(eco())?.[0] ?? '(sin renglón de skills)'));
+    await pedir([[{ name: 'skill', args: { name: 'brief' } }, { name: 'skill', args: {} }, { name: 'skill', args: { name: 'nope' } }]]);
+    await listo3();
+    if (sale('skill', 0) !== 'Skill "brief" — a procedure the user wrote or approved. Follow it for this task:\n\n# Brief\n\nThree bullets, no more.') fail('skills: cargar una skill devolvió: ' + sale('skill', 0).slice(0, 140));
+    if (sale('skill', 1) !== 'Skills (1):\n- brief: Use it when I ask for a summary') fail('skills: listar devolvió: ' + sale('skill', 1));
+    if (sale('skill', 2) !== 'error: there is no skill named "nope". The skills are: brief.' || fila('skill', 2).dataset.estado !== 'error') fail('skills: pedir una que no existe devolvió: ' + sale('skill', 2));
+    if (fila('skill', 0)?.querySelector('.dm-tool-icono')?.dataset.icono !== 'sparkle' || shown(fila('skill', 0)?.querySelector('.dm-tool-que')) !== 'brief') fail('skills: la fila de skill no lleva su ícono o no dice cuál cargó');
+
+    // El agente propone una: NO queda en uso, y el usuario se entera.
+    await pedir([[{ name: 'create_skill', args: { name: 'weekly-report', description: 'Use it for the weekly report', body: '1. Read the notes.\n2. Three bullets.' } }, { name: 'skill', args: { name: 'weekly-report' } }]]);
+    await listo3();
+    if (!sale('create_skill', -1).startsWith('Proposed the skill "weekly-report". It is NOT in use yet')) fail('skills: create_skill devolvió: ' + sale('create_skill', -1).slice(0, 120));
+    if (!sale('skill', -1).startsWith('error: the skill "weekly-report" is a proposal waiting for the user')) fail('skills: una propuesta se pudo cargar antes de aprobarla: ' + sale('skill', -1).slice(0, 120));
+    const avisoS = avisosS().find((n) => n.textContent.includes('An agent proposed a skill: “weekly-report”'));
+    if (!avisoS?.querySelector('.rad-toast-action')) fail('skills: no se avisó de la propuesta, o el aviso no ofrece revisarla');
+    // El aviso lleva a la vista y abre la revisión.
+    avisoS?.querySelector('.rad-toast-action')?.click();
+    await until(() => modal()?.dataset.skill === 'weekly-report', 4000);
+    if (document.querySelector('.rad-tab[aria-current="page"]')?.dataset.view !== 'skills' || modal()?.dataset.skill !== 'weekly-report') fail('skills: el aviso no llevó a revisar la propuesta');
+    if (!modal()?.textContent.includes('No agent can use it until you approve it') || modal()?.querySelector('.dm-skill-propuesta')?.textContent !== '1. Read the notes.\n2. Three bullets.' || modal()?.querySelector('.dm-diff')) fail('skills: la revisión de una skill nueva no muestra lo propuesto (o muestra un diff sin tener con qué comparar)');
+    boton2('Not now')?.click();
+    await closed();
+    await settle();
+    if (!filaS('weekly-report')?.hasAttribute('data-pendiente') || filasS()[0] !== filaS('weekly-report') || !pieS('weekly-report').startsWith('proposed by an agent') || filaS('weekly-report').querySelector('.rad-switch').hidden !== true) fail('skills: «Not now» no dejó la propuesta esperando, arriba de todo: ' + nombresS() + ' / ' + pieS('weekly-report'));
+    // Mientras espera, no está en el índice del agente.
+    await go('chat');
+    await pregunta('And now?');
+    if (!eco().includes('skills in the list: 1')) fail('skills: una propuesta sin aprobar entró al índice: ' + /skills in the list[^\n]*/.exec(eco())?.[0]);
+    await go('skills');
+    // Aprobarla la pone en uso.
+    filaS('weekly-report').querySelector('[data-accion="skill-revisar"]').click();
+    await until(() => modal()?.dataset.skill === 'weekly-report', 3000);
+    boton2('Approve').click();
+    await closed();
+    await until(() => filaS('weekly-report') && !filaS('weekly-report').hasAttribute('data-pendiente'), 3000);
+    if (pieS('weekly-report') !== 'written by an agent' || (await sk()).find((x) => x.nombre === 'weekly-report')?.cuerpo !== '1. Read the notes.\n2. Three bullets.') fail('skills: aprobar no dejó la skill en uso: ' + pieS('weekly-report'));
+    await go('chat');
+    await pregunta('And after approving?');
+    if (!eco().includes('skills in the list: 2')) fail('skills: la skill aprobada no entró al índice: ' + /skills in the list[^\n]*/.exec(eco())?.[0]);
+
+    // El agente propone un CAMBIO a una del usuario: la vigente sigue en uso, se
+    // ve qué cambia, y descartarlo la deja como estaba.
+    await pedir([[{ name: 'create_skill', args: { name: 'brief', description: 'Use it when I ask for a summary', body: '# Brief\n\nFive bullets, no more.' } }, { name: 'skill', args: { name: 'brief' } }]]);
+    await listo3();
+    if (!sale('create_skill', -1).startsWith('Proposed a change to the skill "brief". The current version stays in use') || !sale('skill', -1).endsWith('Three bullets, no more.')) fail('skills: proponer un cambio pisó la versión vigente: ' + sale('create_skill', -1).slice(0, 90) + ' / ' + sale('skill', -1).slice(-40));
+    await go('skills');
+    await until(() => filaS('brief')?.hasAttribute('data-pendiente'), 3000);
+    if (!pieS('brief').includes('an agent proposed a change') || filaS('brief').querySelector('.rad-switch').hidden) fail('skills: una skill con un cambio propuesto no lo dice, o perdió su interruptor: ' + pieS('brief'));
+    filaS('brief').querySelector('[data-accion="skill-revisar"]').click();
+    await until(() => modal()?.dataset.skill === 'brief', 3000);
+    const renglonesD = [...(modal()?.querySelectorAll('.dm-diff-renglon') ?? [])];
+    if (!renglonesD.some((r) => r.dataset.t === 'menos' && r.textContent.includes('Three bullets')) || !renglonesD.some((r) => r.dataset.t === 'mas' && r.textContent.includes('Five bullets'))) fail('skills: la revisión de un cambio no muestra qué cambia');
+    if (!modal()?.textContent.includes('The current version stays in use until you approve it')) fail('skills: la revisión de un cambio no dice que la vigente sigue en uso');
+    boton2('Discard').click();
+    await closed();
+    await until(() => filaS('brief') && !filaS('brief').hasAttribute('data-pendiente'), 3000);
+    { const b = (await sk()).find((x) => x.nombre === 'brief'); if (b.cuerpo !== '# Brief\n\nThree bullets, no more.' || b.propuesta) fail('skills: descartar un cambio no dejó la skill como estaba'); }
+
+    // Apagada: sale del índice y no se carga.
+    filaS('brief').querySelector('[data-accion="skill-activa"]').click();
+    await until(() => filaS('brief')?.hasAttribute('data-apagada'), 3000);
+    if (!pieS('brief').includes('turned off')) fail('skills: apagar una skill no se ve en la lista: ' + pieS('brief'));
+    await go('chat');
+    await pedir([[{ name: 'skill', args: { name: 'brief' } }]]);
+    await listo3();
+    if (!sale('skill', -1).startsWith('error: the skill "brief" is turned off')) fail('skills: una skill apagada se pudo cargar: ' + sale('skill', -1).slice(0, 100));
+    await pregunta('How many now?');
+    if (!eco().includes('skills in the list: 1')) fail('skills: una skill apagada sigue en el índice: ' + /skills in the list[^\n]*/.exec(eco())?.[0]);
+
+    // Con el grupo Skills apagado, el agente no ve el índice.
+    const agenteS = datosM.agenteActual();
+    const susToolsS = datosM.toolsDe(agenteS);
+    datosM.ponerTools(agenteS.id, susToolsS.filter((t) => t !== 'skill' && t !== 'create_skill'));
+    await settle();
+    await pregunta('And without the group?');
+    if (eco().includes('skills in the list')) fail('skills: con el grupo Skills apagado igual le llegó el índice');
+    datosM.ponerTools(agenteS.id, susToolsS);
+    await settle();
+
+    // Importar un .md (el formato de las skills de Claude Code): abre el
+    // formulario lleno, sin guardar nada hasta que el usuario lo mire.
+    await go('skills');
+    await vista._importarTexto('---\nname: Lab Report\ndescription: Use it for lab reports\n---\n\n# Lab\n\nSteps.', 'SKILL.md');
+    await until(() => modal(), 2000);
+    if (campoS('nombre').value !== 'lab-report' || campoS('descripcion').value !== 'Use it for lab reports' || campoS('cuerpo').value !== '# Lab\n\nSteps.' || (await sk()).some((x) => x.nombre === 'lab-report')) fail('skills: importar un .md no llenó el formulario (o guardó sin preguntar): ' + campoS('nombre').value + ' / ' + campoS('descripcion').value);
+    boton2('Save').click();
+    await closed();
+    await until(() => filaS('lab-report'), 3000);
+    if (nombresS() !== 'brief,lab-report,weekly-report') fail('skills: después de importar la lista es ' + nombresS());
+    // Cambiar y borrar.
+    filaS('lab-report').querySelector('[data-accion="skill-editar"]').click();
+    await until(() => modal(), 2000);
+    if (campoS('cuerpo').value !== '# Lab\n\nSteps.') fail('skills: el formulario no trae la skill que se va a cambiar');
+    type(campoS('descripcion'), 'Use it for every lab report');
+    boton2('Save').click();
+    await closed();
+    await until(() => filaS('lab-report')?.querySelector('.dm-skill-descripcion').textContent === 'Use it for every lab report', 3000);
+    if (filaS('lab-report')?.querySelector('.dm-skill-descripcion').textContent !== 'Use it for every lab report') fail('skills: cambiar una skill no se ve en la lista');
+    filaS('lab-report').querySelector('[data-accion="skill-borrar"]').click();
+    await until(() => modal(), 2000);
+    if (!modal().textContent.includes('lab-report')) fail('skills: borrar no dice qué va a borrar');
+    primary().click();
+    await closed();
+    await until(() => !filaS('lab-report'), 3000);
+    const pieLista = shown(vista.querySelector('[data-tarjeta="skills"] .dm-memoria-cuenta'));
+    if (!/^1 of 2 in use · the list takes \d+ of 4000 characters of context$/.test(pieLista)) fail('skills: el pie de la lista dice «' + pieLista + '»');
+
+    // Queda como estaba: sin skills.
+    for (const s of await sk()) await window.rad.invoke('skills:borrar', s.nombre);
+    await until(() => filasS().length === 0, 3000);
+    if (filasS().length || !vista.querySelector('.dm-memoria-vacia')) fail('skills: borrarlas todas no dejó la vista vacía');
+    for (const a of avisosS()) a.querySelector('.rad-toast-close, [aria-label="Close"], [aria-label="Dismiss"]')?.click();
+    await go('chat');
+    datosM.ponerModoTools('manual');
+    data.skills = 'escribir a mano, el índice en el system, cargar y listar, proponer (no queda en uso), el aviso que lleva a revisar, aprobar, un cambio con su diff, descartar, apagar, grupo apagado, importar un .md, cambiar y borrar';
+  }
+
   // Cambiarle las tools a un agente que YA existía, desde su formulario.
   {
     await go('agentes');
@@ -2114,7 +2280,7 @@ else {
     const guardar = async () => { primary().click(); await closed(); await settle(); };
     await editar();
     if (!sw('files')?.checked || !sw('screen')?.checked) fail('el formulario de un agente con todas las tools no las muestra prendidas');
-    for (const g of ['commands', 'code', 'data', 'web', 'browser', 'desktop', 'canvas', 'notes', 'subagents', 'memory']) sw(g).click();
+    for (const g of ['commands', 'code', 'data', 'web', 'browser', 'desktop', 'canvas', 'notes', 'subagents', 'memory', 'skills']) sw(g).click();
     await guardar();
     if (tarjeta() !== 'Tools: Files, Screen') fail(`apagarle grupos a un agente desde su formulario dejó la tarjeta en «${tarjeta()}»`);
     await editar();
