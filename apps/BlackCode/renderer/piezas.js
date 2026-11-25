@@ -38,8 +38,9 @@ export const ICONOS = {
   pin: svg('<path d="M6 2.5h4l-.6 4 2.1 2.1V10h-7V8.6l2.1-2.1zM8 10v3.5"/>'),
   // las skills: una chispa
   skills: svg('<path d="M8 2.5c0 3 2.5 5.5 5.5 5.5-3 0-5.5 2.5-5.5 5.5 0-3-2.5-5.5-5.5-5.5 3 0 5.5-2.5 5.5-5.5z"/>'),
-  // la memoria: un chip
-  memoria: svg('<rect x="4.5" y="4.5" width="7" height="7" rx="1.25"/><path d="M6.5 2.5v2M9.5 2.5v2M6.5 11.5v2M9.5 11.5v2M2.5 6.5h2M2.5 9.5h2M11.5 6.5h2M11.5 9.5h2"/>'),
+  // la memoria: el chip de NeonCode (su `chip`, llevado de la grilla de 24 a
+  // la de 16): el cuerpo, un cuadrado adentro con el centro hueco, y las patas
+  memoria: svg('<path d="M4.75 4.75h6.5v6.5h-6.5zM6.75 6.75h2.5v2.5h-2.5zM6.25 1.75v1.75M9.75 1.75v1.75M6.25 12.5v1.75M9.75 12.5v1.75M1.75 6.25h1.75M1.75 9.75h1.75M12.5 6.25h1.75M12.5 9.75h1.75"/>'),
   // el navegador
   globo: svg('<circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c1.7 1.5 2.5 3.3 2.5 5.5S9.7 12 8 13.5C6.3 12 5.5 10.2 5.5 8S6.3 4 8 2.5z"/>'),
   atras: svg('<path d="M9.5 3.5 5 8l4.5 4.5"/>'),
@@ -47,12 +48,14 @@ export const ICONOS = {
   recargar: svg('<path d="M13 8a5 5 0 1 1-1.5-3.6M13 3v3h-3"/>'),
   estrella: svg('<path d="M8 2.5l1.7 3.5 3.8.5-2.8 2.7.7 3.8L8 11.2 4.6 13l.7-3.8L2.5 6.5l3.8-.5z"/>'),
   marcadores: svg('<path d="M4.5 2.5h7v11L8 11l-3.5 2.5z"/>'),
+  // el historial: un reloj
+  reloj: svg('<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.25l2 1.25"/>'),
   externo: svg('<path d="M9 3h4v4M13 3 7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/>'),
   candado: svg('<rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>'),
   // la terminal: una ventana con su prompt
   terminal: svg('<rect x="2" y="3" width="12" height="10" rx="1.75"/><path d="M5 6.5 7 8 5 9.5M8.5 10H11"/>'),
-  // el canvas: una hoja con su cabecera y una columna
-  canvas: svg('<rect x="2.5" y="2.5" width="11" height="11" rx="1.75"/><path d="M2.5 6.25h11M6.5 6.25v7.25"/>'),
+  // el canvas: los cuatro cuadrados de NeonCode (su `grid`, en la grilla de 16)
+  canvas: svg('<rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/><rect x="9" y="9" width="4.5" height="4.5" rx="1"/>'),
   codigo: svg('<path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/>'),
   biblioteca: svg('<path d="M3 2.75v10.5M6 4.75v8.5M9 3.5v9.75l4-1-1.75-9z"/>'),
   // una tool: una llave fija

@@ -331,6 +331,7 @@ function wire(rad, { llave }) {
       back: 'back', forward: 'forward', reload: 'reload', stop: 'stop',
       capture: 'capture', freeze: 'freeze', external: 'external',
       'fav-list': 'favList', 'fav-toggle': 'favToggle', 'fav-remove': 'favRemove', 'fav-open': 'favOpen',
+      'hist-list': 'histList', 'hist-remove': 'histRemove', 'hist-clear': 'histClear', 'hist-open': 'histOpen',
     };
     for (const [canal, fn] of Object.entries(canales)) rad.handle(`browser:${canal}`, async (arg) => (await nav[fn](arg)) ?? null);
   }

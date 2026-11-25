@@ -73,7 +73,14 @@ if (EXE && !fs.existsSync(EXE)) {
   process.exit(1);
 }
 const TAG = EXE ? 'empaquetada-' : '';
-const command = EXE ? [EXE, []] : [electron, [path.join(ROOT, 'apps', 'BlackCode')]];
+// Las scrollbars flotantes de las páginas se piden en la línea de comandos (ver
+// apps/BlackCode/main.cjs). La app empaquetada que arranca SIN el flag se
+// relanza sola con él: la segunda pasada del .exe corre así, para probarlo.
+// El proceso que lanza el humo termina enseguida y el informe lo deja el
+// relanzado, que hereda el entorno.
+const FLOTANTES = '--enable-features=OverlayScrollbar';
+const command = EXE ? [EXE, [FLOTANTES]] : [electron, [FLOTANTES, path.join(ROOT, 'apps', 'BlackCode')]];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 fs.mkdirSync(SMOKE, { recursive: true });
 
@@ -93,11 +100,15 @@ function run(pass, data) {
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.RAD_SKIN;
   return new Promise((resolve) => {
-    const child = spawn(command[0], command[1], { env, stdio: 'inherit' });
+    const relanza = Boolean(EXE) && pass === 2;
+    const child = spawn(command[0], relanza ? [] : command[1], { env, stdio: 'inherit' });
     const killer = setTimeout(() => { console.error(`smoke: blackcode, pasada ${pass}: tiempo agotado, mato el proceso`); child.kill(); }, TIMEOUT_MS);
-    child.on('exit', (code) => {
+    child.on('exit', async (code) => {
       clearTimeout(killer);
-      if (!fs.existsSync(out)) return resolve({ ok: false, failures: [`la app salió (código ${code}) sin dejar informe`] });
+      // El relanzado no es hijo de este proceso: se espera su informe.
+      if (relanza) for (const t0 = Date.now(); !fs.existsSync(out) && Date.now() - t0 < TIMEOUT_MS;) await sleep(500);
+      if (!fs.existsSync(out)) return resolve({ ok: false, failures: [`la app salió (código ${code}) sin dejar informe${relanza ? ' (arrancó sin el flag de las scrollbars flotantes: tenía que relanzarse sola con él)' : ''}`] });
+      if (relanza) await sleep(400); // que termine de escribirlo
       const report = JSON.parse(fs.readFileSync(out, 'utf8'));
       report.ok = report.ok && code === 0;
       report.shot = path.relative(ROOT, shot);

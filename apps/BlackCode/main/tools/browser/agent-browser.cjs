@@ -1732,9 +1732,13 @@ class AgentBrowser {
   // propósito: aquel cuenta dónde está la página, éste avisa que el usuario
   // apretó una tecla que es de la app. Meterlos juntos obligaría a la barra a
   // repintarse por un Ctrl+T.
-  constructor({ onState, onAtajo } = {}) {
+  constructor({ onState, onAtajo, onVisita } = {}) {
     this.onState = onState || (() => {});
     this.onAtajo = onAtajo || (() => {});
+    // `onVisita` es para el historial (BlackCode 0.18.0; NeonCode no tenía):
+    // `{ url, title }` por cada página que carga, y `{ url, title, soloTitulo }`
+    // cuando llega su título, que casi siempre es después.
+    this.onVisita = onVisita || (() => {});
     this.win = null;
     this.bounds = null;
     // Las pestañas, en el orden de la tira, y cuál está a la vista. Cada una es
@@ -2222,6 +2226,17 @@ class AgentBrowser {
     wc.on('did-navigate', () => (this._sinLeer ||= new WeakSet()).add(wc));
     wc.on('did-navigate-in-page', emitir);
     wc.on('page-title-updated', emitir);
+    // El historial. Una visita es un documento nuevo en el marco principal
+    // (did-navigate solo avisa de ese) o un cambio de dirección sin recargar,
+    // que es como navega una SPA. Al cargar todavía no hay título: llega
+    // después, por su propio evento. Qué entra y qué no lo decide quien
+    // escucha (historial.cjs); acá solo se avisa, y sin tumbar nada.
+    const visita = (v) => { try { this.onVisita(v); } catch (err) { console.error('[browser] historial:', err); } };
+    wc.on('did-navigate', (_e, url) => visita({ url, title: '' }));
+    wc.on('did-navigate-in-page', (_e, url, principal) => { if (principal) visita({ url, title: wc.getTitle() }); });
+    // (`explicito`: el título lo puso la página. Mientras carga, Chromium avisa
+    // con la dirección como título provisorio, y eso no es un título.)
+    wc.on('page-title-updated', (_e, titulo, explicito) => { if (explicito) visita({ url: wc.getURL(), title: titulo, soloTitulo: true }); });
     // Una carga que falla también es un cambio de estado: sin esto la barra se
     // quedaba girando para siempre sobre una URL que nunca llegó.
     wc.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {

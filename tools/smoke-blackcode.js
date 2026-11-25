@@ -61,6 +61,28 @@ const MODELO_LARGO = 'DeepSeek V4.1 Flash 1017 Uncensored';
 
 if (window.rad.skin.id !== 'mono') fail(`BlackCode abrió con la piel ${window.rad.skin.id}, no con mono`);
 
+// Las scrollbars de las páginas del navegador son flotantes (van encima del
+// contenido, sin carril): Chromium lo decide al arrancar, por un flag de la
+// línea de comandos, y vale para toda scrollbar SIN estilo. Las de la app
+// llevan el del núcleo; adentro de un shadow root ese estilo no llega, así que
+// ahí se ve la de Chromium tal cual. (La segunda pasada del .exe arranca sin
+// el flag: acá se ve que la app se relanzó sola con él.)
+{
+  const sonda = document.createElement('div');
+  Object.assign(sonda.style, { position: 'fixed', left: '-400px', top: '0', width: '120px', height: '120px' });
+  const caja = document.createElement('div');
+  Object.assign(caja.style, { width: '100px', height: '100px', overflow: 'scroll' });
+  const alto = document.createElement('div');
+  Object.assign(alto.style, { width: '300px', height: '300px' });
+  caja.append(alto);
+  sonda.attachShadow({ mode: 'open' }).append(caja);
+  document.body.append(sonda);
+  const carril = caja.offsetWidth - caja.clientWidth;
+  sonda.remove();
+  data.scrollbars = carril === 0 ? 'flotantes (sin carril)' : `clásicas, con un carril de ${carril} px`;
+  if (carril !== 0) fail(`las scrollbars de las páginas no son flotantes: una sin estilo reserva ${carril} px (¿falta --enable-features=OverlayScrollbar al lanzar?)`);
+}
+
 // ---------- Segunda pasada: lo de la primera sigue ahí ----------
 const marker = await window.rad.store.read('smoke');
 if (marker?.pass === 1) {
@@ -96,6 +118,11 @@ if (marker?.pass === 1) {
   await go('chat');
   // Lo último de la pasada 1 se escribió justo antes de cerrar.
   if ((await window.rad.store.read('ultimo'))?.ok !== true) fail('lo que se guardó justo antes de cerrar se perdió');
+  // El historial del navegador también volvió (se lee sin abrir el navegador).
+  {
+    const h = await window.rad.invoke('browser:hist-list');
+    if (!Array.isArray(h) || h.length !== 1 || h[0].url !== SMOKE_URL || h[0].title !== 'Smoke page') fail('al reabrir, el historial del navegador volvió como ' + JSON.stringify((h ?? []).map?.((e) => [e.url, e.title])));
+  }
 
   // Borrar un agente se lleva sus chats, y el último que queda ya no se puede borrar.
   await go('agentes');
@@ -1279,6 +1306,119 @@ else {
       if (Math.abs(anchoN() - casa) > 1) fail('navegador: la manija lo achicó por debajo del ancho de la casa (' + Math.round(anchoN()) + ')');
       manija.blur();
       data.navegadorEstirado = 'de ' + Math.round(casa) + ' a ' + Math.round(tope) + ' px en ' + pasos.size + ' pasos, deja ' + Math.round(asoma) + ' px de chat a la vista, mismo vidrio, recorta sin empujar, y vuelve en ' + vuelta.size + ' pasos';
+    }
+
+    // La estrella: en una página que ya es un marcador se RELLENA, y nada más.
+    // El botón no queda «apretado» (sin el fondo ni el reborde que la piel le
+    // pone a un aria-pressed): se ve igual que su vecino.
+    {
+      const estrella = nav.querySelector('[data-accion="nav-estrella"]');
+      const vecino = nav.querySelector('[data-accion="nav-favoritos"]');
+      const dibujo = estrella.querySelector('svg');
+      const alfa = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c); const p = m ? m[1].split(/[ ,/]+/).filter(Boolean) : []; return p.length > 3 ? parseFloat(p[3]) : (c === 'transparent' ? 0 : 1); };
+      if (estrella.getAttribute('aria-pressed') !== 'false' || alfa(getComputedStyle(dibujo).fill) !== 0) fail('navegador: la estrella arranca rellena en una página sin marcador (' + getComputedStyle(dibujo).fill + ')');
+      estrella.click();
+      await until(() => estrella.getAttribute('aria-pressed') === 'true', 3000);
+      await sleep(dur('fast') + 160);
+      const ce = getComputedStyle(estrella);
+      if (estrella.getAttribute('aria-pressed') !== 'true' || getComputedStyle(dibujo).fill !== ce.color || alfa(ce.color) !== 1) fail('navegador: con la página guardada la estrella no se rellena (relleno ' + getComputedStyle(dibujo).fill + ', color ' + ce.color + ')');
+      if (ce.boxShadow !== 'none' || ce.backgroundColor !== getComputedStyle(vecino).backgroundColor) fail('navegador: con la página guardada el botón de la estrella queda remarcado (fondo ' + ce.backgroundColor + ', sombra ' + ce.boxShadow + '): alcanza con la estrella rellena');
+      if ((await window.rad.invoke('browser:fav-list')).length !== 1) fail('navegador: la estrella no guardó el marcador');
+      estrella.click();
+      await until(() => estrella.getAttribute('aria-pressed') === 'false', 3000);
+      await sleep(dur('fast') + 160);
+      if (alfa(getComputedStyle(dibujo).fill) !== 0 || (await window.rad.invoke('browser:fav-list')).length !== 0) fail('navegador: sacar el marcador no vació la estrella');
+    }
+
+    // Una tool que está corriendo: el ícono se pone blanco y se queda QUIETO
+    // (lo que late es la lucecita de «Thinking»).
+    {
+      const f = fila('browser_navigate');
+      const ic = f.querySelector('.dm-tool-icono');
+      const era = f.dataset.estado;
+      f.dataset.estado = 'run';
+      await frame();
+      const cs = getComputedStyle(ic);
+      if (cs.animationName !== 'none' || ic.getAnimations().some((a) => a.effect?.getComputedTiming().iterations === Infinity)) fail('tools: el ícono de una tool que corre late (' + cs.animationName + '): tiene que quedarse quieto');
+      f.dataset.estado = era;
+      await frame();
+    }
+    // Los íconos que vinieron de NeonCode: la grilla del canvas y el chip de la memoria.
+    if (chatView.querySelector('[data-accion="canvas-biblioteca"] svg')?.querySelectorAll('rect').length !== 4) fail('el botón de los canvas no lleva la grilla de cuatro cuadrados');
+    if (!(document.querySelector('.rad-tab[data-view="memoria"] svg path')?.getAttribute('d') ?? '').includes('M6.75 6.75h2.5v2.5h-2.5z')) fail('el ícono de Memory no es el chip con el cuadrado adentro');
+
+    // El historial: por dónde se anduvo, para volver. Una entrada por
+    // dirección (volver a una página la sube), con las que abrió el agente.
+    {
+      const hist = () => window.rad.invoke('browser:hist-list');
+      // (como until, pero la condición pregunta al proceso principal)
+      const hasta = async (cond, ms = 3000) => { for (const t0 = performance.now(); performance.now() - t0 < ms;) { if (await cond()) return true; await sleep(50); } return false; };
+      const abiertos = () => alive(document.querySelectorAll('.rad-overlays .rad-modal')).filter((m) => m.dataset.state === 'open');
+      const ventanaH = () => abiertos().find((m) => m.querySelector('.dm-hist'));
+      const filasH = () => alive(ventanaH()?.querySelectorAll('.dm-biblio-fila') ?? []);
+      const nombresH = () => filasH().map((f) => f.querySelector('.dm-biblio-nombre').textContent).join(' | ');
+      const diasH = () => alive(ventanaH()?.querySelectorAll('.dm-hist-dia') ?? []).map((d) => d.textContent).join(' | ');
+      const botonH = (texto) => [...(ventanaH()?.querySelectorAll('.rad-modal-actions .rad-button') ?? [])].find((b) => b.textContent === texto);
+      const vacioH = () => shown(ventanaH()?.querySelector('.dm-biblio-vacio'));
+      const abrirH = async (n) => { nav.querySelector('[data-accion="nav-historial"]').click(); await until(() => ventanaH() && filasH().length === n, 3000); await settle(); };
+      // lo que quedó de lo de arriba: la primera página (dos veces: ida y vuelta) y la segunda
+      await hasta(async () => (await hist())[0]?.title === 'Smoke page', 3000);
+      const h0 = await hist();
+      if (h0.map((e) => e.url).join(' ') !== SMOKE_URL + ' ' + SMOKE_URL + 'second' || h0[0].title !== 'Smoke page' || h0[1].title !== 'Second page' || h0[0].veces !== 2 || h0[1].veces !== 1) fail('historial: después de navegar quedó ' + JSON.stringify(h0.map((e) => [e.url, e.title, e.veces])));
+      await abrirH(2);
+      if (nombresH() !== 'Smoke page | Second page' || diasH() !== 'Today') fail('historial: la ventana muestra «' + nombresH() + '» bajo «' + diasH() + '»');
+      const detalleH = filasH()[0]?.querySelector('.dm-biblio-detalle').textContent ?? '';
+      if (!/^\d\d:\d\d · http:\/\/127\.0\.0\.1:\d+\/$/.test(detalleH)) fail('historial: el renglón de una página dice «' + detalleH + '»');
+      enIngles('en el historial');
+      await until(() => hueco.hasAttribute('data-foto'), 3000);
+      if (!hueco.hasAttribute('data-foto')) fail('historial: su ventana cae sobre la página y no la eclipsó');
+      // abrir una: va a la pestaña activa, y la ventana se cierra
+      filasH()[1]?.querySelector('.dm-biblio-abrir').click();
+      await closed();
+      for (let i = 0; i < 80 && !String((await estadoNav())?.url).endsWith('/second'); i++) await sleep(50);
+      if (!String((await estadoNav())?.url).endsWith('/second') || abiertos().length) fail('historial: elegir una página no la abrió en la pestaña (' + (await estadoNav())?.url + ') o dejó la ventana abierta');
+      await hasta(async () => (await hist())[0]?.url.endsWith('/second'), 3000);
+      // …y esa visita la subió
+      await abrirH(2);
+      if (nombresH() !== 'Second page | Smoke page') fail('historial: volver a una página no la subió: «' + nombresH() + '»');
+      // buscar, por título o por dirección
+      const buscarH = ventanaH()?.querySelector('input[type="search"]') ?? document.createElement('input');
+      type(buscarH, 'SECOND');
+      await settle();
+      if (nombresH() !== 'Second page' || diasH() !== 'Today') fail('historial: buscar «second» dejó «' + nombresH() + '»');
+      type(buscarH, 'zzz');
+      await settle();
+      if (filasH().length || diasH() || vacioH() !== 'Nothing matches.') fail('historial: una búsqueda sin resultados muestra «' + nombresH() + '» / «' + vacioH() + '»');
+      type(buscarH, '');
+      await settle();
+      // sacar una
+      filasH()[1]?.querySelector('[data-accion="hist-quitar"]').click();
+      await until(() => filasH().length === 1, 3000);
+      if (nombresH() !== 'Second page' || (await hist()).length !== 1) fail('historial: sacar una página dejó «' + nombresH() + '» (' + (await hist()).length + ' guardadas)');
+      // vaciarlo pregunta primero; decir que no, no borra nada
+      botonH('Clear history')?.click();
+      await until(() => abiertos().length === 2, 3000);
+      const pregunta = abiertos().length === 2 ? abiertos().at(-1) : null;
+      if (!pregunta?.textContent.includes('Clear the history?') || !pregunta.textContent.includes('1 page will be forgotten')) fail('historial: vaciar no pregunta antes: ' + (pregunta?.textContent ?? '').slice(0, 120));
+      [...(pregunta?.querySelectorAll('.rad-button') ?? [])].find((b) => b.textContent === 'Cancel')?.click();
+      await until(() => abiertos().length === 1, 3000);
+      await settle();
+      if (filasH().length !== 1 || (await hist()).length !== 1) fail('historial: cancelar la pregunta borró igual');
+      botonH('Clear history')?.click();
+      await until(() => abiertos().length === 2, 3000);
+      [...(abiertos().length === 2 ? abiertos().at(-1).querySelectorAll('.rad-button') : [])].find((b) => b.dataset.variant === 'danger')?.click();
+      await until(() => abiertos().length === 1 && filasH().length === 0, 3000);
+      await settle();
+      if (filasH().length || (await hist()).length || !vacioH().startsWith('No history yet') || !botonH('Clear history')?.disabled) fail('historial: vaciarlo dejó ' + filasH().length + ' filas, «' + vacioH() + '»');
+      botonH('Close')?.click();
+      await closed();
+      await until(() => !hueco.hasAttribute('data-foto'), 3000);
+      // Queda una página anotada, para que la pasada 2 la encuentre al reabrir.
+      await corre({ name: 'browser_navigate', args: { url: SMOKE_URL } });
+      await hasta(async () => (await hist())[0]?.title === 'Smoke page', 3000);
+      const hf = await hist();
+      if (hf.length !== 1 || hf[0].url !== SMOKE_URL || hf[0].title !== 'Smoke page') fail('historial: después de vaciarlo y abrir una página quedó ' + JSON.stringify(hf.map((e) => [e.url, e.title])));
+      data.historial = 'dos páginas con su título, volver sube, abrir desde la ventana, buscar, sacar una, vaciar con pregunta';
     }
 
     // El hueco es uno solo: abrir un canvas cierra el navegador, y al revés.

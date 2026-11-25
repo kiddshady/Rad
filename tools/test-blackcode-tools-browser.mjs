@@ -824,7 +824,9 @@ try {
     ['browser_navigate', 'browser_read', 'browser_click', 'browser_type', 'browser_press', 'browser_upload']);
   t('ipc tiene una función por canal', Object.keys(N.ipc),
     ['attach', 'bounds', 'panel', 'visible', 'state', 'navigate', 'tabNew', 'tabGo', 'tabClose', 'back', 'forward', 'reload', 'stop',
-      'capture', 'freeze', 'external', 'favList', 'favToggle', 'favRemove', 'favOpen']);
+      'capture', 'freeze', 'external', 'favList', 'favToggle', 'favRemove', 'favOpen',
+      // el historial (0.18.0): los cuatro canales de su ventana
+      'histList', 'histRemove', 'histClear', 'histOpen']);
   ok('  y todas son funciones', Object.values(N.ipc).every((f) => typeof f === 'function'));
   ok('la instancia es un AgentBrowser', N.agentBrowser instanceof AgentBrowser);
   ok('  que nace sin pestaña: perezosa, hasta el primer attach', N.agentBrowser.alive === false && N.agentBrowser.panelAbierto === false);
@@ -1521,7 +1523,8 @@ try {
 
     ok('un archivo de favoritos ilegible no se pisa', /if \(favoritosTrabado\) return false;/.test(src));
     ok('las pestañas se leen al abrir el panel y se vuelcan al salir',
-      /agentBrowser\.attach\(mainWindow, \{ restaurar: leerPestanas\(\) \}\)/.test(src) && /volcarPestanas\(\);\n  agentBrowser\.destroy\(\);/.test(src));
+      // (desde la 0.18.0 entre medio pasa el historial: lo que se reabre no cuenta como visita, y lo pendiente baja al salir)
+      /const restaurar = leerPestanas\(\);/.test(src) && /agentBrowser\.attach\(mainWindow, \{ restaurar \}\)/.test(src) && /volcarPestanas\(\);\n  historial\.volcar\(\);\n  agentBrowser\.destroy\(\);/.test(src));
     ok('tabGo y tabClose van con foco, tabNew sin', /tabGo: [^\n]*activar\(id, \{ foco: true \}/.test(src) && /tabClose: [^\n]*cerrarTab\(id, \{ foco: true \}/.test(src) && /tabNew: [^\n]*nuevaTab\(\)/.test(src));
     // De Electron no se usa nada al cargar: lo único que lo nombra es el require
     // de agent-browser.cjs, y navegador.cjs ni eso.

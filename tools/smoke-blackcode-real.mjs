@@ -38,7 +38,9 @@ if (EXE && !fs.existsSync(EXE)) {
   process.exit(1);
 }
 const TAG = EXE ? 'empaquetada-' : '';
-const command = EXE ? [EXE, []] : [electron, [path.join(ROOT, 'apps', 'BlackCode')]];
+// (con las scrollbars flotantes en las páginas: ver apps/BlackCode/main.cjs)
+const FLOTANTES = '--enable-features=OverlayScrollbar';
+const command = EXE ? [EXE, [FLOTANTES]] : [electron, [FLOTANTES, path.join(ROOT, 'apps', 'BlackCode')]];
 
 const data = fs.mkdtempSync(path.join(os.tmpdir(), 'rad-blackcode-real-'));
 const destino = (prov) => path.join(data, `escrito-por-${prov}.txt`);

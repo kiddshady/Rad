@@ -140,14 +140,26 @@ const agentBrowser = new AgentBrowser({
   // llegue al renderer— pero la decisión de qué hacen sigue siendo del renderer,
   // igual que la visibilidad. Acá solo se pasa la tecla.
   onAtajo: (ev) => broadcast('browser:atajo', ev),
+  // El historial (ver historial.cjs): cada página que carga, y su título cuando llega.
+  onVisita: (v) => { if (v.soloTitulo) historial.titular(v); else historial.anotar(v); },
 });
+
+// ---- El historial del browser ----
+//
+// Por dónde se anduvo, para volver (BlackCode 0.18.0). Es del usuario: lo ve
+// y lo borra desde su panel, y ninguna tool lo lee. Las reglas, en
+// historial.cjs. Como los favoritos, vive en la carpeta de datos, así que
+// `configurar` lo vuelve a armar si la carpeta cambia.
+const { crear: crearHistorial } = require('./historial.cjs');
+let historial = crearHistorial({ archivo: path.join(dataDir, 'browser-historial.json'), escribir: atomicWrite });
 
 // ---- Favoritos del browser ----
 //
 // Una lista chica de direcciones que el usuario marca con la estrella de la
-// barra. No hay historial ni carpetas a propósito: el panel es un browser de
-// apoyo, y lo que hace falta es volver rápido a los cinco lugares de siempre
-// (y que el modelo pueda abrirlos por nombre, ver runBrowserNavigate).
+// barra. Sin carpetas a propósito: el panel es un browser de apoyo, y lo que
+// hace falta es volver rápido a los cinco lugares de siempre (y que el modelo
+// pueda abrirlos por nombre, ver runBrowserNavigate). El historial es otra
+// cosa y va aparte (más arriba).
 //
 // Un archivo que no se pudo LEER no es un archivo vacío: si está trabado o roto,
 // no se pisa con una lista vacía (se perderían todos). Roto se aparta como
@@ -218,6 +230,8 @@ function configurar(deps = {}) {
     favoritosFile = path.join(dataDir, 'browser-favoritos.json');
     favoritos = null;
     favoritosTrabado = false;
+    historial.volcar(); // lo pendiente es de la carpeta anterior
+    historial = crearHistorial({ archivo: path.join(dataDir, 'browser-historial.json'), escribir: atomicWrite });
   }
 }
 
@@ -249,7 +263,14 @@ const ipc = {
   attach: () => {
     const mainWindow = ventana();
     if (!mainWindow || mainWindow.isDestroyed()) return { open: false };
-    try { return agentBrowser.attach(mainWindow, { restaurar: leerPestanas() }); } catch (err) {
+    try {
+      const restaurar = leerPestanas();
+      // Las pestañas de la última vez las reabre la app, no el usuario: que
+      // carguen no es una visita nueva (solo la primera vez: después la
+      // pestaña ya está viva y attach no restaura nada).
+      if (!agentBrowser.alive) historial.restauradas(restaurar?.urls);
+      return agentBrowser.attach(mainWindow, { restaurar });
+    } catch (err) {
       return { open: false, error: String(err?.message || err) };
     }
   },
@@ -320,6 +341,14 @@ const ipc = {
   // Abrir un favorito desde la lista: en la pestaña activa, como un Enter en la
   // barra. La URL ya pasó por urlValida al guardarse, pero se revalida acá igual.
   favOpen: (url) => agentBrowser.navigate(url),
+
+  // El historial, para su ventana: la lista entera (son como mucho 1500
+  // renglones cortos; buscar y agrupar por día lo hace la interfaz), sacar
+  // una dirección, vaciarlo, y abrir una en la pestaña activa.
+  histList: () => historial.lista(),
+  histRemove: (url) => { historial.quitar(String(url ?? '')); return historial.lista(); },
+  histClear: () => { historial.vaciar(); return historial.lista(); },
+  histOpen: (url) => agentBrowser.navigate(url),
 };
 
 // ---------------------------------------------------------------------------
@@ -871,6 +900,7 @@ function cerrar() {
   // de las pestañas (browser-pestanas.json, se vuelcan acá); lo que se pierde es
   // el scroll y lo que hubiera a medio escribir en un formulario.
   volcarPestanas();
+  historial.volcar();
   agentBrowser.destroy();
 }
 

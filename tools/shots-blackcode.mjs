@@ -364,7 +364,8 @@ function shoot(scene) {
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.RAD_SKIN;
   return new Promise((resolve) => {
-    const child = spawn(electron, [path.join(ROOT, 'apps', 'BlackCode')], { env, stdio: 'inherit' });
+    // (con las scrollbars flotantes en las páginas, como la app instalada: ver apps/BlackCode/main.cjs)
+    const child = spawn(electron, ['--enable-features=OverlayScrollbar', path.join(ROOT, 'apps', 'BlackCode')], { env, stdio: 'inherit' });
     const killer = setTimeout(() => child.kill(), 40000);
     child.on('exit', () => {
       clearTimeout(killer);

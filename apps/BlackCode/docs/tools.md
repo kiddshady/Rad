@@ -203,8 +203,28 @@ Un navegador de verdad, en un panel, que comparten el usuario y el agente.
   neutralizados (un `alert` congelaba la pestaña).
 - **En el system prompt:** los favoritos por nombre y la pestaña que el
   usuario tiene a la vista (título y dirección, no el contenido).
-- Pestañas y favoritos se guardan en `%APPDATA%\BlackCode\tools`
-  (`browser-pestanas.json`, `browser-favoritos.json`).
+- Pestañas, favoritos e historial se guardan en `%APPDATA%\BlackCode\tools`
+  (`browser-pestanas.json`, `browser-favoritos.json`,
+  `browser-historial.json`).
+- **El historial** (desde la 0.18.0, `main/tools/historial.cjs`): por dónde se
+  anduvo, para volver. Una entrada por dirección (volver a una página la sube y
+  le suma una vez), hasta 1500; entran las páginas http(s) del marco principal
+  y los cambios de dirección de una SPA, también las que abrió el agente (la
+  pestaña es la misma). Lo que la app reabre sola al arrancar no cuenta como
+  visita. El motor avisa (`onVisita`: `did-navigate`,
+  `did-navigate-in-page` y `page-title-updated`, porque el título llega
+  después). **Es del usuario: ninguna tool lo lee** (un título es texto que
+  escribe la página; lo cuida `tools/test-blackcode-historial.mjs`). Su
+  ventana (el reloj de la barra) busca, saca una entrada y lo vacía; canales
+  `browser:hist-list|hist-remove|hist-clear|hist-open`.
+- **Las scrollbars de las páginas son flotantes** (desde la 0.18.0), como en
+  Prism: la feature `OverlayScrollbar` de Chromium. La clásica reservaba un
+  carril con flechas pegado al borde de la capa, y las esquinas redondeadas se
+  lo comían. Desde Electron 44 eso se decide antes de que corra `main.cjs`:
+  el flag tiene que venir en la línea de comandos. Los scripts lo pasan, y la
+  app instalada que arranca sin él se relanza una vez con él
+  (`apps/BlackCode/main.cjs`). Las scrollbars de la app no cambian: las dibuja
+  el núcleo, y una con estilo nunca es flotante.
 - Con `screenshot: true`, `browser_read` le manda al modelo una foto de la
   página, si el modelo ve (igual que `screen_capture`).
 
@@ -517,6 +537,8 @@ para arreglarlos de a uno, con su prueba:
 - `-browser.mjs`: las de NeonCode sobre un Electron de mentira (no abre
   ninguna ventana), más los runners y los canales de BlackCode. Las que allá miraban
   la interfaz de NeonCode no vinieron: la de BlackCode la prueba el humo.
+- `tools/test-blackcode-historial.mjs`: el historial del navegador sobre archivos de
+  verdad en una carpeta temporal, y que ninguna tool lo lea.
 - `tools/test-blackcode-tools-loop.mjs`: los dos loops contra un servidor local que
   hace de las dos APIs. Mira qué pide cada ronda y qué vuelve, también las
   imágenes de una captura.

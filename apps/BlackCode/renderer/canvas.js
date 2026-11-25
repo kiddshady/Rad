@@ -83,7 +83,7 @@ export function montarCanvas({ escena, turnos }) {
     e.preventDefault();
     tarjetas.scrollLeft += e.deltaY;
   }, { passive: false });
-  const botonBiblioteca = h('button', 'rad-iconbutton dm-canvas-biblioteca', { type: 'button', 'data-accion': 'canvas-biblioteca', 'aria-label': 'All canvases', 'data-rad-tip': 'All canvases', 'data-rad-tip-side': 'bottom' }, icono('biblioteca'));
+  const botonBiblioteca = h('button', 'rad-iconbutton dm-canvas-biblioteca', { type: 'button', 'data-accion': 'canvas-biblioteca', 'aria-label': 'All canvases', 'data-rad-tip': 'All canvases', 'data-rad-tip-side': 'bottom' }, icono('canvas'));
   const barra = h('div', 'dm-canvas-barra', { 'data-rad-chrome': '' }, h('div', 'dm-canvas-barra-in', {}, tarjetas));
 
   const abierto = () => panel.hasAttribute('data-abierto');

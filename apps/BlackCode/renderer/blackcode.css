@@ -764,7 +764,10 @@
   .dm-tool[data-con-salida] .dm-tool-chevron { opacity: 1; }
   .dm-tool[data-abierto] .dm-tool-chevron { transform: rotate(180deg); }
   /* El estado va en el color del ícono y de la palabra, no en un bloque. */
-  .dm-tool[data-estado='run'] .dm-tool-icono { color: var(--rad-accent-strong); animation: dm-latido calc(var(--rad-dur-slow) * 2.5) var(--rad-ease-in-out) infinite alternate; }
+  /* Mientras corre, el ícono se queda QUIETO y blanco: lo que late es la
+     lucecita de «Thinking», y dos cosas latiendo a la vez compiten (Fran,
+     24/11/2026). */
+  .dm-tool[data-estado='run'] .dm-tool-icono { color: var(--rad-accent-strong); }
   .dm-tool[data-estado='ok'] .dm-tool-icono, .dm-tool[data-estado='ok'] .dm-tool-estado { color: var(--rad-success); }
   .dm-tool[data-estado='error'] .dm-tool-icono, .dm-tool[data-estado='error'] .dm-tool-estado { color: var(--rad-danger); }
   .dm-tool[data-estado='blocked'] .dm-tool-icono, .dm-tool[data-estado='blocked'] .dm-tool-estado,
@@ -1090,7 +1093,12 @@
   .dm-nav-recargar { display: grid; }
   .dm-nav-recargar > * { grid-area: 1 / 1; transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out); }
   .dm-nav-recargar:not([data-cargando]) .dm-nav-ic-parar, .dm-nav-recargar[data-cargando] .dm-nav-ic-recargar { opacity: 0; }
-  .dm-nav [data-accion='nav-estrella'][aria-pressed='true'] { color: var(--rad-text-1); }
+  /* La página ya es un marcador: se rellena la estrella y nada más. El botón
+     no queda «apretado» (sin fondo ni reborde, como pone la piel a un
+     aria-pressed): la estrella llena ya lo dice (Fran, 24/11/2026). */
+  .dm-nav [data-accion='nav-estrella'][aria-pressed='true'] { color: var(--rad-text-1); background-color: transparent; box-shadow: none; }
+  .dm-nav [data-accion='nav-estrella'][aria-pressed='true']:hover { background-color: var(--rad-tint-hover); }
+  .dm-nav [data-accion='nav-estrella'] svg { transition: fill var(--rad-dur-fast) var(--rad-ease-out); fill: transparent; }
   .dm-nav [data-accion='nav-estrella'][aria-pressed='true'] svg { fill: currentColor; }
   /* El hueco. El radio es el de la capa nativa (12 px), no un token: tienen
      que calzar. */
@@ -1203,6 +1211,15 @@
   .dm-biblio-vacio { color: var(--rad-text-3); font-size: var(--rad-text-s); }
   /* sin nada que decir no ocupa lugar (un relevo vacío deja su celda) */
   .dm-biblio-vacio:not(:has(> :not(.rad-swap-out):not(:empty))) { display: none; }
+
+  /* El historial del navegador: la misma ventana que la biblioteca, con un
+     renglón por día. La X de cada fila aparece al acercarse (o con el teclado). */
+  .dm-hist-dia { padding: var(--rad-space-3) var(--rad-space-3) var(--rad-space-1); font-size: var(--rad-text-xs); color: var(--rad-text-3); }
+  .dm-hist-dia:first-child { padding-top: var(--rad-space-1); }
+  .dm-hist .dm-biblio-fila [data-accion='hist-quitar'] { opacity: 0; transition: opacity var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-hist .dm-biblio-fila:hover [data-accion='hist-quitar'], .dm-hist .dm-biblio-fila:focus-within [data-accion='hist-quitar'] { opacity: 1; }
+  .dm-hist .dm-biblio-abrir .rad-icon { flex: none; color: var(--rad-text-3); }
+  .dm-hist .dm-biblio-detalle { font-family: var(--rad-font-mono); }
 
   /* ---------- El notepad ---------- */
   .dm-notas { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 0; }

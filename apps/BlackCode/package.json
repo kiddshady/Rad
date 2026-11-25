@@ -1,13 +1,13 @@
 {
   "name": "daimon",
   "productName": "BlackCode",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "private": true,
   "description": "BlackCode: an AI chat with several agents, each with its own provider, model, instructions and chats.",
   "author": "Kidd Shady · Umbrovex Systems",
   "main": "main.cjs",
   "scripts": {
-    "start": "electron .",
+    "start": "electron --enable-features=OverlayScrollbar .",
     "icon": "node scripts/icon.mjs",
     "katex": "node scripts/vendor-katex.mjs",
     "xterm": "node scripts/vendor-xterm.mjs",

@@ -27,7 +27,10 @@
 import { menuButton } from '/@core/menu.js';
 import { reconcile } from '/@core/list.js';
 import { toast } from '/@core/toast.js';
-import { ms } from '/@core/motion.js';
+import { openModal, confirm } from '/@core/modal.js';
+import { wireScroll } from '/@core/scroll.js';
+import { wireControls } from '/@core/controls.js';
+import { ms, swapText } from '/@core/motion.js';
 import { h, icono } from './piezas.js';
 
 const pedir = (canal, ...args) => window.rad.invoke(canal, ...args);
@@ -69,6 +72,7 @@ export function montarNavegador({ escena, turnos, router }) {
   const barraUrl = h('form', 'dm-nav-direccion', {}, candado, url);
   const bEstrella = ib('nav-estrella', 'estrella', 'Bookmark this page', { 'aria-pressed': 'false' });
   const bFavoritos = ib('nav-favoritos', 'marcadores', 'Bookmarks');
+  const bHistorial = ib('nav-historial', 'reloj', 'History');
   const bAfuera = ib('nav-afuera', 'externo', 'Open in your browser');
   const foto = h('img', 'dm-nav-foto', { alt: '', 'aria-hidden': 'true' });
   const vacio = h('p', 'dm-nav-vacio', {}, 'Type an address above, or ask an agent with the Browser tools to open a page. You and the agent share this tab.');
@@ -82,7 +86,7 @@ export function montarNavegador({ escena, turnos, router }) {
   escena.append(casaEl);
   const panel = h('aside', 'dm-nav', { 'aria-label': 'Browser', 'aria-hidden': 'true' },
     h('div', 'dm-nav-tira', { 'data-rad-chrome': '' }, tabs, bNueva, h('span', 'dm-nav-aire'), bCerrar),
-    h('div', 'dm-nav-barra', { 'data-rad-chrome': '' }, bAtras, bAdelante, bRecargar, barraUrl, bEstrella, bFavoritos, bAfuera),
+    h('div', 'dm-nav-barra', { 'data-rad-chrome': '' }, bAtras, bAdelante, bRecargar, barraUrl, bEstrella, bFavoritos, bHistorial, bAfuera),
     hueco, manija);
   panel.inert = true;
 
@@ -393,6 +397,99 @@ export function montarNavegador({ escena, turnos, router }) {
   menuButton(bFavoritos, () => (favoritos.length
     ? favoritos.map((f) => ({ id: f.url, label: (f.title || hostDe(f.url) || f.url).slice(0, 60), onSelect: async () => { const r = await pedir('browser:fav-open', f.url); if (r?.ok === false) toast({ text: `Could not open that bookmark: ${r.error ?? ''}`, kind: 'danger' }); } }))
     : [{ id: 'nada', label: 'No bookmarks yet', disabled: true }]), { align: 'end' });
+
+  // ---------- El historial ----------
+  // Por dónde se anduvo, para volver: una ventana con buscador, agrupada por
+  // día. Una entrada por dirección (volver a una página la sube), y entran
+  // también las que abrió el agente: la pestaña es la misma. Lo lleva el
+  // proceso principal (main/tools/historial.cjs); acá se muestra, se busca y se
+  // borra. Como cualquier ventana de la app, cae sobre la página y la eclipsa.
+  const DIA = 86400000;
+  const medianoche = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const rotuloDia = (dia) => {
+    const hoy = medianoche(Date.now());
+    if (dia === hoy) return 'Today';
+    if (dia === medianoche(hoy - DIA / 2)) return 'Yesterday';
+    return new Date(dia).toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric', ...(new Date(dia).getFullYear() !== new Date(hoy).getFullYear() ? { year: 'numeric' } : {}) });
+  };
+  const hora = (t) => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  async function abrirHistorial() {
+    let todo = await pedir('browser:hist-list').catch(() => []);
+    if (!Array.isArray(todo)) todo = [];
+    const buscar = h('input', 'rad-input', { type: 'search', placeholder: 'Search by title or address', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Search the history', 'data-autofocus': true });
+    const lista = h('div', 'dm-biblio-lista dm-hist-lista rad-scroll', { role: 'list' });
+    const vacio = h('p', 'dm-biblio-vacio rad-swap');
+    const cuerpo = h('div', 'dm-biblio dm-hist', {}, h('label', 'rad-field', {}, buscar), lista, vacio);
+    wireScroll(lista);
+    wireControls(cuerpo);
+    const ventana = openModal({
+      title: 'History',
+      body: cuerpo,
+      actions: [
+        // (no se cierra sola: primero pregunta, y vacía la lista a la vista)
+        { id: 'vaciar', label: 'Clear history', close: false, onClick: () => { vaciar(); return false; } },
+        { id: 'cerrar', label: 'Close' },
+      ],
+    });
+    const bVaciar = ventana.el.querySelector('.rad-modal-actions .rad-button');
+
+    async function vaciar() {
+      if (!todo.length) return;
+      const si = await confirm({ title: 'Clear the history?', text: `${todo.length} page${todo.length === 1 ? '' : 's'} will be forgotten. Your bookmarks and your logins stay.`, confirmLabel: 'Clear history', danger: true });
+      if (!si) return;
+      const r = await pedir('browser:hist-clear').catch(() => null);
+      todo = Array.isArray(r) ? r : [];
+      pintarLista();
+    }
+    const filaDia = () => h('div', 'dm-hist-dia', { role: 'presentation' });
+    const filaPagina = (e) => {
+      const nombre = h('span', 'dm-biblio-nombre');
+      const detalle = h('span', 'dm-biblio-detalle');
+      const quitar = h('button', 'rad-iconbutton', { type: 'button', 'data-accion': 'hist-quitar', 'aria-label': 'Remove from the history', 'data-rad-tip': 'Remove from the history' }, icono('cerrar'));
+      const ir = h('button', 'dm-biblio-abrir', { type: 'button' }, icono('globo'), h('span', 'dm-biblio-textos', {}, nombre, detalle));
+      const nodo = h('div', 'dm-biblio-fila', { role: 'listitem' }, ir, quitar);
+      const suUrl = () => nodo.dataset.url ?? e.url;
+      ir.addEventListener('click', async () => {
+        ventana.close('abrir');
+        const r = await pedir('browser:hist-open', suUrl());
+        if (r?.ok === false) toast({ text: `Could not open that page: ${r.error ?? ''}`, kind: 'danger' });
+      });
+      quitar.addEventListener('click', async () => {
+        const r = await pedir('browser:hist-remove', suUrl()).catch(() => null);
+        if (Array.isArray(r)) { todo = r; pintarLista(); }
+      });
+      return nodo;
+    };
+    function ponerFila(nodo, it) {
+      if (it.dia) { if (nodo.textContent !== it.rotulo) nodo.textContent = it.rotulo; return; }
+      nodo.dataset.url = it.url;
+      nodo.querySelector('.dm-biblio-nombre').textContent = it.title || hostDe(it.url) || it.url;
+      nodo.querySelector('.dm-biblio-detalle').textContent = `${hora(it.at)} · ${paraLaBarra(it.url)}`;
+    }
+    function pintarLista() {
+      const q = buscar.value.trim().toLowerCase();
+      const visibles = todo.filter((e) => !q || `${e.title} ${e.url}`.toLowerCase().includes(q));
+      // los días, intercalados: un renglón de título antes de las páginas de cada uno
+      const items = [];
+      let ultimo = null;
+      for (const e of visibles) {
+        const dia = medianoche(e.at);
+        if (dia !== ultimo) { ultimo = dia; items.push({ dia: true, clave: `dia-${dia}`, rotulo: rotuloDia(dia) }); }
+        items.push(e);
+      }
+      reconcile(lista, items, {
+        key: (it) => (it.dia ? it.clave : it.url),
+        create: (it) => { const nodo = it.dia ? filaDia() : filaPagina(it); ponerFila(nodo, it); return nodo; },
+        update: ponerFila,
+      });
+      swapText(vacio, visibles.length ? '' : todo.length ? 'Nothing matches.' : 'No history yet. The pages you and your agents open in this browser show up here.');
+      if (bVaciar) bVaciar.disabled = !todo.length;
+    }
+    buscar.addEventListener('input', pintarLista);
+    pintarLista();
+  }
+  bHistorial.addEventListener('click', abrirHistorial);
 
   // Ctrl+B abre y cierra, desde la app y desde adentro de la página (ahí las
   // teclas no llegan al DOM: las reenvía el main).

@@ -1,5 +1,23 @@
 # Changelog
 
+## BlackCode 0.18.0 (2026-11-25)
+
+- **Scrollbars flotantes en las páginas del navegador**, como en Prism: un hilo
+  que va encima de la página, aparece al mover la rueda y se ensancha al
+  pararse arriba. La clásica de Chromium, con sus flechas, quedaba pegada al
+  borde y las esquinas redondeadas del panel se la comían. La app instalada
+  se relanza sola una vez al abrir para prenderlas (unos 0,2 s).
+- **Historial en el navegador.** El reloj de la barra abre una ventana con las
+  páginas por las que se anduvo, agrupadas por día, con buscador. Una entrada
+  por dirección: volver a una página la sube. Entran también las que abrió un
+  agente. Se saca una, o se vacía entero (pregunta antes). Ninguna tool lo lee.
+- **La estrella de los marcadores**: en una página ya guardada se rellena, y
+  nada más. El botón ya no queda remarcado.
+- **El ícono de una tool que está corriendo se queda quieto**, en blanco. Lo
+  que late es la lucecita de «Thinking».
+- Íconos de NeonCode: el canvas es la grilla de cuatro cuadrados (también en el
+  botón de «All canvases») y la memoria es el chip con el cuadrado adentro.
+
 ## BlackCode 0.17.0 (2026-11-24)
 
 - **Cada chat tiene su carpeta de trabajo, y se ve.** Debajo del campo para
