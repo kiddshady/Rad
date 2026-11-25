@@ -54,8 +54,8 @@ export const ICONOS = {
   marcadores: svg('<path d="M4.5 2.5h7v11L8 11l-3.5 2.5z"/>'),
   // el historial: un reloj
   reloj: svg('<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.25l2 1.25"/>'),
-  // (lo que se dijo por el Atom Echo)
-  mic: svg('<rect x="6" y="2" width="4" height="7.5" rx="2"/><path d="M3.75 7.5a4.25 4.25 0 0 0 8.5 0M8 11.75V14M5.75 14h4.5"/>'),
+  // (un canal: lo que entra solo, sin tipearlo —lo dicho al Atom Echo—. Las ondas alrededor de un punto que Fran tenía en Umbra.)
+  canal: svg('<circle cx="8" cy="8" r="1.25" fill="currentColor" stroke="none"/><path d="M5.5 10.5a3.55 3.55 0 0 1 0-5M10.5 5.5a3.55 3.55 0 0 1 0 5M3.4 12.6a6.5 6.5 0 0 1 0-9.2M12.6 3.4a6.5 6.5 0 0 1 0 9.2"/>'),
   externo: svg('<path d="M9 3h4v4M13 3 7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/>'),
   candado: svg('<rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>'),
   // la terminal: una ventana con su prompt

@@ -11,6 +11,7 @@
 
 import * as datos from './datos.js';
 import { toast } from '/@core/toast.js';
+import * as habla from './habla.js';
 
 const cola = [];        // frases que esperan su turno (el chat de voz estaba contestando)
 let mandando = false;
@@ -54,9 +55,13 @@ export function estadoDeVoz() {
   if (v.eco.fase === 'transcribing') return 'Transcribing…';
   return null;
 }
+/** …y mientras el agente habla (se puede estar hablando sin el Echo: la prueba de Settings). */
+export const estadoDeHabla = () => (habla.hablando() ? 'Speaking…' : null);
 
-export function montarVoz({ shell: s }) {
+export function montarVoz({ shell: s, alHablar = () => {} }) {
   shell = s;
+  habla.montarHabla();
+  habla.alCambiar(alHablar);
   window.rad.on('voz:frase', (f) => {
     if (!f || typeof f.texto !== 'string' || !f.texto.trim()) return;
     cola.push({ texto: f.texto.trim(), agente: String(f.agente ?? ''), actua: f.actua === true });
@@ -69,6 +74,8 @@ export function montarVoz({ shell: s }) {
       const a = datos.agente(datos.chat(t.chat)?.agente);
       const cuerpo = t.estado === 'error' ? `It failed: ${t.nota || 'there was no answer.'}` : t.estado === 'frenado' ? 'Stopped.' : (t.texto || 'Done.');
       aviso(a?.nombre ?? 'BlackCode', cuerpo, t.chat);
+      // …y, si está prendido, la respuesta se dice en voz alta (un turno frenado o roto, no)
+      if (datos.voz().habla?.activa && t.estado === 'ok' && t.texto.trim()) window.rad.invoke('voz:decir', { texto: t.texto }).catch(() => {});
     }
     atender();
   });
@@ -78,5 +85,7 @@ export function montarVoz({ shell: s }) {
     if (!pide || !datos.turnoDeVoz(chat)) return;
     const a = datos.agente(datos.chat(chat)?.agente);
     aviso(`${a?.nombre ?? 'BlackCode'} needs your permission`, pide.label || String(pide.name ?? ''), chat);
+    // (quien habló no está mirando la pantalla: se lo dice)
+    if (datos.voz().habla?.activa) window.rad.invoke('voz:decir', { permiso: true }).catch(() => {});
   });
 }

@@ -14,7 +14,7 @@ import { toast } from '/@core/toast.js';
 import { montarAjustes } from './ajustes.js';
 import { montarTareas, ponerPunto, abrirResultado } from './tareas.js';
 import { ICONOS } from './piezas.js';
-import { montarVoz, estadoDeVoz } from './voz.js';
+import { montarVoz, estadoDeVoz, estadoDeHabla } from './voz.js';
 
 // La interfaz se arma después de leer los datos: el arranque espera.
 const release = hold();
@@ -49,7 +49,7 @@ const ponerEstado = () => {
   const n = datos.toolsQueViajan(a);
   const tools = n ? `${n} tool${n === 1 ? '' : 's'}` : 'no tools';
   // (mientras el Atom Echo escucha o Whisper transcribe, eso es lo que se dice)
-  shell.status.set('right', estadoDeVoz() ?? (datos.algunoRespondiendo() ? 'Answering…' : `${a.nombre} · ${datos.modeloDe(a)} · ${tools}`));
+  shell.status.set('right', estadoDeVoz() ?? estadoDeHabla() ?? (datos.algunoRespondiendo() ? 'Answering…' : `${a.nombre} · ${datos.modeloDe(a)} · ${tools}`));
 };
 shell.status.set('left', views.find((v) => v.id === shell.router.current).label);
 shell.router.on('change', ({ label }) => shell.status.set('left', label));
@@ -89,7 +89,7 @@ window.rad.on('tareas:borrada', (ev) => {
 });
 
 // La voz: lo que se le dice al Atom Echo entra a un chat de su agente.
-montarVoz({ shell });
+montarVoz({ shell, alHablar: ponerEstado });
 
 // El aviso de versión nueva (no baja nada solo, y no dice «estás al día»).
 wireUpdates({ name: 'BlackCode' });

@@ -485,7 +485,9 @@ y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
   BlackCode se conecta al Echo sin Home Assistant (`main/eco.cjs`, con
   `esphome-client`), corta la frase (`main/corte.cjs`) y la transcribe en
   esta máquina con Whisper, en el Python del usuario (`main/escucha.cjs`,
-  `motor/escucha_motor.py`). Está contado en `apps/BlackCode/docs/tools.md`.
+  `motor/escucha_motor.py`). Desde la 1.2.0 el agente puede contestar en voz
+  alta, con una voz clonada (Qwen3-TTS, `main/habla.cjs` y
+  `motor/habla_motor.py`). Está contado en `apps/BlackCode/docs/tools.md`.
 - Se instala y se actualiza desde `kiddshady/daimon-releases`. En Settings,
   About tiene un botón para buscar una versión nueva sin esperar al núcleo.
 - El ícono es la «Red hexagonal»: seis agentes en los vértices de un

@@ -206,9 +206,11 @@ function checkDisk(data, report) {
     const llaveDeMentira = Buffer.alloc(32, 9).toString('base64');
     if (v.activa !== true || v.host !== 'fake-atom.local' || v.actua !== false || typeof v.llave !== 'string' || v.llave.length < 20) failures.push(`la config de la voz guardada: ${JSON.stringify({ ...v, llave: typeof v.llave })}`);
     if (crudo.includes(llaveDeMentira)) failures.push('la llave del Atom Echo quedó en claro en el disco');
+    if (v.habla?.activa !== true || typeof v.habla?.python !== 'string' || !v.habla.python.endsWith('python.exe') || !String(v.habla?.muestra).endsWith('voice-sample.wav')) failures.push(`la respuesta hablada guardada: ${JSON.stringify(v.habla)}`);
   } catch { failures.push('la config de la voz no quedó guardada (falta _voz.json)'); }
   if (leer('voice-si.txt') !== 'said out loud\n') failures.push(`un turno de voz con «Let voice act» no dejó su archivo: ${JSON.stringify(leer('voice-si.txt'))}`);
   if (leer('voice-no.txt') !== null) failures.push('un turno de voz sin permiso escribió su archivo');
+  if (leer('voice-ask.txt') !== null) failures.push('un turno de voz al que se le negó el permiso escribió su archivo');
   if (leer('task-si.txt') !== 'from a task\n') failures.push(`una tarea con «Let it act» no dejó su archivo: ${JSON.stringify(leer('task-si.txt'))}`);
   if (leer('task-no.txt') !== null) failures.push('una tarea de solo lectura escribió task-no.txt');
   const borrado = report.script?.chatBorrado;

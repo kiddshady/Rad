@@ -115,7 +115,7 @@ export async function abrir() {
 // Darle una orden a un agente hablándole al Atom Echo. La config y la llave
 // del Echo las guarda el proceso principal (voz.cjs): acá llega el estado,
 // sin la llave (solo si está puesta).
-let vozEstado = { activa: false, host: '', puerto: 0, agente: '', idioma: 'es', actua: false, python: '', hayLlave: false, cifrado: true, eco: { conexion: 'off', error: '', dispositivo: null, fase: 'idle', ultima: null }, whisper: { estado: 'off', error: '' } };
+let vozEstado = { activa: false, host: '', puerto: 0, agente: '', idioma: 'es', actua: false, python: '', hayLlave: false, cifrado: true, eco: { conexion: 'off', error: '', dispositivo: null, fase: 'idle', ultima: null }, whisper: { estado: 'off', error: '' }, habla: { activa: false, python: '', modelo: '', muestra: '', estado: 'off', error: '', hablando: false }, modelosHabla: [] };
 export const voz = () => vozEstado;
 export async function refrescarVoz() {
   const v = await window.rad.invoke('voz:estado').catch(() => null);
@@ -145,6 +145,12 @@ export function chatDeVoz(agenteId, ahora = Date.now()) {
   chats.update((v) => { v.lista.push(nuevo); return v; });
   avisar('chats');
   return nuevo;
+}
+/** El grupo «Channels» de la lista de chats, ¿está desplegado? (se recuerda) */
+export const canalesAbiertos = () => ui.get().canales !== false;
+export function ponerCanalesAbiertos(si) {
+  ui.patch({ canales: si === true });
+  avisar('chats');
 }
 /** ¿El turno que corre en ese chat vino por voz? */
 export const turnoDeVoz = (chatId) => respuestas.get(chatId)?.voz === true;
@@ -606,6 +612,8 @@ export async function enviar(chatId, texto, adjuntos = null, { voz: dicho = fals
       memoria: conMemoria(a),
       // dónde está parado este chat
       carpeta: carpetaDe(chatId),
+      // se dijo por el micrófono (si se contesta en voz alta, el agente lo sabe)
+      voz: dicho === true,
     });
   } catch {
     terminar(chatId, 'error', 'The request could not be sent.');

@@ -22,13 +22,14 @@ const corte = require('./corte.cjs');
 const dns = require('node:dns');
 
 // El nombre del Echo (algo.local) lo resuelve mDNS, que en Windows a veces
-// tarda o falla la primera vez: se intenta dos veces y, si ya se lo había
+// tarda o falla las primeras veces (medido: dos fallas seguidas de casi 3 s
+// cada una, y a la tercera anda): se intenta tres veces y, si ya se lo había
 // encontrado antes, se usa la dirección de la última vez.
 const ES_IP = /^d{1,3}(.d{1,3}){3}$|:/;
 async function buscar(host) {
   if (ES_IP.test(host)) return host;
   let ultimo = null;
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 3; i++) {
     try { return (await dns.promises.lookup(host, { family: 4 })).address; } catch (err) { ultimo = err; }
   }
   throw ultimo;

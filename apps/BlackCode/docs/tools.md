@@ -673,6 +673,15 @@ Electron:
 | `main/escucha.cjs` | Whisper, en un proceso de Python aparte (`motor/escucha_motor.py`): lo levanta, le pasa el audio en base64 y filtra lo que Whisper inventa |
 | `main/voz.cjs` | Los une con la app: la config (documento reservado `_voz`), la llave cifrada, y el canal `voz:frase` hacia la interfaz |
 
+**El cifrado.** La conexión es Noise (`Noise_NNpsk0_25519_ChaChaPoly_SHA256`).
+Node trae ChaCha20-Poly1305; **Electron no** (su `crypto` es BoringSSL y
+`createCipheriv` contesta «Unknown cipher»): la 1.1.0 conectaba en las pruebas
+con node y fallaba instalada. `main/chacha.cjs` se lo enseña a
+`crypto.createCipheriv`/`createDecipheriv` (solo ese algoritmo, con
+`@noble/ciphers`, y solo si el proceso no lo trae) antes de cargar la librería.
+El humo hace un saludo cifrado completo dentro de Electron (`voz:piezas`): lo
+que se pruebe del Echo con node pelado no dice nada de la app.
+
 **Lo que se le avisa al Echo** (es lo que prende su LED): `RUN_START`,
 `STT_START`, `STT_VAD_END` (deja de mandar audio), `STT_END` con el texto y
 `RUN_END`. La corrida se cierra apenas hay texto, sin esperar la respuesta del
@@ -690,7 +699,10 @@ levantar Python y 6 de cargar el modelo). El audio no toca el disco.
 
 **En la interfaz** (`renderer/voz.js`): la frase va al agente elegido en
 Settings, en su **chat de voz** (un chat común marcado `voz: true`; pasada
-media hora sin hablar, la siguiente abre uno nuevo). No cambia lo que hay en
+media hora sin hablar, la siguiente abre uno nuevo). Esos chats no se mezclan
+con los tipeados: van en el grupo **Channels**, al fondo de la lista de chats
+(`chat.js`: dos listas, la común y la del canal), que se pliega
+(`ui.canales`), dice cuándo fue cada uno y tiene un tacho que los borra todos. No cambia lo que hay en
 pantalla: un toast dice qué se oyó y lleva al chat, y si nadie mira la ventana
 el proceso principal manda un aviso de Windows con la respuesta. Si el chat de
 voz todavía contesta, la frase espera su turno.
@@ -704,8 +716,47 @@ equivocar. Con «Let voice act» va con `'auto'`; lo que pide permiso siempre
 vuelve a la interfaz (que solo sabe si está puesta). BlackCode sale hacia el
 Echo: no abre ningún puerto.
 
-**Lo que no hay:** respuesta hablada (es la segunda parte), el micrófono de la
-PC, elegir al agente nombrándolo en la frase, y más de un Echo.
+### La respuesta hablada
+
+Desde la 1.2.0 el agente puede contestar **en voz alta** lo que se le dijo, por
+los parlantes de la PC, con una voz clonada. También apagada de fábrica
+(Settings → Voice → Spoken answers).
+
+| Archivo | Qué hace |
+|---|---|
+| `main/habla.cjs` | Deja el texto listo para oír (`paraOir`, `enFrases`) y maneja el proceso de la voz: una frase por pedido, el audio por tramos, callar |
+| `motor/habla_motor.py` | Qwen3-TTS con `faster-qwen3-tts`: carga el modelo, aprende la voz de la muestra y entrega el audio mientras lo genera |
+| `renderer/habla.js` | Hace sonar los tramos, uno pegado al otro (Web Audio), y corta al callar |
+
+**Qué se dice.** Solo la respuesta de un turno de voz que terminó bien; un
+mensaje tipeado se contesta por escrito. El pedido de ese turno lleva
+`voz: true` y, si la respuesta hablada está prendida, a las instrucciones del
+agente se les suma `VOICE_NOTE` (en `voz.cjs`): que conteste en una o dos
+frases, sin markdown. Igual se limpia lo que llegue: el código, las tablas, las
+fórmulas y los emojis se saltean, una dirección web se dice «link» (si se la
+borra, la frase queda colgando y el modelo de voz la termina inventando), y lo
+que pasa de 700 caracteres no se dice.
+
+**La voz.** De la muestra se usa solo la huella (`xvec_only=True`), sin su
+texto: con el texto, una muestra en inglés le mezclaba inglés a una respuesta en
+castellano. Sirve cualquier idioma en la muestra.
+
+**El otro Python.** `faster-qwen3-tts` pide versiones de `transformers` que
+chocan con las de Whisper, así que va en un entorno aparte, y su `python.exe`
+se elige en Settings. Con `transformers` 5.24 no carga el modelo; con 5.15.1,
+sí. Medido en una RTX 3060 con el modelo grande: empieza a sonar a 0,5 s y
+genera a 0,6 veces el tiempo real; en frío, 15 s de carga, que arrancan cuando
+el Echo oye la palabra clave. 4,6 GB de la placa; se suelta a los diez minutos.
+
+**Callar.** Decir la palabra clave calla al agente (el Echo avisa que la oyó,
+`voz.cjs` corta el motor y la interfaz). También «Stop» en Settings.
+
+**El motor no lee stdin en un hilo.** En Windows, una lectura bloqueada en otro
+hilo dejaba colgada la carga del modelo. Mira si entró algo sin esperar
+(`PeekNamedPipe`) entre un tramo de audio y el siguiente.
+
+**Lo que no hay:** el micrófono de la PC, elegir al agente nombrándolo en la
+frase, más de un Echo, y un botón para callarlo fuera de Settings.
 
 ## La terminal del panel no es una tool
 

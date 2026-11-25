@@ -17,6 +17,7 @@ const APP = path.join(ROOT, 'apps', 'BlackCode');
 const corte = require(process.env.BLACKCODE_CORTE || path.join(APP, 'main', 'corte.cjs'));
 const escucha = require(process.env.BLACKCODE_ESCUCHA || path.join(APP, 'main', 'escucha.cjs'));
 const eco = require(process.env.BLACKCODE_ECO || path.join(APP, 'main', 'eco.cjs'));
+const habla = require(path.join(APP, 'main', 'habla.cjs'));
 const sim = require(path.join(APP, 'main', 'eco-simulado.cjs'));
 const { tono, silencio } = sim;
 
@@ -471,6 +472,157 @@ function mundo({ config = {}, llave = 'LLAVE-BUENA', opciones = {} } = {}) {
   w.E.parar();
 }
 
+// ---------- El habla: un texto para oír ----------
+{
+  const o = habla.paraOir;
+  ok('oír: el markdown no se lee', o('**Listo**, _Fran_: `luces` apagadas.') === 'Listo, Fran: luces apagadas.');
+  ok('oír: el código se saltea', o('Hice esto:\n```js\nconst x = 1;\n```\nY anduvo.') === 'Hice esto: Y anduvo.', o('Hice esto:\n```js\nconst x = 1;\n```\nY anduvo.'));
+  ok('oír: de un link queda su texto, y una dirección suelta se dice «link» (no se deletrea ni deja la frase colgando)', o('Mirá [la nota](https://a.b/c) o https://x.y/z ahora.') === 'Mirá la nota o link ahora.' && o('Más detalles en https://ejemplo.com/luces') === 'Más detalles en link');
+  ok('oír: una tabla se saltea', !o('Antes.\n| a | b |\n|---|---|\n| 1 | 2 |\nDespués.').includes('|') && o('Antes.\n| a | b |\n|---|---|\n| 1 | 2 |\nDespués.').includes('Después.'));
+  ok('oír: títulos, listas y citas quedan como frases', o('# Título\n- uno\n- dos\n> cita') === 'Título. uno. dos. cita');
+  ok('oír: sin emojis', o('Listo 😀🚀') === 'Listo');
+  ok('oír: nada es nada', o('') === '' && o(null) === '' && o('```\nsolo código\n```') === '');
+  const f = habla.enFrases;
+  ok('frases: una frase corta va sola', JSON.stringify(f('Listo Fran, luces apagadas.')) === '["Listo Fran, luces apagadas."]');
+  ok('frases: las cortitas van juntas', f('Hola. Listo. Ya está.').length === 1);
+  const largas = f('Esta es una primera oración bastante larga que habla de muchas cosas a la vez y no termina nunca jamás, de verdad. Y esta es la segunda oración, también larga, que sigue hablando de otras cosas distintas a las anteriores sin parar. Y la tercera cierra.');
+  ok('frases: las largas van de a una', largas.length >= 2 && largas.every((x) => x.length <= 240), JSON.stringify(largas.map((x) => x.length)));
+  const eterna = f(`${'palabra '.repeat(80)}fin.`);
+  ok('frases: una frase eterna se parte', eterna.length >= 3 && eterna.every((x) => x.length <= 241), JSON.stringify(eterna.map((x) => x.length)));
+  const mucho = f(Array.from({ length: 40 }, (_, i) => `Esta es la oración número ${i + 1} de una respuesta que es para leer.`).join(' '));
+  ok('frases: lo que pasa del tope no se dice', mucho.join(' ').length <= habla.TOPE + 240 && mucho.join(' ').length >= 400 && !mucho.join(' ').includes('número 40'), String(mucho.join(' ').length));
+  ok('frases: sin texto no hay frases', f('').length === 0 && f('```\nx\n```').length === 0);
+}
+
+// ---------- El habla: el proceso de la voz ----------
+{
+  const py = pythonDeMentira();
+  const audios = [];
+  const fines = [];
+  const c = { modelo: 'Qwen/Qwen3-TTS-12Hz-1.7B-Base', muestra: 'C:/voz/zac.mp3', idioma: 'es' };
+  let exe = 'C:/env/python.exe';
+  const h = habla.crear({ python: () => exe, script: 'habla.py', lanzar: py.lanzar, config: () => c, existe: (p) => p !== 'C:/voz/no-esta.wav', alAudio: (a) => audios.push(a), alFin: (x) => fines.push(x) });
+  ok('habla: no levanta nada hasta que hace falta', py.lanzados.length === 0 && h.estado().estado === 'off' && h.estado().hablando === false);
+  ok('habla: sin nada que decir no dice', h.decir('') === null && h.decir('```\ncódigo\n```') === null && py.lanzados.length === 0);
+  const t1 = h.decir('Listo Fran, luces apagadas.');
+  const p = py.lanzados[0];
+  await hasta(() => p?.pedidos.length === 2);
+  ok('habla: levanta el Python de la voz con su motor', py.lanzados.length === 1 && p.comando === 'C:/env/python.exe' && p.args.includes('habla.py'));
+  ok('habla: primero carga el modelo con la muestra, después dice', p.pedidos[0]?.op === 'cargar' && p.pedidos[0].modelo === c.modelo && p.pedidos[0].referencia === 'C:/voz/zac.mp3' && p.pedidos[1]?.op === 'decir' && p.pedidos[1].texto === 'Listo Fran, luces apagadas.' && p.pedidos[1].id === `${t1}.0`, JSON.stringify(p.pedidos));
+  ok('habla: el idioma viaja como lo espera el modelo', p.pedidos[1].idioma === 'Spanish');
+  ok('habla: mientras dice, está hablando', h.estado().hablando === true);
+  p.decir({ ev: 'listo', gpu: 'RTX de mentira' });
+  p.decir({ ev: 'cargando', modelo: c.modelo });
+  p.decir({ ev: 'cargado', modelo: c.modelo, tardo: 1 });
+  const pcm = tono(100);
+  p.decir({ ev: 'audio', id: `${t1}.0`, n: 0, sr: 24000, pcm: pcm.toString('base64') });
+  p.decir({ ev: 'audio', id: `${t1}.0`, n: 1, sr: 24000, pcm: pcm.toString('base64') });
+  p.decir({ ev: 'fin', id: `${t1}.0`, dur: 0.2, tardo: 0.1, primero: 0.05, callado: false });
+  await hasta(() => fines.length === 1);
+  ok('habla: el audio sale por tramos, en orden, como llegó', audios.length === 2 && audios[0].turno === t1 && audios[0].n === 0 && audios[1].n === 1 && audios[0].sr === 24000 && audios[0].pcm.equals(pcm));
+  ok('habla: avisa cuando terminó de decir', fines[0].turno === t1 && fines[0].callado === false && !fines[0].error && h.estado().hablando === false && h.estado().estado === 'ready');
+
+  // una respuesta de varias frases: una por pedido, y el modelo no se vuelve a cargar
+  const t2 = h.decir('Esta es una primera oración bastante larga que habla de muchas cosas a la vez y no termina nunca jamás, de verdad. Y esta es la segunda oración, también larga, que sigue hablando de otras cosas distintas a las anteriores sin parar.');
+  await hasta(() => p.pedidos.length === 4);
+  ok('habla: cada frase va en su pedido, y el modelo se carga una sola vez', p.pedidos.filter((x) => x.op === 'cargar').length === 1 && p.pedidos[2].id === `${t2}.0` && p.pedidos[3].id === `${t2}.1`);
+  p.decir({ ev: 'audio', id: `${t2}.0`, n: 0, sr: 24000, pcm: pcm.toString('base64') });
+  p.decir({ ev: 'fin', id: `${t2}.0`, callado: false });
+  p.decir({ ev: 'audio', id: `${t2}.1`, n: 0, sr: 24000, pcm: pcm.toString('base64') });
+  await hasta(() => audios.length === 4);
+  ok('habla: los tramos de un turno se numeran de corrido, frase tras frase', audios[2].turno === t2 && audios[2].n === 0 && audios[3].n === 1 && fines.length === 1);
+  // callar a mitad: se le avisa al motor por cada frase que faltaba, y lo que siga llegando no suena
+  ok('habla: callar dice que había algo', h.callar() === true && h.estado().hablando === false);
+  await hasta(() => p.pedidos.some((x) => x.op === 'callar'));
+  ok('habla: al callar, el motor deja de generar lo que faltaba', p.pedidos.filter((x) => x.op === 'callar').map((x) => x.id).join() === `${t2}.1`, JSON.stringify(p.pedidos.filter((x) => x.op === 'callar')));
+  p.decir({ ev: 'audio', id: `${t2}.1`, n: 1, sr: 24000, pcm: pcm.toString('base64') });
+  p.decir({ ev: 'fin', id: `${t2}.1`, callado: true });
+  await hasta(() => fines.length === 2);
+  ok('habla: lo que llega después de callar no suena', audios.length === 4 && fines[1].turno === t2 && fines[1].callado === true);
+  ok('habla: callar sin nada que callar no hace nada', h.callar() === false);
+
+  // cambia la muestra: el modelo se prepara de nuevo
+  c.muestra = 'C:/voz/otra.wav';
+  h.decir('Otra voz.');
+  await hasta(() => p.pedidos.filter((x) => x.op === 'cargar').length === 2);
+  ok('habla: con otra muestra, se prepara de nuevo', p.pedidos.filter((x) => x.op === 'cargar')[1]?.referencia === 'C:/voz/otra.wav');
+  // el motor falla con esa frase
+  const idError = p.pedidos.at(-1).id;
+  p.decir({ ev: 'error', id: idError, msg: 'RuntimeError: CUDA out of memory' });
+  await hasta(() => fines.length === 3);
+  ok('habla: si el motor falla, se sabe por qué', /CUDA out of memory/.test(fines[2].error) && h.estado().estado === 'error' && /CUDA out of memory/.test(h.estado().error));
+  // el proceso se muere a mitad de una frase
+  const t4 = h.decir('Me voy a cortar.');
+  await pausa(10);
+  p.stderr.write("ModuleNotFoundError: No module named 'faster_qwen3_tts'\n");
+  await pausa(5);
+  p.salir(1);
+  await hasta(() => fines.length === 4);
+  ok('habla: si el proceso se muere, el turno se cierra y dice qué falta', fines[3].turno === t4 && /“faster_qwen3_tts”/.test(h.estado().error) && h.vivo() === false, h.estado().error);
+  // …y la próxima frase lo levanta de nuevo, cargando el modelo otra vez
+  h.decir('De vuelta.');
+  await hasta(() => py.lanzados[1]?.pedidos.length === 2);
+  ok('habla: después de caerse, se levanta y carga de nuevo', py.lanzados.length === 2 && py.lanzados[1].pedidos[0].op === 'cargar');
+  h.apagar();
+  await hasta(() => py.lanzados[1].pedidos.some((x) => x.op === 'salir'));
+  py.lanzados[1].salir(0);
+  ok('habla: apagar le pide salir, y no es un error', h.estado().estado === 'off' && h.estado().error === '');
+
+  // lo que falta para poder hablar
+  exe = '';
+  ok('habla: sin Python, lo dice', h.decir('Hola.') === null && h.estado().error === 'No Python set for the voice.');
+  exe = 'C:/env/python.exe';
+  c.muestra = '';
+  ok('habla: sin muestra, lo dice', h.decir('Hola.') === null && h.estado().error === 'No voice sample set.' && py.lanzados.length === 2);
+  c.muestra = 'C:/voz/no-esta.wav';
+  ok('habla: con una muestra que no está, lo dice', h.decir('Hola.') === null && h.estado().error === 'The voice sample was not found.' && py.lanzados.length === 2);
+  // se apaga sola
+  const corto = habla.crear({ python: () => 'py', script: 'h.py', lanzar: py.lanzar, config: () => ({ muestra: 'C:/voz/zac.mp3' }), existe: () => true, ociosoMs: 40 });
+  corto.calentar();
+  await hasta(() => py.lanzados.at(-1).pedidos.some((x) => x.op === 'salir'), 600);
+  ok('habla: calentar carga el modelo sin decir nada, y se apaga sola tras un rato', py.lanzados.at(-1).pedidos[0].op === 'cargar' && py.lanzados.at(-1).pedidos.some((x) => x.op === 'salir') && !py.lanzados.at(-1).pedidos.some((x) => x.op === 'decir'));
+  // probar: ¿ese Python tiene la voz?
+  const proceso = (sale, error = '', codigo = 0) => () => { const q = new EventEmitter(); q.stdout = new PassThrough(); q.stderr = new PassThrough(); q.kill = () => {}; setImmediate(() => { if (sale) q.stdout.write(sale); if (error) q.stderr.write(error); setImmediate(() => q.emit('exit', codigo)); }); return q; };
+  ok('probar la voz: un Python que la tiene', (await habla.probar({ python: 'py', lanzar: proceso('{"ok": true, "cuda": true, "gpu": "RTX"}\n') })).gpu === 'RTX');
+  ok('probar la voz: dice qué paquete falta', /“faster_qwen3_tts”/.test((await habla.probar({ python: 'py', lanzar: proceso('', "ModuleNotFoundError: No module named 'faster_qwen3_tts'\n", 1) })).error));
+  ok('probar la voz: sin Python elegido, lo dice', (await habla.probar({ python: '' })).error === 'No Python set for the voice.');
+}
+
+// ---------- El cifrado que Electron no trae ----------
+{
+  // Acá (node) ChaCha20-Poly1305 existe: sirve para comprobar que el propio da lo mismo, de ida y de vuelta.
+  const chacha = require(path.join(APP, 'main', 'chacha.cjs'));
+  const crypto = require('node:crypto');
+  const { chacha20poly1305 } = await import('@noble/ciphers/chacha.js');
+  ok('cifrado: node lo trae, y el vector de la RFC 8439 pasa', chacha.nativo() === true && (await chacha.instalar()) === 'nativo' && chacha.probar() === true);
+  const clave = Buffer.alloc(32, 7);
+  const nonce = Buffer.from('000000000102030405060708', 'hex');
+  const aad = Buffer.from('cabecera');
+  const claro = Buffer.from('okay zac, apagá las luces');
+  const mio = chacha.cifrador(chacha20poly1305, clave, nonce);
+  mio.setAAD(aad, { plaintextLength: claro.length });
+  const cifradoMio = Buffer.concat([mio.update(claro.subarray(0, 5)), mio.update(claro.subarray(5)), mio.final()]);
+  const suyo = crypto.createCipheriv('chacha20-poly1305', clave, nonce, { authTagLength: 16 });
+  suyo.setAAD(aad);
+  const cifradoSuyo = Buffer.concat([suyo.update(claro), suyo.final()]);
+  ok('cifrado: el propio cifra igual que el de node, con la misma marca', cifradoMio.equals(cifradoSuyo) && mio.getAuthTag().equals(suyo.getAuthTag()) && cifradoMio.length === claro.length);
+  const abrir = (datos, marca, conAad = aad) => { const d = chacha.descifrador(chacha20poly1305, clave, nonce); d.setAAD(conAad); d.setAuthTag(marca); return Buffer.concat([d.update(datos), d.final()]); };
+  ok('cifrado: el propio descifra lo que cifró node', abrir(cifradoSuyo, suyo.getAuthTag()).equals(claro));
+  const tocado = Buffer.from(cifradoSuyo); tocado[2] ^= 1;
+  const tira = (fn) => { try { fn(); return false; } catch { return true; } };
+  ok('cifrado: un dato tocado, otra marca u otra cabecera no pasan', tira(() => abrir(tocado, suyo.getAuthTag())) && tira(() => abrir(cifradoSuyo, Buffer.alloc(16, 1))) && tira(() => abrir(cifradoSuyo, suyo.getAuthTag(), Buffer.from('otra'))) && tira(() => abrir(cifradoSuyo, Buffer.alloc(4))));
+  const vacio = chacha.cifrador(chacha20poly1305, clave, nonce); vacio.setAAD(aad);
+  const nada = vacio.final();
+  const suyoVacio = crypto.createCipheriv('chacha20-poly1305', clave, nonce, { authTagLength: 16 }); suyoVacio.setAAD(aad); suyoVacio.final();
+  ok('cifrado: sin datos también da la marca correcta (el saludo de Noise empieza así)', nada.length === 0 && vacio.getAuthTag().equals(suyoVacio.getAuthTag()));
+  const fuenteV = fs.readFileSync(path.join(APP, 'main', 'voz.cjs'), 'utf8');
+  ok('el cifrado se instala antes de cargar la librería del Echo', fuenteV.includes("async () => { await require('./chacha.cjs').instalar(); return import('esphome-client'); }"));
+  const fuenteC = fs.readFileSync(path.join(APP, 'main', 'chacha.cjs'), 'utf8');
+  ok('solo ese algoritmo va al propio, y lo importado como módulo ES ve el cambio', fuenteC.includes('if (!esEl(algo)) return cifrar.call(this, algo, clave, nonce, ...resto);') && fuenteC.includes("require('node:module').syncBuiltinESMExports();") && fuenteC.includes("if (nativo()) return 'nativo';"));
+  const paqueteC = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
+  ok('la app lleva @noble/ciphers', typeof paqueteC.dependencies['@noble/ciphers'] === 'string');
+}
+
 // ---------- La llave y el cableado ----------
 {
   // voz.cjs pide electron al cablear, no al cargarse
@@ -485,13 +637,19 @@ function mundo({ config = {}, llave = 'LLAVE-BUENA', opciones = {} } = {}) {
   ok('la frase le llega a la interfaz con el agente y el permiso', fuente.includes("rad.send('voz:frase', { n: ++cuenta, texto: f.texto, agente: c.agente, actua: c.actua, tardo: f.ms });"));
   ok('al abrir la app conecta recién cuando safeStorage puede descifrar', fuente.includes('electron.app.whenReady().then(() => eco.arrancar());') && !/\n  eco\.arrancar\(\);\n/.test(fuente));
   ok('una llave que no se pudo descifrar se avisa como ilegible', fuente.includes('ilegible: c.hayLlave && !llave'));
-  ok('al salir se desconecta y se apaga Whisper', fuente.includes("electron.app.on('before-quit', () => { eco.parar(); escucha.apagar(); });"));
+  ok('al salir se desconecta y se apagan Whisper y la voz', fuente.includes("electron.app.on('before-quit', () => { eco.parar(); escucha.apagar(); habla.apagar(); });"));
+  ok('la palabra clave calla al agente si estaba hablando, y el modelo de voz empieza a cargar ahí', fuente.includes('calentar: () => { callar(); if (config().habla.activa) { try { habla.calentar(); }'));
+  ok('la respuesta hablada viene apagada y solo habla si está prendida (o es la prueba de Settings)', fuente.includes('activa: d.habla?.activa === true,') && fuente.includes("if (!c.habla.activa && !prueba) return { ok: false, error: 'Spoken answers are off.' };"));
   ok('el motor viaja fuera del asar', fuente.includes("path.join(process.resourcesPath, 'motor', 'escucha_motor.py')"));
   const chat = fs.readFileSync(path.join(APP, 'main', 'chat.cjs'), 'utf8');
   ok('la voz se cablea con el cifrado de la app, y de mentira en el humo', chat.includes("require('./voz.cjs').wire(rad, { taller, cifrar, descifrar, agentes: losAgentes, simulada: ecoDeMentira });") && chat.includes("const ecoDeMentira = taller ? require('./eco-simulado.cjs').paraElHumo() : null;"));
   const paquete = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
-  ok('el paquete lleva la librería del Echo y el motor de Whisper', typeof paquete.dependencies['esphome-client'] === 'string' && JSON.stringify(paquete.build.extraResources) === JSON.stringify([{ from: 'motor', to: 'motor', filter: ['*.py'] }]) && fs.existsSync(path.join(APP, 'motor', 'escucha_motor.py')));
+  ok('el paquete lleva la librería del Echo y los motores de Whisper y de la voz', typeof paquete.dependencies['esphome-client'] === 'string' && JSON.stringify(paquete.build.extraResources) === JSON.stringify([{ from: 'motor', to: 'motor', filter: ['*.py'] }]) && fs.existsSync(path.join(APP, 'motor', 'escucha_motor.py')) && fs.existsSync(path.join(APP, 'motor', 'habla_motor.py')));
   const interfaz = fs.readFileSync(path.join(APP, 'renderer', 'voz.js'), 'utf8');
+  ok('el agente sabe que lo van a oír solo si el turno se dijo y se contesta en voz alta', chat.includes("if (pedido.voz && voz.hablaActiva()) pedido.instrucciones = [pedido.instrucciones, require('./voz.cjs').VOICE_NOTE].filter(Boolean).join('\\n\\n');") && chat.includes('voz: voz === true,') && /read aloud/.test(voz.VOICE_NOTE) && /no markdown/.test(voz.VOICE_NOTE));
+  ok('solo se dice en voz alta la respuesta de un turno de voz que terminó bien', interfaz.includes("if (datos.voz().habla?.activa && t.estado === 'ok' && t.texto.trim()) window.rad.invoke('voz:decir', { texto: t.texto })") && interfaz.indexOf("window.rad.invoke('voz:decir', { texto: t.texto })") > interfaz.indexOf('if (t.voz) {'));
+  const motorHabla = fs.readFileSync(path.join(APP, 'motor', 'habla_motor.py'), 'utf8');
+  ok('el motor de la voz no lee stdin en un hilo (en Windows eso cuelga la carga del modelo) ni guarda el audio', !/^import threading|^import queue/m.test(motorHabla) && motorHabla.includes('PeekNamedPipe') && !/open\(|tempfile|sf\.write/.test(motorHabla) && motorHabla.includes('xvec_only=True'));
   ok('un turno de voz va en manual salvo que el usuario lo prenda', interfaz.includes("{ voz: true, modo: f.actua ? 'auto' : 'manual' }"));
   const motorPy = fs.readFileSync(path.join(APP, 'motor', 'escucha_motor.py'), 'utf8');
   ok('el motor no escribe el audio en el disco', !/open\(|\.write\(|tempfile|wav/.test(motorPy.replace(/sys\.stdout\.write\(/g, '')));
@@ -502,5 +660,5 @@ if (failures.length) {
   for (const f of failures) console.error('  ' + f);
   process.exit(1);
 }
-console.log(`test-blackcode-voz: ok (${hechas} comprobaciones: el corte de la frase, lo que Whisper inventa, el proceso de Whisper, la palabra clave, la conversación con el Echo —frases, silencios, errores, cortes y reconexiones—, la llave y el cableado)`);
+console.log(`test-blackcode-voz: ok (${hechas} comprobaciones: el corte de la frase, lo que Whisper inventa, el proceso de Whisper, la palabra clave, la conversación con el Echo —frases, silencios, errores, cortes y reconexiones—, el texto para oír, el proceso de la voz, la llave y el cableado)`);
 process.exit(0);

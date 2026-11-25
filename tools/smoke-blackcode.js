@@ -13,9 +13,11 @@ const dur = (name) => {
   const v = getComputedStyle(document.documentElement).getPropertyValue(`--rad-dur-${name}`).trim();
   return v.endsWith('ms') ? parseFloat(v) : parseFloat(v) * 1000;
 };
+// (la condición puede ser asíncrona —preguntarle algo al proceso principal—: se la espera. Sin ese await, una promesa
+// siempre es verdadera y la espera terminaba en el acto.)
 const until = async (cond, ms = 9000) => {
   for (const t0 = performance.now(); performance.now() - t0 < ms;) {
-    if (cond()) return true;
+    if (await cond()) return true;
     await frame();
   }
   return false;
@@ -191,7 +193,9 @@ if (marker?.pass === 1) {
     if (e.activa !== true || e.hayLlave !== true || e.host !== 'fake-atom.local' || e.actua !== false || e.eco.conexion !== 'connected' || s.conexiones !== 1 || s.llave !== true || s.suscripto !== 1) fail('voz: al reabrir la app la escucha no volvió prendida y conectada: ' + JSON.stringify({ ...e, whisper: undefined }).slice(0, 300) + ' / ' + JSON.stringify({ conexiones: s.conexiones, llave: s.llave }));
     // (el agente que se había elegido se borró: lo que se diga va al primero de la lista)
     if (datosM.agente(e.agente) || datosM.agenteDeVoz()?.id !== datosM.listaAgentes()[0].id) fail('voz: con el agente elegido borrado, lo dicho no va al primero de la lista');
-    data.voz = 'la escucha quedó prendida y se conectó sola al abrir, con su llave';
+    // …y la respuesta hablada, con su Python, su muestra y su modelo
+    if (e.habla.activa !== true || e.habla.python !== 'C:\\env\\Scripts\\python.exe' || !e.habla.muestra.endsWith('voice-sample.wav') || !e.habla.modelo.includes('1.7B')) fail('habla: al reabrir la app la respuesta hablada no volvió como se dejó: ' + JSON.stringify(e.habla));
+    data.voz = 'la escucha quedó prendida y se conectó sola al abrir, con su llave; la respuesta hablada volvió como se dejó';
   }
   data.persistencia = `3 agentes (uno de Venice), el chat con 4 mensajes (la frenada con ${marker.frenado} caracteres), llaves: Anthropic ${llave.anthropic?.estado}, Venice ${llave.venice?.estado}`;
   window.rad.store.write('smoke', { pass: 2 });
@@ -3660,6 +3664,8 @@ else {
     {
       const p = await window.rad.invoke('voz:piezas');
       if (p.libreria !== true || p.motor !== true) fail('voz: la app no trae la librería del Echo o el motor de Whisper: ' + JSON.stringify(p));
+      // …y ESTE proceso (Electron, no node) sabe hacer el saludo cifrado con el Echo: el cifrado que Electron no trae está puesto, y una llave equivocada no pasa
+      if (p.vector !== true || p.saludo !== true || p.llaveMala !== true || p.cifrado !== 'propio') fail('voz: la app no puede hacer la conexión cifrada con el Echo (la 1.1.0 fallaba instalada con «Unknown cipher»): ' + JSON.stringify(p));
     }
     // De fábrica: apagada, sin llave, sin conectarse a nada.
     {
@@ -3733,6 +3739,7 @@ else {
     if (!dice('voz-eco').includes('Listening…') || statusRight() !== 'Listening…') fail('voz: mientras el Echo escucha no se dice: tarjeta «' + dice('voz-eco') + '», barra «' + statusRight() + '»');
     if ((await sim({})).cargas !== 1) fail('voz: el modelo no empezó a cargar al oír la palabra clave');
     // …y dice algo: va a un chat de voz del agente, sin sacar al usuario de Settings.
+    if (chatView.querySelector('.dm-canales').offsetHeight !== 0 || !chatView.querySelector('.dm-canales').inert) fail('canales: el grupo Channels se ve sin que haya ningún chat de canal (' + chatView.querySelector('.dm-canales').offsetHeight + ' px)');
     const chatAntes = datosM.chatActual()?.id;
     const cuantosAntes = datosM.chatsDe(agenteV.id).length;
     await sim({ que: 'hablar', texto: 'Okay Zac, what time is it?' });
@@ -3761,9 +3768,31 @@ else {
       if (datosM.chatActual()?.id !== chatV.id || view('chat').inert) fail('voz: «Open» no llevó al chat de voz');
       const dicho = msgs()[0];
       if (!dicho?.querySelector('.dm-msg-voz') || !dicho.querySelector('.dm-msg-voz svg') || !dicho.querySelector('.dm-msg-voz').textContent.includes('Said to the Atom Echo') || msgs()[1]?.querySelector('.dm-msg-voz')) fail('voz: el mensaje dicho no lleva su marca de micrófono (o la lleva la respuesta)');
+      // El chat de voz está en el grupo «Channels», al fondo de la lista: flecha, ícono y nombre, con su tacho y sin contador.
+      const grupo = chatView.querySelector('.dm-canales');
+      const cabeza = grupo.querySelector('[data-accion="canales"]');
       const filaV = rows().find((r) => r.dataset.radKey === chatV.id);
-      const otras = rows().filter((r) => r.dataset.radKey !== chatV.id && r.querySelector('.dm-fila-voz'));
-      if (!filaV?.hasAttribute('data-voz') || !(filaV.querySelector('.dm-fila-voz')?.offsetWidth > 0) || otras.some((r) => r.querySelector('.dm-fila-voz').offsetWidth > 0)) fail('voz: la fila del chat de voz no lleva su micrófono, o lo lleva otra');
+      const comunesF = rows().filter((r) => !r.closest('.dm-canales'));
+      await settle();
+      if (!filaV || !filaV.closest('.dm-canales') || grupo.hasAttribute('data-vacio') || grupo.inert || !(grupo.offsetHeight > 40)) fail('canales: el chat de voz no está en el grupo Channels (' + grupo.offsetHeight + ' px)');
+      if (cabeza.textContent.trim() !== 'Channels' || cabeza.querySelectorAll('svg').length !== 2 || !grupo.querySelector('[data-accion="canales-borrar"] svg') || /\d/.test(grupo.querySelector('.dm-canales-fila').textContent)) fail('canales: la cabeza del grupo no es flecha, ícono y nombre, con su tacho y sin contador: «' + grupo.querySelector('.dm-canales-fila').textContent + '»');
+      if (grupo.parentElement.lastElementChild !== grupo || !comunesF.length || comunesF.some((r) => r.getBoundingClientRect().top >= grupo.getBoundingClientRect().top)) fail('canales: el grupo no está al fondo de la lista, debajo de todos los chats');
+      if (!/\d{1,2}\D\d{1,2}.* · \d{2}:\d{2}/.test(shown(filaV?.querySelector('.dm-fila-fecha'))) || comunesF.some((r) => r.querySelector('.dm-fila-fecha'))) fail('canales: la fila de un chat de canal no dice cuándo fue (o lo dice la de un chat común): «' + shown(filaV?.querySelector('.dm-fila-fecha')) + '»');
+      // Se pliega desplegándose (no de golpe), y se acuerda.
+      {
+        const caja = grupo.querySelector('.dm-canales-caja');
+        const alto0 = caja.offsetHeight;
+        cabeza.click();
+        const altos = [];
+        for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 200;) { altos.push(caja.offsetHeight); await frame(); }
+        await settle();
+        if (!(alto0 > 20) || caja.offsetHeight !== 0 || cabeza.getAttribute('aria-expanded') !== 'false' || !caja.inert || (await window.rad.store.read('ui'))?.canales !== false) fail('canales: al plegar el grupo no quedó cerrado y guardado (' + alto0 + ' → ' + caja.offsetHeight + ' px)');
+        if (!altos.some((a) => a > 2 && a < alto0 - 2)) fail('canales: el grupo se pliega de golpe: ' + [...new Set(altos)].join(' → '));
+        cabeza.click();
+        await settle();
+        await sleep(dur('base'));
+        if (caja.offsetHeight !== alto0 || cabeza.getAttribute('aria-expanded') !== 'true' || caja.inert) fail('canales: al desplegarlo no volvió como estaba (' + caja.offsetHeight + ' de ' + alto0 + ' px)');
+      }
       enIngles('en un chat de voz');
     }
 
@@ -3857,6 +3886,185 @@ else {
     datosM.ponerModoTools(modoAntes);
     await go('chat');
     data.voz = 'apagada de fábrica, la llave cifrada y fuera de la interfaz, conectar, una frase a un chat de voz sin sacar al usuario de donde está, dos seguidas en orden, silencio y Whisper caído, manual aunque la app esté en automático, «Let voice act», corte y reconexión';
+  }
+
+  // 11u. La respuesta hablada: el agente contesta lo que se le dijo por los
+  // parlantes, con una voz clonada. Acá la voz es de mentira (anota lo que
+  // «dice» y entrega unos tramos de audio casi mudos, que la interfaz hace
+  // sonar de verdad). Viene apagada; solo se dice la respuesta de un turno de
+  // VOZ; la palabra clave la calla; y si el turno queda esperando permiso, lo dice.
+  {
+    const datosM = await import('/datos.js');
+    const parlante = await import('/habla.js');
+    const sim = (que = {}) => window.rad.invoke('voz:simular', que);
+    const estadoV = () => window.rad.invoke('voz:estado');
+    const agenteV = datosM.agenteActual();
+    const chatV = datosM.chatsDe(agenteV.id).filter((c) => c.voz === true)[0];
+    const quieto = async (chatId) => { await sleep(150); await until(() => !datosM.respondiendo(chatId), 20000); await settle(); };
+    const callado = () => until(() => !parlante.hablando(), 6000);
+    if (!chatV) fail('habla: no quedó el chat de voz del bloque anterior');
+    {
+      const p = await window.rad.invoke('voz:piezas');
+      if (p.motorHabla !== true) fail('habla: la app no trae el motor de la voz: ' + JSON.stringify(p));
+    }
+    await go('ajustes');
+    const tarjetaV = view('ajustes').querySelector('[data-tarjeta="voz"]');
+    const campoV = (c) => tarjetaV.querySelector('[data-campo="' + c + '"]');
+    const boton = (a) => tarjetaV.querySelector('[data-accion="' + a + '"]');
+    const dice = (cual) => shown(tarjetaV.querySelector('[data-estado="' + cual + '"] .rad-swap') ?? tarjetaV.querySelector('[data-estado="' + cual + '"]'));
+    campoV('voz-habla').scrollIntoView({ block: 'center' });
+    await settle();
+    // De fábrica: apagada, sin Python ni muestra, y sin poder probarla.
+    {
+      const e = await estadoV();
+      if (e.habla.activa !== false || e.habla.python !== '' || e.habla.muestra !== '' || campoV('voz-habla').checked || tarjetaV.dataset.habla !== 'no') fail('habla: no viene apagada de fábrica: ' + JSON.stringify(e.habla));
+      if (!boton('voz-habla-probar').disabled || !boton('voz-habla-callar').disabled || !dice('voz-habla').includes('No Python set')) fail('habla: sin Python ni muestra se puede probar, o no lo dice: «' + dice('voz-habla') + '»');
+      if (e.modelosHabla.length !== 2 || !e.habla.modelo.includes('1.7B')) fail('habla: no ofrece los dos modelos con el grande elegido: ' + JSON.stringify(e.modelosHabla));
+    }
+    enIngles('en la parte de la respuesta hablada');
+    // Apagada, un turno de voz se contesta pero no se dice.
+    await sim({ que: 'frase', texto: 'answer in writing only' });
+    await until(async () => (await datosM.hilo(chatV.id)).get().mensajes.findLast((m) => m.rol === 'user')?.texto === 'answer in writing only', 8000);
+    if ((await datosM.hilo(chatV.id)).get().mensajes.findLast((m) => m.rol === 'user')?.texto !== 'answer in writing only') fail('habla: la frase «answer in writing only» no llegó al chat de voz; lo último fue «' + (await datosM.hilo(chatV.id)).get().mensajes.findLast((m) => m.rol === 'user')?.texto + '»');
+    await quieto(chatV.id);
+    await sleep(300);
+    if ((await sim({})).voz.dichos.length !== 0 || parlante.hablando()) fail('habla: apagada, igual dijo la respuesta en voz alta');
+
+    // El Python de la voz y la muestra.
+    type(campoV('voz-habla-python'), 'C:\\env\\Scripts\\python.exe');
+    campoV('voz-habla-python').dispatchEvent(new Event('change', { bubbles: true }));
+    await until(async () => (await estadoV()).habla.python === 'C:\\env\\Scripts\\python.exe', 2000);
+    boton('voz-habla-muestra').click();
+    await until(() => tarjetaV.dataset.muestra === 'si', 3000);
+    await settle();
+    if (!dice('voz-habla-muestra').endsWith('voice-sample.wav') || boton('voz-habla-probar').disabled) fail('habla: al elegir la muestra no queda a la vista, o sigue sin poder probarse: «' + dice('voz-habla-muestra') + '»');
+    await until(() => dice('voz-habla').includes('The voice is installed'), 4000);
+    if (!dice('voz-habla').includes('The voice is installed')) fail('habla: no dice si ese Python tiene la voz: «' + dice('voz-habla') + '»');
+
+    // «Say something»: suena (sin prender nada), se ve, y se puede callar.
+    const antes = parlante.medidas();
+    boton('voz-habla-probar').click();
+    await until(() => parlante.hablando(), 3000);
+    {
+      const m = parlante.medidas();
+      const s = await sim({});
+      if (!parlante.hablando() || m.estado !== 'running' || !(m.cursor > antes.cursor) || m.sonando < 1) fail('habla: la prueba no suena: ' + JSON.stringify(m));
+      if (s.voz.dichos.at(-1) !== 'Así sueno yo. Si me escuchás, está todo andando.') fail('habla: la prueba no dijo su frase en el idioma elegido: ' + JSON.stringify(s.voz.dichos));
+      await until(() => statusRight() === 'Speaking…' && !boton('voz-habla-callar').disabled, 2000);
+      if (statusRight() !== 'Speaking…' || boton('voz-habla-callar').disabled || tarjetaV.dataset.hablando !== 'si') fail('habla: mientras habla no se dice en la barra («' + statusRight() + '») o no se puede callar');
+      // el reloj del audio avanza: está sonando de verdad, no solo programado
+      const r0 = parlante.medidas().reloj;
+      await sleep(200);
+      if (!(parlante.medidas().reloj > r0 + 0.1)) fail('habla: el reloj del audio no avanza (' + r0 + ' → ' + parlante.medidas().reloj + ')');
+      boton('voz-habla-callar').click();
+      await until(() => !parlante.hablando(), 2000);
+      await settle();
+      if (parlante.hablando() || parlante.medidas().sonando !== 0 || statusRight() === 'Speaking…' || !boton('voz-habla-callar').disabled) fail('habla: Stop no la calló: ' + JSON.stringify(parlante.medidas()) + ' / «' + statusRight() + '»');
+    }
+
+    // Se prende: la respuesta de un turno de voz se dice; la de uno tipeado, no.
+    campoV('voz-habla').click();
+    await until(() => tarjetaV.dataset.habla === 'si', 2000);
+    await sleep(700);
+    const dichos0 = (await sim({})).voz.dichos.length;
+    const instruccionesDe = (texto) => Number(/instructions: (\d+) characters/.exec(texto ?? '')?.[1] ?? -1);
+    const sinVoz = instruccionesDe((await datosM.hilo(chatV.id)).get().mensajes.at(-1).texto);
+    await sim({ que: 'frase', texto: 'say this back to me' });
+    await until(async () => (await datosM.hilo(chatV.id)).get().mensajes.findLast((m) => m.rol === 'user')?.texto === 'say this back to me', 8000);
+    if ((await datosM.hilo(chatV.id)).get().mensajes.findLast((m) => m.rol === 'user')?.texto !== 'say this back to me') fail('habla: la frase «say this back to me» no llegó al chat de voz; lo último fue «' + (await datosM.hilo(chatV.id)).get().mensajes.findLast((m) => m.rol === 'user')?.texto + '»');
+    if (!((await sim({})).voz.cargas >= 1)) fail('habla: el modelo de voz no empezó a cargar cuando el Echo oyó la palabra clave');
+    await quieto(chatV.id);
+    await until(async () => (await sim({})).voz.dichos.length === dichos0 + 1, 4000);
+    {
+      const s = await sim({});
+      const respuesta = (await datosM.hilo(chatV.id)).get().mensajes.at(-1).texto;
+      if (s.voz.dichos.length !== dichos0 + 1 || s.voz.dichos.at(-1) !== respuesta || !respuesta.includes('say this back to me')) fail('habla: la respuesta de un turno de voz no se dijo: ' + JSON.stringify(s.voz.dichos.slice(dichos0)).slice(0, 200));
+      // (el agente supo que lo iban a oír: sus instrucciones llevaron la nota de voz, que el turno anterior no tenía)
+      if (!(sinVoz >= 0) || !(instruccionesDe(respuesta) > sinVoz + 300)) fail('habla: al agente no se le dijo que su respuesta se iba a oír (instrucciones: ' + sinVoz + ' → ' + instruccionesDe(respuesta) + ' caracteres)');
+      await until(() => parlante.hablando(), 2000);
+      if (!parlante.hablando()) fail('habla: la respuesta no llegó a sonar');
+    }
+    await callado();
+    // (y termina: cada tramo que se programó, sonó hasta el final)
+    if (parlante.hablando()) fail('habla: la respuesta no terminó de sonar: ' + JSON.stringify(parlante.medidas()));
+    await go('chat');
+    datosM.elegirChat(chatV.id);
+    await settle();
+    const dichos1 = (await sim({})).voz.dichos.length;
+    type(composer.querySelector('textarea'), 'typed, not said');
+    send.click();
+    await quieto(chatV.id);
+    await sleep(400);
+    if ((await sim({})).voz.dichos.length !== dichos1) fail('habla: dijo en voz alta la respuesta de un mensaje tipeado');
+    // (y a un mensaje tipeado no se le suma la nota de voz)
+    if (instruccionesDe((await datosM.hilo(chatV.id)).get().mensajes.at(-1).texto) !== sinVoz) fail('habla: un mensaje tipeado llevó la nota de voz');
+
+    // La palabra clave lo calla: es la forma de interrumpirlo.
+    await sim({ que: 'frase', texto: 'talk until I interrupt you' });
+    await until(async () => (await datosM.hilo(chatV.id)).get().mensajes.findLast((m) => m.rol === 'user')?.texto === 'talk until I interrupt you', 8000);
+    if ((await datosM.hilo(chatV.id)).get().mensajes.findLast((m) => m.rol === 'user')?.texto !== 'talk until I interrupt you') fail('habla: la frase «talk until I interrupt you» no llegó al chat de voz; lo último fue «' + (await datosM.hilo(chatV.id)).get().mensajes.findLast((m) => m.rol === 'user')?.texto + '»');
+    await until(() => parlante.hablando(), 20000);
+    if (!parlante.hablando()) fail('habla: no empezó a hablar para poder interrumpirlo');
+    const callados0 = (await sim({})).voz.callados;
+    await sim({ que: 'pedir' });
+    await until(() => !parlante.hablando(), 2000);
+    {
+      const s = await sim({});
+      if (parlante.hablando() || s.voz.callados !== callados0 + 1) fail('habla: decir la palabra clave no lo calló (motor ' + s.voz.callados + ' de ' + (callados0 + 1) + ', suena ' + parlante.hablando() + ')');
+    }
+    // (el Echo quedó escuchando: ese pedido se cierra en silencio)
+    await sim({ que: 'silencio' });
+    await until(async () => (await estadoV()).eco.fase === 'idle', 6000);
+    await quieto(chatV.id);
+
+    // Un turno de voz que queda esperando permiso lo dice: quien habló no mira la pantalla.
+    await sim({ que: 'frase', texto: 'TOOLS: [{"name":"fs_write","args":{"path":"voice-ask.txt","content":"x\\n"}}]' });
+    await until(() => permiso(), 6000);
+    if (!permiso()) fail('habla: el turno de voz que pide escribir no mostró su tarjeta');
+    await until(async () => (await sim({})).voz.dichos.at(-1) === 'Necesito tu permiso en la pantalla.', 3000);
+    if ((await sim({})).voz.dichos.at(-1) !== 'Necesito tu permiso en la pantalla.') fail('habla: al quedar esperando permiso no lo dijo: ' + JSON.stringify((await sim({})).voz.dichos.slice(-2)));
+    [...(permiso()?.querySelectorAll('.rad-modal-actions .rad-button') ?? [])].find((b) => b.textContent === 'Decline')?.click();
+    await closed();
+    await quieto(chatV.id);
+    await callado();
+
+    // Se apaga: suelta el modelo y deja de decir. Queda prendida para la pasada 2.
+    await go('ajustes');
+    const apagadas0 = (await sim({})).voz.apagadas;
+    campoV('voz-habla').click();
+    await until(() => tarjetaV.dataset.habla === 'no', 2000);
+    await sleep(200);
+    if (!((await sim({})).voz.apagadas > apagadas0)) fail('habla: al apagarla no soltó el modelo de voz');
+    const dichos2 = (await sim({})).voz.dichos.length;
+    await sim({ que: 'frase', texto: 'now you are quiet again' });
+    await until(async () => (await datosM.hilo(chatV.id)).get().mensajes.findLast((m) => m.rol === 'user')?.texto === 'now you are quiet again', 8000);
+    if ((await datosM.hilo(chatV.id)).get().mensajes.findLast((m) => m.rol === 'user')?.texto !== 'now you are quiet again') fail('habla: la frase «now you are quiet again» no llegó al chat de voz; lo último fue «' + (await datosM.hilo(chatV.id)).get().mensajes.findLast((m) => m.rol === 'user')?.texto + '»');
+    await quieto(chatV.id);
+    await sleep(300);
+    if ((await sim({})).voz.dichos.length !== dichos2) fail('habla: apagada de nuevo, siguió diciendo las respuestas');
+    campoV('voz-habla').click();
+    await until(() => tarjetaV.dataset.habla === 'si', 2000);
+    await go('chat');
+    // El tacho del grupo Channels borra todos los chats de canal de ese agente (preguntando), y el grupo se va.
+    {
+      datosM.elegirAgente(agenteV.id);
+      await settle();
+      const grupo = chatView.querySelector('.dm-canales');
+      const n = datosM.chatsDe(agenteV.id).filter((c) => c.voz === true).length;
+      const comunes0 = datosM.chatsDe(agenteV.id).filter((c) => c.voz !== true).length;
+      grupo.querySelector('[data-accion="canales-borrar"]').click();
+      await until(() => modal(), 2000);
+      await sleep(dur('slow') + 120);
+      if (!modal()?.textContent.includes('channel chat') || !modal().textContent.includes(agenteV.nombre)) fail('canales: el tacho no pregunta antes de borrar: ' + modal()?.textContent.slice(0, 120));
+      enIngles('al borrar los chats de canal');
+      primary().click();
+      await closed();
+      await until(() => datosM.chatsDe(agenteV.id).every((c) => c.voz !== true), 4000);
+      await settle();
+      await sleep(dur('base') + 100);
+      if (!(n >= 1) || datosM.chatsDe(agenteV.id).some((c) => c.voz === true) || datosM.chatsDe(agenteV.id).length !== comunes0 || grupo.offsetHeight !== 0 || !grupo.inert) fail('canales: el tacho no borró los ' + n + ' chats de canal y solo esos, o el grupo sigue a la vista (' + grupo.offsetHeight + ' px)');
+    }
+    data.habla = 'apagada de fábrica, la prueba de Settings suena y se calla, la respuesta de un turno de voz se dice y la de uno tipeado no, la palabra clave lo interrumpe, y avisa en voz alta cuando espera permiso';
   }
 
   data.tools = `Toolsmith: ${tools().length} filas en el último chat; permiso, rechazo, dos rondas, confianza por chat, código, base propia, un job, dos capturas, argumentos malos y modo automático`;

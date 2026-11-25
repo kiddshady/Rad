@@ -1,5 +1,40 @@
 # Changelog
 
+## BlackCode 1.2.0 (2026-11-25)
+
+- **Arreglo: la 1.1.0 instalada no podía conectarse al Atom Echo.** Quedaba en
+  «Connect failed during the Noise handshake: Unknown cipher». La conexión va
+  cifrada con ChaCha20-Poly1305, que Node trae y Electron no (su `crypto` es
+  BoringSSL). Las pruebas contra el Echo de verdad se habían hecho con node, y
+  el humo usa un Echo de mentira: nada ejercitaba el cifrado adentro de la app.
+  Ahora la app trae ese algoritmo (`main/chacha.cjs`, con `@noble/ciphers`) y
+  el humo hace, dentro de Electron y con la librería de verdad, un saludo
+  cifrado completo. Probado contra el Echo desde Electron.
+- El nombre `.local` del Echo se busca tres veces (mDNS falló dos seguidas).
+- **Los chats del Atom Echo van a un grupo «Channels», al fondo de la lista**
+  de chats, como Fran lo tenía en Umbra: se pliega (y se acuerda), cada chat
+  dice debajo cuándo fue, y el tacho de la cabeza los borra todos, preguntando.
+  Sin contador. El ícono de las ondas reemplaza al micrófono, también en la
+  marca del mensaje dicho.
+- **El agente contesta en voz alta lo que se le dijo.** La respuesta de un
+  turno de voz sale por los parlantes de la PC (el Atom Echo va sin parlante),
+  con una voz clonada de una muestra que elige el usuario. La hace Qwen3-TTS en
+  esta máquina, en otro Python del usuario (`motor/habla_motor.py`, con
+  `faster-qwen3-tts`): el audio llega por tramos mientras se genera y empieza
+  a sonar a medio segundo. Viene apagada.
+- Solo se dice la respuesta de un turno de VOZ; lo tipeado se contesta por
+  escrito. Al agente se le avisa que lo van a oír, así contesta en una o dos
+  frases. Lo que se dice va sin markdown: el código, las tablas y los emojis
+  se saltean, y una dirección web se dice «link».
+- **Decir la palabra clave lo calla**: es la forma de interrumpirlo. Y si el
+  turno queda esperando permiso, lo dice («Necesito tu permiso en la pantalla»).
+- De la muestra se usa solo la huella de la voz, sin su texto: con el texto, una
+  muestra en otro idioma le mezclaba los idiomas a la respuesta.
+- Settings → Voice → Spoken answers: el Python de la voz, la muestra, el
+  modelo (grande o chico), y «Say something» para probarla.
+- El humo esperaba mal las condiciones asíncronas (una promesa siempre es
+  verdadera): `until` ahora las espera.
+
 ## BlackCode 1.1.0 (2026-11-25)
 
 - **Voz: darle una orden a un agente hablándole a un Atom Echo.** Se dice la

@@ -18,12 +18,18 @@
 const path = require('node:path');
 
 const DOC = '_voz';
+// Lo que se le dice al agente cuando su respuesta se va a decir en voz alta.
+const VOICE_NOTE = '[Voice] The user said this out loud to a microphone, and your final reply will be read aloud to them through the speakers by a text-to-speech voice. Answer in the language the user spoke, in one or two short plain sentences, the way you would say it out loud: no markdown, no lists, no code, no URLs, no emoji. Say numbers and units as words when that reads more naturally. If you ran tools, say only what matters about the result.';
+// Lo que dice cuando un turno de voz queda esperando permiso (va en el idioma en que se habla).
+const PIDE_PERMISO = { es: 'Necesito tu permiso en la pantalla.', en: 'I need your permission on screen.', auto: 'I need your permission on screen.' };
+const PRUEBA = { es: 'Así sueno yo. Si me escuchás, está todo andando.', en: 'This is how I sound. If you can hear me, everything is working.', auto: 'This is how I sound. If you can hear me, everything is working.' };
 const IDIOMAS = ['es', 'en', 'auto'];
 // La llave de la API de ESPHome: 32 bytes en base64.
 const esLlave = (t) => typeof t === 'string' && /^[A-Za-z0-9+/]{43}=$/.test(t.trim()) && Buffer.from(t.trim(), 'base64').length === 32;
 
 function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
   const electron = require('electron');
+  const MODELOS_HABLA = require('./habla.cjs').MODELOS;
   const leer = () => { const d = rad.store.read(DOC); return d && typeof d === 'object' ? d : {}; };
   const config = () => {
     const d = leer();
@@ -36,6 +42,13 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
       actua: d.actua === true,
       python: typeof d.python === 'string' ? d.python : '',
       hayLlave: typeof d.llave === 'string' && d.llave.length > 0,
+      // la respuesta hablada (también apagada de fábrica)
+      habla: {
+        activa: d.habla?.activa === true,
+        python: typeof d.habla?.python === 'string' ? d.habla.python : '',
+        modelo: MODELOS_HABLA.some((m) => m.id === d.habla?.modelo) ? d.habla.modelo : MODELOS_HABLA[0].id,
+        muestra: typeof d.habla?.muestra === 'string' ? d.habla.muestra : '',
+      },
     };
   };
   const laLlave = () => { const d = leer(); return typeof d.llave === 'string' && d.llave ? descifrar(d.llave) : null; };
@@ -47,14 +60,34 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
     script,
     alCambiar: () => avisar(),
   });
+  // La voz con la que contesta: Qwen3-TTS, en otro Python del usuario. El audio
+  // llega por tramos y va a la interfaz, que es la que lo hace sonar.
+  const scriptHabla = electron.app.isPackaged ? path.join(process.resourcesPath, 'motor', 'habla_motor.py') : path.join(__dirname, '..', 'motor', 'habla_motor.py');
+  const paraElHabla = {
+    alAudio: (a) => rad.send('voz:audio', { turno: a.turno, n: a.n, sr: a.sr, pcm: a.pcm.toString('base64') }),
+    alFin: (f) => rad.send('voz:dicho', { turno: f.turno, callado: f.callado === true, error: f.error ?? '' }),
+    alCambiar: () => avisar(),
+  };
+  const habla = simulada?.crearHabla ? simulada.crearHabla(paraElHabla) : require('./habla.cjs').crear({
+    python: () => config().habla.python,
+    script: scriptHabla,
+    config: () => { const c = config(); return { modelo: c.habla.modelo, muestra: c.habla.muestra, idioma: c.idioma }; },
+    ...paraElHabla,
+  });
+  // Callar: el motor deja de generar y la interfaz corta lo que suena.
+  const callar = () => { const habia = habla.callar(); rad.send('voz:callar', {}); return habia; };
   // A Whisper le ayuda saber qué nombres puede oír: los de los agentes.
   const pista = () => [...new Set([...agentes().map((a) => String(a?.nombre ?? '').trim()).filter(Boolean), 'BlackCode'])].join(', ').slice(0, 300);
   let cuenta = 0;
   const eco = require('./eco.cjs').crear({
-    cargar: simulada ? async () => simulada.lib : () => import('esphome-client'),
+    // (antes de conectar, el cifrado que Electron no trae: ver chacha.cjs)
+    cargar: simulada ? async () => simulada.lib : async () => { await require('./chacha.cjs').instalar(); return import('esphome-client'); },
     // (`ilegible`: hay una llave guardada pero Windows ya no la descifra —pasa si se borran los datos de la app a medias—)
     config: () => { const c = config(); const llave = laLlave(); return { activa: c.activa, host: c.host, puerto: c.puerto, llave, ilegible: c.hayLlave && !llave }; },
-    calentar: () => escucha.calentar(),
+    // el Echo oyó la palabra clave: si el agente estaba hablando, se calla (es la forma de interrumpirlo)
+    // …y si va a contestar en voz alta, el modelo de voz empieza a cargar ya:
+    // en frío tarda unos quince segundos, y este es el aviso más temprano que hay
+    calentar: () => { callar(); if (config().habla.activa) { try { habla.calentar(); } catch { /* si no arranca, se sabrá al decir */ } } return escucha.calentar(); },
     transcribir: (pcm) => { const c = config(); return escucha.transcribir(pcm, { idioma: c.idioma === 'auto' ? '' : c.idioma, prompt: pista() }); },
     alFrase: (f) => {
       const c = config();
@@ -66,7 +99,7 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
 
   const vista = () => {
     const { hayLlave, ...c } = config();
-    return { ...c, hayLlave, cifrado: cifrar('x') !== null, eco: eco.estado(), whisper: escucha.estado() };
+    return { ...c, hayLlave, cifrado: cifrar('x') !== null, eco: eco.estado(), whisper: escucha.estado(), habla: { ...c.habla, ...habla.estado() }, modelosHabla: MODELOS_HABLA };
   };
   avisar = () => rad.send('voz:evento', vista());
 
@@ -91,6 +124,18 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
     if (IDIOMAS.includes(c.idioma)) d.idioma = c.idioma;
     if (typeof c.actua === 'boolean') d.actua = c.actua;
     if (typeof c.python === 'string') d.python = c.python.trim().slice(0, 400);
+    if (c.habla && typeof c.habla === 'object') {
+      const h = { ...(d.habla && typeof d.habla === 'object' ? d.habla : {}) };
+      const estaba = h.activa === true;
+      const clave = [h.python ?? '', h.modelo ?? '', h.muestra ?? ''].join('|');
+      if (typeof c.habla.activa === 'boolean') h.activa = c.habla.activa;
+      if (typeof c.habla.python === 'string') h.python = c.habla.python.trim().slice(0, 400);
+      if (typeof c.habla.muestra === 'string') h.muestra = c.habla.muestra.trim().slice(0, 400);
+      if (MODELOS_HABLA.some((m) => m.id === c.habla.modelo)) h.modelo = c.habla.modelo;
+      d.habla = h;
+      // apagarla, o cambiarle el Python, el modelo o la muestra, suelta el proceso: el próximo arranca con lo nuevo
+      if ((estaba && !h.activa) || clave !== [h.python ?? '', h.modelo ?? '', h.muestra ?? ''].join('|')) { callar(); habla.apagar(); }
+    }
     rad.store.write(DOC, d);
     // solo lo que cambia la conexión la reinicia (elegir otro agente no corta nada)
     if (antes !== JSON.stringify([d.activa === true, d.host ?? '', d.puerto ?? 0])) {
@@ -115,6 +160,23 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
     if (d.activa === true) eco.arrancar();
     avisar();
     return { ok: true };
+  });
+  // Decir un texto en voz alta (la respuesta de un turno de voz, o la prueba de Settings).
+  rad.handle('voz:decir', (que) => {
+    const c = config();
+    const prueba = que?.prueba === true;
+    if (!c.habla.activa && !prueba) return { ok: false, error: 'Spoken answers are off.' };
+    const texto = prueba ? PRUEBA[c.idioma] : que?.permiso === true ? PIDE_PERMISO[c.idioma] : String(que?.texto ?? '');
+    const turno = habla.decir(texto);
+    return turno ? { ok: true, turno } : { ok: false, error: habla.estado().error || 'There was nothing to say.' };
+  });
+  rad.handle('voz:callar', () => ({ ok: true, habia: callar() }));
+  rad.handle('voz:probar-habla', () => (simulada ? simulada.probar() : require('./habla.cjs').probar({ python: config().habla.python })));
+  // La muestra de la voz a clonar: un archivo de audio que elige el usuario.
+  rad.handle('voz:elegir-muestra', async (_q, ctx) => {
+    if (taller) return path.join(taller, 'voice-sample.wav'); // (en el humo no se abre un diálogo)
+    const r = await electron.dialog.showOpenDialog(ctx?.window ?? undefined, { title: 'Voice sample', properties: ['openFile'], filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'flac', 'ogg', 'm4a'] }] });
+    return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
   });
   // ¿Este Python tiene Whisper? (no carga ningún modelo)
   rad.handle('voz:probar', () => (simulada ? simulada.probar() : require('./escucha.cjs').probar({ python: config().python || 'python' })));
@@ -145,22 +207,45 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
       const fs = require('node:fs');
       let libreria = false;
       let error = '';
+      // El saludo cifrado ENTERO (Noise, el mismo que se hace con el Echo), con la
+      // librería de verdad haciendo de los dos lados, en ESTE proceso: la 1.1.0
+      // conectaba en las pruebas con node y fallaba instalada, porque Electron no
+      // trae ChaCha20-Poly1305 y nada lo ejercitaba acá adentro.
+      let cifrado = '';
+      let vector = false;
+      let saludo = false;
+      let llaveMala = false;
       try {
+        const chacha = require('./chacha.cjs');
+        cifrado = await chacha.instalar();
+        vector = chacha.probar();
         const lib = await import('esphome-client');
         libreria = typeof lib.EspHomeClient === 'function' && lib.VoiceAssistantSubscribeFlag?.API_AUDIO === 1 && lib.VoiceAssistantEvent?.RUN_END === 2 && lib.VoiceAssistantEvent?.STT_VAD_END === 12;
+        const saludar = (pskCliente, pskEcho) => {
+          const yo = lib.createESPHomeHandshake({ psk: pskCliente });
+          const echo = lib.createESPHomeHandshake({ psk: pskEcho, role: 'responder' });
+          echo.readMessage(yo.writeMessage());
+          yo.readMessage(echo.writeMessage());
+          const dicho = Buffer.from('okay zac');
+          return yo.isComplete && echo.isComplete && echo.receiveCipher.DecryptWithAd(Buffer.alloc(0), yo.sendCipher.EncryptWithAd(Buffer.alloc(0), dicho)).equals(dicho) && yo.receiveCipher.DecryptWithAd(Buffer.alloc(0), echo.sendCipher.EncryptWithAd(Buffer.alloc(0), dicho)).equals(dicho);
+        };
+        saludo = saludar(Buffer.alloc(32, 3), Buffer.alloc(32, 3));
+        try { saludar(Buffer.alloc(32, 3), Buffer.alloc(32, 4)); } catch { llaveMala = true; }
       } catch (err) { error = String(err?.message ?? err).slice(0, 200); }
       let motor = false;
       try { motor = fs.readFileSync(script, 'utf8').includes('"op": "transcribir"'); } catch (err) { error = error || String(err?.message ?? err).slice(0, 200); }
-      return { libreria, motor, empaquetada: electron.app.isPackaged, error };
+      let motorHabla = false;
+      try { motorHabla = fs.readFileSync(scriptHabla, 'utf8').includes('"op": "decir"'); } catch (err) { error = error || String(err?.message ?? err).slice(0, 200); }
+      return { libreria, motor, motorHabla, cifrado, vector, saludo, llaveMala, empaquetada: electron.app.isPackaged, error };
     });
   }
 
-  electron.app.on('before-quit', () => { eco.parar(); escucha.apagar(); });
+  electron.app.on('before-quit', () => { eco.parar(); escucha.apagar(); habla.apagar(); });
   // Al abrir la app, si la escucha quedó prendida, se conecta sola. Recién
   // cuando la app está lista: antes de eso safeStorage no descifra, la llave
   // saldría vacía y el Echo contestaría que le falta.
   electron.app.whenReady().then(() => eco.arrancar());
-  return { eco, escucha, vista };
+  return { eco, escucha, habla, vista, hablaActiva: () => config().habla.activa };
 }
 
-module.exports = { wire, esLlave, DOC };
+module.exports = { wire, esLlave, DOC, VOICE_NOTE };

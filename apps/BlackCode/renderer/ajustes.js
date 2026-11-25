@@ -10,6 +10,7 @@ import * as llave from './llave.js';
 import * as actualizacion from './actualizacion.js';
 import * as datosApp from './datos.js';
 import { h, icono } from './piezas.js';
+import * as parlante from './habla.js';
 
 const PROVEEDORES = [
   {
@@ -610,6 +611,23 @@ function tarjetaVoz() {
   const actua = h('input', '', { type: 'checkbox', role: 'switch', 'data-campo': 'voz-actua' });
   const nota = h('p', 'dm-tarjeta-instr rad-swap');
 
+  // --- La respuesta hablada: el agente contesta por los parlantes, con una voz clonada.
+  const hablaActiva = h('input', '', { type: 'checkbox', role: 'switch', 'data-campo': 'voz-habla' });
+  const textoH = h('span', 'dm-estado-texto rad-swap');
+  const estadoH = h('p', 'dm-estado', { role: 'status', 'data-estado': 'voz-habla' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), textoH);
+  const pythonH = h('input', 'rad-input', { type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: 'C:\\path\\to\\env\\Scripts\\python.exe', 'data-campo': 'voz-habla-python' });
+  const cajaPythonH = h('label', 'rad-field', {}, h('span', 'rad-field-label', {}, 'Python for the voice'), pythonH,
+    h('span', 'rad-field-hint', {}, 'The python.exe of an environment that has the faster-qwen3-tts package and a PyTorch build for your graphics card. It is a different one from Whisper’s: the two need different versions of the same libraries.'));
+  const muestra = h('span', 'dm-carpeta-inicio rad-mono rad-swap', { 'data-estado': 'voz-habla-muestra' });
+  const elegirMuestra = h('button', 'rad-button', { type: 'button', 'data-accion': 'voz-habla-muestra' }, 'Choose…');
+  const cajaMuestra = h('div', 'rad-field', {}, h('span', 'rad-field-label', {}, 'Voice sample'), h('div', 'dm-carpeta-inicio-fila', {}, muestra, elegirMuestra),
+    h('span', 'rad-field-hint', {}, 'A recording of the voice to imitate: ten to twenty seconds of clean speech, in any language. Only the sound of the voice is used.'));
+  const huecoModeloH = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-voz-rotulo-modelo' }, 'Voice model'));
+  const pistaModeloH = h('span', 'rad-field-hint', {}, 'Qwen3-TTS. It is downloaded the first time it speaks; the large one sounds better and takes about 5 GB of the graphics card.');
+  huecoModeloH.append(pistaModeloH);
+  const probarH = h('button', 'rad-button', { type: 'button', 'data-accion': 'voz-habla-probar' }, 'Say something');
+  const callarH = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'voz-habla-callar' }, 'Stop');
+
   const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'voz' },
     h('h2', 'dm-tarjeta-nombre', {}, 'Voice'),
     h('p', 'dm-tarjeta-instr', {}, 'Say the wake word to an M5Stack Atom Echo running ESPHome, and what you say next goes to an agent as a chat message. BlackCode connects to the device itself, without Home Assistant, and turns the audio into text on this PC with Whisper. The audio is never saved.'),
@@ -621,7 +639,12 @@ function tarjetaVoz() {
     h('div', 'dm-voz-whisper', {}, estadoW, probar),
     cajaPython,
     h('label', 'rad-switch', {}, actua, h('span', 'rad-switch-track'), 'Let voice act'),
-    nota);
+    nota,
+    h('h3', 'dm-subtarjeta-nombre', {}, 'Spoken answers'),
+    h('p', 'dm-tarjeta-instr', {}, 'The agent answers what you said out loud, through this PC’s speakers, with a cloned voice (Qwen3-TTS, on this PC). It is told to answer in a sentence or two. Say the wake word again to make it stop.'),
+    h('label', 'rad-switch', {}, hablaActiva, h('span', 'rad-switch-track'), 'Answer out loud'),
+    h('div', 'dm-voz-whisper', {}, estadoH, callarH, probarH),
+    cajaPythonH, cajaMuestra, huecoModeloH);
   wireControls(tarjeta);
 
   let selAgente = null;
@@ -738,13 +761,87 @@ function tarjetaVoz() {
   });
   probar.addEventListener('click', preguntar);
 
+
+  // --- la respuesta hablada
+  let selModeloH = null;
+  let pruebaH = null;
+  let probandoH = false;
+  const armarModeloH = () => {
+    selModeloH?.close();
+    selModeloH?.el.remove();
+    const v = datosApp.voz();
+    selModeloH = createSelect({ options: (v.modelosHabla ?? []).map((m) => ({ value: m.id, label: m.nombre })), value: v.habla.modelo, onChange: (id) => datosApp.guardarVoz({ habla: { modelo: id } }) });
+    selModeloH.el.setAttribute('aria-labelledby', 'dm-voz-rotulo-modelo');
+    selModeloH.el.dataset.campo = 'voz-habla-modelo';
+    huecoModeloH.insertBefore(selModeloH.el, pistaModeloH);
+  };
+  const describirHabla = (v) => {
+    const hb = v.habla ?? {};
+    if (probandoH) return { tono: 'idle', texto: 'Asking that Python whether it has the voice…' };
+    if (hb.estado === 'error') return { tono: 'danger', texto: hb.error || 'The voice stopped.' };
+    if (hb.hablando || parlante.hablando()) return { tono: 'success', texto: 'Speaking…' };
+    if (hb.estado === 'loading' || hb.estado === 'starting') return { tono: 'idle', texto: 'Loading the voice model…' };
+    if (hb.estado === 'ready') return { tono: 'success', texto: 'The voice model is loaded. It unloads after ten minutes without use.' };
+    if (!hb.python) return { tono: hb.activa ? 'warning' : 'idle', texto: 'No Python set for the voice yet.' };
+    if (!hb.muestra) return { tono: hb.activa ? 'warning' : 'idle', texto: 'No voice sample chosen yet.' };
+    if (!pruebaH) return { tono: 'idle', texto: 'Not checked yet.' };
+    if (!pruebaH.ok) return { tono: 'danger', texto: pruebaH.error || 'The voice could not be loaded.' };
+    return { tono: 'success', texto: `The voice is installed${pruebaH.gpu ? ` and will use ${pruebaH.gpu}` : ''}. The model loads when it is about to speak.` };
+  };
+  const ponerHabla = () => {
+    const v = datosApp.voz();
+    const hb = v.habla ?? {};
+    hablaActiva.checked = hb.activa === true;
+    if (document.activeElement !== pythonH) pythonH.value = hb.python ?? '';
+    swapText(muestra, hb.muestra || 'None chosen');
+    const d = describirHabla(v);
+    estadoH.dataset.tono = d.tono;
+    swapText(textoH, d.texto);
+    if (selModeloH && hb.modelo && selModeloH.value !== hb.modelo) selModeloH.value = hb.modelo;
+    probarH.disabled = !hb.python || !hb.muestra;
+    // (el motor termina de generar antes de que termine de sonar: se puede callar mientras suene)
+    const suena = hb.hablando === true || parlante.hablando();
+    callarH.disabled = !suena;
+    tarjeta.dataset.habla = hb.activa ? 'si' : 'no';
+    tarjeta.dataset.hablando = suena ? 'si' : 'no';
+    tarjeta.dataset.muestra = hb.muestra ? 'si' : 'no';
+  };
+  const preguntarH = async () => {
+    if (!datosApp.voz().habla?.python) { pruebaH = null; ponerHabla(); return; }
+    probandoH = true;
+    ponerHabla();
+    pruebaH = await window.rad.invoke('voz:probar-habla').catch(() => ({ ok: false, error: 'Python could not be asked.' }));
+    probandoH = false;
+    ponerHabla();
+  };
+  hablaActiva.addEventListener('change', () => datosApp.guardarVoz({ habla: { activa: hablaActiva.checked } }));
+  pythonH.addEventListener('change', async () => {
+    if (pythonH.value.trim() === (datosApp.voz().habla?.python ?? '')) return;
+    await datosApp.guardarVoz({ habla: { python: pythonH.value } });
+    preguntarH();
+  });
+  pythonH.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pythonH.blur(); } });
+  elegirMuestra.addEventListener('click', async () => {
+    const elegida = await window.rad.invoke('voz:elegir-muestra').catch(() => null);
+    if (elegida) await datosApp.guardarVoz({ habla: { muestra: elegida } });
+  });
+  probarH.addEventListener('click', async () => {
+    const r = await window.rad.invoke('voz:decir', { prueba: true }).catch(() => ({ ok: false, error: 'It could not be asked to speak.' }));
+    if (!r?.ok) toast({ text: r?.error ?? 'It could not speak.', kind: 'danger' });
+  });
+  callarH.addEventListener('click', () => window.rad.invoke('voz:callar'));
+  armarModeloH();
+  ponerHabla();
+  datosApp.on('voz', ponerHabla);
+  parlante.alCambiar(ponerHabla);
+
   armarAgente();
   armarIdioma();
   poner();
   datosApp.on('voz', poner);
   datosApp.on('agentes', () => { armarAgente(); poner(); });
   // (a Python se le pregunta la primera vez que se abre Settings, no al abrir la app)
-  tarjeta.preguntar = () => { if (!prueba && !probando) preguntar(); };
+  tarjeta.preguntar = () => { if (!prueba && !probando) preguntar(); if (!pruebaH && !probandoH) preguntarH(); };
   return tarjeta;
 }
 

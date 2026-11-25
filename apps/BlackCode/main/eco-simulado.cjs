@@ -36,6 +36,8 @@ function crear({ llave = null, info = { name: 'fake-atom', esphomeVersion: '2026
     info,
     capacidades: { supported: true, apiAudio: true },
     falla: null,           // un error con el que rechaza la próxima conexión (y las que sigan)
+    /** ¿Hay alguien suscripto que vaya a atender un pedido? */
+    atendido: () => pedidos.size > 0,
     clientes: [],
     eventos: [],           // lo que el cliente le dijo: { tipo: 'RUN_START', datos }
     suscripto: null,
@@ -138,8 +140,34 @@ function paraElHumo() {
     apagar: () => { cuenta.apagadas++; },
     estado: () => ({ estado: cuenta.cargas ? 'ready' : 'off', error: '', dispositivo: 'cpu', gpu: null, modelo: 'fake-whisper' }),
   };
+  // El habla de mentira: «dice» anotando el texto, y entrega cinco tramos de un tono casi mudo, como si fuera la voz.
+  const voz = { dichos: [], callados: 0, cargas: 0, apagadas: 0, activos: new Map(), n: 0 };
+  const crearHabla = ({ alAudio, alFin, alCambiar }) => ({
+    calentar: () => { voz.cargas++; return true; },
+    decir: (texto) => {
+      const t = String(texto ?? '').trim();
+      if (!t) return null;
+      const turno = 'v' + (++voz.n);
+      const estado = { callado: false };
+      voz.dichos.push(t);
+      voz.activos.set(turno, estado);
+      alCambiar();
+      (async () => {
+        for (let i = 0; i < 5 && !estado.callado; i++) { await new Promise((r) => setTimeout(r, 80)); if (!estado.callado) alAudio({ turno, n: i, sr: 24000, pcm: tono(375, 2).subarray(0, 24000 * 2 / 4) }); }
+        voz.activos.delete(turno);
+        alFin({ turno, callado: estado.callado });
+        alCambiar();
+      })();
+      return turno;
+    },
+    callar: () => { let alguno = false; for (const e of voz.activos.values()) if (!e.callado) { e.callado = true; alguno = true; } if (alguno) voz.callados++; return alguno; },
+    apagar: () => { voz.apagadas++; },
+    estado: () => ({ estado: voz.cargas || voz.dichos.length ? 'ready' : 'off', error: '', gpu: null, hablando: voz.activos.size > 0 }),
+  });
   function simular({ que = 'estado', texto = '', palabra = 'okay zac', vozMs = 1200, falla = null } = {}) {
-    if (que === 'frase') { dichos.push(falla ? new Error(String(falla)) : String(texto)); echo.pedir({ palabra }); echo.hablar({ vozMs }); }
+    // (sin nadie que atienda, lo «dicho» se pierde: si quedara en la cola, saldría como la transcripción de la frase siguiente)
+    if ((que === 'frase' || que === 'hablar') && !echo.atendido()) { /* nadie escucha */ }
+    else if (que === 'frase') { dichos.push(falla ? new Error(String(falla)) : String(texto)); echo.pedir({ palabra }); echo.hablar({ vozMs }); }
     // (en dos pasos: el pedido solo —queda escuchando— y después lo que dice)
     else if (que === 'pedir') echo.pedir({ palabra });
     else if (que === 'hablar') { dichos.push(String(texto)); echo.hablar({ vozMs }); }
@@ -147,9 +175,9 @@ function paraElHumo() {
     else if (que === 'cortar') echo.cortar();
     else if (que === 'volver') echo.volver();
     else if (que === 'limpiar') echo.limpiar();
-    return { eventos: echo.nombres(), datos: echo.eventos.map((e) => e.datos), conexiones: echo.conexiones, suscripto: echo.suscripto, llave: echo.clientes.at(-1)?.opciones.psk === echo.llave, host: echo.clientes.at(-1)?.opciones.host ?? null, ...cuenta };
+    return { eventos: echo.nombres(), datos: echo.eventos.map((e) => e.datos), conexiones: echo.conexiones, suscripto: echo.suscripto, llave: echo.clientes.at(-1)?.opciones.psk === echo.llave, host: echo.clientes.at(-1)?.opciones.host ?? null, ...cuenta, voz: { dichos: [...voz.dichos], callados: voz.callados, cargas: voz.cargas, apagadas: voz.apagadas, hablando: voz.activos.size > 0 } };
   }
-  return { echo, lib, escucha, simular, llave: echo.llave, probar: async () => ({ ok: true, cuda: false, gpu: null, modelo: true }) };
+  return { echo, lib, escucha, crearHabla, simular, llave: echo.llave, probar: async () => ({ ok: true, cuda: false, gpu: null, modelo: true }) };
 }
 
 module.exports = { crear, paraElHumo, tono, silencio, VoiceAssistantEvent };

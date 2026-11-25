@@ -653,10 +653,60 @@
      de un chat de voz, un micrófono delante del nombre. */
   .dm-msg-voz { display: inline-flex; align-items: center; gap: var(--rad-space-1); font-size: var(--rad-text-xs, var(--rad-text-s)); color: var(--rad-text-3); }
   .dm-msg-voz svg { width: 12px; height: 12px; flex: none; }
-  .dm-fila-voz { display: none; flex: none; color: var(--rad-text-3); line-height: 0; }
-  .dm-fila-voz svg { width: 12px; height: 12px; }
-  .dm-fila[data-voz] .dm-fila-voz { display: block; }
-  .dm-fila[aria-current] .dm-fila-voz { color: var(--rad-text-2); }
+  /* Los canales: los chats que entran solos (lo dicho al Atom Echo) van en un
+     grupo al fondo de la lista. Se pliega, y mientras no hay ninguno no ocupa
+     lugar; las dos cosas, desplegándose (no de golpe). */
+  .dm-chats-lista { flex: none; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .dm-canales {
+    flex: none;
+    display: grid;
+    grid-template-rows: 1fr;
+    margin-top: var(--rad-space-2);
+    transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out), margin-top var(--rad-dur-base) var(--rad-ease-in-out), opacity var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .dm-canales[data-vacio] { grid-template-rows: 0fr; margin-top: 0; opacity: 0; }
+  .dm-canales-todo { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 2px; }
+  .dm-canales-fila {
+    flex: none;
+    display: flex;
+    align-items: center;
+    border-radius: var(--rad-radius-m);
+    color: var(--rad-text-2);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-canales-fila:hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
+  .dm-canales-cabeza {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    min-height: var(--rad-control-height);
+    padding-inline: var(--rad-space-2) var(--rad-space-1);
+    border-radius: inherit;
+    text-align: start;
+    font-weight: var(--rad-weight-strong);
+  }
+  .dm-canales-cabeza svg { flex: none; color: var(--rad-text-3); }
+  .dm-canales-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* la flecha mira hacia abajo con el grupo abierto y gira al plegarlo */
+  .dm-canales-chev { transition: transform var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-canales-cabeza[aria-expanded='false'] .dm-canales-chev { transform: rotate(-90deg); }
+  /* el tacho aparece al pasar por la cabeza (o con el foco adentro), y avisa que borra */
+  .dm-canales-borrar {
+    opacity: 0;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-canales-fila:hover .dm-canales-borrar, .dm-canales-fila:focus-within .dm-canales-borrar { opacity: 1; }
+  .dm-canales-borrar:hover { color: var(--rad-danger); }
+  .dm-canales-caja { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-canales-caja[data-abierto] { grid-template-rows: 1fr; }
+  .dm-canales-in { min-height: 0; overflow: hidden; padding-inline-start: var(--rad-space-4); opacity: 0; transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out); }
+  .dm-canales-caja[data-abierto] .dm-canales-in { opacity: 1; transition-delay: calc(var(--rad-dur-base) / 2); }
+  /* la fila de un chat de canal: el nombre y, debajo, cuándo fue */
+  .dm-fila-textos { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+  .dm-fila-fecha { font-size: var(--rad-text-xs); color: var(--rad-text-3); font-variant-numeric: tabular-nums; }
+  .dm-fila[data-voz] .dm-fila-abrir { padding-block: var(--rad-space-1); }
   .dm-carpeta-inicio { flex: 1; min-width: 0; font-size: var(--rad-text-s); color: var(--rad-text-1); overflow-wrap: anywhere; user-select: text; }
 
   /* ---------- Los adjuntos ---------- */

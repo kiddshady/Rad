@@ -81,8 +81,20 @@ export function montarChat(el, { router }) {
   ], { matchAnchorWidth: true });
 
   const nuevo = h('button', 'rad-button dm-nuevo', { type: 'button', 'data-accion': 'nuevo-chat' }, icono('mas'), 'New chat');
-  const lista = h('div', 'dm-chats rad-scroll', { role: 'list', 'data-rad-line': 'bottom' });
+  const lista = h('div', 'dm-chats rad-scroll', { 'data-rad-line': 'bottom' });
   wireScroll(lista);
+  // Adentro: los chats de siempre y, al fondo de todo, el grupo de los canales
+  // (lo que entró solo: lo dicho al Atom Echo). El grupo se pliega, y no ocupa
+  // lugar mientras no hay ninguno.
+  const comunes = h('div', 'dm-chats-lista', { role: 'list' });
+  const delCanal = h('div', 'dm-chats-lista', { role: 'list' });
+  const canalesCabeza = h('button', 'dm-canales-cabeza', { type: 'button', 'aria-expanded': 'true', 'data-accion': 'canales', 'data-rad-tip': 'What you said to the Atom Echo, and the answers' },
+    icono('chevron', 'dm-canales-chev'), icono('canal'), h('span', 'dm-canales-nombre', {}, 'Channels'));
+  const canalesBorrar = h('button', 'rad-iconbutton dm-canales-borrar', { type: 'button', 'aria-label': 'Delete all channel chats', 'data-rad-tip': 'Delete all', 'data-accion': 'canales-borrar' }, icono('tacho'));
+  const canalesCaja = h('div', 'dm-canales-caja', { 'data-abierto': '' }, h('div', 'dm-canales-in', {}, delCanal));
+  const canales = h('section', 'dm-canales', { 'data-vacio': '', 'aria-label': 'Channels' }, h('div', 'dm-canales-todo', {}, h('div', 'dm-canales-fila', {}, canalesCabeza, canalesBorrar), canalesCaja));
+  canales.inert = true;
+  lista.append(comunes, canales);
   const lado = h('aside', 'dm-lado', { 'data-rad-chrome': '' }, selector, nuevo, lista);
 
   // ---------- La conversación ----------
@@ -285,8 +297,8 @@ export function montarChat(el, { router }) {
 
   const fila = (c) => {
     if (c.id === VACIO) return h('p', 'dm-chats-vacio', {}, 'No chats with this agent yet.');
-    // (el micrófono solo se ve en un chat de voz: lo que se le dijo al Atom Echo)
-    const abrir = h('button', 'dm-fila-abrir', { type: 'button' }, h('span', 'dm-fila-voz', { 'aria-hidden': 'true' }, icono('mic')), h('span', 'dm-fila-titulo rad-swap'), h('span', 'dm-fila-punto', { 'aria-hidden': 'true' }, h('i')));
+    // (un chat de canal lleva debajo cuándo fue: se arman solos, y así se los distingue)
+    const abrir = h('button', 'dm-fila-abrir', { type: 'button' }, h('span', 'dm-fila-textos', {}, h('span', 'dm-fila-titulo rad-swap'), ...(c.voz === true ? [h('span', 'dm-fila-fecha rad-swap')] : [])), h('span', 'dm-fila-punto', { 'aria-hidden': 'true' }, h('i')));
     const mas = h('button', 'rad-iconbutton dm-fila-mas', { type: 'button', 'aria-label': 'Chat actions', 'data-rad-tip': 'Actions' }, icono('puntos'));
     const nodo = h('div', 'dm-fila', { role: 'listitem' }, abrir, mas);
     abrir.addEventListener('click', () => datos.elegirChat(nodo.dataset.radKey));
@@ -302,11 +314,40 @@ export function montarChat(el, { router }) {
     else nodo.removeAttribute('aria-current');
     nodo.toggleAttribute('data-respondiendo', datos.respondiendo(c.id));
     nodo.toggleAttribute('data-voz', c.voz === true);
+    const fecha = nodo.querySelector('.dm-fila-fecha');
+    if (fecha) swapText(fecha, cuando(c.tocado));
   };
+  // (día y hora del último mensaje, como los escribe el sistema: «25/11 · 15:50»)
+  const cuando = (ms) => { const d = new Date(ms); return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}`; };
   const dibujarLista = () => {
     const suyos = datos.chatsDe(datos.agenteActual().id);
-    reconcile(lista, suyos.length ? suyos : [{ id: VACIO }], { key: (c) => c.id, create: fila, update: ponerFila });
+    const deCanal = suyos.filter((c) => c.voz === true);
+    const losDemas = suyos.filter((c) => c.voz !== true);
+    // (el lugar vacío solo si no hay NINGÚN chat: con canales, la lista de arriba queda sin nada)
+    reconcile(comunes, losDemas.length ? losDemas : (deCanal.length ? [] : [{ id: VACIO }]), { key: (c) => c.id, create: fila, update: ponerFila });
+    reconcile(delCanal, deCanal, { key: (c) => c.id, create: fila, update: ponerFila });
+    canales.toggleAttribute('data-vacio', !deCanal.length);
+    canales.inert = !deCanal.length;
+    const abierto = datos.canalesAbiertos();
+    canalesCabeza.setAttribute('aria-expanded', String(abierto));
+    canalesCaja.toggleAttribute('data-abierto', abierto);
+    canalesCaja.inert = !abierto;
   };
+  canalesCabeza.addEventListener('click', () => datos.ponerCanalesAbiertos(!datos.canalesAbiertos()));
+  // El tacho del grupo borra todos los chats de canal de este agente (pregunta antes).
+  canalesBorrar.addEventListener('click', async () => {
+    const a = datos.agenteActual();
+    const suyos = datos.chatsDe(a.id).filter((c) => c.voz === true);
+    if (!suyos.length) return;
+    const si = await confirm({
+      title: suyos.length === 1 ? 'Delete the channel chat?' : `Delete the ${suyos.length} channel chats?`,
+      text: `What you said to the Atom Echo for ${a.nombre}, and its answers. This can’t be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!si) return;
+    for (const c of suyos) await datos.borrarChat(c.id);
+  });
   contextMenu(lista, (e) => {
     const nodo = e.target.closest('.dm-fila');
     return nodo ? acciones(nodo.dataset.radKey) : null;
@@ -334,7 +375,7 @@ export function montarChat(el, { router }) {
     const suyos = m.rol === 'user' ? adjuntosDe(m) : null;
     if (suyos) nodo.append(suyos);
     // se dijo, no se tipeó: es lo que Whisper entendió, y conviene verlo
-    if (m.rol === 'user' && m.voz) nodo.append(h('span', 'dm-msg-voz', {}, icono('mic'), 'Said to the Atom Echo'));
+    if (m.rol === 'user' && m.voz) nodo.append(h('span', 'dm-msg-voz', {}, icono('canal'), 'Said to the Atom Echo'));
     if (m.rol === 'assistant') {
       nodo.append(h('div', 'dm-msg-pie', {}, h('div', 'dm-msg-pie-in', {},
         h('span', 'dm-pulso', { 'aria-hidden': 'true' }, h('i')), h('span', 'dm-msg-nota rad-swap'))));

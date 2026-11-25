@@ -11,6 +11,7 @@ and under which license.
 | [Roboto Mono](https://github.com/googlefonts/RobotoMono) | `@rad/fonts` | OFL-1.1 — © The Roboto Mono Project Authors |
 | [xterm.js](https://xtermjs.org) | `renderer/vendor/xterm/` (module, fit addon, stylesheet), modified | MIT — © The xterm.js authors, © Christopher Jeffrey |
 | [Model Context Protocol SDK](https://github.com/modelcontextprotocol/typescript-sdk) | `node_modules/@modelcontextprotocol/sdk` and its dependencies | MIT — © Anthropic, PBC |
+| [@noble/ciphers](https://github.com/paulmillr/noble-ciphers) | `node_modules/@noble/ciphers` | MIT — © 2022 Paul Miller |
 | [esphome-client](https://github.com/hjdhjd/esphome-client) | `node_modules/esphome-client` | ISC — © 2017-2026 HJD |
 | [@lydell/node-pty](https://github.com/lydell/node-pty) | `node_modules/@lydell/` (with its prebuilt binaries) | MIT — © Christopher Jeffrey, © Daniel Imms, © Microsoft Corporation, © Simon Lydell |
 
