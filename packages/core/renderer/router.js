@@ -98,6 +98,10 @@ export function createRouter({ stage, views, initial }) {
   function go(id, { instant = false } = {}) {
     const next = entries.get(id);
     if (!next) throw new Error(`[rad] no hay ninguna vista "${id}"`);
+    // 'go' avisa de CADA pedido de ir a una vista, también a la que ya se ve:
+    // lo que flota encima (un modal de ajustes) lo usa para cerrarse. 'change'
+    // sigue avisando solo cuando la vista cambia.
+    events.dispatchEvent(new CustomEvent('go', { detail: { id, from: current?.def.id ?? null } }));
     if (next === current) return;
     const prev = current;
     current = next;

@@ -26,8 +26,11 @@ const OUT = path.join(ROOT, '.smoke', 'shots');
 // crea acá aparece en la interfaz como si se hubiera hecho a mano.
 const PRELUDE = `
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const go = async (id) => { document.querySelector('.rad-tab[data-view="' + id + '"]').click(); await sleep(600); };
-const view = (id) => document.querySelector('.rad-view[data-view="' + id + '"]');
+// (Settings es un modal con pestañas: «ir» es abrirlo, y view('ajustes') es lo de adentro.
+// La pestaña sale de la tarjeta que se pida ver: irA('acerca') la pone a la vista.)
+const go = async (id) => { document.querySelector('.rad-tab[data-view="' + id + '"]').click(); await sleep(id === 'ajustes' ? 900 : 600); };
+const view = (id) => (id === 'ajustes' ? document.querySelector('.dm-ajustes') : document.querySelector('.rad-view[data-view="' + id + '"]'));
+const pestana = async (id) => { view('ajustes').querySelector('.dm-ajustes-tab[data-tab="' + id + '"]').click(); await sleep(600); };
 const datos = await import('/datos.js');
 const llave = await import('/llave.js');
 const blackcode = datos.agenteActual();
@@ -92,7 +95,7 @@ const SCENES = {
     await go('ajustes');
     const act = await import('/actualizacion.js');
     act.recibir({ state: 'available', version: '0.4.0' });
-    view('ajustes').querySelector('[data-tarjeta="acerca"]').scrollIntoView({ block: 'center' });
+    await pestana('about');
     await sleep(900);`,
   tools: `
     datos.ponerModoTools('auto');
@@ -213,7 +216,7 @@ const SCENES = {
   // …y la carpeta de inicio, en Settings.
   'carpeta-inicio': `
     await go('ajustes');
-    view('ajustes').querySelector('[data-tarjeta="carpeta"]').scrollIntoView({ block: 'center' });
+    await pestana('general');
     await sleep(700);`,
   // La terminal: la shell del panel (en las capturas, cmd y no la del usuario).
   terminal: `
@@ -330,12 +333,14 @@ const SCENES = {
   'subagentes-ajustes': `
     datos.ponerSubagentes({ proveedor: 'anthropic', modelo: 'claude-haiku-5-5' });
     await go('ajustes');
+    await pestana('tools');
     view('ajustes').querySelector('[data-tarjeta="subagentes"]').scrollIntoView({ block: 'center' });
     await sleep(1200);`,
   busqueda: `
     await llave.guardar('tavily', 'tvly-captura-de-blackcode-no-es-una-llave-3333');
     datos.ponerBuscador('tavily');
     await go('ajustes');
+    await pestana('tools');
     view('ajustes').querySelector('[data-tarjeta="busqueda"]').scrollIntoView({ block: 'start' });
     await sleep(1200);`,
   'sin-llave': `

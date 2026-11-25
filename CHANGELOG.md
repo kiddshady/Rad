@@ -1,5 +1,40 @@
 # Changelog
 
+## BlackCode 1.5.0 (2026-11-25) · núcleo 0.20.0
+
+- **Settings es un modal con pestañas.** Era una página larga con doce
+  tarjetas una debajo de la otra: llegar a la voz o al About era scrollear
+  todo. Ahora flota sobre la vista en la que uno esté (la forma del de Umbra):
+  las pestañas a la izquierda, con ícono y nombre, y a la derecha el nombre de
+  la que se ve, la × y sus tarjetas. Son siete: **General** (carpeta de
+  trabajo, nombres de los chats, la bandeja), **Providers** (las llaves de
+  Anthropic y Venice), **Tools** (el modo de permisos, la búsqueda web, los
+  subagentes), **Images**, **Integrations** (los servidores MCP), **Voice** y
+  **About**. Se cierra con Esc, con la × o con un clic afuera, y vuelve a
+  abrir en la pestaña donde quedó. El botón Settings sigue en la titlebar.
+- **El cambio de pestaña va en orden:** la que se ve se va del todo y recién
+  ahí entra la nueva. El modal es de vidrio (su fondo no tapa), así que dos
+  pestañas a medio ver en el mismo lugar se leerían una encima de la otra.
+- **Ir a una vista lo cierra.** El «Open» de un aviso de voz, el ícono de la
+  bandeja o «Review» de una skill llevan a su vista y Settings no queda
+  tapándola. «Go to Settings», el aviso del chat cuando falta una llave, lo
+  abre directo en Providers.
+- **La llave es la de Prism** (la de su gestor de contraseñas, de contorno
+  continuo y en diagonal), en la pestaña Providers y en ese aviso. La pidió
+  Fran.
+- **Núcleo 0.20.0:**
+  - Un ítem de `views` con `action` (una función) en vez de `mount` va en la
+    navegación como los demás pero no es una vista: al tocarlo corre su acción
+    y la vista de atrás no cambia.
+  - `openModal({ className, label })`: clases propias para el panel (un modal
+    con otra forma) y un nombre accesible cuando no lleva título. El modal
+    devuelve además `removed`, que se cumple cuando terminó de irse y salió
+    del documento.
+  - El router avisa `'go'` en cada pedido de ir a una vista, también a la que
+    ya se ve (`'change'` sigue avisando solo cuando cambia).
+  - `opacityNow()` de un nodo fuera del documento da 1 en vez de `NaN`: un
+    relevo de texto en algo que todavía no se ve ya no tira.
+
 ## BlackCode 1.4.0 (2026-11-25)
 
 - **Cada mensaje tiene su hora.** Se guarda con el mensaje (la del usuario, al

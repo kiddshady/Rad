@@ -159,6 +159,11 @@ export function ponerGrupoAbierto(cual, si) {
   ui.patch({ grupos: { ...(ui.get().grupos ?? {}), [cual]: si === true } });
   avisar('chats');
 }
+/** La pestaña de Settings que quedó a la vista la última vez (se recuerda). */
+export const pestanaAjustes = () => (typeof ui.get().ajustes === 'string' ? ui.get().ajustes : '');
+export function ponerPestanaAjustes(id) {
+  if (ui.get().ajustes !== id) ui.patch({ ajustes: String(id) });
+}
 /** El grupo «Channels» de la lista de chats, ¿está desplegado? (se recuerda) */
 export const canalesAbiertos = () => ui.get().canales !== false;
 export function ponerCanalesAbiertos(si) {

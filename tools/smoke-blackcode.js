@@ -27,14 +27,31 @@ const until = async (cond, ms = 9000) => {
 // Lo que tarda en asentarse un relevo o una fila que entra o se va.
 const settle = () => sleep(dur('base') + dur('fast') + 180);
 
-const view = (id) => document.querySelector(`.rad-view[data-view="${id}"]`);
-const go = async (id) => { document.querySelector(`.rad-tab[data-view="${id}"]`).click(); await sleep(dur('base') + 220); };
+// Settings no es una vista: es un modal con pestañas que flota sobre la que
+// esté. Su contenido se arma una vez y se reusa, así que `view('ajustes')`
+// lo devuelve también cerrado (como antes la vista oculta), y `go('ajustes',
+// pestaña)` lo abre en esa pestaña. Ir a cualquier vista lo cierra.
+const ajustesAbierto = () => alive(document.querySelectorAll('.rad-overlays .dm-ajustes'))[0] ?? null;
+let raizAjustes = null;
+const view = (id) => (id === 'ajustes' ? (raizAjustes = ajustesAbierto() ?? raizAjustes) : document.querySelector(`.rad-view[data-view="${id}"]`));
+const go = async (id, pestana = '') => {
+  if (id === 'ajustes') {
+    if (!ajustesAbierto()) { document.querySelector('.rad-tab[data-view="ajustes"]').click(); await until(() => ajustesAbierto(), 2000); await sleep(dur('slow') + 220); }
+    if (pestana && view('ajustes')?.dataset.tab !== pestana) { view('ajustes').querySelector(`.dm-ajustes-tab[data-tab="${pestana}"]`).click(); await sleep(dur('fast') + dur('base') + 200); }
+    return;
+  }
+  view('ajustes');
+  document.querySelector(`.rad-tab[data-view="${id}"]`).click();
+  if (document.querySelector('.rad-overlays .dm-ajustes')) await until(() => !document.querySelector('.rad-overlays .dm-ajustes'), 2500);
+  await sleep(dur('base') + 220);
+};
 const alive = (list) => [...list].filter((el) => !el.closest('[data-rad-leaving]'));
 // El texto vivo de una celda de relevo: durante un relevo tiene las dos frases.
 const shown = (cell) => cell?.querySelector(':scope > :not(.rad-swap-out)')?.textContent ?? '';
 const type = (input, value) => { input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); };
 const key = (el, k, extra = {}) => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...extra }));
-const modal = () => alive(document.querySelectorAll('.rad-overlays .rad-modal')).find((m) => m.dataset.state === 'open');
+// (el de Settings no cuenta: es el lugar donde se está, no una ventana que se abrió encima)
+const modal = () => alive(document.querySelectorAll('.rad-overlays .rad-modal')).find((m) => m.dataset.state === 'open' && !m.classList.contains('dm-ajustes-modal'));
 const primary = () => modal()?.querySelector('.rad-button[data-variant="primary"], .rad-button[data-variant="danger"]');
 const menus = () => [...document.querySelectorAll('.rad-overlays .rad-menu')].filter((m) => m.dataset.state === 'open' && !m.hasAttribute('data-rad-leaving'));
 const pick = async (label) => {
@@ -44,7 +61,7 @@ const pick = async (label) => {
   await settle();
   return true;
 };
-const closed = async () => { await until(() => !document.querySelector('.rad-modal-layer'), 2000); await sleep(60); };
+const closed = async () => { await until(() => ![...document.querySelectorAll('.rad-modal-layer')].some((l) => !l.querySelector('.dm-ajustes-modal')), 2000); await sleep(60); };
 
 const chatView = view('chat');
 const cards = () => alive(view('agentes').querySelectorAll('.dm-tarjeta'));
@@ -132,7 +149,10 @@ if (marker?.pass === 1) {
   // El agente de Venice volvió con su proveedor y su modelo.
   const oraculo = agentes.find((a) => a.nombre === 'Oracle');
   if (oraculo?.proveedor !== 'venice' || oraculo?.modelo !== 'deepseek-v4-1-flash-1017-uncensored') fail(`el agente de Venice volvió como ${JSON.stringify(oraculo)}`);
+  // Settings abre en la pestaña que quedó a la vista la última vez (About: lo último que miró la primera pasada).
   await go('ajustes');
+  if (view('ajustes')?.dataset.tab !== 'about' || getComputedStyle(view('ajustes').querySelector('.dm-ajustes-panel[data-tab="about"]')).visibility !== 'visible') fail(`al reabrir la app, Settings abrió en «${view('ajustes')?.dataset.tab}»: había quedado en About`);
+  await go('ajustes', 'providers');
   const estadoLlave = view('ajustes').querySelector('[data-proveedor="anthropic"] .dm-estado');
   await until(() => estadoLlave.dataset.comprobacion === 'aceptada', 3000);
   if (estadoLlave.dataset.comprobacion !== 'aceptada' || estadoLlave.dataset.tono !== 'success') fail(`al reabrir, la llave de Anthropic figura como ${estadoLlave.dataset.comprobacion}`);
@@ -683,7 +703,7 @@ else {
 // BlackCode le pregunta a la API (acá a la simulada, que contesta según el texto
 // de la llave) y dice lo que la API contestó, no lo que parece por cómo
 // empieza. Y la que guarda no queda a la vista ni al alcance del renderer.
-await go('ajustes');
+await go('ajustes', 'providers');
 const aj = view('ajustes').querySelector('[data-proveedor="anthropic"]');
 const estado = aj.querySelector('.dm-estado');
 const llaveIn = aj.querySelector('[data-campo="llave"]');
@@ -1050,7 +1070,7 @@ else {
   enIngles('en un chat con tools');
 
   // Modo automático: Settings lo dice, y una escritura corre sin tarjeta.
-  await go('ajustes');
+  await go('ajustes', 'tools');
   const tarjetaTools = view('ajustes').querySelector('[data-tarjeta="tools"]');
   const preguntar = tarjetaTools.querySelector('[data-campo="preguntar"]');
   if (!preguntar.checked) fail('de fábrica las tools no piden permiso');
@@ -1065,7 +1085,7 @@ else {
   let tarjetaEnAuto = false;
   await until(() => { tarjetaEnAuto ||= Boolean(permiso()); return msgs().length === 3 && ultimo().dataset.estado === 'ok'; }, 15000);
   if (tarjetaEnAuto || cuenta() !== '1 tool · 1 done') fail(`en modo automático: tarjeta ${tarjetaEnAuto}, contador «${cuenta()}»`);
-  await go('ajustes');
+  await go('ajustes', 'tools');
   preguntar.click();
   await settle();
   if (tarjetaTools.dataset.modo !== 'manual') fail('el modo manual no volvió');
@@ -1486,7 +1506,7 @@ else {
       const hist = () => window.rad.invoke('browser:hist-list');
       // (como until, pero la condición pregunta al proceso principal)
       const hasta = async (cond, ms = 3000) => { for (const t0 = performance.now(); performance.now() - t0 < ms;) { if (await cond()) return true; await sleep(50); } return false; };
-      const abiertos = () => alive(document.querySelectorAll('.rad-overlays .rad-modal')).filter((m) => m.dataset.state === 'open');
+      const abiertos = () => alive(document.querySelectorAll('.rad-overlays .rad-modal')).filter((m) => m.dataset.state === 'open' && !m.classList.contains('dm-ajustes-modal'));
       const ventanaH = () => abiertos().find((m) => m.querySelector('.dm-hist'));
       const filasH = () => alive(ventanaH()?.querySelectorAll('.dm-biblio-fila') ?? []);
       const nombresH = () => filasH().map((f) => f.querySelector('.dm-biblio-nombre').textContent).join(' | ');
@@ -1845,7 +1865,7 @@ else {
   // a la tool.
   {
     const datosM = await import('/datos.js');
-    await go('ajustes');
+    await go('ajustes', 'tools');
     const tb = view('ajustes').querySelector('[data-tarjeta="busqueda"]');
     const selB = tb.querySelector('[data-campo="buscador"]');
     const dice = () => shown(tb.querySelector(':scope > .dm-estado .dm-estado-texto'));
@@ -1873,7 +1893,7 @@ else {
     if (salioB !== 'error: web search needs a Brave API key (Settings)') fail('búsqueda: con Brave elegido y sin llave, web_search devolvió: ' + salioB.slice(0, 160));
     datosM.ponerModoTools('manual');
     // Cargarle la llave a Tavily y elegirlo: queda cifrada, y el aviso se va.
-    await go('ajustes');
+    await go('ajustes', 'tools');
     const tav = tb.querySelector('.dm-subtarjeta[data-proveedor="tavily"]');
     type(tav.querySelector('[data-campo="llave"]'), 'tvly-humo-de-blackcode-no-es-una-llave-2222');
     tav.querySelector('[data-accion="guardar-llave"]').click();
@@ -1972,7 +1992,7 @@ else {
     datosM.ponerModoTools('auto');
 
     // Settings: con qué modelo corren. De fábrica, el del agente.
-    await go('ajustes');
+    await go('ajustes', 'tools');
     const ts = view('ajustes').querySelector('[data-tarjeta="subagentes"]');
     ts.scrollIntoView({ block: 'center' });
     const selP = ts.querySelector('[data-campo="sub-proveedor"]');
@@ -2779,7 +2799,7 @@ else {
     // para el que todavía no arrancó (está vacío y seguía en la de inicio).
     const chatVacio = await nuevoChat();
     if (datosM.chat(chatVacio).carpeta !== inicio) fail('carpeta: el chat vacío no nació en la de inicio');
-    await go('ajustes');
+    await go('ajustes', 'general');
     const tarjetaC = view('ajustes').querySelector('[data-tarjeta="carpeta"]');
     const inicioDice = () => shown(tarjetaC?.querySelector('.dm-carpeta-inicio'));
     if (inicioDice() !== inicio) fail('carpeta: Settings no muestra la carpeta de inicio: «' + inicioDice() + '»');
@@ -2902,7 +2922,7 @@ else {
     if (generadas(-3).length !== 4 || generadas(-2).length !== 4 || generadas(-1).length || fila('generate_image', -1)?.dataset.estado !== 'error' || !salidaI(-1).includes('the limit is 8 per turn')) fail('imágenes: el tope de 8 por turno no frenó la tercera llamada: ' + [generadas(-3).length, generadas(-2).length, generadas(-1).length].join() + ' · ' + salidaI(-1).slice(0, 140));
 
     // Settings: los modelos que ofrece Venice, el filtro, y elegir con cuál.
-    await go('ajustes');
+    await go('ajustes', 'images');
     const tarjetaI = view('ajustes').querySelector('[data-tarjeta="imagenes"]');
     await until(() => tarjetaI?.dataset.modelos === '2', 5000);
     await settle();
@@ -3109,7 +3129,7 @@ else {
     await listoT();
 
     // Settings: el interruptor, que es lo que se guarda.
-    await go('ajustes');
+    await go('ajustes', 'general');
     const tarjetaT = view('ajustes').querySelector('[data-tarjeta="titulos"]');
     const interruptorT = tarjetaT?.querySelector('[data-campo="titulos"]');
     const notaT = () => shown(tarjetaT?.querySelector('.rad-switch + .dm-tarjeta-instr'));
@@ -3172,7 +3192,7 @@ else {
     const avisosM = () => [...document.querySelectorAll('.rad-toast')].filter((n) => !n.hasAttribute('data-rad-leaving')).map((n) => n.textContent);
     const antes = cuantas();
 
-    await go('ajustes');
+    await go('ajustes', 'integrations');
     const tarjetaM = view('ajustes').querySelector('[data-tarjeta="mcp"]');
     const filaM = (nombre) => alive(tarjetaM.querySelectorAll('.dm-mcp-fila')).find((f) => f.dataset.servidor === nombre);
     if (!tarjetaM) fail('mcp: Settings no tiene la tarjeta de servidores');
@@ -3302,7 +3322,7 @@ else {
     if (fila('mcp_smoke_boom')?.dataset.estado === 'ok' || !salidaM('mcp_smoke_boom').includes('declined')) fail('mcp: una llamada rechazada quedó en «' + fila('mcp_smoke_boom')?.dataset.estado + '»: ' + salidaM('mcp_smoke_boom').slice(0, 120));
 
     // Sin «Ask before each call», en automático corre sola.
-    await go('ajustes');
+    await go('ajustes', 'integrations');
     filaM('Smoke').querySelector('[data-accion="mcp-preguntar"]').click();
     await until(() => servidor('Smoke')?.preguntar === false, 3000);
     if (servidor('Smoke')?.preguntar !== false || servidor('Smoke')?.estado !== 'connected') fail('mcp: apagar «Ask before each call» no quedó guardado, o desconectó el servidor');
@@ -3321,7 +3341,7 @@ else {
     datosM.ponerModoTools('auto');
 
     // Cambiarlo: el formulario no trae el valor guardado, y guardarlo sin tocar lo conserva.
-    await go('ajustes');
+    await go('ajustes', 'integrations');
     filaM('Smoke').querySelector('[data-accion="mcp-editar"]').click();
     await until(() => modal(), 2000);
     await sleep(dur('slow') + 120);
@@ -3338,7 +3358,7 @@ else {
     if (cuantas() !== antes + 11) fail('mcp: cambiar el servidor le sacó el grupo al agente (' + cuantas() + ' tools)');
 
     // Apagado: su grupo se va y sus tools también; el agente conserva la marca y al prenderlo vuelve.
-    await go('ajustes');
+    await go('ajustes', 'integrations');
     filaM('Smoke').querySelector('[data-accion="mcp-activo"]').click();
     await until(() => filaM('Smoke')?.dataset.estado === 'off', 3000);
     await settle();
@@ -3632,7 +3652,7 @@ else {
     for (const a of avisosT()) a.querySelector('.rad-toast-close, [aria-label="Close"], [aria-label="Dismiss"]')?.click();
 
     // La bandeja del sistema: cerrar la ventana la esconde, y la app sigue viva.
-    await go('ajustes');
+    await go('ajustes', 'general');
     const tarjetaF = view('ajustes').querySelector('[data-tarjeta="fondo"]');
     const notaF = () => shown(tarjetaF?.querySelector('.dm-tarjeta-instr'));
     if (!tarjetaF?.querySelector('[data-campo="bandeja"]').checked || !notaF().includes('hides BlackCode in the system tray') || datosM.enBandeja() !== true) fail('bandeja: Settings no arranca con «Keep running in the tray» prendido («' + notaF() + '»)');
@@ -3746,7 +3766,7 @@ else {
       if ('llave' in e) fail('voz: el estado que llega a la interfaz trae la llave');
       if (await window.rad.store.read('_voz').then(() => true, () => false)) fail('voz: la interfaz puede leer el documento de la voz (ahí va la llave del Echo)');
     }
-    await go('ajustes');
+    await go('ajustes', 'voice');
     const tarjetaV = view('ajustes').querySelector('[data-tarjeta="voz"]');
     const campoV = (c) => tarjetaV.querySelector('[data-campo="' + c + '"]');
     const errorV = (c) => { const f = campoV(c).closest('.rad-field'); return f.hasAttribute('data-invalid') ? f.textContent : ''; };
@@ -3822,7 +3842,7 @@ else {
       const s = await sim({});
       if (s.eventos.join() !== 'RESPUESTA,RUN_START,STT_START,STT_VAD_END,STT_END,RUN_END') fail('voz: al Echo no se le avisó cada paso (es lo que prende su LED): ' + s.eventos.join());
       if (JSON.stringify(s.datos[4]) !== JSON.stringify([{ name: 'text', value: 'what time is it?' }])) fail('voz: al Echo no le llegó el texto sin la palabra clave: ' + JSON.stringify(s.datos[4]));
-      if (view('ajustes').inert) fail('voz: lo dicho sacó al usuario de Settings');
+      if (!ajustesAbierto() || view('ajustes').dataset.tab !== 'voice') fail('voz: lo dicho sacó al usuario de Settings');
       if (datosM.chatActual()?.id !== chatAntes || datosM.chatsDe(agenteV.id).length !== cuantosAntes + 1) fail('voz: lo dicho cambió el chat que estaba abierto, o no creó exactamente un chat');
       const hilo = (await datosM.hilo(chatV.id)).get().mensajes;
       if (hilo.length !== 2 || hilo[0].rol !== 'user' || hilo[0].texto !== 'what time is it?' || hilo[0].voz !== true || hilo[1].estado !== 'ok' || !hilo[1].texto.includes('what time is it?')) fail('voz: el chat de voz no quedó con lo dicho y su respuesta: ' + JSON.stringify(hilo).slice(0, 300));
@@ -3905,7 +3925,7 @@ else {
     await sim({ que: 'limpiar' });
     const s0 = await sim({ que: 'silencio' });
     await until(async () => (await sim({})).eventos.includes('RUN_END'), 4000);
-    await go('ajustes');
+    await go('ajustes', 'voice');
     await settle();
     if ((await datosM.hilo(chatV.id)).get().mensajes.length !== 6 || !dice('voz-ultima').includes('no speech followed') || s0.frases !== (await sim({})).frases) fail('voz: un silencio mandó un mensaje, transcribió, o Settings no lo dice: «' + dice('voz-ultima') + '»');
     // Whisper falla: tampoco entra nada, y se dice por qué.
@@ -3928,7 +3948,7 @@ else {
     await closed();
     await quieto(chatV.id);
     // Con «Let voice act», corre como en automático.
-    await go('ajustes');
+    await go('ajustes', 'voice');
     campoV('voz-actua').click();
     await until(() => tarjetaV.dataset.actua === 'si', 2000);
     await settle();
@@ -3945,7 +3965,7 @@ else {
       if (permiso() || !escribio || escribio.estado !== 'ok') fail('voz: con «Let voice act» y la app en manual, el turno de voz no corrió solo: ' + JSON.stringify(hilo.slice(antesAct).map((m) => [m.rol, m.estado])).slice(0, 200));
     }
     // (lo tipeado sigue el modo de la app: «Let voice act» es solo de la voz)
-    await go('ajustes');
+    await go('ajustes', 'voice');
     campoV('voz-actua').click();
     await until(() => tarjetaV.dataset.actua === 'no', 2000);
 
@@ -3993,7 +4013,7 @@ else {
       const p = await window.rad.invoke('voz:piezas');
       if (p.motorHabla !== true) fail('habla: la app no trae el motor de la voz: ' + JSON.stringify(p));
     }
-    await go('ajustes');
+    await go('ajustes', 'voice');
     const tarjetaV = view('ajustes').querySelector('[data-tarjeta="voz"]');
     const campoV = (c) => tarjetaV.querySelector('[data-campo="' + c + '"]');
     const boton = (a) => tarjetaV.querySelector('[data-accion="' + a + '"]');
@@ -4115,7 +4135,7 @@ else {
     await callado();
 
     // Se apaga: suelta el modelo y deja de decir. Queda prendida para la pasada 2.
-    await go('ajustes');
+    await go('ajustes', 'voice');
     const apagadas0 = (await sim({})).voz.apagadas;
     campoV('voz-habla').click();
     await until(() => tarjetaV.dataset.habla === 'no', 2000);
@@ -4239,6 +4259,150 @@ else {
     if (((await window.rad.store.read('chats'))?.lista ?? []).some((c) => c.fijado)) fail('fijar: al soltarlo quedó guardado como fijado');
     datosM.ponerGrupoAbierto('recientes', true);
     data.fijar = 'sin fijados la lista es la de siempre; Pin lo sube a Pinned con Recent debajo; los dos se pliegan; Unpin del último devuelve todo a la vista';
+  }
+
+  // 11y. Settings es un modal con pestañas que flota sobre la vista en la que
+  // uno esté (era una página larga). Se mide: que abra desde la titlebar sin
+  // cambiar la vista de atrás, que cada tarjeta esté en su pestaña, que el
+  // cambio de pestaña vaya en orden (la vieja se va del todo y recién ahí
+  // entra la nueva: el modal es de vidrio y dos a medio ver se leen encimadas),
+  // el teclado, que un modal abierto encima se cierre solo él, las tres formas
+  // de cerrarlo, que recuerde la pestaña, y que ir a una vista lo cierre.
+  {
+    await go('chat');
+    const tabS = document.querySelector('.rad-tab[data-view="ajustes"]');
+    if (ajustesAbierto()) fail('ajustes: sigue abierto después de ir al chat');
+    if (document.querySelector('.rad-view[data-view="ajustes"]')) fail('ajustes: sigue habiendo una vista de Settings detrás del modal');
+    tabS.focus();
+    tabS.click();
+    await until(() => ajustesAbierto(), 2000);
+    await sleep(dur('slow') + 220);
+    const m = ajustesAbierto();
+    const panelM = m?.closest('.rad-modal');
+    if (!m || !panelM) fail('ajustes: el botón Settings de la titlebar no abrió el modal');
+    else {
+      const panel = (id) => m.querySelector('.dm-ajustes-panel[data-tab="' + id + '"]');
+      const boton = (id) => m.querySelector('.dm-ajustes-tab[data-tab="' + id + '"]');
+      const paneles = () => [...m.querySelectorAll('.dm-ajustes-panel')];
+      const visibles = () => paneles().filter((p) => getComputedStyle(p).visibility === 'visible').map((p) => p.dataset.tab).join();
+      const tituloM = () => shown(m.querySelector('.dm-ajustes-titulo .rad-swap'));
+      const asentar = () => sleep(dur('fast') + dur('base') + 260);
+      // flota: la vista de atrás es la misma y no se toca
+      if (document.querySelector('.rad-tab[aria-current="page"]')?.dataset.view !== 'chat' || view('chat').dataset.state !== 'active' || !document.querySelector('.rad-root').inert) fail('ajustes: abrir Settings cambió la vista de atrás, o no la dejó inerte');
+      if (panelM.getAttribute('aria-label') !== 'Settings' || panelM.getAttribute('aria-modal') !== 'true') fail('ajustes: el modal no dice qué es');
+      const caja = panelM.getBoundingClientRect();
+      if (innerWidth > 1100 && Math.abs(caja.width - 960) > 1) fail('ajustes: el modal mide ' + r2(caja.width) + ' px de ancho (van 960)');
+      if (Math.abs(caja.height - Math.min(innerHeight * 0.86, 880)) > 1.5) fail('ajustes: el modal mide ' + r2(caja.height) + ' px de alto (va el 86 % de la ventana, hasta 880)');
+      // las siete pestañas, en orden, cada una con su ícono propio
+      const tabs = [...m.querySelectorAll('.dm-ajustes-tab')];
+      if (tabs.map((t) => t.textContent.trim()).join() !== 'General,Providers,Tools,Images,Integrations,Voice,About' || tabs.some((t) => !t.querySelector('svg') || t.getAttribute('role') !== 'tab')) fail('ajustes: las pestañas son «' + tabs.map((t) => t.textContent.trim()).join() + '»');
+      // cada tarjeta, en su pestaña
+      const donde = JSON.stringify(Object.fromEntries(paneles().map((p) => [p.dataset.tab, [...p.querySelectorAll('.dm-ajustes-pila > *')].map((t) => t.dataset.tarjeta ?? t.dataset.proveedor).join(' ')])));
+      const va = JSON.stringify({ general: 'carpeta titulos fondo', providers: 'anthropic venice', tools: 'tools busqueda subagentes', images: 'imagenes', integrations: 'mcp', voice: 'voz', about: 'acerca' });
+      if (donde !== va) fail('ajustes: las tarjetas quedaron repartidas así: ' + donde);
+      await go('ajustes', 'general');
+      await asentar();
+      if (visibles() !== 'general' || tituloM() !== 'General' || tabs.filter((t) => t.getAttribute('aria-selected') === 'true').map((t) => t.dataset.tab).join() !== 'general') fail('ajustes: en General se ve «' + visibles() + '», el título dice «' + tituloM() + '»');
+      if (paneles().filter((p) => !p.inert).map((p) => p.dataset.tab).join() !== 'general') fail('ajustes: una pestaña que no se ve se puede tocar');
+      // El cambio de pestaña, cuadro por cuadro: en orden, sin encimarse y sin corte.
+      boton('tools').click();
+      const pasos = [];
+      for (let i = 0; i < 60; i++) {
+        const sale = getComputedStyle(panel('general')).visibility === 'visible' ? op(panel('general')) : 0;
+        pasos.push([r2(sale), r2(op(panel('tools')))]);
+        if (pasos.at(-1)[0] === 0 && pasos.at(-1)[1] === 1 && i > 4) break;
+        await frame();
+      }
+      const dice = pasos.filter((p, i) => !i || p.join() !== pasos[i - 1].join()).map((p) => p.join('/')).join(' ');
+      if (pasos.some(([a, b]) => a > 0.05 && b > 0.05)) fail('ajustes: al cambiar de pestaña, la que se va y la que entra se ven encimadas (se va/entra): ' + dice);
+      if (new Set(pasos.map((p) => p[0]).filter((x) => x > 0.02 && x < 0.98)).size < 2) fail('ajustes: la pestaña que se va desaparece de golpe: ' + dice);
+      if (new Set(pasos.map((p) => p[1]).filter((x) => x > 0.02 && x < 0.98)).size < 2) fail('ajustes: la pestaña que entra aparece de golpe: ' + dice);
+      if (pasos.at(-1).join() !== '0,1') fail('ajustes: el cambio de pestaña no terminó: ' + dice);
+      await asentar();
+      if (visibles() !== 'tools' || tituloM() !== 'Tools' || m.querySelectorAll('.dm-ajustes-titulo .rad-swap > *').length !== 1 || m.dataset.tab !== 'tools') fail('ajustes: después del cambio se ve «' + visibles() + '» y el título dice «' + m.querySelector('.dm-ajustes-titulo').textContent + '»');
+      data.ajustesCambio = dice;
+      // dos cambios seguidos: no queda ninguna a medio ver
+      boton('voice').click();
+      await sleep(40);
+      boton('images').click();
+      await asentar();
+      await sleep(200);
+      if (visibles() !== 'images' || op(panel('images')) !== 1 || paneles().some((p) => p.hasAttribute('data-saliendo')) || tituloM() !== 'Images') fail('ajustes: después de dos cambios seguidos se ve «' + visibles() + '» (opacidad ' + r2(op(panel('images'))) + '), título «' + tituloM() + '»');
+      // la pestaña ya dice «Voice» y «About»: su única tarjeta no lo repite; las demás sí llevan su nombre
+      await go('ajustes', 'voice');
+      await asentar();
+      if (getComputedStyle(panel('voice').querySelector('.dm-tarjeta > .dm-tarjeta-nombre')).display !== 'none' || getComputedStyle(panel('about').querySelector('.dm-tarjeta > .dm-tarjeta-nombre')).display !== 'none') fail('ajustes: la tarjeta de Voice o de About repite el nombre de su pestaña');
+      if ([...m.querySelectorAll('.dm-ajustes-panel:not([data-tab="voice"]):not([data-tab="about"]) .dm-tarjeta > .dm-tarjeta-nombre')].some((n) => getComputedStyle(n).display === 'none')) fail('ajustes: una tarjeta de las otras pestañas perdió su nombre');
+      enIngles('con Settings abierto');
+      // el teclado: flechas, Home y End recorren las pestañas (y las muestran)
+      boton('voice').focus();
+      key(boton('voice'), 'ArrowDown');
+      await asentar();
+      const t1 = m.dataset.tab + '/' + document.activeElement?.dataset?.tab;
+      key(document.activeElement, 'ArrowDown');
+      await asentar();
+      const t2 = m.dataset.tab + '/' + document.activeElement?.dataset?.tab;
+      key(document.activeElement, 'ArrowUp');
+      await asentar();
+      const t3 = m.dataset.tab + '/' + document.activeElement?.dataset?.tab;
+      key(document.activeElement, 'Home');
+      await asentar();
+      const t4 = m.dataset.tab + '/' + document.activeElement?.dataset?.tab;
+      if ([t1, t2, t3, t4].join() !== 'about/about,general/general,about/about,general/general') fail('ajustes: las flechas recorren las pestañas así: ' + [t1, t2, t3, t4].join());
+      if (tabs.filter((t) => t.getAttribute('tabindex') === '0').map((t) => t.dataset.tab).join() !== 'general') fail('ajustes: el Tab entra a la lista de pestañas por más de una, o por otra que la que se ve');
+      // Un modal encima de Settings (el formulario de un servidor MCP): Esc cierra ese, no Settings.
+      await go('ajustes', 'integrations');
+      m.querySelector('[data-accion="mcp-nuevo"]').click();
+      await until(() => modal(), 2000);
+      await sleep(dur('slow') + 120);
+      if (!modal()) fail('ajustes: desde Settings no se abrió el formulario de un servidor MCP');
+      key(document.activeElement ?? document.body, 'Escape');
+      await closed();
+      await sleep(dur('base') + 120);
+      if (modal() || !ajustesAbierto() || m.dataset.tab !== 'integrations') fail('ajustes: Esc con un modal encima no cerró solo ese (Settings ' + (ajustesAbierto() ? 'sigue' : 'se cerró') + ')');
+      // Esc cierra Settings, y el foco vuelve al botón que lo abrió
+      key(document.activeElement ?? document.body, 'Escape');
+      await until(() => !document.querySelector('.rad-overlays .dm-ajustes'), 2500);
+      await sleep(dur('base') + 120);
+      if (document.querySelector('.rad-overlays .dm-ajustes') || document.querySelector('.rad-root').inert || document.activeElement !== tabS) fail('ajustes: Esc no lo cerró, o no devolvió el foco al botón de la titlebar (está en ' + (document.activeElement?.dataset?.view ?? document.activeElement?.className) + ')');
+      // reabre en la pestaña donde quedó, y quedó guardada
+      tabS.click();
+      await until(() => ajustesAbierto(), 2000);
+      await sleep(dur('slow') + 220);
+      await until(async () => (await window.rad.store.read('ui'))?.ajustes === 'integrations', 3000);
+      if (m.dataset.tab !== 'integrations' || visibles() !== 'integrations' || (await window.rad.store.read('ui'))?.ajustes !== 'integrations') fail('ajustes: no reabrió en la pestaña donde quedó (se ve «' + visibles() + '», guardada ' + JSON.stringify((await window.rad.store.read('ui'))?.ajustes) + ')');
+      if (document.activeElement !== boton('integrations')) fail('ajustes: al abrir, el foco no está en la pestaña que se ve');
+      // la × lo cierra
+      const cerrar = m.querySelector('.dm-ajustes-cerrar');
+      if (cerrar.getAttribute('data-rad-tip') !== 'Close' || cerrar.hasAttribute('title') || !cerrar.querySelector('svg')) fail('ajustes: la × no tiene su tooltip propio o su ícono');
+      cerrar.click();
+      await until(() => !document.querySelector('.rad-overlays .dm-ajustes'), 2500);
+      if (document.querySelector('.rad-overlays .dm-ajustes')) fail('ajustes: la × no lo cerró');
+      // un clic afuera lo cierra
+      tabS.click();
+      await until(() => ajustesAbierto(), 2000);
+      await sleep(dur('slow') + 220);
+      ajustesAbierto()?.closest('.rad-modal-layer').querySelector('.rad-scrim').click();
+      await until(() => !document.querySelector('.rad-overlays .dm-ajustes'), 2500);
+      if (document.querySelector('.rad-overlays .dm-ajustes')) fail('ajustes: un clic afuera no lo cerró');
+      // ir a una vista lo cierra (el «Open» de un aviso, la bandeja): si no, queda tapando el lugar al que se quiso ir
+      tabS.click();
+      await until(() => ajustesAbierto(), 2000);
+      await sleep(dur('slow') + 220);
+      document.querySelector('.rad-tab[data-view="agentes"]').click();
+      await until(() => !document.querySelector('.rad-overlays .dm-ajustes'), 2500);
+      await sleep(dur('base') + 220);
+      if (document.querySelector('.rad-overlays .dm-ajustes') || document.querySelector('.rad-tab[aria-current="page"]')?.dataset.view !== 'agentes' || document.querySelector('.rad-root').inert) fail('ajustes: ir a una vista con Settings abierto no lo cerró, o no llevó a la vista');
+      await go('chat');
+      // «Go to Settings», el aviso del chat cuando falta la llave, abre en Providers
+      chatView.querySelector('[data-accion="ir-ajustes"]').click();
+      await until(() => ajustesAbierto(), 2000);
+      await sleep(dur('slow') + 220);
+      if (!ajustesAbierto() || m.dataset.tab !== 'providers' || visibles() !== 'providers') fail('ajustes: «Go to Settings» no abrió en Providers (se ve «' + visibles() + '»)');
+      if (!boton('providers').querySelector('svg g[transform]')) fail('ajustes: Providers no lleva la llave de Prism (la de contorno continuo, en diagonal)');
+      await go('chat');
+      data.ajustes = 'modal de ' + Math.round(caja.width) + '×' + Math.round(caja.height) + ' sobre la vista, siete pestañas con sus tarjetas, cambio en orden, flechas, un modal encima, Esc, ×, clic afuera, recuerda la pestaña, y navegar lo cierra';
+    }
   }
 
   // 11x. La hora de cada mensaje, en lo que cuesta ver con un chat recién
@@ -4445,7 +4609,7 @@ else {
 // no hay updater, y lo dice; en la app instalada le pregunta a GitHub. Los
 // demás estados (hay una versión, bajando, lista) se recorren dándole al
 // módulo los eventos que mandaría el núcleo: no se publica nada para probar.
-await go('ajustes');
+await go('ajustes', 'about');
 {
   const act = await import('/actualizacion.js');
   const about = view('ajustes').querySelector('[data-tarjeta="acerca"]');

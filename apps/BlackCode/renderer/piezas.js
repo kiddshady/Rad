@@ -19,6 +19,10 @@ export const ICONOS = {
   chat: svg('<path d="M2.5 4.5A1.5 1.5 0 0 1 4 3h8a1.5 1.5 0 0 1 1.5 1.5v5A1.5 1.5 0 0 1 12 11H7.5l-3 2.5V11H4a1.5 1.5 0 0 1-1.5-1.5z"/>'),
   agentes: svg('<circle cx="6" cy="5.75" r="2.5"/><path d="M1.5 13c.4-2.2 2.2-3.5 4.5-3.5s4.1 1.3 4.5 3.5"/><path d="M10.6 3.4a2.5 2.5 0 0 1 0 4.7M12.2 9.9c1.2.5 2 1.6 2.3 3.1"/>'),
   ajustes: svg('<path d="M2.5 5h6M11.5 5h2M2.5 11h2M7.5 11h6"/><circle cx="10" cy="5" r="1.5"/><circle cx="6" cy="11" r="1.5"/>'),
+  // (las pestañas de Settings que no tenían ícono: imágenes, integraciones, acerca de)
+  imagen: svg('<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><circle cx="6" cy="6.5" r="1"/><path d="M3 11.5l3-3 2.5 2.5 2-2 2.5 2.5"/>'),
+  enchufe: svg('<path d="M6 2.5v3M10 2.5v3M4.5 5.5h7V8a3.5 3.5 0 0 1-7 0zM8 11.5v2"/>'),
+  info: svg('<circle cx="8" cy="8" r="5.5"/><path d="M8 7.5V11"/><circle cx="8" cy="5.2" r=".6" fill="currentColor" stroke="none"/>'),
   mas: svg('<path d="M8 3v10M3 8h10"/>'),
   puntos: svg('<circle cx="3.5" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1.1" fill="currentColor" stroke="none"/>'),
   enviar: svg('<path d="M8 13V3.5M4 7.5l4-4 4 4"/>'),
@@ -30,7 +34,10 @@ export const ICONOS = {
   chevron: svg('<path d="M4.5 6.5 8 10l3.5-3.5"/>'),
   // (el mismo, hacia arriba: subir un agente en la lista)
   subir: svg('<path d="M4.5 9.5 8 6l3.5 3.5"/>'),
-  llave: svg('<circle cx="5.25" cy="10.75" r="2.75"/><path d="M7.3 8.7l6.2-6.2M11 5l2 2M9.2 6.8l1.6 1.6"/>'),
+  // La llave es la de Prism (la de su gestor de contraseñas; Fran la pidió acá,
+  // nov 2026): de contorno continuo, el ojo y el eje con su diente en una sola
+  // silueta, acostada y puesta en diagonal con rotate(-45).
+  llave: svg('<g transform="rotate(-45 8 8)"><path d="M8.31 6.6H1.9V9.4H3.2V11H5.8V9.4H8.31A3.3 3.3 0 1 0 8.31 6.6Z"/><circle cx="12.3" cy="8" r="1" fill="currentColor" stroke="none"/></g>'),
   cerrar: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
   copiar: svg('<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>'),
   bajar: svg('<path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/>'),

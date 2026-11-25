@@ -10,8 +10,12 @@
 //     ],
 //   });
 //   const resultado = await m.closed;   // el id de la acción, o 'dismiss'
+//   await m.removed;                    // …y cuando terminó de irse y salió del documento
 //
 //   if (await confirm({ title: '¿Eliminar?', text: '…', confirmLabel: 'Eliminar', danger: true })) …
+//
+// `className` le suma clases al panel (un modal con su propia forma: ancho,
+// sin relleno) y `label` lo nombra cuando no lleva título.
 //
 // Mientras hay un modal, la app de atrás queda inert (ni foco ni clicks) y el
 // Tab da vueltas adentro del modal. Al cerrar, el foco vuelve a donde estaba.
@@ -26,7 +30,7 @@ import { t } from './strings.js';
 let openCount = 0;
 const appRoot = () => document.querySelector('.rad-root');
 
-export function openModal({ title, body, actions = [], dismissible = true } = {}) {
+export function openModal({ title, body, actions = [], dismissible = true, className = '', label = '' } = {}) {
   const previous = document.activeElement;
 
   const wrap = document.createElement('div');
@@ -38,6 +42,8 @@ export function openModal({ title, body, actions = [], dismissible = true } = {}
   panel.tabIndex = -1;
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'true');
+  for (const c of String(className).split(/\s+/).filter(Boolean)) panel.classList.add(c);
+  if (!title && label) panel.setAttribute('aria-label', label);
 
   if (title) {
     const h = document.createElement('h2');
@@ -88,6 +94,8 @@ export function openModal({ title, body, actions = [], dismissible = true } = {}
 
   let resolveClosed;
   const closed = new Promise((r) => { resolveClosed = r; });
+  let resolveRemoved;
+  const removed = new Promise((r) => { resolveRemoved = r; });
   let isClosed = false;
   const popStack = pushOverlay({ onEscape: () => { if (dismissible) close('dismiss'); } });
 
@@ -97,7 +105,7 @@ export function openModal({ title, body, actions = [], dismissible = true } = {}
     popStack();
     openCount--;
     if (root && openCount === 0) root.inert = false;
-    Promise.all([dismiss(panel, { remove: false }), dismiss(scrim, { remove: false })]).then(() => wrap.remove());
+    Promise.all([dismiss(panel, { remove: false }), dismiss(scrim, { remove: false })]).then(() => { wrap.remove(); resolveRemoved(); });
     if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
     resolveClosed(result);
     return closed;
@@ -116,7 +124,7 @@ export function openModal({ title, body, actions = [], dismissible = true } = {}
 
   (panel.querySelector('[data-autofocus]') || autofocus || panel).focus({ preventScroll: true });
 
-  const api = { el: panel, close, closed };
+  const api = { el: panel, close, closed, removed };
   return api;
 }
 

@@ -21,6 +21,7 @@ import { openMenu } from '/@core/menu.js';
 import { toast } from '/@core/toast.js';
 import { crearAdjuntos, adjuntosDe, ACEPTA } from './adjuntos.js';
 import { ponerHora } from './hora.js';
+import { abrirAjustes } from './ajustes.js';
 
 // Los items que no son un chat ni un mensaje: el lugar vacío de cada lista.
 const VACIO = '_vacio';
@@ -154,7 +155,7 @@ export function montarChat(el, { router }) {
   const bFinal = h('button', 'dm-al-final', { type: 'button', 'data-accion': 'al-final', 'aria-label': 'Jump to latest', 'data-rad-tip': 'Jump to latest', 'data-rad-tip-side': 'top', tabindex: '-1', 'aria-hidden': 'true' }, icono('chevron'));
 
   const irAjustes = h('button', 'rad-button', { type: 'button', 'data-accion': 'ir-ajustes' }, 'Go to Settings');
-  irAjustes.addEventListener('click', () => router.go('ajustes'));
+  irAjustes.addEventListener('click', () => abrirAjustes('providers'));
   const aviso = h('div', 'dm-aviso', { role: 'status' },
     h('div', 'dm-aviso-in', {}, h('div', 'dm-aviso-caja', {},
       icono('llave'), h('span', 'dm-aviso-texto rad-swap'), irAjustes)));

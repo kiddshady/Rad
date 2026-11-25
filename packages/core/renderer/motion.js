@@ -61,7 +61,10 @@ export function whenDone(animation, timeoutMs, fn) {
 /** La opacidad que se ve ahora, para que una animación nueva arranque desde
     ahí y no desde 1 o 0. */
 export function opacityNow(el) {
-  return parseFloat(getComputedStyle(el).opacity);
+  // (un nodo fuera del documento no tiene estilo calculado: cuenta como entero,
+  // así el que arma una duración con esto no recibe un NaN)
+  const n = parseFloat(getComputedStyle(el).opacity);
+  return Number.isNaN(n) ? 1 : n;
 }
 
 /** Termina las animaciones de un elemento sin dejarlas retenidas. */

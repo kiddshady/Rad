@@ -113,7 +113,9 @@ function tabs({ views, router }) {
     clip.append(text);
     box.append(clip);
     item.append(box);
-    item.addEventListener('click', () => router.go(v.id));
+    // (un ítem con `action` no es una vista: hace algo, como abrir un modal)
+    if (typeof v.action === 'function') item.setAttribute('aria-haspopup', 'dialog');
+    item.addEventListener('click', () => (typeof v.action === 'function' ? v.action() : router.go(v.id)));
     nav.append(item);
     items.set(v.id, { item, label, plain: !v.icon });
   }
@@ -158,7 +160,8 @@ function rail({ views, router }) {
     const label = h('span', 'rad-rail-label');
     label.textContent = v.label ?? v.id;
     item.append(label);
-    item.addEventListener('click', () => router.go(v.id));
+    if (typeof v.action === 'function') item.setAttribute('aria-haspopup', 'dialog');
+    item.addEventListener('click', () => (typeof v.action === 'function' ? v.action() : router.go(v.id)));
     nav.append(item);
     items.set(v.id, item);
   }
@@ -227,7 +230,10 @@ export function createShell({ root, title, subtitle, views = [], initial, nav, r
 
   const tb = titlebar({ title, subtitle });
   const stage = h('main', 'rad-stage');
-  const router = createRouter({ stage, views, initial });
+  // Un ítem de `views` con `action` (una función) en vez de `mount` va en la
+  // navegación como los demás, pero no es una vista: al tocarlo corre su
+  // acción (abrir un modal, por ejemplo) y la vista de atrás no cambia.
+  const router = createRouter({ stage, views: views.filter((v) => typeof v.action !== 'function'), initial });
 
   shell.append(tb.el);
   let railPart = null;

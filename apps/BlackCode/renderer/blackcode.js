@@ -11,7 +11,7 @@ import { montarNotas } from './notas.js';
 import { montarMemoria } from './memoria.js';
 import { montarSkills, revisarSkill } from './skills.js';
 import { toast } from '/@core/toast.js';
-import { montarAjustes } from './ajustes.js';
+import { abrirAjustes, cerrarAjustes } from './ajustes.js';
 import { montarTareas, ponerPunto, abrirResultado } from './tareas.js';
 import { ICONOS } from './piezas.js';
 import { montarVoz, estadoDeVoz, estadoDeHabla } from './voz.js';
@@ -27,7 +27,8 @@ const views = [
   { id: 'skills', label: 'Skills', icon: ICONOS.skills, mount: (el) => montarSkills(el) },
   { id: 'tareas', label: 'Tasks', icon: ICONOS.reloj, mount: (el, router) => montarTareas(el, { router }) },
   { id: 'agentes', label: 'Agents', icon: ICONOS.agentes, mount: (el, router) => montarAgentes(el, { router }) },
-  { id: 'ajustes', label: 'Settings', icon: ICONOS.ajustes, mount: (el, router) => montarAjustes(el, { router }) },
+  // (Settings no es una vista: es un modal que flota sobre la que esté)
+  { id: 'ajustes', label: 'Settings', icon: ICONOS.ajustes, action: () => abrirAjustes() },
 ];
 
 const shell = createShell({
@@ -53,6 +54,10 @@ const ponerEstado = () => {
 };
 shell.status.set('left', views.find((v) => v.id === shell.router.current).label);
 shell.router.on('change', ({ label }) => shell.status.set('left', label));
+// Settings flota sobre la vista: lo que lleve a una vista (el «Open» de un
+// aviso, «Go to the chat», el ícono de la bandeja) lo cierra, o quedaría
+// tapando el lugar al que se quiso ir.
+shell.router.on('go', () => cerrarAjustes());
 ponerEstado();
 datos.on('agentes', ponerEstado);
 datos.on('modelos', ponerEstado);

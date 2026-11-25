@@ -1,9 +1,10 @@
-// La vista de ajustes: una llave por proveedor, y de qué está hecha la app.
+// Los ajustes: un modal flotante con pestañas (las llaves, las tools, las
+// imágenes, los servidores MCP, la voz, y de qué está hecha la app).
 
 import { openModal, confirm } from '/@core/modal.js';
 import { reconcile } from '/@core/list.js';
 import { createSelect, setFieldError, wireControls } from '/@core/controls.js';
-import { swapText } from '/@core/motion.js';
+import { swapText, ms, token, cancelAll, opacityNow, SAFETY_MS } from '/@core/motion.js';
 import { toast } from '/@core/toast.js';
 import { setBusy } from '/@core/busy.js';
 import * as llave from './llave.js';
@@ -1052,27 +1053,163 @@ function tarjetaMcp() {
   return tarjeta;
 }
 
-export function montarAjustes(el, { router }) {
+// ---------- El modal ----------
+// Settings es un modal que flota sobre la vista en la que uno esté, con las
+// pestañas a la izquierda (la forma del de Umbra): era una página larga, y
+// llegar a la voz o al About era scrollear todo. Se arma una vez y se reusa:
+// las tarjetas escuchan los datos de la app, y armarlas de nuevo en cada
+// apertura dejaría sus oyentes colgados.
+//
+// Las siete pestañas están siempre en el modal, apiladas en una misma celda;
+// la que no se ve queda oculta e inerte. Al cambiar van en orden: la vieja se
+// va del todo y recién ahí entra la nueva. No es un fundido con la vieja
+// tapando porque el modal es de vidrio: su fondo no tapa nada, y dos pestañas
+// a medio ver en el mismo lugar se leen una encima de la otra.
+export const PESTANAS = [
+  { id: 'general', nombre: 'General', icono: 'ajustes' },
+  { id: 'providers', nombre: 'Providers', icono: 'llave' },
+  { id: 'tools', nombre: 'Tools', icono: 'tool' },
+  { id: 'images', nombre: 'Images', icono: 'imagen' },
+  { id: 'integrations', nombre: 'Integrations', icono: 'enchufe' },
+  { id: 'voice', nombre: 'Voice', icono: 'canal' },
+  { id: 'about', nombre: 'About', icono: 'info' },
+];
+const esPestana = (id) => PESTANAS.some((p) => p.id === id);
+
+let armado = null;  // lo de adentro del modal: se arma una vez
+// Dónde queda lo de adentro mientras el modal está cerrado: en el documento,
+// oculto. Suelto no puede quedar: las tarjetas se siguen poniendo al día con
+// los datos de la app (una llave que se comprueba, un servidor que conecta), y
+// lo que miden o animan necesita estar en el documento.
+let guardado = null;
+let abierto = null; // el modal, mientras está abierto
+
+function armar() {
   const laVoz = tarjetaVoz();
+  const tarjetas = {
+    general: [tarjetaCarpeta(), tarjetaTitulos(), tarjetaFondo()],
+    providers: PROVEEDORES.map((p) => tarjetaLlave(p)),
+    tools: [tarjetaTools(), tarjetaBusqueda(), tarjetaSubagentes()],
+    images: [tarjetaImagenes()],
+    integrations: [tarjetaMcp()],
+    voice: [laVoz],
+    about: [tarjetaAcerca()],
+  };
 
-  el.append(h('div', 'dm-pagina', {},
-    h('header', 'dm-pagina-cabeza', {}, h('div', '', {}, h('h1', '', {}, 'Settings'), h('p', '', {}, 'What BlackCode needs to talk to the models.'))),
-    ...PROVEEDORES.map((p) => tarjetaLlave(p)),
-    tarjetaBusqueda(),
-    tarjetaTools(),
-    tarjetaCarpeta(),
-    tarjetaTitulos(),
-    tarjetaImagenes(),
-    tarjetaMcp(),
-    laVoz,
-    tarjetaFondo(),
-    tarjetaSubagentes(),
-    tarjetaAcerca()));
+  const nav = h('nav', 'dm-ajustes-nav', { role: 'tablist', 'aria-orientation': 'vertical', 'aria-label': 'Settings' },
+    h('div', 'dm-ajustes-nav-titulo', {}, 'Settings'));
+  const titulo = h('span', 'rad-swap');
+  const bCerrar = h('button', 'rad-iconbutton dm-ajustes-cerrar', { type: 'button', 'aria-label': 'Close', 'data-accion': 'cerrar-ajustes', 'data-rad-tip': 'Close', 'data-rad-tip-key': 'Esc', 'data-rad-tip-side': 'bottom' }, icono('cerrar'));
+  const celda = h('div', 'dm-ajustes-celda');
+  const raiz = h('div', 'dm-ajustes', {},
+    nav,
+    h('div', 'dm-ajustes-cuerpo', {},
+      h('header', 'dm-ajustes-cabeza', {}, h('h2', 'dm-ajustes-titulo', {}, titulo), bCerrar),
+      celda));
 
-  // Al abrir Ajustes se le pregunta a la API por cada llave guardada. Lo que
+  const partes = new Map();
+  for (const p of PESTANAS) {
+    const boton = h('button', 'dm-ajustes-tab', { type: 'button', role: 'tab', id: `dm-ajustes-tab-${p.id}`, 'data-tab': p.id, 'aria-selected': 'false', 'aria-controls': `dm-ajustes-panel-${p.id}`, tabindex: '-1' },
+      icono(p.icono), h('span', '', {}, p.nombre));
+    const panel = h('div', 'dm-ajustes-panel', { role: 'tabpanel', id: `dm-ajustes-panel-${p.id}`, 'data-tab': p.id, 'aria-labelledby': `dm-ajustes-tab-${p.id}` },
+      h('div', 'dm-ajustes-pila', {}, ...tarjetas[p.id]));
+    panel.inert = true;
+    boton.addEventListener('click', () => mostrar(p.id));
+    nav.append(boton);
+    celda.append(panel);
+    partes.set(p.id, { boton, panel });
+  }
+  // Flechas arriba y abajo recorren las pestañas (y las muestran).
+  nav.addEventListener('keydown', (e) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+    const i = PESTANAS.findIndex((p) => p.id === actual);
+    const n = PESTANAS.length;
+    const j = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : (i + (e.key === 'ArrowDown' ? 1 : n - 1)) % n;
+    e.preventDefault();
+    mostrar(PESTANAS[j].id);
+    partes.get(PESTANAS[j].id).boton.focus();
+  });
+
+  let actual = '';
+  function mostrar(id, { animar = true } = {}) {
+    if (!esPestana(id) || id === actual) return;
+    const sale = partes.get(actual)?.panel ?? null;
+    actual = id;
+    for (const [k, { boton, panel }] of partes) {
+      const es = k === id;
+      boton.setAttribute('aria-selected', String(es));
+      boton.setAttribute('tabindex', es ? '0' : '-1');
+      boton.toggleAttribute('data-autofocus', es);
+      panel.toggleAttribute('data-activa', es);
+      panel.inert = !es;
+    }
+    const entra = partes.get(id).panel;
+    const nombre = PESTANAS.find((p) => p.id === id).nombre;
+    if (sale && animar && abierto) {
+      // Cada una arranca desde lo que se ve ahora: con dos cambios seguidos,
+      // la que se iba puede estar volviendo, y la que entraba, yéndose.
+      const volvia = entra.hasAttribute('data-saliendo');
+      const desdeE = volvia ? opacityNow(entra) : 0;
+      const desdeS = opacityNow(sale);
+      cancelAll(entra);
+      cancelAll(sale);
+      entra.removeAttribute('data-saliendo');
+      if (!volvia) entra.scrollTop = 0;
+      sale.setAttribute('data-saliendo', '');
+      const fuera = ms('dur-fast') * desdeS;
+      const dentro = ms('dur-base');
+      const a = sale.animate([{ opacity: desdeS }, { opacity: 0 }], { duration: fuera, easing: token('ease-in-out'), fill: 'forwards' });
+      let ya = false;
+      // (si mientras tanto volvió a ser la que se ve, ya la soltó el cambio siguiente)
+      const fin = () => { if (ya) return; ya = true; if (sale !== partes.get(actual).panel) { sale.removeAttribute('data-saliendo'); a.cancel(); } };
+      a.finished.then(fin, fin);
+      setTimeout(fin, fuera + SAFETY_MS);
+      const e = entra.animate([{ opacity: desdeE }, { opacity: 1 }], { duration: dentro, delay: volvia ? 0 : fuera, easing: token('ease-out'), fill: 'backwards' });
+      // (una ventana tapada no avanza sus animaciones: pasado el plazo, queda entera igual)
+      setTimeout(() => { if (e.playState !== 'finished' && e.playState !== 'idle') e.finish(); }, (volvia ? 0 : fuera) + dentro + SAFETY_MS);
+      swapText(titulo, nombre);
+    } else {
+      for (const { panel } of partes.values()) { cancelAll(panel); panel.removeAttribute('data-saliendo'); }
+      entra.scrollTop = 0;
+      // (el primer llenado, o un cambio con el modal cerrado: sin relevo)
+      titulo.replaceChildren();
+      swapText(titulo, nombre);
+    }
+    raiz.dataset.tab = id;
+    datosApp.ponerPestanaAjustes(id);
+  }
+
+  // Al abrir Settings se le pregunta a la API por cada llave guardada. Lo que
   // ya contestó (la acepta o la rechaza) no se vuelve a preguntar; lo que no
   // se pudo comprobar, sí.
   const comprobarTodas = () => { for (const p of PROVEEDORES) llave.comprobar(p.id); laVoz.preguntar(); };
-  comprobarTodas();
-  router.on('change', ({ id }) => { if (id === 'ajustes') comprobarTodas(); });
+  guardado = h('div', 'dm-ajustes-guardado', { hidden: true, 'aria-hidden': 'true' }, raiz);
+  guardado.inert = true;
+  document.body.append(guardado);
+  return { raiz, mostrar, comprobarTodas, bCerrar, actual: () => actual };
+}
+
+/** Cierra Settings, si está abierto (la app lo llama cuando algo lleva a una vista). */
+export function cerrarAjustes() {
+  abierto?.close('dismiss');
+}
+
+/** Abre Settings (o, si ya está abierto, lo deja como está). Con `pestana`,
+ *  en esa; sin ella, en la que quedó la última vez. Devuelve el modal. */
+export function abrirAjustes(pestana = '') {
+  const a = (armado ??= armar());
+  if (abierto) {
+    if (esPestana(pestana)) a.mostrar(pestana);
+    return abierto;
+  }
+  const guardada = datosApp.pestanaAjustes();
+  a.mostrar(esPestana(pestana) ? pestana : esPestana(guardada) ? guardada : PESTANAS[0].id, { animar: false });
+  const m = openModal({ body: a.raiz, className: 'dm-ajustes-modal', label: 'Settings' });
+  abierto = m;
+  a.bCerrar.onclick = () => m.close('dismiss');
+  m.closed.then(() => { if (abierto === m) abierto = null; });
+  // cuando terminó de irse: lo de adentro vuelve a su lugar (salvo que ya esté en otro modal, reabierto mientras este se iba)
+  m.removed.then(() => { if (!a.raiz.isConnected) guardado.append(a.raiz); });
+  a.comprobarTodas();
+  return m;
 }

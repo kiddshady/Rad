@@ -68,11 +68,15 @@ const shell = createShell({
   views: [
     { id: 'inicio', label: 'Inicio', icon: '<svg…>', mount(el, router) { … } },
     { id: 'ajustes', label: 'Ajustes', icon: '<svg…>', mount(el) { … } },
+    // con `action` en vez de `mount` no es una vista: va en la navegación y
+    // al tocarlo corre la función (abrir un modal), sin cambiar la de atrás
+    { id: 'ayuda', label: 'Ayuda', icon: '<svg…>', action() { … } },
   ],
 });
 
 shell.router.go('ajustes');
 shell.router.on('change', ({ id, from, label }) => { … });
+shell.router.on('go', ({ id, from }) => { … }); // cada pedido de ir, también a la que ya se ve
 shell.status.set('left', 'Listo');
 shell.setSubtitle('borrador');
 ```
@@ -123,6 +127,10 @@ const m = openModal({ title: 'Renombrar', body: nodo, actions: [
   { id: 'ok', label: 'Guardar', variant: 'primary' },
 ] });
 await m.closed; // el id de la acción, o 'dismiss'
+await m.removed; // …y cuando terminó de irse y salió del documento
+
+// Un modal con otra forma (ancho, sin relleno): clases propias y un nombre.
+openModal({ body: nodo, className: 'mi-modal', label: 'Ajustes' });
 
 if (await confirm({ title: '¿Eliminar?', confirmLabel: 'Eliminar', danger: true })) { … }
 
@@ -491,6 +499,11 @@ y los comentarios siguen en castellano) y la fuente de código es Roboto Mono.
   `motor/escucha_motor.py`). Desde la 1.2.0 el agente puede contestar en voz
   alta, con una voz clonada (Qwen3-TTS, `main/habla.cjs` y
   `motor/habla_motor.py`). Está contado en `apps/BlackCode/docs/tools.md`.
+- Settings es un modal con pestañas que flota sobre la vista en la que uno
+  esté (`renderer/ajustes.js`, `abrirAjustes(pestaña)`): General, Providers,
+  Tools, Images, Integrations, Voice y About. Lo de adentro se arma una vez y
+  se reusa; con el modal cerrado queda guardado en el documento, oculto,
+  porque las tarjetas se siguen poniendo al día con los datos de la app.
 - Se instala y se actualiza desde `kiddshady/daimon-releases`. En Settings,
   About tiene un botón para buscar una versión nueva sin esperar al núcleo.
 - El ícono es la «Red hexagonal»: seis agentes en los vértices de un
