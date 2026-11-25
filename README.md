@@ -435,7 +435,7 @@ es por donde la instalada encuentra su actualización, y no se tocan.)
 La primera app hecha con Rad: un chat con IA donde se arman varios agentes,
 cada uno con su nombre, su proveedor y su modelo, sus instrucciones y sus
 propios chats, con los modelos de Anthropic y los de Venice. Un agente puede
-tener tools prendidas (archivos, comandos y jobs, código, SQLite, web, abrir cosas, mirar la pantalla, un canvas y un navegador al lado del chat, una libreta de notas, subagentes, memoria y skills) y entonces actúa en la PC;
+tener tools prendidas (archivos, comandos y jobs, código, SQLite, web, abrir cosas, mirar la pantalla, un canvas y un navegador al lado del chat, una libreta de notas, subagentes, memoria, skills y, si se la prende, generar imágenes con Venice) y entonces actúa en la PC;
 cómo están armadas, en `apps/BlackCode/docs/tools.md`. Las respuestas dibujan las
 fórmulas en LaTeX (KaTeX, con mhchem). A un mensaje se le adjuntan imágenes y
 archivos de texto con el botón +, pegando o soltándolos sobre la conversación

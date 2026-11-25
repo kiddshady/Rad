@@ -394,6 +394,72 @@ function tarjetaTools() {
   return tarjeta;
 }
 
+// Generar imágenes (la tool generate_image): con qué modelo de Venice, y su
+// filtro de contenido adulto. Usa la llave de Venice de más arriba. La tool
+// nace apagada en los agentes porque gasta plata: acá se dice.
+function tarjetaImagenes() {
+  const PREDET = '__venice__';
+  const hueco = h('div', 'rad-field dm-img-modelo', {}, h('span', 'rad-field-label', { id: 'dm-img-rotulo' }, 'Model'));
+  const texto = h('span', 'dm-estado-texto rad-swap');
+  const estado = h('p', 'dm-estado', { role: 'status' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), texto);
+  const filtro = h('input', '', { type: 'checkbox', role: 'switch', id: 'dm-img-filtro', 'data-campo': 'img-filtro' });
+  const nota = h('p', 'dm-tarjeta-instr rad-swap');
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'imagenes' },
+    h('h2', 'dm-tarjeta-nombre', {}, 'Image generation'),
+    h('p', 'dm-tarjeta-instr', {}, 'An agent with the Images tool makes images with Venice, using the Venice key above, and shows them in the chat. Every image is paid from your Venice balance, so the tool is off on every agent until you turn it on for that agent.'),
+    hueco, estado,
+    h('label', 'rad-switch', {}, filtro, h('span', 'rad-switch-track'), 'Blur adult content'),
+    nota);
+  wireControls(tarjeta);
+  let select = null;
+  let lista = [];
+  let turno = 0;
+  const precio = (m) => (typeof m.precio === 'number' ? ` · $${m.precio.toFixed(2)} per image` : '');
+  const armar = () => {
+    select?.close();
+    select?.el.remove();
+    const guardado = datosApp.ajustesImagenes().modelo;
+    // un modelo que salió de la lista de Venice se deja a la vista, con su id
+    const modelos = guardado && !lista.some((m) => m.id === guardado) ? [{ id: guardado, nombre: guardado }, ...lista] : lista;
+    select = createSelect({
+      options: [{ value: PREDET, label: 'Venice’s default' }, ...modelos.map((m) => ({ value: m.id, label: `${m.nombre}${precio(m)}` }))],
+      value: guardado || PREDET,
+      onChange: (v) => datosApp.ponerImagenes({ modelo: v === PREDET ? '' : v }),
+    });
+    select.el.setAttribute('aria-labelledby', 'dm-img-rotulo');
+    select.el.dataset.campo = 'img-modelo';
+    select.el.disabled = !lista.length;
+    hueco.append(select.el);
+  };
+  const cargar = async () => {
+    const mio = ++turno;
+    const r = await window.rad.invoke('imagenes:modelos', true).catch(() => null);
+    if (mio !== turno) return;
+    lista = r?.ok ? r.modelos : [];
+    armar();
+    tarjeta.dataset.modelos = String(lista.length);
+    if (r?.ok && lista.length) { estado.dataset.tono = 'success'; swapText(texto, `Venice offers ${lista.length} image model${lista.length === 1 ? '' : 's'} with your key.`); }
+    else if (llave.de('venice').estado !== 'lista') { estado.dataset.tono = 'warning'; swapText(texto, 'There is no Venice key saved: add one above to generate images.'); }
+    else { estado.dataset.tono = 'danger'; swapText(texto, `Could not load the image models: ${r?.error ?? 'Venice lists none for this key'}.`); }
+  };
+  const poner = () => {
+    const a = datosApp.ajustesImagenes();
+    filtro.checked = a.filtro;
+    swapText(nota, a.filtro
+      ? 'Venice blurs an image when it classes it as adult content.'
+      : 'Images come back as generated, without Venice’s adult content blur. Venice’s own terms still apply.');
+    if (select && select.value !== (a.modelo || PREDET)) select.value = a.modelo || PREDET;
+  };
+  // (el agente no puede tocar este filtro: no es un parámetro de la tool)
+  filtro.addEventListener('change', () => datosApp.ponerImagenes({ filtro: filtro.checked }));
+  armar();
+  poner();
+  cargar();
+  datosApp.on('ajustes', poner);
+  llave.on(cargar);
+  return tarjeta;
+}
+
 // La carpeta de inicio: donde arranca un chat nuevo. Después cada chat
 // recuerda la suya (se ve y se cambia debajo del campo para escribir).
 function tarjetaCarpeta() {
@@ -423,6 +489,7 @@ export function montarAjustes(el, { router }) {
     tarjetaBusqueda(),
     tarjetaTools(),
     tarjetaCarpeta(),
+    tarjetaImagenes(),
     tarjetaSubagentes(),
     tarjetaAcerca()));
 

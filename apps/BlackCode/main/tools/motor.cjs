@@ -56,7 +56,9 @@ function activeToolNames(run) {
   // El filtro es fijo para todo el turno del hijo, así que no le cambia la lista
   // de tools detrás de un bloque thinking.
   if (run?.subagent) {
-    names = names.filter((n) => n !== 'delegate' && n !== 'schedule' && n !== 'remember' && n !== 'create_skill');
+    names = names.filter((n) => n !== 'delegate' && n !== 'schedule' && n !== 'remember' && n !== 'create_skill'
+      // (ni genera imágenes: gasta plata del usuario, y la pide quien habla con él)
+      && n !== 'generate_image');
     if (run.subagent.access !== 'full') names = names.filter((n) => READ_ROUND_TOOLS.has(n));
     // El browser es UNO, compartido con el padre y el usuario, y todas sus tools
     // trabajan sobre la pestaña activa. Dos hijos a la vez con browser_navigate
@@ -204,6 +206,7 @@ function argsDigest(name, args) {
       return cut([a.action, a.action === 'list' && a.scope === 'all' ? 'library' : null, a.title].filter(Boolean).join(' '));
     }
     case 'create_skill': return cut([a.type, a.name].filter(Boolean).join(' '));
+    case 'generate_image': return cut(a.prompt);
     case 'skill': return cut(a.name || 'all skills');
     case 'list_skills': return 'my skills';
     default: {

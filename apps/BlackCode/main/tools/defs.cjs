@@ -515,6 +515,28 @@ const TOOL_DEFS = [{
     },
     required: ['name', 'description', 'body'],
   },
+}, {
+  // (de BlackCode: ver imagenes.cjs. No lleva width/height —hay modelos que
+  // los rechazan— ni safe_mode, que es un ajuste del usuario)
+  name: 'generate_image',
+  description: 'Generate an image from a text description and show it to the user in the chat. Every image spends money from the user\'s Venice balance, so use it when the user asks for an image or clearly wants one, not to decorate an answer. '
+    + 'Write the prompt in English, concrete and visual: the subject, the setting, the style, the light, the framing. The image is saved to a file and shown under this call. You get its path back, not the picture, unless you pass look: true. '
+    + 'To change something, call it again with the whole improved prompt: an image cannot be edited in place.',
+  parameters: {
+    type: 'object',
+    properties: {
+      prompt: { type: 'string', description: 'What the image shows, in English.' },
+      aspect_ratio: { type: 'string', description: 'Shape of the image: "1:1", "16:9", "9:16", "4:3", "3:2"… Leave it out for the model\'s own.' },
+      variants: { type: 'integer', description: 'How many different images of the same prompt, 1 to 4 (default 1). Each one costs.' },
+      negative_prompt: { type: 'string', description: 'What must NOT appear in the image.' },
+      model: { type: 'string', description: 'An image model id. Leave it out to use the one the user chose in Settings.' },
+      resolution: { type: 'string', description: '"1K", "2K" or "4K", only for models that offer it. Higher costs more.' },
+      style: { type: 'string', description: 'A Venice style preset by name, like "Cinematic", "Anime" or "3D Model".' },
+      seed: { type: 'integer', description: 'The same seed with the same prompt gives the same image.' },
+      look: { type: 'boolean', description: 'true to get the image yourself and check it before going on. It costs tokens: default false.' },
+    },
+    required: ['prompt'],
+  },
 }];
 
 // Los grupos con que se prenden y se apagan en un agente.
@@ -538,6 +560,10 @@ const GRUPOS = [
   { id: 'memory', nombre: 'Memory', tools: ['remember', 'recall'] },
   // Las skills. Prendido, el agente ve además su índice en el system.
   { id: 'skills', nombre: 'Skills', tools: ['skill', 'create_skill'] },
+  // Generar imágenes gasta plata del usuario en cada llamada. Por eso el
+  // grupo es OPCIONAL: no entra en «todas las tools» con que nace un agente
+  // ni se les suma solo a los que ya existen. Se prende a mano, por agente.
+  { id: 'images', nombre: 'Images', tools: ['generate_image'], opcional: true },
 ];
 
 const porNombre = new Map(TOOL_DEFS.map((t) => [t.name, t]));

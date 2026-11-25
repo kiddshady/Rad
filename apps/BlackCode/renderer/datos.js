@@ -8,6 +8,8 @@
 //   chat-<id>   { mensajes: [{ id, rol, texto, estado?, nota?, modelo?, tools?, agotado? }] }
 //               y, entre los mensajes, las filas de tools: { id, rol: 'tool', tool,
 //               texto (qué tocó), estado, ms?, salida?, cortada?, imagenes? }
+//               (imagenes: [{ name, dataUrl }] las de una captura o de run_code;
+//               [{ name, archivo }] las de generate_image, que quedan en disco)
 //   ui          { agente, chats: { <agente>: <chat> } }   lo último que se miraba
 // Un documento por chat: abrir la app no lee todas las conversaciones, y
 // guardar un mensaje no reescribe las demás.
@@ -31,7 +33,7 @@ const GUARDAR_CADA_MS = 1500;
 const TITULO_MAX = 46;
 const TITULO_NUEVO = 'New chat';
 
-let agentes, busqueda, delegados;
+let agentes, busqueda, delegados, imagenesDoc;
 let chats;
 let ui;
 let catalogo = { proveedores: [] }; // los proveedores con sus modelos
@@ -55,7 +57,8 @@ const avisar = (tipo, detalle = {}) => { for (const fn of oyentes.get(tipo) ?? [
 
 // ---------- Arranque ----------
 export async function abrir() {
-  [delegados, busqueda, agentes, chats, ui, catalogo, herramientas] = await Promise.all([
+  [imagenesDoc, delegados, busqueda, agentes, chats, ui, catalogo, herramientas] = await Promise.all([
+    openDoc('imagenes', { modelo: '', filtro: true }),
     openDoc('subagentes', { proveedor: null, modelo: '' }),
     openDoc('busqueda', { proveedor: 'duckduckgo' }),
     openDoc('agentes', { lista: [] }),
@@ -108,9 +111,12 @@ export const modeloConTools = (prov, id) => modelosDe(prov).find((m) => m.id ===
 export const toolsDe = (a) => (Array.isArray(a?.tools) ? a.tools : []);
 /** Los grupos que un agente tiene prendidos enteros o en parte, por nombre. */
 export const gruposDe = (a) => herramientas.grupos.filter((g) => g.tools.some((t) => toolsDe(a).includes(t))).map((g) => g.nombre);
-/** Todas las tools que hay. Un agente nuevo nace con todas prendidas (Fran lo
- *  pidió el 24/11/2026: apagadas de fábrica, no las encontraba). */
-export const todasLasTools = () => herramientas.grupos.flatMap((g) => g.tools);
+/** Todas las tools con que nace un agente. Nace con todas prendidas (Fran lo
+ *  pidió el 24/11/2026: apagadas de fábrica, no las encontraba), menos las de
+ *  un grupo OPCIONAL: generar imágenes gasta plata en cada llamada, así que se
+ *  prende a mano en el agente que la vaya a usar. Tampoco se les suma sola a
+ *  los agentes que ya existen (sumarToolsNuevas parte de esta misma lista). */
+export const todasLasTools = () => herramientas.grupos.filter((g) => !g.opcional).flatMap((g) => g.tools);
 // Las tools que había antes de que la app anotara cuáles conoce (0.7.4).
 const TOOLS_HASTA_0_7_4 = ['fs_read', 'fs_write', 'fs_edit', 'fs_delete', 'code_search', 'shell_exec', 'cmd_exec', 'job_start', 'job_output', 'job_kill',
   'run_code', 'db_query', 'sqlite_query', 'fetch', 'web_search', 'http_request', 'os_open', 'screen_capture'];
@@ -132,6 +138,16 @@ export function sumarToolsNuevas(lista, conocidas, todas) {
     return { ...a, tools: [...new Set([...suyas, ...nuevas])] };
   });
   return cambio ? out : null;
+}
+// ---------- Las imágenes (generate_image) ----------
+/** Lo elegido en Settings: con qué modelo de Venice se generan ('' = el que
+ *  Venice marque como predeterminado) y si va su filtro de contenido adulto.
+ *  Lo lee el proceso principal del mismo documento. */
+export const ajustesImagenes = () => ({ modelo: String(imagenesDoc.get().modelo ?? ''), filtro: imagenesDoc.get().filtro !== false });
+export function ponerImagenes(cambio) {
+  const ahora = ajustesImagenes();
+  imagenesDoc.patch({ modelo: typeof cambio?.modelo === 'string' ? cambio.modelo : ahora.modelo, filtro: typeof cambio?.filtro === 'boolean' ? cambio.filtro : ahora.filtro });
+  avisar('ajustes');
 }
 /** ¿Ese agente ve la memoria de la app? Es su grupo Memory: prendido, además
  *  de poder anotar y leer, la tiene en su contexto. */
@@ -491,7 +507,7 @@ function alLlegar(ev) {
     avisar('mensajes', { chat: chatId });
   } else if (ev.tipo === 'tool-imagenes') {
     const fila = r.doc.get().mensajes.find((m) => m.rol === 'tool' && m.id === ev.callId);
-    if (fila && Array.isArray(ev.imagenes)) fila.imagenes = ev.imagenes.map(({ name, dataUrl }) => ({ name, dataUrl }));
+    if (fila && Array.isArray(ev.imagenes)) fila.imagenes = ev.imagenes.map(({ name, dataUrl, archivo }) => (archivo ? { name, archivo } : { name, dataUrl })); // (las de generate_image van por su archivo, no adentro del chat)
     bajar(r);
     avisar('mensajes', { chat: chatId });
   } else if (ev.tipo === 'canvas') {

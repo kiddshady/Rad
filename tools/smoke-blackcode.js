@@ -766,8 +766,8 @@ else {
   const form = modal();
   type(form.querySelector('[data-campo="nombre"]'), 'Toolsmith');
   const interruptores = [...form.querySelectorAll('[data-campo="tools"] input[role="switch"]')];
-  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas,notes,subagents,memory,skills' || !interruptores.every((i) => i.checked)) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
-  // un agente nuevo nace con todas prendidas: se le apaga la web
+  if (interruptores.map((i) => i.dataset.grupo).join() !== 'files,commands,code,data,web,browser,desktop,screen,canvas,notes,subagents,memory,skills,images' || !interruptores.every((i) => i.checked === (i.dataset.grupo !== 'images'))) fail(`el formulario ofrece las tools: ${interruptores.map((i) => `${i.dataset.grupo}=${i.checked}`).join(', ')}`);
+  // un agente nuevo nace con todas prendidas (menos Images, que gasta plata y es opcional): se le apaga la web
   for (const i of interruptores) if (i.dataset.grupo === 'web') i.click();
   enIngles('en el formulario con tools');
   primary().click();
@@ -948,7 +948,7 @@ else {
     const abrir = async () => { boton.click(); await until(() => menus().length > 0, 2000); await sleep(dur('base') + 60); };
     await abrir();
     const filasMenu = [...menus()[0].querySelectorAll('.rad-menu-item')].map((i) => i.textContent.trim());
-    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Notes,Subagents,Memory,Skills,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
+    if (filasMenu.join() !== 'Files,Commands,Code,Databases,Web,Browser,Desktop,Screen,Canvas,Notes,Subagents,Memory,Skills,Images,Turn all on,Turn all off') fail(`el menú de tools trae: ${filasMenu.join()}`);
     await pick('Turn all off');
     if (dice() !== 'Tools: off' || boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· no tools')) fail(`apagar todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
@@ -956,7 +956,9 @@ else {
     if (dice() !== '32 tools' || !boton.hasAttribute('data-prendidas') || !statusRight().endsWith('· 32 tools')) fail(`prender todas desde la conversación: el botón dice «${dice()}» y la barra «${statusRight()}»`);
     await abrir();
     const marcadas = [...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].length;
-    if (marcadas !== 13) fail(`con todas prendidas el menú marca ${marcadas} grupos de 13`);
+    // («todas» no prende Images: es opcional, porque gasta plata en cada llamada)
+    if (marcadas !== 13 || menus()[0].querySelector('.rad-menu-item[aria-checked="true"]')?.parentElement.querySelectorAll('.rad-menu-item[aria-checked]').length !== 14) fail(`con todas prendidas el menú marca ${marcadas} grupos de 14 (tienen que ser 13: Images no entra en «todas»)`);
+    if ([...menus()[0].querySelectorAll('.rad-menu-item[aria-checked="true"]')].some((i) => i.textContent.trim() === 'Images')) fail('«Turn all on» prendió Images, que gasta plata: es opcional');
     await pick('Web');
     if (dice() !== '29 tools') fail(`apagar un grupo desde la conversación dejó «${dice()}»`);
     // y las recibe el modelo: el pedido siguiente corre una de esas tools
@@ -2649,6 +2651,127 @@ else {
     for (const a of avisosC()) a.querySelector('.rad-toast-close, [aria-label="Close"], [aria-label="Dismiss"]')?.click();
     datosM.ponerModoTools('manual');
     data.carpeta = 'un chat nuevo en la de inicio, el cd mueve solo su chat, cada chat vuelve a la suya, elegir otra, volver a la de inicio, una que ya no existe, la terminal donde está el chat, y la de inicio en Settings';
+  }
+
+  // 11o. Generar imágenes (generate_image). Gasta plata del usuario en cada
+  // llamada: nace apagada, la tarjeta de permiso dice cuánto sale, y hay un
+  // tope por turno. La imagen queda en un archivo y al chat va su ruta. En el
+  // humo no hay Venice: los modelos y las imágenes son de mentira (PNG de 96 px).
+  {
+    const datosM = await import('/datos.js');
+    const agenteI = datosM.agenteActual();
+    const susToolsI = datosM.toolsDe(agenteI);
+    const salidaI = (n = -1) => fila('generate_image', n)?.querySelector('.dm-tool-pre').textContent ?? '';
+    const generadas = (n = -1) => [...(fila('generate_image', n)?.querySelectorAll('.dm-generada') ?? [])];
+    const listoI = async () => { await sleep(200); for (let i = 0; i < 400 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50); await settle(); };
+    const avisosI = () => [...document.querySelectorAll('.rad-toast')].filter((n) => !n.hasAttribute('data-rad-leaving'));
+
+    // Nace apagada: no está entre las tools de un agente con «todas», y su grupo es opcional.
+    const grupoI = datosM.gruposTools().find((g) => g.id === 'images');
+    if (!grupoI?.opcional || grupoI.tools.join() !== 'generate_image') fail('imágenes: el grupo Images no está, o no figura como opcional: ' + JSON.stringify(grupoI));
+    if (susToolsI.includes('generate_image') || datosM.todasLasTools().includes('generate_image')) fail('imágenes: la tool nació prendida, y gasta plata: tiene que prenderla el usuario');
+    // Sin prenderla, el agente no la tiene: pedirla no corre nada.
+    datosM.ponerModoTools('auto');
+    chatView.querySelector('[data-accion="nuevo-chat"]').click();
+    await settle();
+    await pedir([[{ name: 'generate_image', args: { prompt: 'before turning it on' } }]]);
+    await listoI();
+    if (generadas().length || fila('generate_image')?.dataset.estado === 'ok') fail('imágenes: con el grupo apagado la tool corrió igual');
+
+    // Prendida para este agente. En modo manual, la tarjeta dice con qué y cuánto sale.
+    datosM.ponerTools(agenteI.id, [...susToolsI, 'generate_image']);
+    datosM.ponerModoTools('manual');
+    await settle();
+    chatView.querySelector('[data-accion="nuevo-chat"]').click();
+    await settle();
+    await pedir([[{ name: 'generate_image', args: { prompt: 'A red fox in the snow', variants: 2, aspect_ratio: '16:9' } }]]);
+    await until(() => permiso(), 5000);
+    const tarjetaP = permiso();
+    if (!tarjetaP?.textContent.includes('Allow generate_image?') || !tarjetaP.textContent.includes('2 images with Simulated image, 16:9.') || !tarjetaP.textContent.includes('About $0.08 of your Venice balance.')) fail('imágenes: la tarjeta de permiso no dice el modelo y el precio: ' + (tarjetaP?.textContent ?? '(sin tarjeta)').slice(0, 220));
+    if (fila('generate_image')) fail('imágenes: la fila apareció antes de contestar la tarjeta');
+    enIngles('con la tarjeta de generate_image');
+    primary()?.click();
+    await closed();
+    await listoI();
+
+    // La fila, con sus dos imágenes, cargadas desde el archivo.
+    await until(() => generadas().length === 2 && generadas().every((g) => g.hasAttribute('data-lista')), 8000);
+    await sleep(dur('base') + 160);
+    const gs = generadas();
+    if (fila('generate_image')?.dataset.estado !== 'ok' || gs.length !== 2) fail('imágenes: la llamada quedó en «' + fila('generate_image')?.dataset.estado + '» con ' + gs.length + ' imágenes');
+    if (!gs.every((g) => { const im = g.querySelector('img'); return im.naturalWidth === 96 && im.src.startsWith('data:image/png;base64,') && op(im) > 0.99; })) fail('imágenes: las imágenes no se ven en la fila (' + gs.map((g) => g.querySelector('img').naturalWidth + ' px, opacidad ' + r2(op(g.querySelector('img')))).join(' · ') + ')');
+    if (gs.length === 2 && gs[0].querySelector('img').src === gs[1].querySelector('img').src) fail('imágenes: las dos variantes son la misma imagen');
+    if (fila('generate_image')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'image' || shown(fila('generate_image')?.querySelector('.dm-tool-que')) !== 'A red fox in the snow') fail('imágenes: la fila no lleva su ícono o no dice qué se pidió');
+    if (!salidaI().startsWith('Generated 2 images with Simulated image (sim-image), 16:9.') || !salidaI().includes('Cost: about $0.08') || !salidaI().includes('You did not get the image itself')) fail('imágenes: lo que recibió el agente: ' + salidaI().slice(0, 200));
+    // En el chat guardado va la RUTA de cada imagen, no la imagen.
+    {
+      const idI = datosM.chatActual().id;
+      let filaG = null;
+      for (let i = 0; i < 60 && !filaG?.imagenes; i++) { filaG = ((await window.rad.store.read('chat-' + idI))?.mensajes ?? []).find((m) => m.tool === 'generate_image'); if (!filaG?.imagenes) await sleep(100); }
+      if (filaG?.imagenes?.length !== 2 || !filaG.imagenes.every((im) => typeof im.archivo === 'string' && /images[\\/]\d{4}-\d{2}[\\/]image-.*\.png$/.test(im.archivo) && !('dataUrl' in im)) || JSON.stringify(filaG).includes('base64')) fail('imágenes: el chat guardó ' + JSON.stringify(filaG?.imagenes ?? null).slice(0, 200) + ': tiene que ir la ruta del archivo, no la imagen');
+    }
+    // Tocar una imagen abre su menú; guardarla y mostrarla en su carpeta andan.
+    gs[0]?.click();
+    await until(() => menus().length === 1, 2000);
+    await sleep(dur('base') + 80);
+    {
+      const rotulos = [...(menus()[0]?.querySelectorAll('.rad-menu-item') ?? [])].map((i) => i.textContent.trim()).join('|');
+      if (rotulos !== 'Open|Save as…|Show in folder|Copy path') fail('imágenes: el menú de una imagen trae ' + rotulos);
+      enIngles('en el menú de una imagen generada');
+    }
+    await pick('Save as');
+    await until(() => avisosI().some((n) => n.textContent.includes('Saved')), 3000);
+    if (!avisosI().some((n) => n.textContent.includes('Saved'))) fail('imágenes: «Save as…» no guardó la imagen: ' + avisosI().map((n) => n.textContent).join(' | '));
+    gs[0]?.click();
+    await until(() => menus().length === 1, 2000);
+    await sleep(dur('base') + 80);
+    await pick('Show in folder');
+    await settle();
+    if (avisosI().some((n) => n.textContent.includes('is gone'))) fail('imágenes: mostrar en su carpeta una imagen que existe dice que no está');
+
+    // Un prompt que Venice rechaza: la fila falla, con la sugerencia, y no deja imagen.
+    datosM.ponerModoTools('auto');
+    await pedir([[{ name: 'generate_image', args: { prompt: 'REFUSED fox' } }]]);
+    await listoI();
+    if (fila('generate_image')?.dataset.estado !== 'error' || !salidaI().includes('refused the prompt') || !salidaI().includes('Venice suggests') || generadas().length) fail('imágenes: un prompt rechazado quedó en «' + fila('generate_image')?.dataset.estado + '»: ' + salidaI().slice(0, 160));
+    // El tope del turno: 4 y 4 entran; la tercera llamada no corre.
+    await pedir([[{ name: 'generate_image', args: { prompt: 'first batch', variants: 4 } }, { name: 'generate_image', args: { prompt: 'second batch', variants: 4 } }, { name: 'generate_image', args: { prompt: 'one too many' } }]]);
+    await listoI();
+    if (generadas(-3).length !== 4 || generadas(-2).length !== 4 || generadas(-1).length || fila('generate_image', -1)?.dataset.estado !== 'error' || !salidaI(-1).includes('the limit is 8 per turn')) fail('imágenes: el tope de 8 por turno no frenó la tercera llamada: ' + [generadas(-3).length, generadas(-2).length, generadas(-1).length].join() + ' · ' + salidaI(-1).slice(0, 140));
+
+    // Settings: los modelos que ofrece Venice, el filtro, y elegir con cuál.
+    await go('ajustes');
+    const tarjetaI = view('ajustes').querySelector('[data-tarjeta="imagenes"]');
+    await until(() => tarjetaI?.dataset.modelos === '2', 5000);
+    await settle();
+    if (shown(tarjetaI?.querySelector('.dm-estado-texto')) !== 'Venice offers 2 image models with your key.') fail('imágenes: Settings dice «' + shown(tarjetaI?.querySelector('.dm-estado-texto')) + '»');
+    enIngles('en Settings, con las imágenes');
+    const filtroI = tarjetaI?.querySelector('[data-campo="img-filtro"]');
+    const notaI = () => shown(tarjetaI?.querySelector('.rad-switch + .dm-tarjeta-instr'));
+    if (!filtroI?.checked || datosM.ajustesImagenes().filtro !== true || !notaI().includes('blurs an image')) fail('imágenes: el filtro de contenido adulto no arranca prendido («' + notaI() + '»)');
+    filtroI?.click();
+    await settle();
+    if (datosM.ajustesImagenes().filtro !== false || !notaI().includes('without Venice')) fail('imágenes: apagar el filtro no quedó guardado, o no se dice («' + notaI() + '»)');
+    if ((await window.rad.store.read('imagenes'))?.filtro !== false) fail('imágenes: el filtro apagado no llegó al documento que lee el proceso principal');
+    filtroI?.click();
+    await settle();
+    if (datosM.ajustesImagenes().filtro !== true) fail('imágenes: volver a prender el filtro no quedó guardado');
+    // el modelo elegido es el que se usa
+    datosM.ponerImagenes({ modelo: 'sim-image-pro' });
+    await settle();
+    if (!(tarjetaI?.querySelector('[data-campo="img-modelo"]')?.textContent ?? '').includes('Simulated image Pro')) fail('imágenes: el selector de Settings no muestra el modelo elegido: «' + tarjetaI?.querySelector('[data-campo="img-modelo"]')?.textContent + '»');
+    await go('chat');
+    await pedir([[{ name: 'generate_image', args: { prompt: 'with the chosen model' } }]]);
+    await listoI();
+    if (!salidaI().startsWith('Generated 1 image with Simulated image Pro (sim-image-pro)') || !salidaI().includes('Cost: about $0.10')) fail('imágenes: no usó el modelo elegido en Settings: ' + salidaI().slice(0, 120));
+
+    // Queda como estaba.
+    datosM.ponerImagenes({ modelo: '' });
+    datosM.ponerTools(agenteI.id, susToolsI);
+    datosM.ponerModoTools('manual');
+    for (const a of avisosI()) a.querySelector('.rad-toast-close, [aria-label="Close"], [aria-label="Dismiss"]')?.click();
+    await settle();
+    data.imagenes = 'apagada de fábrica, la tarjeta con el precio, dos imágenes desde su archivo, la ruta en el chat, guardar y mostrar, un prompt rechazado, el tope del turno, y Settings con el filtro y el modelo';
   }
 
   // Cambiarle las tools a un agente que YA existía, desde su formulario.

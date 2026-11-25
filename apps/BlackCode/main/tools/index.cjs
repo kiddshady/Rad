@@ -27,6 +27,7 @@ const notas = require('./notas.cjs');
 const delegar = require('./delegar.cjs');
 const memoria = require('./memoria.cjs');
 const skills = require('./skills.cjs');
+const imagenes = require('./imagenes.cjs');
 
 let listo = false;
 
@@ -50,8 +51,10 @@ let listo = false;
  *                      modelo corre un hijo de `delegate` y cómo se lo llama
  *   memoria            la memoria de la app (main/memoria.cjs): remember y recall
  *   skills             las skills de la app (main/skills.cjs): skill y create_skill
+ *   imagenes           { getKey(), ajustes(), deMentira }: la llave de Venice, lo
+ *                      elegido en Settings y si es el humo (generate_image)
  */
-function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null, skills: skillsApp = null } = {}) {
+function iniciar({ carpeta = null, trash = null, shell = null, capturador = null, pantallas = null, titulosDeChats = null, avisar = null, ventana = null, modeloVe = null, abrirAfuera = null, alProducir = null, getKey = null, getSecret = null, webSearch = null, subagentes = null, memoria: memoriaApp = null, skills: skillsApp = null, imagenes: imagenesApp = null } = {}) {
   archivos.configurar({ trash });
   web.configurar({ getKey, getSecret, webSearch });
   abrir.configurar({ shell });
@@ -76,13 +79,14 @@ function iniciar({ carpeta = null, trash = null, shell = null, capturador = null
   });
   if (memoriaApp) memoria.configurar({ memoria: memoriaApp });
   if (skillsApp) skills.configurar({ skills: skillsApp });
+  if (imagenesApp) imagenes.configurar({ ...imagenesApp, ...(carpeta ? { carpeta } : {}), ...(modeloVe ? { modeloVe } : {}) });
   motor.configurar({ classifyOsTarget: abrir.classifyOsTarget });
   // el hijo de `delegate` es una sesión como la de cualquier turno
   delegar.configurar({ crearSesion: (opciones) => module.exports.crearSesion(opciones), ...(subagentes ?? {}) });
   if (listo) return;
   motor.registrar({
     ...archivos.runners, ...comandos.runners, ...trabajos.runners, ...busqueda.runners,
-    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners, ...delegar.runners, ...memoria.runners, ...skills.runners,
+    ...codigo.runners, ...datos.runners, ...web.runners, ...abrir.runners, ...captura.runners, ...lienzo.runners, ...navegador.runners, ...notas.runners, ...delegar.runners, ...memoria.runners, ...imagenes.runners, ...skills.runners,
   });
   listo = true;
 }
@@ -101,7 +105,8 @@ function cerrar() {
 function catalogo() {
   const hay = new Set(motor.registradas());
   return {
-    grupos: defs.GRUPOS.map((g) => ({ id: g.id, nombre: g.nombre, tools: g.tools.filter((n) => hay.has(n)) })).filter((g) => g.tools.length),
+    // (`opcional`: no entra en «todas las tools» de un agente; ver defs.cjs)
+    grupos: defs.GRUPOS.map((g) => ({ id: g.id, nombre: g.nombre, tools: g.tools.filter((n) => hay.has(n)), ...(g.opcional ? { opcional: true } : {}) })).filter((g) => g.tools.length),
     carpeta: base.getCwd(),
   };
 }
@@ -112,6 +117,8 @@ function catalogo() {
 async function vistaPrevia(run, name, args) {
   try {
     if (name === 'canvas') return ['edit', 'update', 'delete'].includes(args?.action) ? lienzo.canvasPreview(args) : null;
+    // generar una imagen sale plata: la tarjeta dice con qué modelo y cuánto
+    if (name === 'generate_image') return await imagenes.vista(args);
     return await archivos.preview(run, name, args);
   } catch { return null; }
 }
@@ -136,7 +143,7 @@ module.exports = {
     // lista de tools cambie a mitad de un turno lo rompe.)
     const sinNotas = Array.isArray(opciones?.tools) && opciones.tools.some((n) => n === 'notepad' || n === 'notepad_write') && !notas.lista();
     // (lo mismo con la memoria, si la app no la configuró)
-    const fuera = new Set([...(sinNotas ? ['notepad', 'notepad_write'] : []), ...(memoria.lista() ? [] : ['remember', 'recall']), ...(skills.lista() ? [] : ['skill', 'create_skill'])]);
+    const fuera = new Set([...(sinNotas ? ['notepad', 'notepad_write'] : []), ...(memoria.lista() ? [] : ['remember', 'recall']), ...(skills.lista() ? [] : ['skill', 'create_skill']), ...(imagenes.lista() ? [] : ['generate_image'])]);
     const s = sesion.crear(fuera.size && Array.isArray(opciones?.tools) ? { ...opciones, tools: opciones.tools.filter((n) => !fuera.has(n)) } : opciones);
     const sistema = s.sistema;
     // …y los canvas que este chat tiene abiertos: su cuerpo no viaja en la
@@ -168,6 +175,8 @@ module.exports = {
   canvas: lienzo,
   navegador,
   notas,
+  // las imágenes generadas: sus modelos (Settings) y leer un archivo para mostrarlo
+  imagenes,
   argsDigest: motor.argsDigest,
   plegar: require('./guardas.cjs').foldToolRows,
   getCwd: base.getCwd,

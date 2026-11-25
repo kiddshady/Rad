@@ -171,6 +171,15 @@ function checkDisk(data, report) {
   if (!fs.existsSync(path.join(taller, 'notes.db'))) failures.push('la base de las notas no quedó en el disco');
   if (leer(path.join('exports', 'sum.js')) !== 'const a = 1;\nconst b = 2;\nconsole.log(a + b);') failures.push(`el canvas exportado quedó como ${JSON.stringify(leer(path.join('exports', 'sum.js')))}`);
   if (!fs.existsSync(path.join(taller, 'code-workspace', 'out.txt'))) failures.push('run_code no dejó su archivo en el taller');
+  // generate_image: las imágenes quedaron en archivos (images/<año-mes>/), y la que el guion guardó con «Save as…», en exports
+  {
+    const dirI = path.join(taller, 'images');
+    const guardadas = fs.existsSync(dirI) ? fs.readdirSync(dirI).flatMap((mes) => fs.readdirSync(path.join(dirI, mes)).map((f) => path.join(dirI, mes, f))) : [];
+    const esPng = (f) => { const b = fs.readFileSync(f); return b[0] === 0x89 && b.toString('latin1', 1, 4) === 'PNG'; };
+    if (guardadas.length < 11 || !guardadas.every((f) => /image-.*\.png$/.test(f) && esPng(f))) failures.push(`generate_image dejó ${guardadas.length} archivos en images (se esperaban 11 PNG: 2, 4, 4 y 1)`);
+    const exportadas = fs.existsSync(path.join(taller, 'exports')) ? fs.readdirSync(path.join(taller, 'exports')).filter((f) => /^image-.*\.png$/.test(f)) : [];
+    if (exportadas.length !== 1 || !esPng(path.join(taller, 'exports', exportadas[0]))) failures.push(`«Save as…» de una imagen generada dejó ${exportadas.length} archivos en exports`);
+  }
   const borrado = report.script?.chatBorrado;
   if (!borrado) failures.push('el guion no dijo qué chat borró');
   else if (files.some((f) => f.startsWith(`chat-${borrado}.`))) failures.push(`el documento del chat borrado sigue en el disco: ${files.filter((f) => f.startsWith(`chat-${borrado}.`)).join(', ')}`);

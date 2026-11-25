@@ -109,7 +109,9 @@ export function montarChat(el, { router }) {
         };
       }),
       { separator: true },
-      { id: 'todas', label: 'Turn all on', onSelect: () => datos.ponerTools(a.id, grupos.flatMap((g) => g.tools)) },
+      // «Todas» son las de siempre: un grupo opcional (Images, que gasta plata
+      // en cada llamada) no se prende de rebote. Si ya estaba prendido, sigue.
+      { id: 'todas', label: 'Turn all on', onSelect: () => datos.ponerTools(a.id, grupos.flatMap((g) => (g.opcional ? g.tools.filter((t) => tiene.has(t)) : g.tools))) },
       { id: 'ninguna', label: 'Turn all off', onSelect: () => datos.ponerTools(a.id, []) },
     ];
   }, { align: 'end' });

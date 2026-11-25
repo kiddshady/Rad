@@ -1,5 +1,23 @@
 # Changelog
 
+## BlackCode 0.19.0 (2026-11-25)
+
+- **Generar imágenes.** Tool nueva, `generate_image`: el agente genera una
+  imagen con Venice y queda en el chat, debajo de la llamada. Tocarla abre su
+  menú: abrirla, guardarla, mostrarla en su carpeta.
+- Usa la llave de Venice que ya está en Settings y cualquiera de los modelos de
+  imagen que Venice ofrezca con esa llave. En Settings hay una tarjeta nueva,
+  «Image generation», para elegir el modelo (dice cuánto sale cada imagen) y
+  para el filtro de contenido adulto de Venice.
+- **Gasta saldo de Venice en cada imagen.** Por eso viene apagada: se prende
+  por agente, en el grupo Images. La tarjeta de permiso dice con qué modelo y
+  cuánto sale, hay un tope de 8 imágenes por turno, y los subagentes no la
+  tienen.
+- Las imágenes se guardan como archivos, no adentro del chat: un chat con
+  muchas imágenes no se vuelve pesado.
+- El agente no ve lo que generó salvo que lo pida: no gasta tokens en mirar.
+- Son 33 tools en 14 grupos.
+
 ## BlackCode 0.18.2 (2026-11-25)
 
 - **Ir al final del chat.** Un botón redondo aparece sobre el campo para

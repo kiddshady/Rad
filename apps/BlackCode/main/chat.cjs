@@ -16,7 +16,8 @@
 // trae además { chat, tools, modo } y aparecen tres eventos:
 //     tipo 'tool'      { callId, kind, label }             se pidió una tool
 //     tipo 'tool-fin'  { callId, status, ms, out, outCut } cómo terminó
-//     tipo 'tool-imagenes' { callId, imagenes }            dejó imágenes: [{ name, dataUrl }]
+//     tipo 'tool-imagenes' { callId, imagenes }            dejó imágenes: [{ name, dataUrl }], o
+//                                                          [{ name, archivo }] las de generate_image
 //     tipo 'canvas'    { canvas }                          el agente creó o cambió un canvas
 //     tipo 'confirmar' { callId, name, label, args, vista } pide permiso;
 //                      se contesta con rad.invoke('chat:confirmar', { callId, permitir, confiar, chat })
@@ -198,6 +199,10 @@ function wire(rad, { llave }) {
     // la corrida sabe si su modelo ve (lo anota el pedido, más abajo)
     modeloVe: (run) => run?.ve === true,
   };
+  // generate_image: la llave de Venice (la misma de los agentes de Venice), lo
+  // que el usuario eligió en Settings (el modelo y el filtro de contenido
+  // adulto) y, en el humo, sin red.
+  const paraLasImagenes = { imagenes: { getKey: () => llave.leer(rad.store, 'venice'), ajustes: () => rad.store.read('imagenes') ?? {}, deMentira: Boolean(taller) } };
   // run_code dejó imágenes: van a la fila de esa llamada, en el chat.
   const alProducir = (run, imagenes) => run.notify('tool:artifact', { images: imagenes });
   if (taller) {
@@ -210,7 +215,7 @@ function wire(rad, { llave }) {
       ...paraElCanvas,
       ...paraElNavegador,
       ...paraLaBusqueda,
-      ...paraLosSubagentes, ...paraLaMemoria,
+      ...paraLosSubagentes, ...paraLaMemoria, ...paraLasImagenes,
       abrirAfuera: (u) => anotar(`url ${u}`),
       trash: (ruta) => fs.promises.rename(ruta, path.join(taller, '.trash', `${Date.now()}-${path.basename(ruta)}`)),
       // y no miran la pantalla de nadie: capturan una de mentira
@@ -228,7 +233,7 @@ function wire(rad, { llave }) {
     const carpeta = path.join(path.dirname(rad.store.dir), 'tools');
     fs.mkdirSync(carpeta, { recursive: true });
     const { desktopCapturer, screen } = require('electron');
-    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, ...paraLosSubagentes, ...paraLaMemoria, abrirAfuera: (u) => shell.openExternal(u) });
+    herramientas.iniciar({ carpeta, alProducir, trash: (ruta) => shell.trashItem(ruta), shell, capturador: desktopCapturer, pantallas: screen, ...paraElCanvas, ...paraElNavegador, ...paraLaBusqueda, ...paraLosSubagentes, ...paraLaMemoria, ...paraLasImagenes, abrirAfuera: (u) => shell.openExternal(u) });
     herramientas.setCwd(rad.store.read(DOC_TOOLS)?.carpeta);
   }
   // Al salir, lo que quedó corriendo en segundo plano se mata.
@@ -334,6 +339,36 @@ function wire(rad, { llave }) {
       'hist-list': 'histList', 'hist-remove': 'histRemove', 'hist-clear': 'histClear', 'hist-open': 'histOpen',
     };
     for (const [canal, fn] of Object.entries(canales)) rad.handle(`browser:${canal}`, async (arg) => (await nav[fn](arg)) ?? null);
+  }
+
+  // ---------- Las imágenes generadas ----------
+  // Lo que generate_image guarda son archivos; la interfaz los pide por su
+  // ruta, y solo se le dan los de esa carpeta (imagenes.esMia).
+  {
+    const img = herramientas.imagenes;
+    const esta = (archivo) => img.esMia(archivo) && fs.existsSync(path.resolve(archivo));
+    rad.handle('imagenes:modelos', async (fresco) => {
+      try { return { ok: true, modelos: (await img.modelos({ fresco: fresco === true })).map(({ id, nombre, precio }) => ({ id, nombre, precio })) }; } catch (err) { return { ok: false, error: String(err?.message || err) }; }
+    });
+    rad.handle('imagenes:ver', (archivo) => img.leer(archivo));
+    // En el humo no se abre nada del sistema: se contesta como si.
+    rad.handle('imagenes:abrir', async (archivo) => { if (!esta(archivo)) return { ok: false }; if (!taller) await shell.openPath(path.resolve(archivo)); return { ok: true }; });
+    rad.handle('imagenes:mostrar', (archivo) => { if (!esta(archivo)) return { ok: false }; if (!taller) shell.showItemInFolder(path.resolve(archivo)); return { ok: true }; });
+    rad.handle('imagenes:guardar-como', async (archivo, ctx) => {
+      if (!esta(archivo)) return { ok: false, error: 'That image file is gone.' };
+      let destino;
+      if (taller) {
+        destino = path.join(taller, 'exports', path.basename(archivo));
+        fs.mkdirSync(path.dirname(destino), { recursive: true });
+      } else {
+        const { dialog, app } = require('electron');
+        const opciones = { title: 'Save image', defaultPath: path.join(app.getPath('pictures'), path.basename(archivo)) };
+        const r = ctx?.window ? await dialog.showSaveDialog(ctx.window, opciones) : await dialog.showSaveDialog(opciones);
+        if (r.canceled || !r.filePath) return { ok: false, cancelado: true };
+        destino = r.filePath;
+      }
+      try { fs.copyFileSync(path.resolve(archivo), destino); return { ok: true, destino }; } catch (err) { return { ok: false, error: String(err?.message || err) }; }
+    });
   }
 
   // ---------- El canvas ----------

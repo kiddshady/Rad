@@ -842,6 +842,30 @@
 
   /* Las imágenes que dejó una llamada. Entran fundiéndose. */
   .dm-tool-imagenes { display: flex; flex-wrap: wrap; gap: var(--rad-space-2); }
+  /* Una imagen de generate_image: más grande que una captura (es lo que se
+     pidió ver), cargada cuando la fila se acerca. Tocarla abre su menú. */
+  .dm-generada {
+    display: grid;
+    place-items: center;
+    min-width: 96px;
+    min-height: 96px;
+    max-width: 100%;
+    padding: 0;
+    border-radius: var(--rad-radius-m);
+    overflow: hidden;
+    background: color-mix(in srgb, var(--rad-surface-0) 62%, transparent);
+    cursor: pointer;
+    transition: filter var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-generada > * { grid-area: 1 / 1; }
+  .dm-generada:hover, .dm-generada[aria-expanded='true'] { filter: brightness(1.08); }
+  .dm-generada-img { display: block; max-width: 100%; max-height: 420px; opacity: 0; transition: opacity var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-generada[data-lista] .dm-generada-img { opacity: 1; }
+  .dm-generada[data-falta] .dm-generada-img { display: none; }
+  .dm-generada-nota { padding: var(--rad-space-3); font-size: var(--rad-text-xs); color: var(--rad-text-3); }
+  .dm-generada:not([data-falta]) .dm-generada-nota { display: none; }
+  /* varias variantes del mismo pedido: de a dos por renglón */
+  .dm-tool-imagenes:has(.dm-generada ~ .dm-generada) .dm-generada { max-width: calc(50% - var(--rad-space-1)); }
   .dm-tool[data-con-imagenes] .dm-tool-imagenes { padding: 0 var(--rad-space-3) var(--rad-space-3); }
   .dm-tool-imagen {
     max-width: 100%;

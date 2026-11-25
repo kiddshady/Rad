@@ -42,6 +42,8 @@ const PATHS = {
   // la memoria: el `chip` de NeonCode, tal cual (el cuerpo, un cuadrado adentro
   // con el centro hueco, y las patas)
   memory: "M7 7h10v10H7zM10 10h4v4h-4zM9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3",
+  // una imagen generada: el marco, el sol y la montaña (Feather `image`)
+  image: "M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM21 15l-5-5L5 21",
   delegate: "M12 3a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M12 8v3M12 11c-4 0-6 1.5-6 5M12 11c4 0 6 1.5 6 5M6 16a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M18 16a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5",
 };
 
@@ -64,6 +66,7 @@ const DE_TOOL = {
   skill: 'sparkle', create_skill: 'sparkle', list_skills: 'sparkle',
   mcp: 'plug', delegate: 'delegate',
   remember: 'memory', recall: 'memory',
+  generate_image: 'image',
 };
 
 /** El nombre del ícono de una tool, o null si no tiene uno propio. */

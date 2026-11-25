@@ -9,6 +9,8 @@
 import { openModal } from '/@core/modal.js';
 import { wireControls } from '/@core/controls.js';
 import { swapText } from '/@core/motion.js';
+import { menuButton } from '/@core/menu.js';
+import { toast } from '/@core/toast.js';
 import * as datos from './datos.js';
 import { h, icono } from './piezas.js';
 import { iconoTool } from './iconos-tools.js';
@@ -21,6 +23,41 @@ const ESTADOS = {
   aborted: 'cancelled',
   blocked: 'blocked',
 };
+
+// Una imagen de generate_image. No viaja adentro del chat: está en un archivo
+// y acá se la pide por su ruta, cuando la fila se acerca a la vista (un chat
+// con muchas imágenes no las carga todas al abrir). Tocarla abre su menú.
+const vistas = new Map(); // archivo -> Promise<dataUrl | null>
+const verArchivo = (archivo) => {
+  if (!vistas.has(archivo)) vistas.set(archivo, window.rad.invoke('imagenes:ver', archivo).catch(() => null));
+  return vistas.get(archivo);
+};
+async function cargarGenerada(caja) {
+  const url = await verArchivo(caja.dataset.archivo);
+  if (url) { caja.querySelector('img').src = url; caja.setAttribute('data-lista', ''); } else { caja.setAttribute('data-falta', ''); caja.querySelector('.dm-generada-nota').textContent = 'This image file is gone.'; }
+}
+const alAcercarse = new IntersectionObserver((entradas) => {
+  for (const e of entradas) if (e.isIntersecting) { alAcercarse.unobserve(e.target); cargarGenerada(e.target); }
+}, { rootMargin: '600px 0px' });
+function generada(im) {
+  const caja = h('button', 'dm-generada', { type: 'button', 'data-archivo': im.archivo, 'aria-label': `Generated image ${im.name}: options`, 'data-rad-tip': im.name },
+    h('img', 'dm-generada-img', { alt: im.name }), h('span', 'dm-generada-nota'));
+  const pedir = (canal) => window.rad.invoke(canal, im.archivo).catch(() => null);
+  menuButton(caja, () => {
+    const falta = caja.hasAttribute('data-falta');
+    return [
+      { id: 'abrir', label: 'Open', icon: icono('externo').innerHTML, disabled: falta, onSelect: async () => { if (!(await pedir('imagenes:abrir'))?.ok) toast({ text: 'That image file is gone.', kind: 'danger' }); } },
+      { id: 'guardar', label: 'Save as…', icon: icono('bajar').innerHTML, disabled: falta, onSelect: async () => {
+        const r = await pedir('imagenes:guardar-como');
+        if (r?.ok) toast({ text: 'Saved' }); else if (!r?.cancelado) toast({ text: `Could not save the image: ${r?.error ?? 'unknown error'}`, kind: 'danger' });
+      } },
+      { id: 'mostrar', label: 'Show in folder', icon: icono('carpeta').innerHTML, disabled: falta, onSelect: async () => { if (!(await pedir('imagenes:mostrar'))?.ok) toast({ text: 'That image file is gone.', kind: 'danger' }); } },
+      { id: 'copiar', label: 'Copy path', icon: icono('copiar').innerHTML, onSelect: () => navigator.clipboard.writeText(im.archivo).then(() => toast({ text: 'Copied' }), () => toast({ text: 'Could not copy', kind: 'danger' })) },
+    ];
+  });
+  alAcercarse.observe(caja);
+  return caja;
+}
 
 /** La fila de una llamada: qué tool, sobre qué, y cómo terminó. Se abre para
  *  ver lo que devolvió. */
@@ -65,7 +102,7 @@ export function ponerTool(nodo, m) {
   const caja = nodo.querySelector('.dm-tool-imagenes');
   const lista = Array.isArray(m.imagenes) ? m.imagenes : [];
   if (caja.childElementCount !== lista.length) {
-    caja.replaceChildren(...lista.map((im) => h('img', 'dm-tool-imagen', { src: im.dataUrl, alt: im.name, 'data-rad-tip': im.name })));
+    caja.replaceChildren(...lista.map((im) => (im.archivo ? generada(im) : h('img', 'dm-tool-imagen', { src: im.dataUrl, alt: im.name, 'data-rad-tip': im.name }))));
   }
   nodo.toggleAttribute('data-con-imagenes', lista.length > 0);
   if (!texto) { nodo.removeAttribute('data-abierto'); nodo.querySelector('.dm-tool-cabeza').setAttribute('aria-expanded', 'false'); }
@@ -103,7 +140,11 @@ export function vistaDe(vista) {
   else if (vista.mode === 'toobig') frase('The file is too large to preview the change.', 'warning');
   else if (vista.mode === 'fail') frase(vista.error, 'warning');
   else if (vista.mode === 'nothing') frase('There is nothing at that path.', 'warning');
-  else if (vista.mode === 'delfile') frase(`Moves this file to the Recycle Bin (${bytes(vista.bytes ?? 0)}). It can be restored from there.`);
+  // generar una imagen sale plata: con qué modelo, cuántas y cuánto
+  else if (vista.mode === 'imagen') {
+    frase(`${vista.cuantas} image${vista.cuantas === 1 ? '' : 's'} with ${vista.modelo}${vista.aspecto ? `, ${vista.aspecto}` : ''}${vista.resolucion ? `, ${vista.resolucion}` : ''}.`);
+    frase(typeof vista.total === 'number' ? `About $${vista.total.toFixed(2)} of your Venice balance.` : 'It is paid from your Venice balance. Venice does not publish a price for this model.');
+  } else if (vista.mode === 'delfile') frase(`Moves this file to the Recycle Bin (${bytes(vista.bytes ?? 0)}). It can be restored from there.`);
   else if (vista.mode === 'deldir') {
     frase(`Moves this folder and everything in it to the Recycle Bin: ${vista.partial ? 'more than ' : ''}${vista.files} file${vista.files === 1 ? '' : 's'} in ${vista.dirs} folder${vista.dirs === 1 ? '' : 's'}. It can be restored from there.`);
   } else if (vista.mode === 'diff') {

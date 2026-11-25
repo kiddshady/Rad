@@ -63,6 +63,11 @@ agente. La barra de estado repite la cuenta.
 | Subagents | `delegate` |
 | Memory | `remember`, `recall` |
 | Skills | `skill`, `create_skill` |
+| Images (opcional) | `generate_image` |
+
+Images es el único grupo **opcional**: gasta plata del usuario en cada llamada,
+así que no entra en «todas» (un agente nuevo nace sin él, y a los que ya
+existen no se les suma). Se prende a mano, por agente.
 
 La pantalla va sola en su grupo: es lo más privado que una tool puede mirar
 (lo que haya abierto, sin elegir qué), y se prende aparte de todo lo demás.
@@ -301,6 +306,53 @@ agente y contra qué se resuelven sus rutas relativas.
 - Un subagente arranca en la carpeta de su padre en ese momento, y lo que se
   mueva no mueve al padre (eso no cambió).
 
+## Las imágenes generadas
+
+Desde la 0.19.0: `generate_image`, en `main/tools/imagenes.cjs`. Es de
+BlackCode (NeonCode no la tenía). El proveedor es Venice: con una sola llave da
+todo su catálogo de modelos de imagen.
+
+- **La llave** es la de Venice que la app ya guarda cifrada (la de los agentes
+  de Venice). No hay otra, ni va por el entorno.
+- **Los modelos no están escritos en el código**: se le piden a Venice
+  (`GET /models?type=image`), con el tope del prompt, los formatos y el precio
+  de cada uno, y se guardan diez minutos. El que se usa: el que pide el agente
+  (`model`), si no el de Settings, si no el que Venice marca como
+  predeterminado.
+- **Lo que pide** (`POST /image/generate`): `model`, `prompt`, y si vienen,
+  `negative_prompt`, `aspect_ratio`, `resolution`, `style_preset`, `seed`,
+  `variants` (1 a 4); siempre `return_binary: false`, `format: 'webp'`,
+  `hide_watermark: true`. No manda `width`/`height`: hay modelos que los
+  rechazan. La respuesta trae `images`, una lista de base64.
+- **Gasta plata en cada llamada.** Por eso el grupo es opcional, los subagentes
+  no la tienen, la tarjeta de permiso dice con qué modelo y cuánto sale
+  (`vista`, con el precio de la lista de Venice), y hay un tope de 8 imágenes
+  por turno entre todas las llamadas (en modo automático nadie mira cada una).
+- **El filtro de contenido adulto** de Venice (`safe_mode`: borronea lo que
+  clasifica como adulto) es un interruptor de Settings, prendido de fábrica.
+  **No es un parámetro de la tool**: el agente no lo puede cambiar. Si Venice
+  devolvió la imagen borroneada (`x-venice-is-blurred`), se le dice al agente.
+- **Las imágenes van a archivos**, en `%APPDATA%\BlackCode\tools\images\<año-mes>\`,
+  y a la fila del chat va la ruta (`imagenes: [{ name, archivo }]`). Las
+  capturas van adentro del documento del chat, en base64; con imágenes
+  generadas un chat pasaría a pesar decenas de MB. La interfaz las pide por su
+  ruta (`imagenes:ver`) cuando la fila se acerca a la vista, y el proceso
+  principal solo le da archivos de esa carpeta (`esMia`). El formato se decide
+  por los primeros bytes, no por lo que se pidió.
+- **El modelo no recibe la imagen**, salvo que pase `look: true` y vea: el que
+  la juzga es el usuario, y mandársela cuesta tokens. El resultado se lo dice
+  («no describas lo que no miraste»).
+- **Los errores de Venice se traducen**: sin saldo (402), prompt rechazado (422,
+  con el `suggested_prompt` si vino), demasiados pedidos (429), modelo sin
+  lugar (503), modelo solo para Pro.
+- **En el humo no hay Venice**: los modelos son dos de mentira y la imagen es un
+  PNG de 96 px armado acá, con un color que sale del prompt.
+- Settings: la tarjeta «Image generation» (el modelo, con su precio, y el
+  filtro). Canales `imagenes:modelos|ver|abrir|mostrar|guardar-como`; lo
+  elegido queda en el documento `imagenes`.
+- Lo que no está: editar una imagen, agrandarla y quitarle el fondo (Venice
+  tiene `/image/edit`; los otros dos no se verificaron en su documentación).
+
 ## Los subagentes
 
 `delegate` (grupo Subagents, desde la 0.13.0) le pasa un trabajo a un
@@ -537,6 +589,9 @@ para arreglarlos de a uno, con su prueba:
 - `-browser.mjs`: las de NeonCode sobre un Electron de mentira (no abre
   ninguna ventana), más los runners y los canales de BlackCode. Las que allá miraban
   la interfaz de NeonCode no vinieron: la de BlackCode la prueba el humo.
+- `tools/test-blackcode-imagenes.mjs`: `generate_image` contra un servidor local que
+  hace de Venice (los modelos, el pedido, los errores, el tope del turno, qué
+  archivos se dejan leer).
 - `tools/test-blackcode-historial.mjs`: el historial del navegador sobre archivos de
   verdad en una carpeta temporal, y que ninguna tool lo lea.
 - `tools/test-blackcode-tools-loop.mjs`: los dos loops contra un servidor local que
