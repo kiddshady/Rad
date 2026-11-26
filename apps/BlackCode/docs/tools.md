@@ -539,7 +539,12 @@ acordarse).
   Agrupado por chat, los chats por recencia y adentro en el orden en que se
   dijo, con un fragmento centrado en la coincidencia. Cada coincidencia trae
   el **id del chat y el número del mensaje**, para ir con `chat_read`. Mira
-  también las filas de las tools (qué tocó cada una y su salida). `scope`:
+  también las filas de las tools, pero solo qué tocó cada una (su ruta o su
+  consulta), no lo que devolvió; y los mensajes van primero: las tools
+  completan los lugares que sobran (1.8.1, lo pidió Zac: con temas de código,
+  los listados de archivos y los informes de subagentes tapaban lo que se
+  dijo). Las fechas, en ISO (`2026-11-25 04:09`), como el sello de los
+  mensajes. `scope`:
   `others` (de fábrica: los otros chats), `current`, `all`. Sin consulta,
   lista los chats más recientes con su id.
 - **`chat_read({ id, around? | from?, to? })`** es de BlackCode: los mensajes

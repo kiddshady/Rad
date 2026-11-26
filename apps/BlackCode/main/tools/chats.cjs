@@ -70,11 +70,14 @@ function chatSnippet(text, terms) {
   return '…' + s.slice(start, start + 400) + '…';
 }
 
+// [BlackCode] En ISO (2026-11-25 04:09), como el sello que lleva cada mensaje
+// del usuario al viajar (main/hora.cjs): el mismo formato en todos lados, y sin
+// la duda de día y mes (lo pidió Zac, 1.8.1). En NeonCode era 25/11/26 04:09.
 function chatStamp(ts) {
   if (!ts) return '?';
   const d = new Date(ts);
   const p = (n) => String(n).padStart(2, '0');
-  return `${d.getDate()}/${d.getMonth() + 1}/${String(d.getFullYear()).slice(2)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 // ---------- los chats del agente ----------
@@ -87,9 +90,12 @@ function chatsDe(agente) {
 }
 const mensajesDe = (id) => { try { const m = deps.leer(id)?.mensajes; return Array.isArray(m) ? m : []; } catch { return []; } };
 
-// Lo buscable de un mensaje: lo que se dijo, o qué tocó una tool y su salida.
+// Lo buscable de un mensaje: lo que se dijo, o qué tocó una tool (su nombre y
+// su ruta o consulta). Lo que DEVOLVIÓ no: un listado de archivos, lo que leyó
+// fs_read o el informe de un subagente llenaban la búsqueda de ruido (Zac,
+// 1.8.1). «El archivo que editamos» se sigue encontrando por su ruta.
 function textoDe(m) {
-  if (m?.rol === 'tool') return `${m.tool ?? 'tool'} ${m.texto ?? ''}\n${typeof m.salida === 'string' ? m.salida : ''}`;
+  if (m?.rol === 'tool') return `${m.tool ?? 'tool'} ${m.texto ?? ''}`;
   if (m?.rol === 'user' || m?.rol === 'assistant') return typeof m.texto === 'string' ? m.texto : '';
   return '';
 }
@@ -116,11 +122,14 @@ async function runChatSearch(run, { query, scope, limit } = {}) {
   }
 
   // Con consulta: chat por chat, podando al top-n por recencia después de cada
-  // uno (lo retenido queda acotado por n + el chat más grande).
+  // uno (lo retenido queda acotado por n + el chat más grande). Los mensajes
+  // van primero: las filas de tools solo completan los lugares que sobran
+  // (Zac, 1.8.1: con temas de código, las tools tapaban lo que se dijo).
   const match = (low, every) => (every ? terms.every((t) => low.includes(t)) : terms.some((t) => low.includes(t)));
   const podar = (arr) => { arr.sort((a, b) => b.ts - a.ts); return arr.slice(0, n); };
-  let hitsTodos = [];
-  let hitsAlguno = [];
+  const lista2 = () => ({ msgs: [], tools: [] });
+  let hitsTodos = lista2();
+  let hitsAlguno = lista2();
   for (const c of propios) {
     const msgs = mensajesDe(c.id);
     // (las respuestas del agente no llevan hora propia: toman la del mensaje
@@ -132,13 +141,15 @@ async function runChatSearch(run, { query, scope, limit } = {}) {
       if (!texto) return;
       const low = texto.toLowerCase();
       const row = { chat: c.id, title: c.titulo || 'Untitled', n: i + 1, ts: hora, who: quien(m), content: texto };
-      if (match(low, true)) hitsTodos.push(row);
-      else if (terms.length > 1 && match(low, false)) hitsAlguno.push(row);
+      const donde = m.rol === 'tool' ? 'tools' : 'msgs';
+      if (match(low, true)) hitsTodos[donde].push(row);
+      else if (terms.length > 1 && match(low, false)) hitsAlguno[donde].push(row);
     });
-    hitsTodos = podar(hitsTodos);
-    hitsAlguno = podar(hitsAlguno);
+    for (const h of [hitsTodos, hitsAlguno]) { h.msgs = podar(h.msgs); h.tools = podar(h.tools); }
   }
-  const hits = hitsTodos.length ? hitsTodos : hitsAlguno;
+  const juntar = (h) => [...h.msgs, ...h.tools.slice(0, Math.max(0, n - h.msgs.length))];
+  const conTodas = juntar(hitsTodos);
+  const hits = conTodas.length ? conTodas : juntar(hitsAlguno);
   if (!hits.length) return `No messages matching "${terms.join(' ')}" in ${sc === 'current' ? 'this chat' : sc === 'all' ? 'your chats' : 'your other chats'}.`;
 
   // Agrupado por chat (los chats, por recencia); adentro de cada uno, en el
@@ -149,7 +160,7 @@ async function runChatSearch(run, { query, scope, limit } = {}) {
     porChat.get(r.chat).rows.push(r);
   }
   const cuerpo = [...porChat.entries()].map(([id, c]) => `[Chat "${c.title}" · id ${id}]\n${c.rows.sort((a, b) => a.n - b.n).map((r) => `  #${r.n} [${chatStamp(r.ts)}] ${r.who}: ${chatSnippet(r.content, terms)}`).join('\n')}`).join('\n\n');
-  const pie = hitsTodos.length ? '' : `\n\n(No message has all of "${terms.join(' ')}"; these have some of them.)`;
+  const pie = conTodas.length ? '' : `\n\n(No message has all of "${terms.join(' ')}"; these have some of them.)`;
   const out = `${cuerpo}${pie}\n\nTo read around a match: chat_read with the chat id and around: <message number>.`;
   return out.length > BUSQUEDA_MAX ? out.slice(0, BUSQUEDA_MAX) + '\n…[truncated]' : out;
 }

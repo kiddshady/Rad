@@ -494,7 +494,7 @@ const TOOL_DEFS = [{
   // Los chats de antes (main/tools/chats.cjs): de NeonCode, que lo trajo de
   // Umbra. Cada agente busca y lee SOLO en sus propios chats.
   name: 'chat_search',
-  description: "Search YOUR past conversations with the user (only the chats of this agent; other agents' chats are never visible) for a topic, message or detail discussed before. Use it when the user references something from an earlier chat ('lo que hablamos del...', 'el otro día te pregunté...'). Returns matching messages grouped by chat, each with the chat id and its message number, so you can read around it with chat_read. Omit query to list your most recent chats instead. Read each [timestamp] to judge how long ago it was. Read-only.",
+  description: "Search YOUR past conversations with the user (only the chats of this agent; other agents' chats are never visible) for a topic, message or detail discussed before. Use it when the user references something from an earlier chat ('lo que hablamos del...', 'el otro día te pregunté...'). Returns matching messages grouped by chat, each with the chat id and its message number, so you can read around it with chat_read. What was said comes first; tool calls match only by what they touched (a file path, a query), never by what they returned. Omit query to list your most recent chats instead. Read each [timestamp] to judge how long ago it was. Read-only.",
   parameters: {
     type: 'object',
     properties: {

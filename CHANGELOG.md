@@ -1,5 +1,30 @@
 # Changelog
 
+## BlackCode 1.8.1 (2026-11-25)
+
+Retoques que Fran fue juntando al usar la 1.8.0:
+
+- **La fila de la tool `canvas` lleva la hojita con el destello**, como el
+  resto de la app desde la 1.5.2: la lista de íconos de las filas venía de
+  NeonCode y seguía con los cuatro cuadrados.
+- **El botón de tools de la cabecera:** prendido, en el gris de los botones
+  de al lado (antes en blanco pleno, resaltaba más que ellos); apagado, más
+  atenuado que ellos. Al pasarle el mouse se aclara como todos (su color
+  propio le pisaba el del hover).
+- **Sin anillo al cerrar el visor.** Al cerrarse, el visor le devuelve el foco
+  a la miniatura, y con Esc Chromium le prendía el anillo de teclado, que
+  quedaba pegado. Si se abrió con el mouse, ese foco vuelve sin anillo; si se
+  abrió con el teclado, el anillo vuelve (dice dónde se está).
+- **`chat_search` con menos ruido** (lo propuso Zac): de una tool se busca
+  solo qué tocó (su ruta o su consulta), no lo que devolvió, y los mensajes
+  van primero (las tools completan lo que sobra). Las fechas, en ISO
+  (`2026-11-25 04:09`), como el sello de los mensajes.
+- **El cursor de la terminal es el de NTX:** con foco, un bloque blanco del
+  alto de la letra con aureola, que parpadea apagando las dos cosas juntas;
+  sin foco, el mismo bloque apagado (no el contorno hueco de xterm). El
+  bloque es un `::before` centrado en la celda, así el interlineado de la
+  terminal no cambia.
+
 ## BlackCode 1.8.0 (2026-11-25)
 
 - **Un agente puede recuperar lo que se habló en sus otros chats.** Lo propuso

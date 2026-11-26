@@ -83,7 +83,8 @@ export function paraElModelo(m) {
  *  visor y el clic derecho, su menú. */
 function mirable(boton, src, nombre) {
   const menu = menuDeDato(src, nombre);
-  boton.addEventListener('click', () => abrirVisor({ src, nombre, menu }));
+  // (detail 0 = Enter o Espacio: abierto con el teclado, el anillo vuelve al cerrar)
+  boton.addEventListener('click', (e) => abrirVisor({ src, nombre, menu, origen: boton, conPuntero: e.detail > 0 }));
   contextMenu(boton, menu);
   return boton;
 }

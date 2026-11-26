@@ -1258,7 +1258,7 @@ else {
     const doc = () => panel.querySelector('.dm-canvas-doc');
     if (doc()?.querySelector('.dm-titulo')?.textContent !== 'Plan' || doc()?.querySelectorAll('li').length !== 2 || !doc()?.querySelector('.dm-formula')) fail('canvas: el documento no se pintó como markdown (título, lista y fórmula)');
     if (tarjetasC().length !== 1 || !tarjetasC()[0].hasAttribute('data-activa') || !barra.hasAttribute('data-con-tarjetas')) fail('canvas: la barra no muestra la tarjeta del canvas abierto: ' + tarjetasC().length + ' tarjetas, activa ' + tarjetasC()[0]?.hasAttribute('data-activa') + ', barra ' + barra.hasAttribute('data-con-tarjetas') + ', todas ' + barra.querySelectorAll('.dm-canvas-tarjeta').length);
-    if (fila('canvas')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'grid') fail('canvas: su fila no lleva el ícono del canvas');
+    if (fila('canvas')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'documento') fail('canvas: su fila no lleva el ícono del canvas (la hojita con el destello)');
     // el panel empuja a la conversación, no la tapa
     const pr = panel.getBoundingClientRect();
     const tr = thread().getBoundingClientRect();
@@ -2198,14 +2198,28 @@ else {
     const colorDe = (token) => { const s = document.createElement('i'); s.style.color = getComputedStyle(document.documentElement).getPropertyValue(token).trim(); document.body.append(s); const c = getComputedStyle(s).color; s.remove(); return c; };
     if (!cursor) fail('terminal: no hay cursor');
     else {
+      // (1.8.1: el cursor de NTX. El bloque es un ::before del alto de la
+      // letra, con aureola; la celda queda transparente y sin contorno.)
       const teniaBloque = cursor.classList.contains('xterm-cursor-block');
       cursor.classList.remove('xterm-cursor-outline', 'xterm-cursor-blink');
       cursor.classList.add('xterm-cursor-block');
       const cs = getComputedStyle(cursor);
+      const bloque = getComputedStyle(cursor, '::before');
       const cr = cursor.getBoundingClientRect();
-      if (cs.backgroundColor !== colorDe('--rad-text-1') || cs.color !== colorDe('--rad-surface-0')) fail('terminal: el cursor de bloque es ' + cs.backgroundColor + ' con letra ' + cs.color + ', no el blanco de la app (' + colorDe('--rad-text-1') + ') con el fondo');
-      if (cr.width < 5 || cr.height < 12) fail('terminal: el cursor mide ' + Math.round(cr.width) + '×' + Math.round(cr.height) + ': no es un bloque');
-      data.terminalCursor = 'bloque de ' + Math.round(cr.width) + '×' + Math.round(cr.height) + ' px, ' + cs.backgroundColor + (teniaBloque ? '' : ' (en contorno sin el foco)');
+      const alto = cr.height - parseFloat(bloque.top) - parseFloat(bloque.bottom);
+      const blanco = colorDe('--rad-text-1');
+      // (getComputedStyle devuelve un objeto VIVO: al cambiar de clase abajo,
+      // `bloque` pasa a decir el apagado. Para el informe se anota ahora.)
+      const conFoco = bloque.backgroundColor;
+      if (bloque.backgroundColor !== blanco || !bloque.boxShadow.startsWith(blanco) || cs.color !== colorDe('--rad-surface-0')) fail('terminal: el cursor con foco es ' + bloque.backgroundColor + ' con aureola «' + bloque.boxShadow + '» y letra ' + cs.color + ', no el bloque blanco de la app (' + blanco + ') con aureola y la letra en el fondo');
+      if (cs.backgroundColor !== 'rgba(0, 0, 0, 0)' || cs.outlineStyle !== 'none') fail('terminal: la celda del cursor sigue pintada (' + cs.backgroundColor + ', contorno ' + cs.outlineStyle + '): el bloque es el ::before');
+      if (cr.width < 5 || Math.abs(alto / cr.height - 0.8) > 0.02) fail('terminal: el bloque del cursor mide ' + Math.round(cr.width) + '×' + Math.round(alto) + ' en una celda de ' + Math.round(cr.height) + ' de alto: tiene que ser el alto de la letra (80 %)');
+      // Sin foco: el mismo bloque, apagado, en vez del contorno hueco de xterm.
+      cursor.classList.remove('xterm-cursor-block');
+      cursor.classList.add('xterm-cursor-outline');
+      const apagado = getComputedStyle(cursor, '::before');
+      if (!/\/ 0\.3\)$/.test(apagado.backgroundColor) || getComputedStyle(cursor).outlineStyle !== 'none') fail('terminal: sin foco, el cursor es ' + apagado.backgroundColor + ' con contorno ' + getComputedStyle(cursor).outlineStyle + ': tiene que ser el bloque apagado (30 %), sin contorno');
+      data.terminalCursor = 'bloque de ' + Math.round(cr.width) + '×' + Math.round(alto) + ' px en una celda de ' + Math.round(cr.height) + ', ' + conFoco + ' con aureola; sin foco, ' + apagado.backgroundColor + (teniaBloque ? '' : ' (la ventana del humo no tiene el foco)');
     }
     // Un color de 24 bits: xterm lo ponía con un atributo style, que la CSP
     // bloquea. (El prompt de cmd lo escribe la shell: $E es el escape.)

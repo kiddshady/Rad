@@ -402,8 +402,10 @@
     font-size: var(--rad-text-l);
     font-weight: var(--rad-weight-strong);
   }
-  /* Las tools del agente: a la derecha de la cabecera. Apagadas, en el gris
-     de lo secundario; prendidas, en el color del texto. */
+  /* Las tools del agente: a la derecha de la cabecera. Prendidas, en el gris
+     de los botones de al lado en reposo (antes iba en blanco pleno y
+     resaltaba más que ellos: Fran, 1.8.1); apagadas, más atenuado que ellos.
+     Al pasarle el mouse, como todos. */
   .dm-conv-tools {
     flex: none;
     align-self: center;
@@ -413,7 +415,8 @@
     font-size: var(--rad-text-s);
     transition: color var(--rad-dur-base) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out);
   }
-  .dm-conv-tools[data-prendidas] { color: var(--rad-text-1); }
+  .dm-conv-tools[data-prendidas] { color: var(--rad-text-2); }
+  .dm-conv-tools:hover { color: var(--rad-text-1); }
   .dm-conv-tools-texto { white-space: nowrap; }
 
   /* ---------- La pantalla de inicio ---------- */
@@ -1086,6 +1089,9 @@
     transition: filter var(--rad-dur-fast) var(--rad-ease-out);
   }
   .dm-tool-imagen-caja:hover { filter: brightness(1.08); }
+  /* Una miniatura que abrió el visor con el mouse recibe el foco de vuelta al
+     cerrarlo, sin anillo (visor.js, «el anillo al volver»). */
+  [data-sin-anillo]:focus-visible { outline-color: transparent; }
   .dm-tool-imagen {
     display: block;
     max-width: 100%;
@@ -1304,6 +1310,49 @@
   .dm-term-cuerpo .xterm-viewport::-webkit-scrollbar { display: none; }
   /* Lo marcado en la terminal se copia con Ctrl+C: es selección de xterm, no del documento. */
   .dm-term-cuerpo .xterm-rows { user-select: none; }
+  /* El cursor, como el de NTX (Fran, 1.8.1; ver .xterm-cursor-block en
+     S:\tools\NTX\src\renderer\src\styles\base.css): con foco, un bloque con
+     aureola, que parpadea apagando el bloque y la aureola juntos; sin foco, el
+     mismo bloque apagado (no el contorno hueco de xterm), que dice «esta shell
+     está viva, pero no es acá donde escribís».
+     El tamaño: xterm le da a cada celda el alto entero del renglón, y acá el
+     renglón es 1,25 veces la letra (NTX va a 1). Para que el bloque sea el de
+     NTX sin apretar el interlineado de la terminal, el bloque no es la celda:
+     es un ::before del alto de la letra, centrado (10 % arriba y abajo =
+     1 / 1,25). La letra queda encima (`isolation` + z-index -1).
+     xterm escribe sus reglas sin capa, y le ganan a las de esta: lo que pisa
+     las suyas (el fondo y el contorno de la celda) va con !important. La
+     letra la sigue manejando xterm: oscura sobre el bloque y clara en la
+     mitad apagada del parpadeo, con su mismo ritmo (1 s, step-end). */
+  .dm-term-cuerpo .xterm-rows .xterm-cursor.xterm-cursor-block,
+  .dm-term-cuerpo .xterm-rows .xterm-cursor.xterm-cursor-outline {
+    position: relative;
+    isolation: isolate;
+    background-color: transparent !important;
+    outline: none !important;
+  }
+  .dm-term-cuerpo .xterm-rows .xterm-cursor.xterm-cursor-block::before,
+  .dm-term-cuerpo .xterm-rows .xterm-cursor.xterm-cursor-outline::before {
+    content: '';
+    position: absolute;
+    inset: 10% 0;
+    z-index: -1;
+    background-color: var(--rad-text-1);
+    box-shadow: 0 0 7px var(--rad-text-1);
+  }
+  /* (xterm recorta cada renglón: la aureola, más alta que el bloque, salía
+     cortada en seco arriba y abajo. Solo el renglón del cursor deja ver afuera.) */
+  .dm-term-cuerpo .xterm-rows > div:has(> .xterm-cursor) { overflow: visible !important; }
+  .dm-term-cuerpo .xterm-rows .xterm-cursor.xterm-cursor-outline::before {
+    background-color: color-mix(in srgb, var(--rad-text-1) 30%, transparent);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--rad-text-1) 22%, transparent);
+  }
+  .dm-term-cuerpo .xterm-rows.xterm-focus .xterm-cursor.xterm-cursor-blink.xterm-cursor-block::before {
+    animation: dm-cursor-parpadeo 1s step-end infinite;
+  }
+  @keyframes dm-cursor-parpadeo {
+    50% { background-color: transparent; box-shadow: none; }
+  }
   /* La barra que xterm dibuja: la misma forma y el mismo ritmo que las del
      resto de la app. El ancho lo escribe xterm en línea y no se toca; el borde
      transparente deja el pulgar del grosor de las otras. */

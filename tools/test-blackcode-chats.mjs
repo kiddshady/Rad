@@ -49,6 +49,7 @@ const LISTA = [
   { id: 'z-iconos', agente: 'zac', titulo: 'Iconos para canvas', cuenta: 6, creado: H(24), tocado: H(24, 20) },
   { id: 'z-viejo', agente: 'zac', titulo: 'Plan de Biologica', cuenta: 2, creado: H(10), tocado: H(10, 9) },
   { id: 'z-largo', agente: 'zac', titulo: 'Chat largo', cuenta: 60, creado: H(5), tocado: H(5, 9) },
+  { id: 'z-codigo', agente: 'zac', titulo: 'Codigo', cuenta: 4, creado: H(23, 10), tocado: H(23, 12) },
   { id: 'o-secreto', agente: 'oracle', titulo: 'Cosas de Oracle', cuenta: 2, creado: H(25), tocado: H(25, 19) },
 ];
 const largo = 'x'.repeat(5000);
@@ -64,6 +65,13 @@ const DOCS = {
   ] },
   'z-viejo': { mensajes: [{ rol: 'user', texto: 'plan para el final de biologica', t: H(10, 9) }, { rol: 'assistant', texto: 'Tres semanas, dos unidades por dia.', estado: 'ok' }] },
   'z-largo': { mensajes: Array.from({ length: 60 }, (_, i) => ({ rol: i % 2 ? 'assistant' : 'user', texto: i === 30 ? `el dato clave es 4242 ${largo}` : `mensaje ${i + 1} ${'y'.repeat(900)}`, estado: 'ok' })) },
+  // (la fila de la tool es MÁS NUEVA que el mensaje: igual tiene que ganar el mensaje)
+  'z-codigo': { mensajes: [
+    { rol: 'user', texto: 'abri main.js por favor', t: H(23, 10) },
+    { rol: 'assistant', texto: 'dale', estado: 'ok' },
+    { rol: 'user', texto: 'segui', t: H(23, 12) },
+    { id: 'c2', rol: 'tool', tool: 'fs_read', texto: 'C:\\app\\main.js', estado: 'ok', salida: 'contenido enorme del archivo' },
+  ] },
   'o-secreto': { mensajes: [{ rol: 'user', texto: 'el fantasma pixelado y el icono del canvas, pero de Oracle', t: H(25, 19) }, { rol: 'assistant', texto: 'respuesta de oracle', estado: 'ok' }] },
 };
 
@@ -95,9 +103,9 @@ try {
   seccion('chat_search');
   {
     const r = await buscar(hacerRun(), { query: 'fantasma pixelado' });
-    ok('cada coincidencia dice su número de mensaje', /#4 \[24\/11\/26 20:00\] user: me gusta la variante del fantasma pixelado/.test(r), r);
+    ok('cada coincidencia dice su número de mensaje', /#4 \[2026-11-24 20:00\] user: me gusta la variante del fantasma pixelado/.test(r), r);
     ok('y cómo seguir leyendo', r.includes('chat_read with the chat id and around'), r);
-    ok('una respuesta sin hora toma la del mensaje que respondió', r.includes('#5 [24/11/26 20:00] assistant: Anotado: fantasma pixelado.'), r);
+    ok('una respuesta sin hora toma la del mensaje que respondió', r.includes('#5 [2026-11-24 20:00] assistant: Anotado: fantasma pixelado.'), r);
     ok('adentro de un chat, en el orden en que se dijo', r.indexOf('#4 ') > 0 && r.indexOf('#4 ') < r.indexOf('#5 '), r);
     ok('el chat actual no entra (scope others)', !r.includes('z-hoy'), r);
     const actual = await buscar(hacerRun(), { query: 'fantasma', scope: 'current' });
@@ -106,6 +114,13 @@ try {
     ok('scope all, en los dos (y sigue sin Oracle)', todos.includes('z-hoy') && todos.includes('z-iconos') && !todos.includes('o-secreto'), todos);
     const ruta = await buscar(hacerRun(), { query: 'canvas-icons.html' });
     ok('encuentra por lo que tocó una tool (su ruta)', ruta.includes('tool fs_write'), ruta);
+    // (Zac, 1.8.1: las salidas de las tools llenaban la búsqueda de ruido)
+    t('lo que DEVOLVIÓ una tool no se busca', await buscar(hacerRun(), { query: 'enorme' }), 'No messages matching "enorme" in your other chats.');
+    const uno = await buscar(hacerRun(), { query: 'main.js', limit: 1 });
+    ok('un mensaje le gana a una fila de tool, aunque la tool sea más nueva', uno.includes('#1 [2026-11-23 10:00] user: abri main.js') && !uno.includes('tool fs_read'), uno);
+    const dos = await buscar(hacerRun(), { query: 'main.js', limit: 2 });
+    ok('…y la tool completa los lugares que sobran', dos.includes('#1 ') && dos.includes('#4 [2026-11-23 12:00] tool fs_read: fs_read C:\\app\\main.js'), dos);
+    ok('las fechas van en ISO, como el sello de los mensajes', /\[2026-11-24 20:00\]/.test(r) && !/\d+\/\d+\/26/.test(r), r);
     const alguna = await buscar(hacerRun(), { query: 'biologica zanahoria' });
     ok('si ninguno tiene todas, valen los que tienen alguna, y lo dice', alguna.includes('z-viejo') && alguna.includes('No message has all of'), alguna);
     t('sin nada', await buscar(hacerRun(), { query: 'zanahoria' }), 'No messages matching "zanahoria" in your other chats.');

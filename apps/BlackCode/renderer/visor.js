@@ -38,8 +38,10 @@ export function menuDeDato(dataUrl, nombre = 'image.png') {
 }
 
 /** Abre el visor. `menu` es la función que arma los ítems del clic derecho
- *  (los mismos que en la miniatura). Devuelve el modal. */
-export async function abrirVisor({ src, nombre = 'Image', menu = null }) {
+ *  (los mismos que en la miniatura). `origen` es la miniatura que lo abrió y
+ *  `conPuntero`, si fue con el mouse (ver «el anillo al volver»). Devuelve el
+ *  modal. */
+export async function abrirVisor({ src, nombre = 'Image', menu = null, origen = null, conPuntero = false }) {
   const img = new Image();
   img.className = 'dm-zoom-img';
   img.alt = nombre;
@@ -62,6 +64,24 @@ export async function abrirVisor({ src, nombre = 'Image', menu = null }) {
     menos, pct, mas, entera, cerrar);
   const caja = h('div', 'dm-zoom', { tabindex: '-1' }, lienzo, barra);
   const m = openModal({ body: caja, className: 'dm-zoom-modal', label: nombre });
+
+  // El anillo al volver: al cerrarse, el modal le devuelve el foco a la
+  // miniatura, y si se cerró con Esc Chromium lo toma como teclado y le prende
+  // el anillo, que quedaba pegado (Fran, 1.8.1). Si el visor se abrió con el
+  // mouse, ese foco devuelto va sin anillo (lo apaga `data-sin-anillo` en el
+  // CSS) hasta que la miniatura lo pierda. Abierto con el teclado, el anillo
+  // queda: ahí dice dónde se está. (El foco llega en el mismo `close`, antes
+  // del cuadro siguiente: la marca está puesta cuando se pinta.)
+  if (origen && conPuntero) {
+    const alVolver = () => {
+      origen.setAttribute('data-sin-anillo', '');
+      origen.addEventListener('blur', () => origen.removeAttribute('data-sin-anillo'), { once: true });
+    };
+    origen.addEventListener('focus', alVolver, { once: true });
+    // (si el foco no volvió a ella, el aviso no queda esperando: le apagaría
+    // el anillo a la próxima llegada con Tab)
+    m.removed.then(() => origen.removeEventListener('focus', alVolver));
+  }
 
   // ---------- dónde está la imagen ----------
   let s = 1; let x = 0; let y = 0;

@@ -36,7 +36,11 @@ const PATHS = {
   db: "M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM20 12c0 1.7-3.6 3-8 3s-8-1.3-8-3M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5",
   drive: "M22 12H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11zM6.5 16h.01",
   exchange: "M3 8h14M14 5l3 3-3 3M21 16H7M10 13l-3 3 3 3",
-  grid: "M5 3.5h4a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a1.5 1.5 0 0 1-1.5-1.5v-4a1.5 1.5 0 0 1 1.5-1.5zM15 3.5h4a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a1.5 1.5 0 0 1-1.5-1.5v-4a1.5 1.5 0 0 1 1.5-1.5zM5 13.5h4a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a1.5 1.5 0 0 1-1.5-1.5v-4a1.5 1.5 0 0 1 1.5-1.5zM15 13.5h4a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a1.5 1.5 0 0 1-1.5-1.5v-4a1.5 1.5 0 0 1 1.5-1.5z",
+  // el canvas: «Documento + sparkle», la hojita con el destello que Fran
+  // diseñó con Zac (la `canvas` de piezas.js, que es de esta misma grilla de 24
+  // con trazo 2). Reemplazó a los cuatro cuadrados de NeonCode (1.5.2 en el
+  // resto de la app; en la fila de la tool, 1.8.1).
+  documento: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 11l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z",
   plug: "M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z",
   sparkle: "M10 3c0 3.9 3.1 7 7 7-3.9 0-7 3.1-7 7 0-3.9-3.1-7-7-7 3.9 0 7-3.1 7-7zM17.5 14.5c0 1.7 1.3 3 3 3-1.7 0-3 1.3-3 3 0-1.7-1.3-3-3-3 1.7 0 3-1.3 3-3z",
   // la memoria: el `chip` de NeonCode, tal cual (el cuerpo, un cuadrado adentro
@@ -63,7 +67,7 @@ const DE_TOOL = {
   os_open: 'external', screen_capture: 'eye',
   browser_navigate: 'globe', browser_read: 'globe', browser_click: 'globe',
   browser_type: 'globe', browser_press: 'globe', browser_upload: 'globe',
-  canvas: 'grid', notepad: 'notepad', notepad_write: 'notepad',
+  canvas: 'documento', notepad: 'notepad', notepad_write: 'notepad',
   chat_search: 'bubble', chat_read: 'bubble', rag_search: 'library', schedule: 'clock',
   skill: 'sparkle', create_skill: 'sparkle', list_skills: 'sparkle',
   mcp: 'plug', delegate: 'delegate',

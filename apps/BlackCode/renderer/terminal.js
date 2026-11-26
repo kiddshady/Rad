@@ -9,7 +9,9 @@
 //   - Cerrar el panel NO la mata: cerrar la vista de algo que está corriendo no
 //     es matarlo, y volver a abrir tiene que encontrar lo que quedó. Se muere
 //     con la app o con el botón de reiniciar.
-//   - El cursor es un bloque, del blanco de la app.
+//   - El cursor es un bloque, del blanco de la app: el de NTX (1.8.1), con
+//     aureola y del alto de la letra con foco, y apagado sin foco. Lo dibuja
+//     el CSS (blackcode.css, «El cursor, como el de NTX»).
 //
 // xterm (renderer/vendor/xterm) se carga recién al abrir el panel por primera
 // vez. Viaja adaptado a la CSP de la app: ver scripts/vendor-xterm.mjs.

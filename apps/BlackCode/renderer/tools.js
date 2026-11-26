@@ -57,10 +57,11 @@ function generada(im) {
       { id: 'copiar', label: 'Copy path', icon: icono('copiar').innerHTML, onSelect: () => navigator.clipboard.writeText(im.archivo).then(() => toast({ text: 'Copied' }), () => toast({ text: 'Could not copy', kind: 'danger' })) },
     ];
   };
-  caja.addEventListener('click', () => {
+  caja.addEventListener('click', (e) => {
     const src = caja.querySelector('.dm-generada-img').getAttribute('src');
     if (!src || caja.hasAttribute('data-falta')) return; // (todavía cargando, o el archivo ya no está: el menú lo dice)
-    abrirVisor({ src, nombre: nombreDeArchivo(im.archivo) || im.name, menu: items });
+    // (detail 0 = Enter o Espacio: abierto con el teclado, el anillo vuelve)
+    abrirVisor({ src, nombre: nombreDeArchivo(im.archivo) || im.name, menu: items, origen: caja, conPuntero: e.detail > 0 });
   });
   contextMenu(caja, items);
   alAcercarse.observe(caja);
@@ -76,7 +77,7 @@ function enChat(im) {
   const caja = h('button', 'dm-tool-imagen-caja', { type: 'button', 'aria-label': `Image ${nombre}: view`, 'data-rad-tip': nombre },
     h('img', 'dm-tool-imagen', { src: im.dataUrl, alt: nombre }));
   const items = menuDeDato(im.dataUrl, nombre);
-  caja.addEventListener('click', () => abrirVisor({ src: im.dataUrl, nombre, menu: items }));
+  caja.addEventListener('click', (e) => abrirVisor({ src: im.dataUrl, nombre, menu: items, origen: caja, conPuntero: e.detail > 0 }));
   contextMenu(caja, items);
   return caja;
 }
