@@ -46,6 +46,16 @@ const go = async (id, pestana = '') => {
   await sleep(dur('base') + 220);
 };
 const alive = (list) => [...list].filter((el) => !el.closest('[data-rad-leaving]'));
+// Las reglas de estilo de la página, capas incluidas. Para lo que se prende
+// con el foco: si la ventana del humo no tiene el foco de Windows (uno está
+// usando otra), Chromium no prende :focus ni :focus-visible en vivo, así que
+// eso se mira en la regla, y en vivo solo cuando la ventana tiene el foco.
+const reglasCSS = () => {
+  const out = [];
+  const ir = (lista) => { for (const r of lista) { if (r.selectorText != null) out.push(r); if (r.cssRules) ir(r.cssRules); } };
+  for (const hoja of [...document.styleSheets, ...document.adoptedStyleSheets]) { try { ir(hoja.cssRules); } catch {} }
+  return out;
+};
 // El texto vivo de una celda de relevo: durante un relevo tiene las dos frases.
 const shown = (cell) => cell?.querySelector(':scope > :not(.rad-swap-out)')?.textContent ?? '';
 const type = (input, value) => { input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); };
@@ -879,6 +889,57 @@ try { await window.rad.store.read('_llave'); } catch { reservado = true; }
 if (!reservado) fail('el renderer pudo leer el documento de la llave');
 data.llave = dice();
 
+// El ojito del campo (pedido de Fran, para copiar la llave): con el campo
+// vacío trae la guardada y la muestra, en mono y fundiéndose (no de golpe);
+// otra vez, la tapa y deja el campo vacío. Con algo pegado, solo lo destapa.
+// Se tapa solo al cambiar de pestaña y al cerrar Settings.
+{
+  const ojo = aj.querySelector('[data-accion="ver-llave"]');
+  const seVe = () => llaveIn.type === 'text' && ojo.getAttribute('aria-pressed') === 'true';
+  const alfaTexto = () => { const m = /rgba?\(([^)]+)\)/.exec(getComputedStyle(llaveIn).color); const q = m ? m[1].split(/[ ,/]+/).filter(Boolean) : []; return q.length > 3 ? parseFloat(q[3]) : 1; };
+  if (!ojo || ojo.disabled || ojo.closest('.rad-field') !== llaveIn.closest('.rad-field') || llaveIn.type !== 'password' || ojo.getAttribute('aria-pressed') !== 'false') fail('ojito: el campo de la llave no tiene su ojito listo para mostrarla');
+  {
+    const o = ojo.getBoundingClientRect(), c = llaveIn.getBoundingClientRect();
+    if (!(o.right <= c.right && o.right > c.right - 8 && o.top >= c.top && o.bottom <= c.bottom)) fail('ojito: no está adentro del campo, a la derecha: ' + [o.left, o.top, o.right, o.bottom].map(Math.round).join() + ' en ' + [c.left, c.top, c.right, c.bottom].map(Math.round).join());
+  }
+  ojo.click();
+  const alfas = new Set();
+  for (const t0 = performance.now(); performance.now() - t0 < dur('base') + dur('slow') + 400 && !(seVe() && llaveIn.value === LLAVE && alfaTexto() > 0.99); ) { alfas.add(r2(alfaTexto())); await frame(); }
+  await sleep(dur('slow') + 80);
+  if (!seVe() || llaveIn.value !== LLAVE) fail('ojito: tocarlo con el campo vacío no mostró la llave guardada (' + llaveIn.type + ', ' + (llaveIn.value === LLAVE ? 'la llave' : '«' + llaveIn.value.slice(0, 6) + '…»') + ')');
+  if (!(Math.min(...alfas) < 0.3)) fail('ojito: la llave aparece de golpe, sin fundirse (' + [...alfas].join(', ') + ')');
+  if (!/mono|consolas/i.test(getComputedStyle(llaveIn).fontFamily)) fail('ojito: la llave mostrada no va en mono: ' + getComputedStyle(llaveIn).fontFamily);
+  if (/no-es-una-llave/.test(document.documentElement.outerHTML)) fail('ojito: la llave mostrada quedó escrita en el HTML (y no solo en el valor del campo)');
+  ojo.click();
+  await sleep(dur('base') + dur('slow') + 160);
+  if (llaveIn.type !== 'password' || llaveIn.value !== '' || ojo.getAttribute('aria-pressed') !== 'false') fail('ojito: tocarlo otra vez no tapó la llave ni vació el campo');
+  // lo que uno pega: solo se destapa, y se vuelve a tapar sin borrarse
+  type(llaveIn, 'sk-ant-api03-pegada-no-es-una-llave-9999');
+  ojo.click();
+  await sleep(dur('base') + dur('slow') + 160);
+  if (!seVe() || llaveIn.value !== 'sk-ant-api03-pegada-no-es-una-llave-9999') fail('ojito: con algo pegado no lo mostró tal cual');
+  ojo.click();
+  await sleep(dur('base') + dur('slow') + 160);
+  if (llaveIn.type !== 'password' || llaveIn.value !== 'sk-ant-api03-pegada-no-es-una-llave-9999') fail('ojito: al tapar lo pegado lo borró o no lo tapó');
+  type(llaveIn, '');
+  // se tapa al cambiar de pestaña
+  ojo.click();
+  await until(() => seVe() && llaveIn.value === LLAVE, 2000);
+  await go('ajustes', 'tools');
+  await go('ajustes', 'providers');
+  if (llaveIn.type !== 'password' || llaveIn.value !== '' || ojo.getAttribute('aria-pressed') !== 'false') fail('ojito: al cambiar de pestaña la llave quedó a la vista');
+  // y al cerrar Settings
+  ojo.click();
+  await until(() => seVe() && llaveIn.value === LLAVE, 2000);
+  await go('chat');
+  await settle();
+  if (llaveIn.type !== 'password' || llaveIn.value !== '') fail('ojito: al cerrar Settings la llave quedó a la vista');
+  await go('ajustes', 'providers');
+  // sin llave guardada ni nada pegado no hay qué mostrar
+  const veOjo = view('ajustes').querySelector('[data-proveedor="venice"] [data-accion="ver-llave"]');
+  if (!veOjo?.disabled) fail('ojito: sin llave de Venice ni nada pegado, su ojito se puede tocar');
+}
+
 // 11. Venice. Su llave va aparte de la de Anthropic. Un agente con ese
 // proveedor elige entre los modelos de Venice (el select de modelos releva
 // al de Anthropic), y su pedido viaja a ese proveedor con ese modelo.
@@ -1345,6 +1406,14 @@ else {
     await settle();
     if (filasB().length !== 1 || !filasB()[0].textContent.includes('Study plan')) fail('canvas: buscar «study» en la biblioteca dejó ' + filasB().length + ' filas');
     enIngles('en la biblioteca del canvas');
+    // el pie es solo el Close: entre la lista y él va el aire del esfumado y el gap del modal, sin el margen del pie
+    {
+      const lista = modal().querySelector('.dm-biblio-lista').getBoundingClientRect();
+      const cerrar = modal().querySelector('.rad-modal-actions').getBoundingClientRect();
+      const aire = Math.round(cerrar.top - lista.bottom);
+      const gap = parseFloat(getComputedStyle(modal()).rowGap) || 0;
+      if (Math.abs(aire - gap) > 2) fail('canvas: entre la lista de la biblioteca y el Close hay ' + aire + ' px, se esperaba solo el gap del modal (' + gap + ' px)');
+    }
     modal().querySelector('.rad-button').click();
     await closed();
 
@@ -2367,6 +2436,22 @@ else {
         if (alfa(cs.backgroundColor) !== 1 || cs.backdropFilter !== 'none') fail('ir al final: el botón flota sobre texto y no es opaco (fondo ' + cs.backgroundColor + ', backdrop ' + cs.backdropFilter + ')');
       }
       if (bF.getAttribute('aria-label') !== 'Jump to latest' || bF.getAttribute('data-rad-tip') !== 'Jump to latest') fail('ir al final: el botón no dice qué hace');
+      // con el foco de teclado no lleva el anillo de la casa sino un brillo blanco, como el de NeonCode
+      {
+        const regla = reglasCSS().find((r) => r.selectorText === '.dm-al-final:focus-visible');
+        const sombraR = regla?.style.boxShadow ?? '';
+        if (!regla || regla.style.outlineStyle !== 'none' || !/color-mix\([^)]*--rad-focus/.test(sombraR) || !/0(px)? 0(px)? var\(--rad-space-4\)/.test(sombraR)) fail('ir al final: la regla del foco de teclado no apaga el anillo y brilla del color del foco: «' + (regla?.cssText ?? 'no está') + '»');
+        if (document.hasFocus()) {
+          const sombra0 = getComputedStyle(bF).boxShadow;
+          bF.focus({ focusVisible: true });
+          await sleep(dur('fast') + 120);
+          const cs = getComputedStyle(bF);
+          const halo = /(rgba|color)\([^)]*\) 0px 0px 16px/;
+          if (!bF.matches(':focus-visible') || cs.outlineStyle !== 'none' || !halo.test(cs.boxShadow) || halo.test(sombra0)) fail('ir al final: con el foco de teclado no brilla en blanco (o lleva el anillo): outline ' + cs.outlineStyle + ', sombra ' + cs.boxShadow);
+          bF.blur();
+          await sleep(dur('fast') + 120);
+        }
+      }
       // tocarlo: baja ANDANDO, llega al final y se esconde
       const camino = new Set();
       bF.click();
@@ -4154,6 +4239,24 @@ else {
       await settle();
       if (!filaV || filaV.closest('[data-grupo]') !== grupo || grupo.hasAttribute('data-vacio') || grupo.inert || !(grupo.offsetHeight > 40)) fail('canales: el chat de voz no está en el grupo Channels (' + grupo.offsetHeight + ' px)');
       if (cabeza.textContent.trim() !== 'Channels' || cabeza.querySelectorAll('svg').length !== 2 || !grupo.querySelector('[data-accion="canales-borrar"] svg') || /\d/.test(grupo.querySelector('.dm-canales-fila').textContent)) fail('canales: la cabeza del grupo no es flecha, ícono y nombre, con su tacho y sin contador: «' + grupo.querySelector('.dm-canales-fila').textContent + '»');
+      // El tacho se ve con el puntero encima o con el foco de TECLADO adentro; el
+      // foco que deja un clic (en la cabeza, o en el tacho al volver del confirm)
+      // no lo deja pegado.
+      {
+        const tacho = grupo.querySelector('[data-accion="canales-borrar"]');
+        const sel = reglasCSS().filter((r) => r.selectorText.includes('.dm-canales-borrar') && r.style.opacity === '1').map((r) => r.selectorText).join(' | ');
+        if (!/:hover/.test(sel) || !/:has\(:focus-visible\)/.test(sel) || /:focus-within|:focus(?!-visible)/.test(sel)) fail('canales: el tacho no se prende solo con el puntero o el foco de teclado: «' + sel + '»');
+      }
+      if (document.hasFocus()) {
+        const tacho = grupo.querySelector('[data-accion="canales-borrar"]');
+        const tras = async (el, visible) => { el.focus({ focusVisible: visible }); await sleep(dur('fast') + 120); return r2(op(tacho)); };
+        const deCabeza = await tras(cabeza, false);
+        const deTacho = await tras(tacho, false);
+        const deTeclado = await tras(tacho, true);
+        tacho.blur();
+        await sleep(dur('fast') + 120);
+        if (deCabeza !== 0 || deTacho !== 0 || deTeclado < 0.99 || op(tacho) !== 0) fail('canales: el tacho no sigue al foco de teclado (clic en la cabeza ' + deCabeza + ', clic en el tacho ' + deTacho + ', teclado ' + deTeclado + ', sin foco ' + r2(op(tacho)) + ')');
+      }
       if (grupo.parentElement.lastElementChild !== grupo || !comunesF.length || comunesF.some((r) => r.getBoundingClientRect().top >= grupo.getBoundingClientRect().top)) fail('canales: el grupo no está al fondo de la lista, debajo de todos los chats');
       if (!/\d{1,2}\D\d{1,2}.* · \d{2}:\d{2}/.test(shown(filaV?.querySelector('.dm-fila-fecha'))) || comunesF.some((r) => r.querySelector('.dm-fila-fecha'))) fail('canales: la fila de un chat de canal no dice cuándo fue (o lo dice la de un chat común): «' + shown(filaV?.querySelector('.dm-fila-fecha')) + '»');
       // (un chat de canal no se fija: su menú no lo ofrece)

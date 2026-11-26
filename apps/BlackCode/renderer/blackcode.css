@@ -225,6 +225,38 @@
   .dm-estado-detalle[data-abierto] .dm-estado-detalle-in { opacity: 1; transition-delay: calc(var(--rad-dur-fast) / 2); }
   .dm-llave { display: grid; gap: var(--rad-space-3); }
   .dm-llave-acciones { display: flex; justify-content: flex-end; gap: var(--rad-space-2); }
+  /* El campo de una llave con su ojito adentro, a la derecha (el de NeonCode).
+     Mostrada, la llave va en mono: es un dato. Entre puntitos y letras el
+     texto se funde por color (data-relevo), nunca de golpe: se va en base
+     acelerando y vuelve en slow frenando (con fast las dos mitades, a Fran le
+     resultó brusco). El ojo cambia de dibujo en el mismo tiempo. Activo, el ojo
+     no queda «apretado» (como la estrella y el pin): lo dice su dibujo. */
+  .dm-llave-campo { position: relative; display: grid; min-width: 0; }
+  .dm-llave-campo .rad-input {
+    padding-inline-end: calc(var(--rad-control-height) + var(--rad-space-1));
+    transition: box-shadow var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-slow) var(--rad-ease-out);
+  }
+  .dm-llave-campo .rad-input[type='text'] { font-family: var(--rad-font-mono); font-size: var(--rad-text-s); }
+  .dm-llave-campo .rad-input[data-relevo] {
+    color: transparent;
+    transition: box-shadow var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-base) var(--rad-ease-in);
+  }
+  .dm-llave-ojo {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 3px;
+    margin-block: auto;
+    width: calc(var(--rad-control-height) - 6px);
+    height: calc(var(--rad-control-height) - 6px);
+    border-radius: calc(var(--rad-radius-m) - 3px);
+    color: var(--rad-text-3);
+    transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out), opacity var(--rad-dur-fast) var(--rad-ease-out), transform var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-llave-ojo[aria-pressed='true'] { color: var(--rad-text-3); background-color: transparent; box-shadow: none; }
+  .dm-llave-ojo:hover, .dm-llave-ojo[aria-pressed='true']:hover { color: var(--rad-text-1); background-color: var(--rad-tint-hover); }
+  .dm-llave-ojo:disabled { opacity: 0.4; pointer-events: none; }
+  .dm-llave-ojo .rad-icon { grid-area: 1 / 1; transition: opacity var(--rad-dur-slow) var(--rad-ease-in-out); }
+  .dm-llave-ojo[aria-pressed='false'] .dm-ojo-tapar, .dm-llave-ojo[aria-pressed='true'] .dm-ojo-ver { opacity: 0; }
   /* Un botón callado que no se puede usar se apaga: la piel lo deja igual. */
   .dm-llave-acciones .rad-button[data-variant='quiet']:disabled { color: var(--rad-text-3); }
   .dm-datos {
@@ -615,6 +647,14 @@
       color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out);
   }
   .dm-al-final:hover { color: var(--rad-text-1); box-shadow: var(--rad-shadow-2), inset 0 0 0 var(--rad-line-width) var(--rad-line-strong); }
+  /* con el foco de teclado no lleva el anillo de la casa sino un brillo
+     alrededor, como el de NeonCode (que allá es cian): del color del foco, que
+     en la piel mono es blanco. */
+  .dm-al-final:focus-visible {
+    outline: none;
+    color: var(--rad-text-1);
+    box-shadow: var(--rad-shadow-2), inset 0 0 0 var(--rad-line-width) color-mix(in srgb, var(--rad-focus) 32%, transparent), 0 0 var(--rad-space-4) color-mix(in srgb, var(--rad-focus) 18%, transparent);
+  }
   .dm-al-final[data-visible]:active { transform: translate(-50%, 0) scale(0.92); }
   .dm-al-final .rad-icon { width: 18px; height: 18px; }
 
@@ -960,14 +1000,16 @@
   /* la flecha mira hacia abajo con el grupo abierto y gira al plegarlo */
   .dm-canales-chev { transition: transform var(--rad-dur-base) var(--rad-ease-in-out); }
   .dm-canales-cabeza[aria-expanded='false'] .dm-canales-chev { transform: rotate(-90deg); }
-  /* el tacho aparece al pasar por la cabeza (o con el foco adentro). Al
-     pasarle por encima es un botón como los demás tachos de la app: sin rojo
-     (lo de borrar lo avisa el confirm). */
+  /* el tacho aparece al pasar por la cabeza (o con el foco de TECLADO
+     adentro: el foco que deja un clic, en la cabeza o en el tacho después del
+     confirm, no cuenta, si no se quedaba pegado). Al pasarle por encima es un
+     botón como los demás tachos de la app: sin rojo (lo de borrar lo avisa el
+     confirm). */
   .dm-canales-borrar {
     opacity: 0;
     transition: opacity var(--rad-dur-fast) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
   }
-  .dm-canales-fila:hover .dm-canales-borrar, .dm-canales-fila:focus-within .dm-canales-borrar { opacity: 1; }
+  .dm-canales-fila:hover .dm-canales-borrar, .dm-canales-fila:has(:focus-visible) .dm-canales-borrar { opacity: 1; }
   .dm-canales-caja { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out); }
   .dm-canales-caja[data-abierto] { grid-template-rows: 1fr; }
   .dm-canales-in { min-height: 0; overflow: clip; overflow-clip-margin: padding-box var(--dm-aro); padding-inline-start: var(--rad-space-4); opacity: 0; transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out); }
@@ -1795,6 +1837,12 @@
 
   /* La biblioteca: todos los canvas, también los de la papelera. */
   .rad-modal:has(.dm-biblio) { --rad-modal-width: 560px; }
+  /* El pie de All canvases (y del historial del navegador, que usa lo mismo)
+     es solo el Close, y entre la lista y él se sumaban 48 px: los 24 del
+     esfumado de abajo de la lista (--rad-fade), el gap del modal y el margen
+     de arriba del pie. Se va el margen: quedan el esfumado y el gap, 36 px
+     (con 24, sin el gap, a Fran le pareció que bajó demasiado). */
+  .rad-modal:has(.dm-biblio) .rad-modal-actions { margin-top: 0; }
   .dm-biblio { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-3); min-width: 0; }
   .dm-biblio-lista { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rad-space-1); max-height: 46vh; min-height: 120px; align-content: start; --rad-a-scroll-inset: var(--rad-space-1); }
   .dm-biblio-fila { display: flex; align-items: center; gap: var(--rad-space-1); min-width: 0; border-radius: var(--rad-radius-m); transition: background-color var(--rad-dur-fast) var(--rad-ease-out); }

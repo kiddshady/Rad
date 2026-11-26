@@ -1,5 +1,32 @@
 # Changelog
 
+## BlackCode 1.15.0 (2026-11-26)
+
+Ajustes que pidió Fran, probados por él en la app de dev:
+
+- **El ojito de las llaves.** En Settings › Providers (y en las llaves de los
+  buscadores, en Tools) el campo tiene un ojo adentro, a la derecha, como el
+  de NeonCode. Con el campo vacío trae la llave guardada y la muestra en mono
+  para copiarla; con algo pegado, solo lo destapa. Se vuelve a tapar al
+  tocarlo, al cambiar de pestaña y al cerrar Settings; sin llave ni nada
+  pegado queda apagado. Entre puntitos y letras el texto se funde por color:
+  sale en `base` acelerando y entra en `slow` frenando (con `fast` las dos
+  mitades se sentía brusco). Fran eligió esto entre tres opciones (las otras:
+  sumar un «Copy key», o solo «Copy key» sin mostrarla): la llave en claro
+  ahora llega a la interfaz, pero solo con el ojito (`llave:ver`); nunca va a
+  un agente ni a una tool.
+- **El tacho de Channels ya no queda pegado.** Se veía con cualquier foco
+  adentro de la fila, también el que deja un clic (en la cabeza, o en el
+  tacho al volver del confirm). Ahora: el puntero encima o el foco de
+  teclado (`:has(:focus-visible)`).
+- **«Jump to latest» con foco de teclado brilla** en vez de llevar el anillo
+  (el brillo de NeonCode, del color del foco: blanco en la piel mono).
+- **All canvases con menos aire arriba del Close:** se sumaban el esfumado
+  de la lista, el gap del modal y el margen del pie (48 px); se fue el
+  margen y quedan 36. Vale también para el historial del navegador.
+- En el humo: el tacho según el foco, el brillo, el aire del pie y el ojito
+  (mostrar, tapar, lo pegado, pestaña, cierre, apagado sin llave).
+
 ## BlackCode 1.14.1 (2026-11-26) · núcleo 0.21.2
 
 Ajustes que pidió Fran, probados por él en la app de dev:

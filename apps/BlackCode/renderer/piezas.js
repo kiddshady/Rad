@@ -61,6 +61,10 @@ export const ICONOS = {
   // silueta, acostada y puesta en diagonal con rotate(-45).
   llave: svg('<g transform="rotate(-45 8 8)"><path d="M8.31 6.6H1.9V9.4H3.2V11H5.8V9.4H8.31A3.3 3.3 0 1 0 8.31 6.6Z"/><circle cx="12.3" cy="8" r="1" fill="currentColor" stroke="none"/></g>'),
   cerrar: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
+  // Ver y tapar una llave: los ojos de NeonCode (`eye` y `eye-off` de su
+  // icons.js, grilla de 24 escalada a 16), los de su campo de la llave.
+  ojo: svg('<g transform="scale(.6667)" stroke-width="2.25"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM9 12a3 3 0 1 0 6 0 3 3 0 1 0-6 0"/></g>'),
+  ojoTachado: svg('<g transform="scale(.6667)" stroke-width="2.25"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"/></g>'),
   copiar: svg('<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>'),
   bajar: svg('<path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/>'),
   // (exportar: la misma de bajar, con la flecha hacia arriba: sale de la app.

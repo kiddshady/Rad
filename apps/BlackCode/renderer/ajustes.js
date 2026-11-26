@@ -86,6 +86,13 @@ function describir(p, e, c) {
   return { tono: 'idle', texto: `Saved and encrypted on this PC: ${e.pista}` };
 }
 
+// Los ojitos de las tarjetas de llaves (las de Providers y las de los
+// buscadores, en Tools): al cambiar de pestaña o cerrar Settings, cada uno
+// vuelve a tapar lo que mostraba. Con `salvoLaQueSeVe`, no los de la pestaña
+// que está a la vista.
+const tapadores = new Set();
+const taparLlaves = ({ salvoLaQueSeVe = false } = {}) => { for (const tapar of tapadores) tapar(salvoLaQueSeVe); };
+
 // Con `sub`, en vez de una tarjeta entera es un bloque para ir adentro de
 // otra (las llaves de los buscadores, en la tarjeta de la búsqueda).
 function tarjetaLlave(p, { sub = false } = {}) {
@@ -96,10 +103,16 @@ function tarjetaLlave(p, { sub = false } = {}) {
   const cajaDetalle = h('div', 'dm-estado-detalle', {}, h('div', 'dm-estado-detalle-in', {}, detalle));
 
   const campo = h('input', 'rad-input', { type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: p.ejemplo, 'data-campo': 'llave' });
+  // El ojito, adentro del campo a la derecha (como el de NeonCode): muestra lo
+  // que se está pegando o, con el campo vacío, la llave guardada (la trae el
+  // proceso principal), para copiarla. Vuelve a taparse al cambiar de pestaña
+  // o cerrar Settings.
+  const ojo = h('button', 'rad-iconbutton dm-llave-ojo', { type: 'button', 'data-accion': 'ver-llave', 'aria-label': 'Show key', 'aria-pressed': 'false', 'data-rad-tip': 'Show' },
+    icono('ojo', 'dm-ojo-ver'), icono('ojoTachado', 'dm-ojo-tapar'));
   const caja = h('label', 'rad-field', {},
     h('span', 'rad-field-label', {}, 'Paste a key'),
-    campo,
-    h('span', 'rad-field-hint', {}, 'It is never shown and never leaves this PC: it is stored encrypted with Windows protection.'));
+    h('span', 'dm-llave-campo', {}, campo, ojo),
+    h('span', 'rad-field-hint', {}, 'It never leaves this PC and is stored encrypted with Windows protection. It only shows when you press the eye.'));
   const guardar = h('button', 'rad-button', { type: 'submit', 'data-variant': 'primary', 'data-accion': 'guardar-llave' }, 'Save');
   const quitar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'quitar-llave' }, 'Remove key');
   const probar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'comprobar-llave' }, 'Check again');
@@ -130,18 +143,78 @@ function tarjetaLlave(p, { sub = false } = {}) {
     probar.disabled = e.estado !== 'lista' || c.fase === 'comprobando';
     // La tarjeta trabaja mientras le pregunta a la API.
     setBusy(tarjeta, c.fase === 'comprobando');
+    // Si se mostraba la llave guardada y esa ya no es la guardada (se quitó o
+    // se pegó otra), se tapa.
+    if (revelada !== null && (e.estado !== 'lista' || e.pista !== pistaRevelada)) tapar({ animar: false });
+    ponerOjo();
   };
+
+  // ---------- El ojito ----------
+  let visible = false;
+  let revelada = null; // la llave guardada, si es lo que se puso en el campo para verla
+  let pistaRevelada = null;
+  let turnoOjo = 0;
+  function ponerOjo() {
+    ojo.setAttribute('aria-pressed', String(visible));
+    ojo.setAttribute('aria-label', visible ? 'Hide key' : 'Show key');
+    ojo.dataset.radTip = visible ? 'Hide' : 'Show';
+    ojo.disabled = !visible && !campo.value && llave.de(p.id).estado !== 'lista';
+  }
+  // Entre los puntitos y las letras, el texto se funde por color (no por
+  // opacity, que pierde ClearType), cambia y vuelve: nunca de golpe.
+  const relevo = (cambio) => new Promise((listo) => {
+    campo.setAttribute('data-relevo', '');
+    setTimeout(() => { cambio(); campo.removeAttribute('data-relevo'); listo(); }, ms('dur-base'));
+  });
+  async function ver() {
+    const turno = ++turnoOjo;
+    let guardada = null;
+    if (!campo.value && llave.de(p.id).estado === 'lista') {
+      guardada = await llave.ver(p.id);
+      if (turno !== turnoOjo) return;
+      if (!guardada) { toast({ text: `Could not read the ${p.nombre} key`, kind: 'danger' }); return; }
+    }
+    visible = true;
+    ponerOjo();
+    await relevo(() => {
+      if (turno !== turnoOjo) return; // lo taparon mientras se fundía
+      if (guardada !== null) { campo.value = guardada; revelada = guardada; pistaRevelada = llave.de(p.id).pista; }
+      campo.type = 'text';
+    });
+  }
+  async function tapar({ animar = true } = {}) {
+    if (!visible && revelada === null) return;
+    visible = false;
+    turnoOjo++;
+    const cambio = () => {
+      campo.type = 'password';
+      if (revelada !== null && campo.value === revelada) campo.value = '';
+      revelada = null;
+      pistaRevelada = null;
+      ponerOjo();
+    };
+    if (animar) await relevo(cambio);
+    else cambio();
+  }
+  ojo.addEventListener('click', () => (visible ? tapar() : ver()));
+  tapadores.add((salvoLaQueSeVe) => {
+    if (salvoLaQueSeVe && tarjeta.closest('.dm-ajustes-panel')?.hasAttribute('data-activa')) return;
+    tapar({ animar: false });
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    // la llave guardada que se mostró, sin cambios: no hay nada que guardar
+    if (revelada !== null && campo.value === revelada) { tapar(); return; }
     if (!campo.value.trim()) { setFieldError(caja, 'Paste the key here.'); campo.focus(); return; }
     const r = await llave.guardar(p.id, campo.value);
     if (!r.ok) { setFieldError(caja, r.error); campo.focus(); return; }
     setFieldError(caja, null);
     campo.value = '';
+    tapar({ animar: false });
     toast({ text: `${p.nombre} key saved`, kind: 'success' });
   });
-  campo.addEventListener('input', () => { if (caja.hasAttribute('data-invalid')) setFieldError(caja, null); });
+  campo.addEventListener('input', () => { if (caja.hasAttribute('data-invalid')) setFieldError(caja, null); ponerOjo(); });
   probar.addEventListener('click', () => llave.comprobar(p.id, { forzar: true }));
   quitar.addEventListener('click', async () => {
     const si = await confirm({
@@ -1224,6 +1297,10 @@ function armar() {
   function mostrar(id, { animar = true } = {}) {
     if (!esPestana(id) || id === actual) return;
     const sale = partes.get(actual)?.panel ?? null;
+    // una llave que se estaba mostrando se tapa cuando ya no se ve su pestaña
+    // (después de que su panel terminó de fundirse, para que no cambie a la vista)
+    if (sale && animar && abierto) setTimeout(() => taparLlaves({ salvoLaQueSeVe: true }), ms('dur-fast') + SAFETY_MS);
+    else taparLlaves({ salvoLaQueSeVe: true });
     actual = id;
     for (const [k, { boton, panel }] of partes) {
       const es = k === id;
@@ -1299,7 +1376,7 @@ export function abrirAjustes(pestana = '') {
   a.bCerrar.onclick = () => m.close('dismiss');
   m.closed.then(() => { if (abierto === m) abierto = null; });
   // cuando terminó de irse: lo de adentro vuelve a su lugar (salvo que ya esté en otro modal, reabierto mientras este se iba)
-  m.removed.then(() => { if (!a.raiz.isConnected) guardado.append(a.raiz); });
+  m.removed.then(() => { taparLlaves(); if (!a.raiz.isConnected) guardado.append(a.raiz); });
   a.comprobarTodas();
   return m;
 }

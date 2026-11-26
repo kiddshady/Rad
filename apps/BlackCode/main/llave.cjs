@@ -4,8 +4,9 @@
 //
 // Se guardan cifradas con safeStorage y nunca en claro: lo que va al store es
 // el blob en base64, en un documento con _ (el renderer no puede leerlo ni
-// pisarlo). La llave en claro no sale nunca de este proceso: al renderer le
-// llega solo el estado y una pista para reconocerla.
+// pisarlo). Al renderer le llega el estado y una pista para reconocerla; la
+// llave en claro, solo cuando el usuario toca el ojito de su tarjeta en
+// Settings (`llave:ver`, ver abajo). Nunca va a un agente ni a una tool.
 //
 // En Windows safeStorage no es DPAPI directo: cifra con una clave maestra
 // que vive en <userData>/Local State. Si esa carpeta se borra o se mueve, el
@@ -110,6 +111,13 @@ async function comprobar(store, proveedor, { forzar = false } = {}) {
 
 function wire(rad, { alCambiar } = {}) {
   rad.handle('llave:estado', () => estado(rad.store));
+
+  // Ver la llave guardada: lo pide SOLO el ojito de su tarjeta en Settings,
+  // para copiarla (Fran, 26/11/2026: «que se puedan revelar las apis con un
+  // toggle con forma de ojito para cuando las tengo que copiar»). La interfaz
+  // la pone en el campo y la vuelve a tapar al cambiar de pestaña o cerrar
+  // Settings. Las tools corren acá en main y no llegan a este canal.
+  rad.handle('llave:ver', (proveedor) => leer(rad.store, proveedor));
 
   rad.handle('llave:guardar', async (proveedor, valor) => {
     const p = de(proveedor);

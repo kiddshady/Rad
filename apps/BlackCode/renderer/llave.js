@@ -1,6 +1,6 @@
 // El estado de las llaves de las APIs (una por proveedor), visto desde el
-// renderer. La llave en claro nunca llega acá: solo si está, si se puede leer
-// y una pista para reconocerla. Las guarda, cifradas, el proceso principal
+// renderer: si está, si se puede leer y una pista para reconocerla. La llave
+// en claro llega solo con `ver`, cuando el usuario toca el ojito. Las guarda, cifradas, el proceso principal
 // (main/llave.cjs).
 //
 // Aparte está la comprobación: si la API acepta la llave. Eso se le pregunta
@@ -19,6 +19,9 @@ export const de = (proveedor) => actual[proveedor] ?? { estado: 'falta' };
 export const on = (fn) => { subs.add(fn); return () => subs.delete(fn); };
 /** ¿Hace falta pegar la llave de ese proveedor para que un agente conteste? */
 export const falta = (proveedor) => !actual.simulado && de(proveedor).estado !== 'lista';
+
+/** La llave guardada, en claro (o null): solo para el ojito de su tarjeta. */
+export const ver = (proveedor) => window.rad.invoke('llave:ver', proveedor);
 
 export async function refrescar() {
   return poner(await window.rad.invoke('llave:estado'));
