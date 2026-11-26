@@ -1,5 +1,28 @@
 # Changelog
 
+## BlackCode 1.9.0 (2026-11-25)
+
+- **Quién dijo cada cosa.** Arriba del primer mensaje de cada turno va el
+  nombre de quien lo dijo, chico y en gris: el del agente (el de ahora, si se
+  lo renombró) y el del usuario, que se pone en Settings › General («Your
+  name»; vacío, «You»). Es solo de la interfaz: no viaja en ningún pedido a
+  un agente (documento `perfil`). Es texto de verdad, así que entra al
+  seleccionar y copiar, que sigue llevándose todo lo que se ve. Una respuesta
+  partida en tramos lo lleva una vez, y si el agente llamó tools antes de
+  escribir, el nombre queda igual arriba de ellas. Lo pidió Fran.
+- **Exportar un chat a Markdown.** Un botón en la cabecera guarda el chat en
+  un `.md` limpio (`renderer/exportar.js` lo arma, el proceso principal lo
+  escribe con «Guardar como»): el título, el agente y la fecha, y cada turno
+  con su nombre en negrita y lo que se dijo con su markdown original. Sin
+  horas ni tools; las imágenes y los archivos como marcas; una respuesta
+  cortada o fallida, con su nota. El formato lo aprobó Fran.
+- **Los canvas sin chat tienen dueño** (lo encontró Zac: dos canvas del panel
+  no le aparecían). Cada canvas guarda su agente al nacer, también el que
+  crea una tarea programada; al borrar un chat sus canvas siguen siendo de su
+  agente; y los huérfanos de antes, sin dueño conocido, los ve cualquier
+  agente (las dos, decisiones de Fran). Columna `agent_id` en `canvas.db`,
+  agregada sola en las bases que ya existían.
+
 ## BlackCode 1.8.1 (2026-11-25)
 
 Retoques que Fran fue juntando al usar la 1.8.0:

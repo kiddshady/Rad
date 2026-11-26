@@ -33,7 +33,7 @@ const GUARDAR_CADA_MS = 1500;
 const TITULO_MAX = 46;
 const TITULO_NUEVO = 'New chat';
 
-let agentes, busqueda, delegados, imagenesDoc, titulosDoc;
+let agentes, busqueda, delegados, imagenesDoc, titulosDoc, perfilDoc;
 let chats;
 let ui;
 let catalogo = { proveedores: [] }; // los proveedores con sus modelos
@@ -59,7 +59,8 @@ const avisar = (tipo, detalle = {}) => { for (const fn of oyentes.get(tipo) ?? [
 
 // ---------- Arranque ----------
 export async function abrir() {
-  [titulosDoc, imagenesDoc, delegados, busqueda, agentes, chats, ui, catalogo, herramientas] = await Promise.all([
+  [perfilDoc, titulosDoc, imagenesDoc, delegados, busqueda, agentes, chats, ui, catalogo, herramientas] = await Promise.all([
+    openDoc('perfil', { nombre: '' }),
     openDoc('titulos', { activo: true }),
     openDoc('imagenes', { modelo: '', filtro: true }),
     openDoc('subagentes', { proveedor: null, modelo: '' }),
@@ -249,6 +250,20 @@ export function sumarToolsNuevas(lista, conocidas, todas) {
   return cambio ? out : null;
 }
 // ---------- El nombre de los chats ----------
+// ---------- El nombre del usuario (1.9.0) ----------
+// Lo que dice el chat arriba de sus mensajes y lo que lleva la exportación a
+// .md. Es SOLO de la interfaz: no viaja en ningún pedido a un agente (Fran lo
+// pidió así: «no para decírselo a los agentes»). Vacío, «You».
+const NOMBRE_MAX = 40;
+export const nombreUsuario = () => String(perfilDoc?.get().nombre ?? '').trim() || 'You';
+export const nombreGuardado = () => String(perfilDoc?.get().nombre ?? '').trim();
+export function ponerNombreUsuario(nombre) {
+  const limpio = String(nombre ?? '').replace(/\s+/g, ' ').trim().slice(0, NOMBRE_MAX);
+  if (limpio === nombreGuardado()) return;
+  perfilDoc.patch({ nombre: limpio });
+  avisar('perfil');
+}
+
 /** ¿El nombre de un chat nuevo lo escribe un modelo? (Settings; prendido de fábrica.) */
 export const titulosConModelo = () => titulosDoc.get().activo !== false;
 export function ponerTitulosConModelo(si) {
@@ -387,7 +402,8 @@ export async function borrarAgente(id) {
   avisar('agentes');
   avisar('chats');
   avisar('seleccion');
-  window.rad.invoke('canvas:huerfanos', suyos.map((c) => c.id)).catch(() => {});
+  // (sus canvas quedan, anotados a su nombre aunque el agente ya no exista: ninguno otro los ve)
+  window.rad.invoke('canvas:huerfanos', { chats: suyos.map((c) => c.id), agente: id }).catch(() => {});
   // (sus tareas programadas se van con él)
   window.rad.invoke('tareas:sin-agente', id).catch(() => {});
   await Promise.all(suyos.map((c) => removeDoc(`chat-${c.id}`)));
@@ -512,8 +528,9 @@ export async function borrarChat(id) {
   avisar('chats');
   avisar('seleccion');
   avisar('respuesta', { chat: id });
-  // sus canvas no se borran con el chat: quedan sueltos, en la biblioteca
-  window.rad.invoke('canvas:huerfanos', [id]).catch(() => {});
+  // sus canvas no se borran con el chat: quedan sueltos, en la biblioteca, y
+  // siguen siendo de su agente (Fran, 1.8.2)
+  window.rad.invoke('canvas:huerfanos', { chats: [id], agente: c.agente }).catch(() => {});
   await removeDoc(`chat-${id}`);
 }
 

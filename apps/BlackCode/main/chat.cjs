@@ -533,6 +533,26 @@ function wire(rad, { llave }) {
         return { ok: true };
       } catch (err) { return { ok: false, error: String(err?.message || err) }; }
     });
+    // Exportar un chat a Markdown (1.9.0): el texto lo arma la interfaz
+    // (renderer/exportar.js); acá se elige dónde y se escribe. En el humo va a
+    // la carpeta de mentira, sin diálogo.
+    rad.handle('chat:exportar', async (pedido, ctx) => {
+      const texto = typeof pedido?.texto === 'string' ? pedido.texto : '';
+      const nombre = path.basename(String(pedido?.nombre ?? 'Chat.md')).replace(/[<>:"/\\|?*]+/g, ' ').trim() || 'Chat.md';
+      if (!texto) return { ok: false, error: 'There is nothing to export.' };
+      let destino;
+      if (taller) {
+        destino = path.join(taller, 'exports', nombre.endsWith('.md') ? nombre : `${nombre}.md`);
+        fs.mkdirSync(path.dirname(destino), { recursive: true });
+      } else {
+        const { dialog, app } = require('electron');
+        const opciones = { title: 'Export chat', defaultPath: path.join(app.getPath('documents'), nombre), filters: [{ name: 'Markdown', extensions: ['md'] }] };
+        const r = ctx?.window ? await dialog.showSaveDialog(ctx.window, opciones) : await dialog.showSaveDialog(opciones);
+        if (r.canceled || !r.filePath) return { ok: false, cancelado: true };
+        destino = r.filePath;
+      }
+      try { fs.writeFileSync(destino, texto, 'utf8'); return { ok: true, destino }; } catch (err) { return { ok: false, error: String(err?.message || err) }; }
+    });
     rad.handle('imagenes:guardar-dato', async (pedido, ctx) => {
       const d = deDato(pedido);
       if (!d) return { ok: false, error: 'That is not an image.' };
@@ -562,7 +582,13 @@ function wire(rad, { llave }) {
   rad.handle('canvas:borrar', (que) => lienzo.store.remove(String(que?.id ?? ''), que?.convoId ?? null));
   rad.handle('canvas:restaurar', (id) => lienzo.store.restore(String(id ?? '')) ?? null);
   // Se borró un chat: sus canvas quedan sueltos, en la biblioteca.
-  rad.handle('canvas:huerfanos', (chats) => { for (const c of Array.isArray(chats) ? chats : []) lienzo.store.orphanConversation(String(c)); return { ok: true }; });
+  // (con el agente de esos chats: sus canvas siguen siendo de él, 1.8.2)
+  rad.handle('canvas:huerfanos', (pedido) => {
+    const chats = Array.isArray(pedido) ? pedido : Array.isArray(pedido?.chats) ? pedido.chats : [];
+    const agente = typeof pedido?.agente === 'string' ? pedido.agente : null;
+    for (const c of chats) lienzo.store.orphanConversation(String(c), agente);
+    return { ok: true };
+  });
   rad.handle('canvas:exportar', async (c) => {
     let nombre = lienzo.nombreDeExport({ title: c?.title, kind: c?.kind, language: c?.language });
     // un canvas que ya se llama «sum.js» no sale como «sum.js.js»

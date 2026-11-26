@@ -398,6 +398,32 @@ function tarjetaTools() {
   return tarjeta;
 }
 
+// El nombre del usuario (1.9.0): lo que dice el chat arriba de sus mensajes y
+// lo que lleva un chat exportado. Solo de la interfaz: no se le manda a ningún
+// agente (Fran: «no para decírselo a los agentes»). Se guarda solo, al dejar
+// de escribir.
+function tarjetaNombre() {
+  const campo = h('input', 'rad-input', { type: 'text', autocomplete: 'off', spellcheck: 'false', maxlength: '40', placeholder: 'You', 'data-campo': 'nombre' });
+  const caja = h('label', 'rad-field', {},
+    h('span', 'rad-field-label', {}, 'Name'),
+    campo,
+    h('span', 'rad-field-hint', {}, 'Empty, it says “You”.'));
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'nombre' },
+    h('h2', 'dm-tarjeta-nombre', {}, 'Your name'),
+    h('p', 'dm-tarjeta-instr', {}, 'Shown above your messages in the chat, and in a chat you export. It is only for this window: it is never sent to the agents.'),
+    caja);
+  wireControls(tarjeta);
+  let espera = 0;
+  const guardar = () => { clearTimeout(espera); datosApp.ponerNombreUsuario(campo.value); };
+  campo.addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(guardar, 400); });
+  campo.addEventListener('change', guardar);
+  // (lo que cambió desde otro lado; no se pisa lo que se está escribiendo)
+  const poner = () => { if (document.activeElement !== campo) campo.value = datosApp.nombreGuardado(); };
+  poner();
+  datosApp.on('perfil', poner);
+  return tarjeta;
+}
+
 // El nombre de los chats: lo escribe un modelo, o es el comienzo del primer
 // mensaje. Es un pedido chico más por chat nuevo, así que se puede apagar.
 function tarjetaTitulos() {
@@ -1088,7 +1114,7 @@ let abierto = null; // el modal, mientras está abierto
 function armar() {
   const laVoz = tarjetaVoz();
   const tarjetas = {
-    general: [tarjetaCarpeta(), tarjetaTitulos(), tarjetaFondo()],
+    general: [tarjetaNombre(), tarjetaCarpeta(), tarjetaTitulos(), tarjetaFondo()],
     providers: PROVEEDORES.map((p) => tarjetaLlave(p)),
     tools: [tarjetaTools(), tarjetaBusqueda(), tarjetaSubagentes()],
     images: [tarjetaImagenes()],

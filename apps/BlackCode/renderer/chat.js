@@ -22,6 +22,7 @@ import { toast } from '/@core/toast.js';
 import { crearAdjuntos, adjuntosDe, ACEPTA } from './adjuntos.js';
 import { ponerHora } from './hora.js';
 import { abrirAjustes } from './ajustes.js';
+import { chatAMarkdown, nombreDeArchivo } from './exportar.js';
 
 // Los items que no son un chat ni un mensaje: el lugar vacío de cada lista.
 const VACIO = '_vacio';
@@ -147,6 +148,20 @@ export function montarChat(el, { router }) {
       { id: 'ninguna', label: 'Turn all off', onSelect: () => datos.ponerTools(a.id, []) },
     ];
   }, { align: 'end' });
+  // Exportar el chat a Markdown (1.9.0, Fran): seleccionar y copiar se lleva
+  // todo lo que se ve; esto da el chat limpio, sin horas ni tools (ver
+  // exportar.js). El archivo lo escribe el proceso principal.
+  const botonExportar = h('button', 'rad-iconbutton dm-conv-exportar', { type: 'button', 'data-accion': 'exportar', 'aria-label': 'Export as Markdown', 'data-rad-tip': 'Export as Markdown', 'data-rad-tip-side': 'bottom' }, icono('bajar'));
+  botonExportar.addEventListener('click', async () => {
+    const c = datos.chatActual();
+    if (!c) return;
+    const mensajes = (await datos.hilo(c.id)).get().mensajes ?? [];
+    if (!mensajes.some((m) => m.rol === 'user' || m.rol === 'assistant')) { toast({ text: 'There is nothing to export yet.' }); return; }
+    const texto = chatAMarkdown({ chat: c, agente: datos.agenteActual()?.nombre || 'Agent', yo: datos.nombreUsuario(), mensajes });
+    const r = await window.rad.invoke('chat:exportar', { nombre: nombreDeArchivo(c.titulo), texto }).catch((err) => ({ ok: false, error: String(err?.message || err) }));
+    if (r?.ok) toast({ text: 'Chat exported' });
+    else if (!r?.cancelado) toast({ text: `Could not export the chat: ${r?.error ?? 'unknown error'}`, kind: 'danger' });
+  });
   const celda = h('div', 'dm-hilo-celda');
   // Ir al final de la conversación: un botón redondo que flota sobre el borde
   // de abajo, y aparece solo cuando uno subió a leer (es el de NeonCode). Va en
@@ -197,7 +212,7 @@ export function montarChat(el, { router }) {
   const marco = h('div', 'dm-hilo-marco', {}, celda, bFinal);
   const cajaRedactor = h('div', 'dm-redactor-caja', {}, redactor);
   const conv = h('section', 'dm-conv', {},
-    h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, nav.boton, consola.boton, lienzo.botonBiblioteca, botonTools),
+    h('header', 'dm-conv-cabeza', { 'data-rad-chrome': '' }, titulo, nav.boton, consola.boton, lienzo.botonBiblioteca, botonExportar, botonTools),
     lienzo.barra, marco, aviso, cajaRedactor, inicio);
   const enInicio = () => !datos.chatActual();
   const ponerInicio = () => {
@@ -431,6 +446,10 @@ export function montarChat(el, { router }) {
     }
     const cuerpo = h('div', m.rol === 'user' ? 'dm-msg-cuerpo' : 'dm-msg-cuerpo dm-md');
     const nodo = h('article', 'dm-msg', { 'data-rol': m.rol }, cuerpo);
+    // quién lo dijo, arriba (el CSS lo sube y solo lo muestra en el primero
+    // de cada turno: ver marcarTurnos). Va al final para que el cuerpo siga
+    // siendo el primer hijo.
+    nodo.append(h('div', 'dm-msg-quien'));
     // lo que adjuntó: va arriba del texto (el orden lo pone el CSS)
     const suyos = m.rol === 'user' ? adjuntosDe(m) : null;
     if (suyos) nodo.append(suyos);
@@ -510,10 +529,33 @@ export function montarChat(el, { router }) {
       ponerAlFinal();
     }, BAJADA_MS);
   });
+  // El nombre arriba de cada turno (1.9.0, Fran: le sirve al seleccionar y
+  // copiar el chat). Un turno empieza en cada mensaje del usuario y en el
+  // primer tramo de la respuesta del agente; los tramos que siguen y las filas
+  // de las tools son del mismo turno y no lo repiten. El del agente es su
+  // nombre de ahora (renombrarlo cambia sus chats); el del usuario, el de
+  // Settings, o «You».
+  const marcarTurnos = (mensajes) => {
+    const abre = new Set();
+    mensajes.forEach((m, i) => {
+      const ant = mensajes[i - 1];
+      if (m.rol === 'user' || (m.rol === 'assistant' && (!ant || ant.rol === 'user'))) abre.add(m.id);
+    });
+    const agente = datos.agenteActual()?.nombre || 'Agent';
+    const yo = datos.nombreUsuario();
+    for (const nodo of hilo.col.children) {
+      const q = nodo.querySelector(':scope > .dm-msg-quien');
+      if (!q) continue;
+      nodo.toggleAttribute('data-turno', abre.has(nodo.dataset.radKey));
+      const nombre = nodo.dataset.rol === 'user' ? yo : agente;
+      if (q.textContent !== nombre) q.textContent = nombre;
+    }
+  };
   const dibujarMensajes = () => {
     if (!hilo) return;
     const lista2 = hilo.doc?.get().mensajes ?? [];
     reconcile(hilo.col, lista2.length ? lista2 : [{ id: VACIO }], { key: (m) => m.id, create: mensaje, update: ponerMensaje });
+    marcarTurnos(lista2);
     if (hilo.pegado && !hilo.bajando) alFondo();
     ponerAlFinal();
   };
@@ -701,6 +743,8 @@ export function montarChat(el, { router }) {
   };
 
   datos.on('agentes', () => { ponerCabeza(); ponerAviso(); dibujarMensajes(); });
+  // (el nombre del usuario cambió en Settings: los turnos lo repiten)
+  datos.on('perfil', () => dibujarMensajes());
   datos.on('modelos', ponerCabeza);
   datos.on('tools', ponerCabeza);
   datos.on('seleccion', () => lienzo.alCambiarDeChat());

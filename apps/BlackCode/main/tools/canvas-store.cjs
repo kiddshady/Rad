@@ -47,8 +47,8 @@ const crypto = require('node:crypto');
 
 const newId = () => crypto.randomUUID();
 
-const COLS = 'id, conversation_id, title, kind, language, content, version, created_at, updated_at';
-const LIST_COLS = 'id, conversation_id, title, kind, language, version, created_at, updated_at';
+const COLS = 'id, conversation_id, agent_id, title, kind, language, content, version, created_at, updated_at';
+const LIST_COLS = 'id, conversation_id, agent_id, title, kind, language, version, created_at, updated_at';
 
 let db = null;
 
@@ -79,6 +79,11 @@ function init(dbPath) {
   // arriba no corre sobre una tabla que ya está.
   const cols = db.prepare('PRAGMA table_info(canvases)').all().map((c) => c.name);
   if (!cols.includes('deleted_at')) db.exec('ALTER TABLE canvases ADD COLUMN deleted_at TEXT');
+  // [BlackCode 1.8.2] De qué agente es: lo guarda la tool al crearlo y queda
+  // aunque se borre su chat (ver orphanConversation). Los de antes nacieron sin
+  // él: el dueño de esos sale de su chat, y uno huérfano sin dueño es de todos
+  // (ver esSuyo en canvas.cjs).
+  if (!cols.includes('agent_id')) db.exec('ALTER TABLE canvases ADD COLUMN agent_id TEXT');
   purgeTrash();
   return db;
 }
@@ -93,14 +98,14 @@ const ready = () => {
   return db;
 };
 
-function create({ conversationId = null, title = 'Untitled', kind = 'document', language = null, content = '' } = {}) {
+function create({ conversationId = null, agentId = null, title = 'Untitled', kind = 'document', language = null, content = '' } = {}) {
   const id = newId();
   const safeTitle = String(title || 'Untitled').trim() || 'Untitled';
   const safeKind = kind === 'code' ? 'code' : 'document';
   ready().prepare(
-    `INSERT INTO canvases (id, conversation_id, title, kind, language, content, version)
-     VALUES (?, ?, ?, ?, ?, ?, 1)`
-  ).run(id, conversationId || null, safeTitle, safeKind, language || null, String(content || ''));
+    `INSERT INTO canvases (id, conversation_id, agent_id, title, kind, language, content, version)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1)`
+  ).run(id, conversationId || null, agentId || null, safeTitle, safeKind, language || null, String(content || ''));
   return get(id);
 }
 
@@ -202,11 +207,14 @@ function purgeTrash(dias = TRASH_DIAS) {
  *  NULL) y siguen alcanzables desde la biblioteca. Es a propósito — un canvas es
  *  un documento que el usuario puede querer conservar, y borrar un chat no pasa
  *  por la papelera (esa es solo para lo que borra el modelo, ver `trash`). */
-function orphanConversation(conversationId) {
+// [BlackCode 1.8.2] `agentId`: el agente del chat que se borra. Queda anotado
+// en los canvas que no lo tenían (los de antes), así siguen siendo de él: Fran
+// eligió que un canvas de un chat borrado siga siendo de su agente.
+function orphanConversation(conversationId, agentId = null) {
   if (!conversationId) return 0;
   return ready().prepare(
-    "UPDATE canvases SET conversation_id = NULL WHERE conversation_id = ?"
-  ).run(String(conversationId)).changes;
+    'UPDATE canvases SET agent_id = COALESCE(agent_id, ?), conversation_id = NULL WHERE conversation_id = ?'
+  ).run(agentId || null, String(conversationId)).changes;
 }
 
 // [BlackCode] Cierra la base: al salir de la app, o antes de abrir otra ruta. Allá no

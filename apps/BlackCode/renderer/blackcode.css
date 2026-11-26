@@ -1283,6 +1283,9 @@
   .dm-canvas-biblioteca { flex: none; align-self: center; margin-left: auto; }
   .dm-nav-boton + .dm-canvas-biblioteca { margin-left: 0; }
   .dm-canvas-biblioteca + .dm-conv-tools { margin-left: 0; }
+  /* (exportar el chat, 1.9.0: en el mismo grupo, antes de las tools) */
+  .dm-conv-exportar { flex: none; align-self: center; margin-left: auto; }
+  .dm-canvas-biblioteca + .dm-conv-exportar, .dm-conv-exportar + .dm-conv-tools { margin-left: 0; }
   .dm-nav-boton[aria-pressed='true'] { color: var(--rad-text-1); background: var(--rad-tint-press); }
 
   /* ---------- La terminal ---------- */
@@ -1823,8 +1826,30 @@
   .dm-formula .katex-error, .dm-formula[data-estado='error'] { color: var(--rad-warning); }
   .dm-formula .katex { animation: rad-fade-in var(--rad-dur-base) var(--rad-ease-out) both; }
 
-  /* Un tramo de texto que quedó vacío no ocupa lugar. */
-  .dm-msg[data-vacio] { display: none; }
+  /* Un tramo de texto que quedó vacío no ocupa lugar. Salvo que abra el turno
+     (el agente llamó tools sin escribir antes): ahí queda solo su nombre,
+     arriba de las tools. */
+  .dm-msg[data-vacio]:not([data-turno]) { display: none; }
+  .dm-msg[data-vacio][data-turno] > :not(.dm-msg-quien) { display: none; }
+
+  /* Quién lo dijo (1.9.0): arriba del primer mensaje de cada turno, chico y
+     en el gris de lo secundario. Es texto de verdad: entra cuando se
+     selecciona y se copia el chat (para eso lo pidió Fran). El del usuario va
+     del lado de su burbuja. */
+  .dm-msg-quien {
+    display: none;
+    order: -2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--rad-text-s);
+    font-weight: var(--rad-weight-strong);
+    color: var(--rad-text-2);
+  }
+  .dm-msg[data-turno] > .dm-msg-quien { display: block; }
+  .dm-msg[data-rol='assistant'] > .dm-msg-quien { margin-bottom: var(--rad-space-1); }
+  .dm-msg[data-rol='user'] > .dm-msg-quien { justify-self: end; max-width: 100%; }
 
   /* Debajo de la respuesta, en un renglón: la hora en que terminó y el
      contador de tools. Cada uno se despliega por su lado (un mensaje de antes

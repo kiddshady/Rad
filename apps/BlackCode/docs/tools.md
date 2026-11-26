@@ -173,9 +173,19 @@ volcarlo en el mensaje. Cómo está armado:
   (`esSuyo` en `canvas.cjs`, con `agenteDeChat` que llega por `configurar`):
   `list` con scope «all» lista los de todos sus chats, `read` abre también los
   de otro chat suyo (solo lectura), y `delete` borra solo uno de sus chats. El
-  de otro agente, o el de un chat ya borrado (no es de nadie: lo borra el
-  usuario desde el panel), da «not found», y la tarjeta de permiso tampoco lo
-  muestra. `edit` y `update` siguen acotados al chat, como siempre.
+  de otro agente da «not found», y la tarjeta de permiso tampoco lo muestra.
+  `edit` y `update` siguen acotados al chat, como siempre.
+- **De quién es un canvas** (1.8.2). En la 1.8.0 el dueño salía solo del chat,
+  y un canvas «sin chat» no era de nadie: Zac no encontraba dos que el panel
+  mostraba. Un canvas queda sin chat de tres formas: se borra su chat (la app
+  lo desengancha para no perderlo), se borra el agente entero, o lo crea una
+  tarea programada (que no tiene chat). Ahora cada canvas guarda su agente al
+  nacer (`agent_id`, columna agregada por `ALTER` en las bases que ya
+  existían), y al desenganchar un chat se anota el agente en los que no lo
+  tenían (`canvas:huerfanos` recibe `{ chats, agente }`). El dueño es ese
+  agente; si no lo tiene, el de su chat; y un huérfano viejo, sin agente ni
+  chat, es de TODOS (decisión de Fran). Borrar un chat no borra sus canvas:
+  siguen siendo de su agente (también decisión de Fran).
 - La interfaz está en `renderer/canvas.js`. Un documento se pinta con
   `markdown.js`; el código va sin resaltado.
 

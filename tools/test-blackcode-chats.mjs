@@ -176,12 +176,13 @@ try {
   {
     const DB = path.join(TMP, 'canvas.db');
     canvas.configurar({ dbPath: () => DB, agenteDeChat: chats.agenteDe });
-    const crear = async (convoId, title) => {
-      const r = await canvas.runners.canvas(hacerRun({ convoId }), { action: 'create', title, content: `contenido de ${title}` });
-      return /\bid[:= ]+"?([\w-]+)/i.exec(r)?.[1] ?? canvas.store.listByConversation(convoId).find((c) => c.title === title)?.id;
+    const crear = async (convoId, title, agente = 'zac') => {
+      const r = await canvas.runners.canvas(hacerRun({ convoId, agente }), { action: 'create', title, content: `contenido de ${title}` });
+      return /\bid[:= ]+"?([\w-]+)/i.exec(r)?.[1];
     };
     const deZac = await crear('z-iconos', 'Hoja de iconos');
-    const deOracle = await crear('o-secreto', 'Lo de Oracle');
+    const deOracle = await crear('o-secreto', 'Lo de Oracle', 'oracle');
+    ok('cada canvas guarda de qué agente es al nacer (1.8.2)', canvas.store.get(deZac)?.agent_id === 'zac' && canvas.store.get(deOracle)?.agent_id === 'oracle', JSON.stringify([canvas.store.get(deZac)?.agent_id, canvas.store.get(deOracle)?.agent_id]));
     ok('se crearon los dos canvas', Boolean(deZac && deOracle), `${deZac} ${deOracle}`);
     const propio = await canvas.runners.canvas(hacerRun({ convoId: 'z-hoy' }), { action: 'read', id: deZac });
     ok('Zac lee el canvas de otro chat suyo', propio.includes('contenido de Hoja de iconos') && propio.includes('from another of your chats'), propio.slice(0, 160));
@@ -194,13 +195,29 @@ try {
 
     // La biblioteca y el borrado, también por agente (Fran: «en NeonCode el
     // único agente era Neo; acá pueden existir varios»).
-    const huerfano = await crear('chat-que-ya-no-existe', 'Huerfano');
+    // Los huérfanos (1.8.2, decisiones de Fran). Uno viejo, de antes de que
+    // los canvas guardaran su agente, sin chat: no tiene dueño conocido, es de
+    // todos. Uno de antes que todavía tiene su chat: es del agente del chat.
+    const viejoSuelto = canvas.store.create({ conversationId: null, title: 'Chistes de gatos', content: 'miau' }).id;
+    const viejoConChat = canvas.store.create({ conversationId: 'o-secreto', title: 'Viejo de Oracle', content: 'x' }).id;
+    // Uno de una tarea programada de Oracle: sin chat, pero con su agente.
+    const deTarea = await crear('', 'De una tarea de Oracle', 'oracle');
     const biblio = await canvas.runners.canvas(hacerRun({ convoId: 'z-hoy' }), { action: 'list', scope: 'all' });
-    ok('el list «all» de Zac trae los de sus chats', biblio.includes(deZac) && biblio.startsWith('All the canvases of your chats (1)'), biblio);
-    ok('…y no los de Oracle', !biblio.includes(deOracle) && !biblio.includes('Lo de Oracle'), biblio);
-    ok('…ni uno cuyo chat ya no existe (no es de nadie)', !biblio.includes(huerfano), biblio);
+    ok('el list «all» de Zac trae los suyos y el huérfano viejo', biblio.includes(deZac) && biblio.includes(viejoSuelto) && biblio.startsWith('All the canvases of your chats (2)'), biblio);
+    ok('…y no los de Oracle: ni el de su chat, ni uno viejo de su chat, ni el de su tarea', !biblio.includes(deOracle) && !biblio.includes(viejoConChat) && !biblio.includes(deTarea), biblio);
     const deOracleVe = await canvas.runners.canvas(hacerRun({ agente: 'oracle', convoId: 'otro' }), { action: 'list', scope: 'all' });
-    ok('Oracle ve solo el suyo', deOracleVe.includes(deOracle) && !deOracleVe.includes(deZac), deOracleVe);
+    ok('Oracle ve los suyos (también el de su tarea) y el huérfano viejo, nada de Zac', deOracleVe.includes(deOracle) && deOracleVe.includes(viejoConChat) && deOracleVe.includes(deTarea) && deOracleVe.includes(viejoSuelto) && !deOracleVe.includes(deZac), deOracleVe);
+    ok('el huérfano viejo lo lee cualquiera', (await canvas.runners.canvas(hacerRun({ convoId: 'z-hoy' }), { action: 'read', id: viejoSuelto })).includes('miau'));
+    // Se borra el chat de Zac donde nació su canvas: sigue siendo de Zac.
+    canvas.store.orphanConversation('z-iconos', 'zac');
+    ok('al borrar su chat, el canvas queda sin chat pero con su agente', canvas.store.get(deZac)?.conversation_id === null && canvas.store.get(deZac)?.agent_id === 'zac');
+    const suelto = await canvas.runners.canvas(hacerRun({ convoId: 'z-hoy' }), { action: 'read', id: deZac });
+    ok('…y Zac lo sigue leyendo, «whose chat was deleted»', suelto.includes('contenido de Hoja de iconos') && suelto.includes('whose chat was deleted'), suelto.slice(0, 140));
+    t('…y Oracle sigue sin verlo', await canvas.runners.canvas(hacerRun({ agente: 'oracle', convoId: 'otro' }), { action: 'read', id: deZac }), `error: canvas not found: ${deZac}`);
+    // Un canvas viejo (sin agente) de un chat que se borra toma el agente del chat.
+    canvas.store.orphanConversation('o-secreto', 'oracle');
+    ok('un viejo sin agente, al borrarse su chat, queda a nombre del agente del chat', canvas.store.get(viejoConChat)?.agent_id === 'oracle');
+    t('…así que no pasa a ser «de todos»', await canvas.runners.canvas(hacerRun({ convoId: 'z-hoy' }), { action: 'read', id: viejoConChat }), `error: canvas not found: ${viejoConChat}`);
     t('Zac no borra el de Oracle', await canvas.runners.canvas(hacerRun({ convoId: 'z-hoy' }), { action: 'delete', id: deOracle }), `error: canvas not found: ${deOracle}`);
     ok('…que sigue ahí', Boolean(canvas.store.get(deOracle)));
     t('la tarjeta de permiso no muestra el contenido ajeno', canvas.canvasPreview({ action: 'delete', id: deOracle }, hacerRun({ convoId: 'z-hoy' })), { target: `canvas ${deOracle}`, mode: 'gone' });

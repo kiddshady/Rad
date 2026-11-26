@@ -3335,6 +3335,51 @@ else {
     data.titulos = 'el nombre de siempre primero y el del modelo después, una sola vez, sin pisar el que puso el usuario, apagado no nombra, y el interruptor de Settings';
   }
 
+  // Quién dijo cada cosa y exportar el chat (1.9.0, Fran): el nombre arriba
+  // del primer mensaje de cada turno (el del usuario sale de Settings, y no
+  // viaja a los agentes), y un botón que guarda el chat limpio en .md.
+  {
+    const datosQ = await import('/datos.js');
+    await go('ajustes', 'general');
+    const campoN = view('ajustes').querySelector('[data-tarjeta="nombre"] [data-campo="nombre"]');
+    if (!campoN || campoN.placeholder !== 'You') fail('nombres: Settings › General no tiene el campo «Your name»');
+    enIngles('en Settings, con el nombre del usuario');
+    if (campoN) { type(campoN, 'Fran Test'); await sleep(700); }
+    if ((await window.rad.store.read('perfil'))?.nombre !== 'Fran Test' || datosQ.nombreUsuario() !== 'Fran Test') fail('nombres: lo escrito en «Your name» no quedó guardado: ' + JSON.stringify(await window.rad.store.read('perfil')));
+    await go('chat');
+    await settle();
+    const msgs = [...chatView.querySelectorAll('.dm-hilo:not([data-rad-leaving]) .dm-msg')];
+    const se = (n) => getComputedStyle(n).display !== 'none';
+    const delUsuario = msgs.filter((n) => n.dataset.rol === 'user');
+    if (!delUsuario.length) fail('nombres: el chat no tiene mensajes para mirar');
+    if (!delUsuario.every((n) => n.hasAttribute('data-turno') && n.querySelector(':scope > .dm-msg-quien')?.textContent === 'Fran Test' && se(n.querySelector(':scope > .dm-msg-quien')))) fail('nombres: un mensaje del usuario no lleva su nombre arriba');
+    const agenteQ = datosQ.agenteActual().nombre;
+    const abren = msgs.filter((n) => n.dataset.rol === 'assistant' && n.hasAttribute('data-turno'));
+    if (!abren.length || !abren.every((n) => n.querySelector(':scope > .dm-msg-quien')?.textContent === agenteQ)) fail('nombres: la respuesta no lleva el nombre del agente («' + agenteQ + '») arriba');
+    // una sola vez por turno: el tramo que abre la respuesta viene después de un mensaje del usuario
+    if (!abren.every((n) => n.previousElementSibling?.dataset.rol === 'user')) fail('nombres: el nombre del agente se repite adentro de un turno');
+    if (msgs.some((n) => !n.hasAttribute('data-turno') && se(n.querySelector(':scope > .dm-msg-quien') ?? document.body) && n.querySelector(':scope > .dm-msg-quien'))) fail('nombres: un tramo que no abre el turno muestra el nombre');
+    // El primer tramo vacío (el agente llamó tools sin escribir antes) se ve igual: con el nombre solo.
+    {
+      const tramo = abren[0];
+      tramo?.setAttribute('data-vacio', '');
+      if (!tramo || !se(tramo) || !se(tramo.querySelector('.dm-msg-quien')) || se(tramo.querySelector('.dm-msg-cuerpo'))) fail('nombres: un primer tramo vacío no deja ver el nombre sobre las tools');
+      tramo?.removeAttribute('data-vacio');
+    }
+    // Exportar: el botón de la cabecera guarda el .md (en el humo, sin diálogo).
+    const exportar = chatView.querySelector('.dm-conv-cabeza [data-accion="exportar"]');
+    if (!exportar) fail('exportar: no está el botón en la cabecera');
+    exportar?.click();
+    await until(() => [...document.querySelectorAll('.rad-toast')].some((n) => !n.hasAttribute('data-rad-leaving') && n.textContent.includes('Chat exported')), 4000);
+    if (![...document.querySelectorAll('.rad-toast')].some((n) => n.textContent.includes('Chat exported'))) fail('exportar: el botón no exportó el chat: ' + [...document.querySelectorAll('.rad-toast')].map((n) => n.textContent).join(' | '));
+    enIngles('con el chat exportado');
+    // Vacío, «You» (y queda así: la pasada 2 no espera un nombre).
+    datosQ.ponerNombreUsuario('');
+    await settle();
+    if (delUsuario[0]?.querySelector(':scope > .dm-msg-quien')?.textContent !== 'You') fail('nombres: sin nombre en Settings, el mensaje no dice «You»');
+    data.nombres = 'el nombre del usuario en Settings (guardado), arriba de sus mensajes; el del agente una vez por turno, también sobre un primer tramo vacío; exportar a .md con aviso; vacío, «You»';
+  }
+
   // Cambiarle las tools a un agente que YA existía, desde su formulario.
   {
     await go('agentes');
@@ -4523,7 +4568,7 @@ else {
       if (tabs.map((t) => t.textContent.trim()).join() !== 'General,Providers,Tools,Images,Integrations,Voice,About' || tabs.some((t) => !t.querySelector('svg') || t.getAttribute('role') !== 'tab')) fail('ajustes: las pestañas son «' + tabs.map((t) => t.textContent.trim()).join() + '»');
       // cada tarjeta, en su pestaña
       const donde = JSON.stringify(Object.fromEntries(paneles().map((p) => [p.dataset.tab, [...p.querySelectorAll('.dm-ajustes-pila > *')].map((t) => t.dataset.tarjeta ?? t.dataset.proveedor).join(' ')])));
-      const va = JSON.stringify({ general: 'carpeta titulos fondo', providers: 'anthropic venice', tools: 'tools busqueda subagentes', images: 'imagenes', integrations: 'mcp', voice: 'voz', about: 'acerca' });
+      const va = JSON.stringify({ general: 'nombre carpeta titulos fondo', providers: 'anthropic venice', tools: 'tools busqueda subagentes', images: 'imagenes', integrations: 'mcp', voice: 'voz', about: 'acerca' });
       if (donde !== va) fail('ajustes: las tarjetas quedaron repartidas así: ' + donde);
       await go('ajustes', 'general');
       await asentar();
@@ -4762,9 +4807,12 @@ else {
       const [v1, v2, a1, a2] = msgs();
       if (alto(v1.querySelector('.dm-msg-meta')) > 0 || v1.querySelector('.dm-msg-hora').textContent || v1.querySelector('.dm-msg-hora').hasAttribute('data-rad-tip')) fail('hora: un mensaje del usuario de antes de que se guardara la hora muestra una: «' + v1.querySelector('.dm-msg-hora').textContent + '»');
       if (v2.querySelector('.dm-msg-cuando').hasAttribute('data-abierto') || alto(v2.querySelector('.dm-msg-cuando')) > 0.5 || v2.querySelector('.dm-msg-hora').textContent) fail('hora: una respuesta de antes de que se guardara la hora muestra una');
-      // (sin hora no hay renglón debajo de la burbuja: el mensaje mide lo que su burbuja)
-      if (v1.querySelector('.dm-msg-cuerpo').textContent !== 'An old question' || alto(v1) < 20 || Math.abs(alto(v1) - alto(v1.querySelector('.dm-msg-cuerpo'))) > 0.5) fail('hora: un mensaje sin hora no se ve como siempre (mide ' + r2(alto(v1)) + ' px y su burbuja ' + r2(alto(v1.querySelector('.dm-msg-cuerpo'))) + ')');
-      if (Math.abs(alto(v2) - alto(v2.querySelector('.dm-msg-cuerpo'))) > 0.5) fail('hora: una respuesta sin hora no se ve como siempre (mide ' + r2(alto(v2)) + ' px y su texto ' + r2(alto(v2.querySelector('.dm-msg-cuerpo'))) + ')');
+      // (sin hora no hay renglón debajo de la burbuja: de la burbuja para abajo,
+      // el mensaje mide lo que ella. Desde la 1.9.0 arriba va el nombre de
+      // quién lo dijo, así que se mide desde la burbuja y no el mensaje entero.)
+      const deLaBurbujaAbajo = (n) => n.getBoundingClientRect().bottom - n.querySelector('.dm-msg-cuerpo').getBoundingClientRect().top;
+      if (v1.querySelector('.dm-msg-cuerpo').textContent !== 'An old question' || alto(v1) < 20 || Math.abs(deLaBurbujaAbajo(v1) - alto(v1.querySelector('.dm-msg-cuerpo'))) > 0.5) fail('hora: un mensaje sin hora no se ve como siempre (de la burbuja para abajo mide ' + r2(deLaBurbujaAbajo(v1)) + ' px y su burbuja ' + r2(alto(v1.querySelector('.dm-msg-cuerpo'))) + ')');
+      if (Math.abs(deLaBurbujaAbajo(v2) - alto(v2.querySelector('.dm-msg-cuerpo'))) > 0.5) fail('hora: una respuesta sin hora no se ve como siempre (del texto para abajo mide ' + r2(deLaBurbujaAbajo(v2)) + ' px y su texto ' + r2(alto(v2.querySelector('.dm-msg-cuerpo'))) + ')');
       const p2 = (n) => String(n).padStart(2, '0');
       const dia = p2(ayer.getDate()) + '/' + p2(ayer.getMonth() + 1) + (ayer.getFullYear() === new Date().getFullYear() ? '' : '/' + ayer.getFullYear());
       if (a1.querySelector('.dm-msg-hora').textContent !== dia + ' 23:58') fail('hora: un mensaje de ayer dice «' + a1.querySelector('.dm-msg-hora').textContent + '», tenía que llevar el día: «' + dia + ' 23:58»');

@@ -213,15 +213,26 @@ function canvasBlock(convoId) {
 
 // [BlackCode] ¿Este canvas es de esta corrida? En NeonCode había un solo agente
 // (Neo), así que «la biblioteca entera» eran todos suyos. Acá hay varios, y la
-// regla de Fran es que no se crucen: un agente ve, lee y borra solo los canvas
-// de SUS chats (el de este chat siempre). Uno de otro agente, o de un chat
-// borrado (no es de nadie: lo borra el usuario desde el panel), no existe para
-// la tool. Sin `agenteDeChat` (la tool sola, en sus tests) vale lo de antes.
+// regla de Fran es que no se crucen: un agente ve, lee y borra solo SUS canvas
+// (el de este chat, siempre). Uno de otro agente no existe para la tool. Sin
+// `agenteDeChat` (la tool sola, en sus tests) vale lo de antes.
+//
+// De quién es un canvas (1.8.2): el agente que anotó al nacer (`agent_id`, que
+// queda aunque se borre su chat), y si no lo tiene (los de antes), el de su
+// chat. Un huérfano viejo, sin agente ni chat, no tiene dueño conocido: es de
+// TODOS (Fran lo eligió; en la 1.8.0 no era de nadie y Zac no encontraba dos
+// canvas que se veían en el panel).
+function duenoDe(c) {
+  if (c?.agent_id) return c.agent_id;
+  return c?.conversation_id && agenteDeChat ? agenteDeChat(c.conversation_id) : null;
+}
 function esSuyo(run, c, convoId) {
   if (!c) return false;
   if (convoId && c.conversation_id === convoId) return true;
   if (!agenteDeChat) return true;
-  return Boolean(c.conversation_id) && typeof run?.agente === 'string' && run.agente !== '' && agenteDeChat(c.conversation_id) === run.agente;
+  const dueno = duenoDe(c);
+  if (!dueno) return !c.conversation_id; // (huérfano viejo: de todos; uno con chat que no está en la lista, de nadie)
+  return typeof run?.agente === 'string' && run.agente !== '' && dueno === run.agente;
 }
 
 async function runCanvas(run, { action, id, title, kind = 'document', language, content, edits, replace_all: replaceAll, scope } = {}) {
@@ -268,7 +279,8 @@ async function runCanvas(run, { action, id, title, kind = 'document', language, 
     if (!c || !(deEsteChat || propio || sinRegla)) return `error: canvas not found: ${id}`;
     run.notify('tool:activity', { reqId: run.reqId, kind: 'canvas', label: c.title });
     if (propio) {
-      return `Canvas ${canvasDescriptor(c)}, from another of your chats. It can be read from here but not edited: `
+      const deDonde = c.conversation_id ? 'from another of your chats' : 'whose chat was deleted';
+      return `Canvas ${canvasDescriptor(c)}, ${deDonde}. It can be read from here but not edited: `
         + `edit and update only work on this chat's canvases (to build on it, create a new canvas here). Content:\n\n${c.content}`;
     }
     return `Canvas ${canvasDescriptor(c)}. Current content follows — to revise it, call canvas action "edit" `
@@ -339,7 +351,9 @@ async function runCanvas(run, { action, id, title, kind = 'document', language, 
 
   if (action === 'create') {
     if (!body.trim()) return 'error: content is required to create a canvas';
-    const c = canvasStore.create({ conversationId: convoId, title, kind, language, content: body });
+    // ([BlackCode 1.8.2] con su agente: sigue siendo de él si se borra el chat,
+    // y el de una tarea programada, que no tiene chat, no queda sin dueño)
+    const c = canvasStore.create({ conversationId: convoId, agentId: typeof run.agente === 'string' ? run.agente : null, title, kind, language, content: body });
     run.notify('tool:activity', { reqId: run.reqId, kind: 'canvas', label: c.title });
     run.notify('canvas:opened', { reqId: run.reqId, convoId, canvas: c });
     return `Canvas "${c.title}" created (id: ${c.id}, version ${c.version}). It is now open in the user's canvas `
