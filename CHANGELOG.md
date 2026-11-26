@@ -1,5 +1,19 @@
 # Changelog
 
+## BlackCode 1.13.4 (2026-11-26)
+
+- **Arreglado: en Settings se veía un select de otra pestaña.** El modelo de
+  los subagentes (pestaña Tools) flotaba encima de las demás pestañas (Fran
+  lo vio sobre la tarjeta del celu en Integrations). Las pestañas y las
+  vistas se ocultan con `visibility: hidden`, y un hijo con `visibility:
+  visible` propio le gana al padre. Lo que se prende adentro (los selects
+  que se turnan, el «New chat», la barra de Notes, los paneles del chat) va
+  ahora con `visibility: inherit`. Había dos fugas más del mismo tipo, sin
+  ver: el «New chat» y la barra de Notes seguían a la vista con su vista
+  oculta, tapados por la de encima.
+- La sección `<fugas>` del humo recorre todas las vistas y las pestañas de
+  Settings y busca algo de una oculta que se vea (probada al revés).
+
 ## BlackCode 1.13.3 (2026-11-26)
 
 - **Borrar chats desde el celu.** El puente suma `DELETE /api/chats/:id`, que

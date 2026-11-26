@@ -5382,6 +5382,52 @@ await go('ajustes', 'about');
 }
 // </notas-sel>
 
+// <fugas>
+// Nada de una vista oculta ni de una pestaña de Settings que no se ve puede
+// quedar a la vista. Se ocultan con `visibility: hidden`, y un hijo con
+// `visibility: visible` propio le gana al padre: así se colaba el select de
+// los subagentes (pestaña Tools) en todas las demás pestañas (Fran lo vio
+// encima de la tarjeta del celu, nov 2026), y lo mismo el «New chat» y la
+// barra de Notes en las otras vistas. Lo que se prende adentro va con
+// `visibility: inherit`. Se recorren todas las vistas (ya montadas) y todas
+// las pestañas.
+{
+  const ocultos = '.rad-view[data-state="hidden"], .dm-ajustes-panel:not([data-activa]):not([data-saliendo])';
+  const seVe = (el) => el.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+  const fugas = () => {
+    const malos = [];
+    for (const el of document.querySelectorAll('*')) {
+      const oculto = el.closest(ocultos);
+      if (!oculto || !seVe(el)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) continue;
+      // (de cada fuga, solo el de más arriba)
+      if (el.parentElement?.closest(ocultos) && seVe(el.parentElement)) continue;
+      malos.push(`${String(el.className || el.tagName).slice(0, 60)} (de ${oculto.dataset.view || oculto.dataset.tab})`);
+    }
+    return malos;
+  };
+  const vistas = [...document.querySelectorAll('.rad-tab[data-view]')].map((b) => b.dataset.view).filter((v) => v !== 'ajustes');
+  for (const v of vistas) {
+    await go(v);
+    const f = fugas();
+    if (f.length) fail(`fugas: en la vista ${v} se ve algo de una vista oculta: ${f.slice(0, 4).join(' | ')}`);
+  }
+  await go('ajustes', 'tools');
+  // (la fuga que vio Fran: el modelo de los subagentes, que tiene que estar prendido)
+  if (!await until(() => view('ajustes').querySelectorAll('[data-tarjeta="subagentes"] .dm-modelos > .rad-select[data-activo]').length === 1, 3000)) fail('fugas: en Tools no hay un solo modelo de subagentes prendido: la prueba no prueba la fuga que vio Fran');
+  const pestanas = [...view('ajustes').querySelectorAll('.dm-ajustes-tab')].map((b) => b.dataset.tab);
+  for (const p of pestanas) {
+    await go('ajustes', p);
+    await sleep(dur('fast') + 80);
+    const f = fugas();
+    if (f.length) fail(`fugas: en Settings › ${p} se ve algo de otra pestaña: ${f.slice(0, 4).join(' | ')}`);
+  }
+  if (vistas.length < 5 || pestanas.length < 5) fail(`fugas: recorrió pocas vistas o pestañas (${vistas.length} y ${pestanas.length}): la prueba no prueba nada`);
+  data.fugas = `${vistas.length} vistas y ${pestanas.length} pestañas recorridas`;
+}
+// </fugas>
+
 // Para la captura y para la pasada 2: de vuelta en el chat.
 await go('chat');
 window.rad.store.write('smoke', { pass: 1, chat: chatId, chatVenice, frenado: data.frenado, horas: data.horasGuardadas });

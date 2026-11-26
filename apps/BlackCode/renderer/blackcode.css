@@ -182,7 +182,7 @@
   }
   .dm-modelos > .rad-select[data-activo] {
     opacity: 1;
-    visibility: visible;
+    visibility: inherit;
     transition-delay: var(--rad-dur-fast), 0s, 0s, 0s;
   }
   .dm-modelos > .rad-select:disabled { color: var(--rad-text-3); cursor: default; }
@@ -304,7 +304,7 @@
   .dm-lado-cabeza > :not(.dm-sel),
   .dm-lado[data-seleccion] .dm-lado-cabeza > .dm-sel {
     opacity: 1;
-    visibility: visible;
+    visibility: inherit;
     transition:
       opacity var(--rad-dur-base) var(--rad-ease-out) var(--rad-dur-fast),
       visibility 0s linear var(--rad-dur-fast),
@@ -358,7 +358,7 @@
   }
   .dm-buscar[data-con-texto] .dm-buscar-limpiar {
     opacity: 1;
-    visibility: visible;
+    visibility: inherit;
     transition:
       opacity var(--rad-dur-base) var(--rad-ease-out),
       visibility 0s,
@@ -559,7 +559,7 @@
   }
   .dm-conv[data-inicio] > .dm-inicio {
     opacity: 1;
-    visibility: visible;
+    visibility: inherit;
     pointer-events: auto;
     transition: opacity var(--rad-dur-base) var(--rad-ease-out) var(--rad-dur-fast), visibility 0s;
   }
@@ -608,7 +608,7 @@
   }
   .dm-al-final[data-visible] {
     opacity: 1;
-    visibility: visible;
+    visibility: inherit;
     pointer-events: auto;
     transform: translate(-50%, 0) scale(1);
     transition: opacity var(--rad-dur-base) var(--rad-ease-in-out), transform var(--rad-dur-base) var(--rad-ease-out), visibility 0s,
@@ -1293,7 +1293,7 @@
   .dm-canvas[data-abierto], .dm-nav[data-abierto], .dm-term[data-abierto] {
     opacity: 1;
     transform: none;
-    visibility: visible;
+    visibility: inherit;
     transition: opacity var(--rad-dur-base) var(--rad-ease-out), transform var(--rad-dur-base) var(--rad-ease-out), visibility 0s;
   }
   .dm-canvas-cabeza {
@@ -1611,7 +1611,7 @@
   .dm-nav-hueco[data-vacio] .dm-nav-vacio { opacity: 1; }
   /* La foto de la página, mientras la app tiene algo encima de la capa. */
   .dm-nav-foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top left; opacity: 0; visibility: hidden; }
-  .dm-nav-hueco[data-foto] .dm-nav-foto { opacity: 1; visibility: visible; }
+  .dm-nav-hueco[data-foto] .dm-nav-foto { opacity: 1; visibility: inherit; }
 
   /* ---------- La memoria ---------- */
   /* Una página como Agents y Settings: el texto fijo arriba y la lista abajo. */
@@ -1901,7 +1901,7 @@
     visibility: hidden;
     transition: opacity var(--rad-dur-base) var(--rad-ease-in-out), visibility 0s linear var(--rad-dur-base);
   }
-  .dm-notas-hoja[data-con-nota] .dm-notas-cabeza { opacity: 1; visibility: visible; transition: opacity var(--rad-dur-base) var(--rad-ease-in-out), visibility 0s; }
+  .dm-notas-hoja[data-con-nota] .dm-notas-cabeza { opacity: 1; visibility: inherit; transition: opacity var(--rad-dur-base) var(--rad-ease-in-out), visibility 0s; }
   .dm-notas-icono { color: var(--rad-text-3); }
   .dm-notas-donde { color: var(--rad-text-2); font-size: var(--rad-text-s); }
   .dm-notas-guardado { flex: 1; min-width: 0; color: var(--rad-text-3); font-size: var(--rad-text-xs); }
