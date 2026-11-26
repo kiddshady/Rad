@@ -1,5 +1,13 @@
 # Changelog
 
+## BlackCode 1.13.3 (2026-11-26)
+
+- **Borrar chats desde el celu.** El puente suma `DELETE /api/chats/:id`, que
+  la interfaz resuelve como el tacho de la PC (`datos.borrarChat`): el chat
+  se va en los dos lados. En BlackCode Mobile se seleccionan en el cajón,
+  como en la PC (pedido de Fran: en el celu no había cómo borrarlos).
+- Test del puente (49, la ruta probada al revés) y su parte en el humo.
+
 ## BlackCode 1.13.2 (2026-11-26)
 
 - **Ctrl+Alt+B muestra o esconde BlackCode desde cualquier lado** (pedido de

@@ -214,6 +214,8 @@ function crear(rad, { electron = require('electron'), esperaMs = ESPERA_MS } = {
     imagenes: Array.isArray(b.imagenes) ? b.imagenes.filter((x) => typeof x === 'string' && /^data:image\/(png|jpeg|webp|gif);base64,/.test(x)).slice(0, 8) : [],
   }));
   ruta('POST', '/api/chats/:id/stop', ({ p }) => preguntar('frenar', { chat: p.id }));
+  // borrar un chat desde el celu (1.13.3): lo hace la interfaz, como el tacho de la PC
+  ruta('DELETE', '/api/chats/:id', ({ p }) => preguntar('borrar', { chat: p.id }));
   ruta('POST', '/api/chats/:id/confirm', ({ p, b }) => preguntar('confirmar', { chat: p.id, permitir: b.permitir === true, confiar: b.confiar === true }));
   // los canvas de un agente (en el celu se leen, no se editan)
   ruta('GET', '/api/canvases', ({ q }) => preguntar('canvases', { agente: String(q.get('agente') ?? '') }));

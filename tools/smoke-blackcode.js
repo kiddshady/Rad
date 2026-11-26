@@ -5169,8 +5169,12 @@ await go('ajustes', 'about');
   if (delCelu) await window.rad.invoke('canvas:borrar', { id: delCelu.id });
   await datosM.borrarChat(chatC);
 
-  await datosM.borrarChat(id);
-  data.celuPedidos = `${fin.datos?.mensajes?.length ?? 0} mensajes, la foto por referencia, canvas del agente y tareas (pausar, correr, leer)`;
+  // Borrar el chat desde el celu (1.13.3): lo borra la interfaz, y otra vez da 404.
+  const sinChat = await atender({ que: 'borrar', chat: id });
+  if (!sinChat.ok || datosM.chat(id)) fail('celu: borrar el chat desde el celu no lo borró: ' + JSON.stringify(sinChat));
+  if ((await atender({ que: 'borrar', chat: id })).status !== 404) fail('celu: borrar un chat que ya no existe no da 404');
+  if ((await atender({ que: 'estado' })).datos?.chats?.some((c) => c.id === id)) fail('celu: el chat borrado sigue en el estado que ve el celu');
+  data.celuPedidos = `${fin.datos?.mensajes?.length ?? 0} mensajes, la foto por referencia, canvas del agente, tareas (pausar, correr, leer) y borrar el chat`;
   // (Settings queda en About, como lo dejó la sección de antes: la pasada 2
   // comprueba que la app recuerde esa pestaña)
   await go('ajustes', 'about');

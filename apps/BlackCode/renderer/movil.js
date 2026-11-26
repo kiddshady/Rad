@@ -96,6 +96,13 @@ const PEDIDOS = {
 
   frenar({ chat: id }) { datos.frenar(id); return { ok: true }; },
 
+  /** Borra un chat (1.13.3, pedido de Fran: en el celu no había cómo). Lo mismo que el tacho de la PC. */
+  async borrar({ chat: id }) {
+    if (!datos.chat(id)) throw new Fallo(404, 'That chat does not exist anymore.');
+    await datos.borrarChat(id);
+    return { ok: true };
+  },
+
   confirmar({ chat: id, permitir, confiar }) {
     if (!datos.confirmacion(id)) throw new Fallo(409, 'Nothing is waiting for permission in this chat.');
     datos.confirmar(id, permitir === true, confiar === true);

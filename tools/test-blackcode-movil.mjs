@@ -132,6 +132,7 @@ interfaz = (canal, p) => {
   else if (p.que === 'chat') responder(p.chat === 'c1' ? { ok: true, datos: { chat: { id: 'c1' }, mensajes: [], antes: p.antes } } : { ok: false, status: 404, error: 'That chat does not exist anymore.' });
   else if (p.que === 'crear') responder({ ok: true, datos: { id: 'nuevo' } });
   else if (p.que === 'enviar') responder({ ok: true, datos: { ok: true } });
+  else if (p.que === 'borrar') responder(p.chat === 'c1' ? { ok: true, datos: { ok: true } } : { ok: false, status: 404, error: 'That chat does not exist anymore.' });
   else if (p.que === 'canvases') responder({ ok: true, datos: [{ id: 'cv1', agente: p.agente }] });
   else if (p.que === 'canvas') responder(p.canvas === 'cv1' ? { ok: true, datos: { id: 'cv1', contenido: '# hola' } } : { ok: false, status: 404, error: 'That canvas does not exist anymore.' });
   else if (p.que === 'tareas') responder({ ok: true, datos: { tareas: [], resultados: [], sinLeer: 2 } });
@@ -161,6 +162,12 @@ ok('mandar pasa el texto y solo las imágenes de verdad', env.que === 'enviar' &
 ok('un JSON roto da 400', (await pedir('POST', '/api/chats', { clave, crudo: '{roto' })).status === 400);
 const colgada = await pedir('POST', '/api/chats/c1/stop', { clave });
 ok('si la interfaz no contesta, 503 (y no se cuelga)', colgada.status === 503, colgada.texto);
+
+// ---------- Borrar un chat (1.13.3) ----------
+ok('borrar un chat pide la clave', (await pedir('DELETE', '/api/chats/c1')).status === 401);
+const borrado = await pedir('DELETE', '/api/chats/c1', { clave });
+ok('borrar un chat lo pide a la interfaz', borrado.status === 200 && pedidos.at(-1).que === 'borrar' && pedidos.at(-1).chat === 'c1', borrado.texto);
+ok('borrar uno que no existe da 404', (await pedir('DELETE', '/api/chats/otro', { clave })).status === 404);
 
 // ---------- Canvases y tareas ----------
 const cvs = await pedir('GET', '/api/canvases?agente=z', { clave });
@@ -229,5 +236,5 @@ if (failures.length) {
   for (const f of failures) console.log('  ' + f);
   process.exit(1);
 }
-console.log(`test-blackcode-movil: ok (${hechas} comprobaciones: apagado de fábrica, la clave al prender y cifrada, ping abierto y lo demás con clave, la clave nunca en la interfaz, los pedidos por la interfaz y sus errores, una interfaz colgada, canvases y tareas (y que un dato llamado id no pise el pedido), las imágenes y la carpeta de la app, el canal de eventos y la clave nueva, apagarlo, y el cableado)`);
+console.log(`test-blackcode-movil: ok (${hechas} comprobaciones: apagado de fábrica, la clave al prender y cifrada, ping abierto y lo demás con clave, la clave nunca en la interfaz, los pedidos por la interfaz y sus errores, una interfaz colgada, borrar un chat, canvases y tareas (y que un dato llamado id no pise el pedido), las imágenes y la carpeta de la app, el canal de eventos y la clave nueva, apagarlo, y el cableado)`);
 process.exit(0);
