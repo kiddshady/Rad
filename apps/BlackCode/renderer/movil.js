@@ -163,7 +163,76 @@ const PEDIDOS = {
     if (!r?.ok) throw new Fallo(409, r?.error ?? 'The task could not start.');
     return { ok: true };
   },
+
+  // ---------- Las notas (1.14.0) ----------
+  // Las del usuario, las mismas de la vista Notes: leer, escribir, fijar,
+  // mover a una carpeta que ya existe y borrar (para siempre, como el tacho de
+  // la PC). Las carpetas se crean, renombran y borran en la PC (Fran). Van los
+  // mismos canales que usa la vista, y después de cada cambio se avisa (ver
+  // notasTocadas): la vista de la PC se pone al día y los celus vuelven a pedir.
+  async notas() {
+    const [n, c] = await Promise.all([window.rad.invoke('notas:lista'), window.rad.invoke('notas:carpetas')]);
+    return {
+      notas: (Array.isArray(n) ? n : []).map((x) => ({ id: x.id, contenido: x.content ?? '', carpeta: x.folder_id ?? null, fijada: Boolean(x.pinned), tocada: fechaDe(x.updated_at) })),
+      carpetas: (Array.isArray(c) ? c : []).map((x) => ({ id: x.id, nombre: x.name })),
+    };
+  },
+  async notaCrear({ contenido, carpeta }) {
+    const texto = textoDeNota(contenido);
+    const folderId = await carpetaQueExiste(carpeta);
+    const fila = await window.rad.invoke('notas:crear', { content: texto, folderId });
+    if (!fila?.id) throw new Fallo(500, 'The note could not be saved.');
+    notasTocadas();
+    return { id: fila.id };
+  },
+  async notaGuardar({ nota, contenido }) {
+    const texto = textoDeNota(contenido);
+    await notaQueExiste(nota);
+    if (!(await window.rad.invoke('notas:guardar', { id: nota, content: texto }))) throw new Fallo(500, 'The note could not be saved.');
+    notasTocadas();
+    return { ok: true };
+  },
+  async notaFijar({ nota, fijada }) {
+    await notaQueExiste(nota);
+    if (!(await window.rad.invoke('notas:fijar', { id: nota, pinned: fijada === true }))) throw new Fallo(500, 'Could not pin the note.');
+    notasTocadas();
+    return { ok: true };
+  },
+  async notaMover({ nota, carpeta }) {
+    await notaQueExiste(nota);
+    const folderId = await carpetaQueExiste(carpeta);
+    if (!(await window.rad.invoke('notas:mover', { id: nota, folderId }))) throw new Fallo(500, 'Could not move the note.');
+    notasTocadas();
+    return { ok: true };
+  },
+  async notaBorrar({ nota }) {
+    await notaQueExiste(nota);
+    if (!(await window.rad.invoke('notas:borrar', nota))) throw new Fallo(500, 'Could not delete the note.');
+    notasTocadas();
+    return { ok: true };
+  },
 };
+
+// (una nota vacía no existe: borrar el texto no la borra, como en la PC)
+function textoDeNota(contenido) {
+  const texto = typeof contenido === 'string' ? contenido : '';
+  if (!texto.trim()) throw new Fallo(400, 'A note cannot be empty.');
+  return texto;
+}
+// (el store contesta que sí aunque la nota no exista: se pregunta antes)
+async function notaQueExiste(id) {
+  const lista = await window.rad.invoke('notas:lista');
+  if (!id || !(Array.isArray(lista) && lista.some((n) => n.id === id))) throw new Fallo(404, 'That note does not exist anymore.');
+}
+async function carpetaQueExiste(id) {
+  if (id === null || id === undefined || id === '') return null;
+  const lista = await window.rad.invoke('notas:carpetas');
+  if (!(Array.isArray(lista) && lista.some((c) => c.id === id))) throw new Fallo(404, 'That folder does not exist anymore.');
+  return id;
+}
+// Las notas cambiaron desde el celu: la vista de la PC las vuelve a leer como
+// cuando las escribe un agente (notas.js escucha este evento).
+const notasTocadas = () => window.dispatchEvent(new CustomEvent('blackcode:notas', { detail: { desde: 'celu' } }));
 
 // (un canvas es del agente que lo creó; los huérfanos sin dueño, de todos)
 const deEseAgente = (c, agente) => !c.agent_id || c.agent_id === agente;
@@ -231,6 +300,13 @@ datos.on('turno', ({ chat, estado, texto } = {}) => {
 window.rad.on('tareas:evento', () => mandar({ tipo: 'tareas' }));
 window.rad.on('canvas:evento', () => mandar({ tipo: 'canvas' }));
 datos.on('canvas', () => mandar({ tipo: 'canvas' }));
+// Las notas: las que escribe un agente (notas:evento) y las que cambian en la
+// vista de la PC o desde un celu (blackcode:notas). Juntas en una tanda corta:
+// escribiendo en la PC se guarda a cada rato.
+let notasPendiente = null;
+const avisarNotas = () => { clearTimeout(notasPendiente); notasPendiente = setTimeout(() => mandar({ tipo: 'notas' }), 250); };
+window.rad.on('notas:evento', avisarNotas);
+window.addEventListener('blackcode:notas', avisarNotas);
 
 export async function montarMovil() {
   window.rad.on('movil:clientes', (n) => { clientes = Number(n) || 0; });

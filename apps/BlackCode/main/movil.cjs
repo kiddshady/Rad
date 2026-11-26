@@ -225,6 +225,14 @@ function crear(rad, { electron = require('electron'), esperaMs = ESPERA_MS } = {
   ruta('GET', '/api/tasks/results/:id', ({ p }) => preguntar('resultado', { resultado: p.id }));
   ruta('POST', '/api/tasks/:id/active', ({ p, b }) => preguntar('tareaActivar', { tarea: p.id, activa: b.activa === true }));
   ruta('POST', '/api/tasks/:id/run', ({ p }) => preguntar('tareaCorrer', { tarea: p.id }));
+  // las notas (1.14.0): leer, escribir, fijar, mover a una carpeta que ya existe y borrar
+  const carpetaDe = (b) => (typeof b.carpeta === 'string' && b.carpeta ? b.carpeta : null);
+  ruta('GET', '/api/notes', () => preguntar('notas'));
+  ruta('POST', '/api/notes', ({ b }) => preguntar('notaCrear', { contenido: typeof b.contenido === 'string' ? b.contenido : '', carpeta: carpetaDe(b) }));
+  ruta('POST', '/api/notes/:id', ({ p, b }) => preguntar('notaGuardar', { nota: p.id, contenido: typeof b.contenido === 'string' ? b.contenido : '' }));
+  ruta('POST', '/api/notes/:id/pin', ({ p, b }) => preguntar('notaFijar', { nota: p.id, fijada: b.fijada === true }));
+  ruta('POST', '/api/notes/:id/folder', ({ p, b }) => preguntar('notaMover', { nota: p.id, carpeta: carpetaDe(b) }));
+  ruta('DELETE', '/api/notes/:id', ({ p }) => preguntar('notaBorrar', { nota: p.id }));
   ruta('GET', '/api/image/:chat/:msg/:n', async ({ p, q, res }) => {
     const im = await preguntar('imagen', { chat: p.chat, msg: p.msg, n: Number(p.n) });
     let buf = null;

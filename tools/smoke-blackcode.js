@@ -5174,7 +5174,49 @@ await go('ajustes', 'about');
   if (!sinChat.ok || datosM.chat(id)) fail('celu: borrar el chat desde el celu no lo borró: ' + JSON.stringify(sinChat));
   if ((await atender({ que: 'borrar', chat: id })).status !== 404) fail('celu: borrar un chat que ya no existe no da 404');
   if ((await atender({ que: 'estado' })).datos?.chats?.some((c) => c.id === id)) fail('celu: el chat borrado sigue en el estado que ve el celu');
-  data.celuPedidos = `${fin.datos?.mensajes?.length ?? 0} mensajes, la foto por referencia, canvas del agente, tareas (pausar, correr, leer) y borrar el chat`;
+
+  // Las notas desde el celu (1.14.0): crear en una carpeta, guardar, fijar,
+  // sacar de la carpeta y borrar, con el store de verdad. La vista Notes de
+  // la PC, abierta, se pone al día sola; y lo que se escribe en la PC se avisa
+  // (el puente lo reenvía a los celus).
+  {
+    const avisosN = [];
+    const oir = (e) => avisosN.push(e.detail?.desde);
+    window.addEventListener('blackcode:notas', oir);
+    await go('notas');
+    const vN = view('notas');
+    const titulosN = () => alive(vN.querySelectorAll('.dm-notas-nota')).map((n) => n.querySelector('.dm-notas-nota-titulo').textContent);
+    const carpetaN = await window.rad.invoke('notas:carpeta-crear', 'Phone smoke');
+    const leerN = async (nid) => (await atender({ que: 'notas' })).datos?.notas?.find((x) => x.id === nid) ?? null;
+    if ((await atender({ que: 'notaCrear', contenido: '   ' })).status !== 400) fail('celu: una nota vacía no da 400');
+    if ((await atender({ que: 'notaCrear', contenido: 'x', carpeta: 'no-existe' })).status !== 404) fail('celu: crear en una carpeta que no existe no da 404');
+    const nuevaN = await atender({ que: 'notaCrear', contenido: '# From the phone\nfirst line', carpeta: carpetaN?.id });
+    const nid = nuevaN.datos?.id;
+    let n = nid ? await leerN(nid) : null;
+    if (!n || n.carpeta !== carpetaN?.id || n.contenido !== '# From the phone\nfirst line' || n.fijada) fail('celu: la nota creada no quedó como se mandó: ' + JSON.stringify(nuevaN) + ' ' + JSON.stringify(n));
+    if (!avisosN.includes('celu')) fail('celu: crear una nota no le avisó a la vista de la PC');
+    if (!(await until(() => titulosN().includes('From the phone'), 3000))) fail('celu: la vista Notes de la PC no mostró sola la nota creada en el celu: ' + JSON.stringify(titulosN()));
+    if (!(await atender({ que: 'notaGuardar', nota: nid, contenido: '# From the phone, edited\nsecond' })).ok) fail('celu: guardar la nota no anduvo');
+    if (!(await until(() => titulosN().includes('From the phone, edited'), 3000))) fail('celu: la vista de la PC no se puso al día con lo guardado en el celu');
+    // lo que se hace en la vista de la PC se avisa (y el puente se lo reenvía a los celus): fijarla desde allá
+    const filaPC = alive(vN.querySelectorAll('.dm-notas-nota')).find((f) => f.querySelector('.dm-notas-nota-titulo').textContent === 'From the phone, edited');
+    filaPC?.click();
+    await settle();
+    avisosN.length = 0;
+    vN.querySelector('[data-accion="nota-fijar"]')?.click();
+    if (!(await until(async () => avisosN.includes('pc') && (await leerN(nid))?.fijada, 3000))) fail('celu: fijar una nota en la vista de la PC no avisó que las notas cambiaron (o no la fijó)');
+    if (!(await atender({ que: 'notaFijar', nota: nid, fijada: false })).ok || (await leerN(nid))?.fijada) fail('celu: desfijar la nota desde el celu no anduvo');
+    if (!(await until(() => vN.querySelector('[data-accion="nota-fijar"]')?.getAttribute('aria-pressed') === 'false', 3000))) fail('celu: la nota abierta en la PC no se enteró de que el celu la desfijó');
+    if (!(await atender({ que: 'notaMover', nota: nid, carpeta: null })).ok || (await leerN(nid))?.carpeta !== null) fail('celu: sacar la nota de su carpeta no anduvo');
+    if ((await atender({ que: 'notaMover', nota: nid, carpeta: 'no-existe' })).status !== 404) fail('celu: mover a una carpeta que no existe no da 404');
+    if ((await atender({ que: 'notaGuardar', nota: 'no-existe', contenido: 'x' })).status !== 404) fail('celu: guardar una nota que no existe no da 404 (el store dice que sí igual)');
+    if (!(await atender({ que: 'notaBorrar', nota: nid })).ok || (await leerN(nid))) fail('celu: borrar la nota no la borró');
+    if ((await atender({ que: 'notaBorrar', nota: nid })).status !== 404) fail('celu: borrar una nota que ya no existe no da 404');
+    if (!(await until(() => !titulosN().some((t) => t.startsWith('From the phone')), 3000))) fail('celu: la nota borrada en el celu sigue en la vista de la PC');
+    window.removeEventListener('blackcode:notas', oir);
+    if (carpetaN?.id) await window.rad.invoke('notas:carpeta-borrar', carpetaN.id);
+  }
+  data.celuPedidos = `${fin.datos?.mensajes?.length ?? 0} mensajes, la foto por referencia, canvas del agente, tareas (pausar, correr, leer), borrar el chat y las notas (crear, guardar, fijar, mover, borrar; la PC al día)`;
   // (Settings queda en About, como lo dejó la sección de antes: la pasada 2
   // comprueba que la app recuerde esa pestaña)
   await go('ajustes', 'about');

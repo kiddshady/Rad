@@ -19,7 +19,10 @@
 // Lo que cambia respecto de allá: la nota se LEE dibujada (el markdown de la
 // app, con fórmulas) y se EDITA como texto; allá era un editor que hacía las
 // dos cosas a la vez (Milkdown), que acá no vino. Tampoco vinieron arrastrar
-// una nota a una carpeta, la selección múltiple ni «Clear all».
+// una nota a una carpeta ni «Clear all» (la selección múltiple llegó en la 1.13.1).
+//
+// Desde la 1.14.0 también se escriben desde el celular (renderer/movil.js):
+// lo que cambia allá se trata como lo que escribe un agente (cambioAfuera).
 
 import { openModal, confirm } from '/@core/modal.js';
 import { menuButton } from '/@core/menu.js';
@@ -31,7 +34,14 @@ import { wireControls, setFieldError } from '/@core/controls.js';
 import { pintar } from './markdown.js';
 import { h, icono } from './piezas.js';
 
-const pedir = (canal, ...args) => window.rad.invoke(canal, ...args);
+// Lo que cambia las notas se avisa (`blackcode:notas`, desde la PC): el puente
+// del celular (movil.js) les dice a los celus que las vuelvan a pedir.
+const SOLO_LEEN = new Set(['notas:lista', 'notas:carpetas']);
+async function pedir(canal, ...args) {
+  const r = await window.rad.invoke(canal, ...args);
+  if (!SOLO_LEEN.has(canal)) window.dispatchEvent(new CustomEvent('blackcode:notas', { detail: { desde: 'pc' } }));
+  return r;
+}
 const GUARDAR_MS = 700; // cuánto después de la última tecla se guarda
 
 // El título de una nota: su primera línea con texto, sin las marcas de
@@ -506,6 +516,8 @@ export function montarNotas(el, { router }) {
       });
     }
   });
+  // Las cambió un celu (1.14.0): lo mismo que si las hubiera escrito un agente.
+  window.addEventListener('blackcode:notas', (e) => { if (e.detail?.desde === 'celu') cambioAfuera(); });
   // Al irse a otra vista, lo pendiente se guarda.
   router.on('change', ({ id }) => { if (id !== 'notas') asentar(); else cargar(); });
 

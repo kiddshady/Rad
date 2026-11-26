@@ -1,5 +1,24 @@
 # Changelog
 
+## BlackCode 1.14.0 (2026-11-26)
+
+- **Las notas, desde el celu.** El puente suma `GET /api/notes`, `POST
+  /api/notes` (crear), `POST /api/notes/:id` (guardar), `/pin`, `/folder` y
+  `DELETE /api/notes/:id`, que la interfaz resuelve con los mismos canales de
+  la vista Notes. En BlackCode Mobile: la lista con carpetas plegables,
+  búsqueda y selección para borrar varias, y la nota que se lee dibujada y se
+  edita como texto, guardándose sola. Crear, renombrar y borrar carpetas
+  queda en la PC (Fran eligió ese alcance); desde el celu se mueve una nota a
+  una carpeta que ya existe.
+- El store de notas contesta que sí aunque la nota no exista: el puente se
+  fija antes y da 404, y una carpeta que no existe también.
+- Lo que cambia en un lado se ve en el otro: lo que escribe el celu le llega
+  a la vista Notes de la PC como lo que escribe un agente (si hay texto sin
+  guardar, no se pisa ninguna versión), y lo que se escribe en la PC (o un
+  agente) se les avisa a los celus con el evento `notas`.
+- Test del puente (60, las rutas nuevas probadas al revés) y su parte en el
+  humo, con el store de verdad y la vista de la PC abierta.
+
 ## BlackCode 1.13.4 (2026-11-26)
 
 - **Arreglado: en Settings se veía un select de otra pestaña.** El modelo de

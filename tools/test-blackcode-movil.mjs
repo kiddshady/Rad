@@ -139,6 +139,9 @@ interfaz = (canal, p) => {
   else if (p.que === 'resultado') responder({ ok: true, datos: { id: p.resultado } });
   else if (p.que === 'tareaActivar') responder({ ok: true, datos: { ok: true, tarea: p.tarea, activa: p.activa } });
   else if (p.que === 'tareaCorrer') responder({ ok: true, datos: { ok: true, tarea: p.tarea } });
+  else if (p.que === 'notas') responder({ ok: true, datos: { notas: [{ id: 'n1', contenido: '# Compras' }], carpetas: [] } });
+  else if (p.que === 'notaCrear') responder({ ok: true, datos: { id: 'n2' } });
+  else if (['notaGuardar', 'notaFijar', 'notaMover', 'notaBorrar'].includes(p.que)) responder(p.nota === 'n1' ? { ok: true, datos: { ok: true } } : { ok: false, status: 404, error: 'That note does not exist anymore.' });
   else if (p.que === 'imagen') {
     if (p.msg === 'data') responder({ ok: true, datos: { dataUrl: `data:image/png;base64,${PNG_1x1}` } });
     else if (p.msg === 'archivo') responder({ ok: true, datos: { archivo: path.join(tmp, 'tools', 'images', 'a.png') } });
@@ -184,6 +187,27 @@ const act = await pedir('POST', '/api/tasks/t7/active', { clave, cuerpo: { activ
 ok('pausar una tarea', act.status === 200 && act.json?.tarea === 't7' && act.json?.activa === false, act.texto);
 const cor = await pedir('POST', '/api/tasks/t7/run', { clave });
 ok('correr una tarea ahora', cor.status === 200 && cor.json?.tarea === 't7', cor.texto);
+
+// ---------- Notas (1.14.0) ----------
+ok('las notas piden la clave', (await pedir('GET', '/api/notes')).status === 401);
+const nts = await pedir('GET', '/api/notes', { clave });
+ok('las notas salen de la interfaz', nts.status === 200 && nts.json?.notas?.[0]?.id === 'n1' && pedidos.at(-1).que === 'notas', nts.texto);
+const nn = await pedir('POST', '/api/notes', { clave, cuerpo: { contenido: 'hola', carpeta: 'f1' } });
+ok('crear una nota, con su carpeta', nn.status === 200 && nn.json?.id === 'n2' && pedidos.at(-1).contenido === 'hola' && pedidos.at(-1).carpeta === 'f1', nn.texto);
+await pedir('POST', '/api/notes', { clave, cuerpo: { contenido: 42, carpeta: '' } });
+ok('crear: lo que no es texto viaja vacío y sin carpeta', pedidos.at(-1).contenido === '' && pedidos.at(-1).carpeta === null);
+const ng = await pedir('POST', '/api/notes/n1', { clave, cuerpo: { contenido: 'otra' } });
+// (la nota viaja como `nota`: un `id` pisaría el número del pedido, como pasó con los canvas)
+ok('guardar una nota: su id no pisa el número del pedido', ng.status === 200 && pedidos.at(-1).que === 'notaGuardar' && pedidos.at(-1).nota === 'n1' && pedidos.at(-1).contenido === 'otra' && typeof pedidos.at(-1).id === 'number', ng.texto);
+ok('guardar una que no existe da 404', (await pedir('POST', '/api/notes/nada', { clave, cuerpo: { contenido: 'x' } })).status === 404);
+const nf = await pedir('POST', '/api/notes/n1/pin', { clave, cuerpo: { fijada: true } });
+ok('fijar una nota', nf.status === 200 && pedidos.at(-1).que === 'notaFijar' && pedidos.at(-1).fijada === true, nf.texto);
+const nm = await pedir('POST', '/api/notes/n1/folder', { clave, cuerpo: { carpeta: null } });
+ok('sacar una nota de su carpeta', nm.status === 200 && pedidos.at(-1).que === 'notaMover' && pedidos.at(-1).carpeta === null, nm.texto);
+ok('borrar una nota pide la clave', (await pedir('DELETE', '/api/notes/n1')).status === 401);
+const nb = await pedir('DELETE', '/api/notes/n1', { clave });
+ok('borrar una nota', nb.status === 200 && pedidos.at(-1).que === 'notaBorrar' && pedidos.at(-1).nota === 'n1', nb.texto);
+ok('borrar una que no existe da 404', (await pedir('DELETE', '/api/notes/nada', { clave })).status === 404);
 
 // ---------- Imágenes ----------
 const img = await pedir('GET', '/api/image/c1/data/0?max=480', { clave });
@@ -236,5 +260,5 @@ if (failures.length) {
   for (const f of failures) console.log('  ' + f);
   process.exit(1);
 }
-console.log(`test-blackcode-movil: ok (${hechas} comprobaciones: apagado de fábrica, la clave al prender y cifrada, ping abierto y lo demás con clave, la clave nunca en la interfaz, los pedidos por la interfaz y sus errores, una interfaz colgada, borrar un chat, canvases y tareas (y que un dato llamado id no pise el pedido), las imágenes y la carpeta de la app, el canal de eventos y la clave nueva, apagarlo, y el cableado)`);
+console.log(`test-blackcode-movil: ok (${hechas} comprobaciones: apagado de fábrica, la clave al prender y cifrada, ping abierto y lo demás con clave, la clave nunca en la interfaz, los pedidos por la interfaz y sus errores, una interfaz colgada, borrar un chat, canvases, tareas y notas (y que un dato llamado id no pise el pedido), las imágenes y la carpeta de la app, el canal de eventos y la clave nueva, apagarlo, y el cableado)`);
 process.exit(0);
