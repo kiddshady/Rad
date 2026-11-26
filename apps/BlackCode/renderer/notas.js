@@ -100,7 +100,7 @@ export function montarNotas(el, { router }) {
   const lista = h('div', 'dm-notas-lista rad-scroll', { role: 'list', 'data-rad-line': 'bottom' });
   const vacia = h('p', 'dm-notas-vacia rad-swap');
   wireScroll(lista);
-  const lado = h('aside', 'dm-lado dm-notas-lado', { 'data-rad-chrome': '' },
+  const lado = h('aside', 'dm-lado dm-notas-lado rad-sheet', { 'data-rad-chrome': '' },
     h('div', 'dm-notas-acciones', {}, nueva, nuevaCarpeta), campoBuscar, lista, vacia);
   wireControls(lado);
 
@@ -115,7 +115,7 @@ export function montarNotas(el, { router }) {
   const cuerpo = h('div', 'dm-notas-cuerpo rad-scroll', { 'data-rad-line': 'top' });
   wireScroll(cuerpo);
   const hueco = h('p', 'dm-notas-hueco', {}, 'Pick a note, or write a new one. Agents with the Notepad tools can read and write these too.');
-  const hoja = h('section', 'dm-notas-hoja', {},
+  const hoja = h('section', 'dm-notas-hoja rad-sheet', {},
     h('header', 'dm-notas-cabeza', { 'data-rad-chrome': '' }, icono('nota', 'dm-notas-icono'), donde, estadoGuardado, bFijar, bMover, bBorrar, bEditar),
     cuerpo, hueco);
   el.append(lado, hoja);

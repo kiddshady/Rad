@@ -258,20 +258,23 @@
 
   /* ---------- Chat ---------- */
 
+  /* El chat (y Notes) son dos hojas sueltas: el lado y la conversación, con
+     el mismo aire entre ellas que entre el escenario y el borde de la ventana
+     (core 0.21.0, pedido de Fran: «como en Verba»). */
   .dm-chat {
     display: grid;
     grid-template-columns: 272px minmax(0, 1fr);
+    gap: var(--rad-space-2);
     min-height: 0;
   }
 
-  /* El lado: el agente y sus chats. Una línea fina lo separa de la charla. */
+  /* El lado: el agente y sus chats, en su propia hoja. */
   .dm-lado {
     display: flex;
     flex-direction: column;
     gap: var(--rad-space-2);
     min-height: 0;
     padding: var(--rad-space-3) var(--rad-space-3) 0;
-    box-shadow: inset calc(var(--rad-line-width) * -1) 0 0 var(--rad-line);
   }
   /* El selector de agente: el nombre y el chevron, del alto de un control. */
   .dm-agente {
@@ -1810,7 +1813,7 @@
   .dm-hist .dm-biblio-detalle { font-family: var(--rad-font-mono); }
 
   /* ---------- El notepad ---------- */
-  .dm-notas { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 0; }
+  .dm-notas { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: var(--rad-space-2); min-height: 0; }
   .dm-notas-lado { padding-bottom: 0; }
   .dm-notas-acciones { display: flex; gap: var(--rad-space-2); }
   .dm-notas-nueva { flex: 1; justify-content: flex-start; padding-inline: var(--rad-space-3); }

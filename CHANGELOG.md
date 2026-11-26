@@ -1,5 +1,25 @@
 # Changelog
 
+## BlackCode 1.13.0 (2026-11-26) · núcleo 0.21.0
+
+- **Chat y Notes en dos hojas sueltas**, como en Verba (pedido de Fran): el
+  lado y la conversación (o la lista y la nota) son dos paneles flotantes
+  con aire entre ellos, el mismo `space-2` que separa el escenario del borde
+  de la ventana. La línea que separaba el lado se fue: separa el aire.
+- **Núcleo 0.21.0: vistas de hojas.** Una vista con `sheets: true` se reparte
+  en hojas `.rad-sheet` (el reparto es de la app). El router marca la vista
+  y, mientras está activa, el escenario. Las hojas recortan lo de adentro
+  como el escenario y llevan el canto en `::after`.
+- **Pieles:** glass (y mono, que la hereda) pinta la vista de hojas como el
+  telón, corrido igual que el escenario, así el aire se ve como el fondo de
+  la ventana y la vista sigue tapando para el fundido; cada hoja lleva el
+  velo, el brillo, el canto y `--skin-sheet-shadow` (glass 0.2.0). El
+  escenario funde su canto y su sombra a la par del cambio de vista (la
+  sombra a transparente con la misma forma, para que interpole). Classic
+  0.6.0: la vista del color de la ventana y cada hoja del escenario.
+- El humo mide el aire, el telón en el aire, el canto de las hojas y el
+  fundido del escenario de ida y vuelta (probado al revés).
+
 ## BlackCode 1.12.0 (2026-11-26)
 
 - **Canvases y Tasks en el celu.** El puente de BlackCode Mobile suma los

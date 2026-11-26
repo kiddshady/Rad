@@ -34,6 +34,10 @@ export function createRouter({ stage, views, initial }) {
     el.dataset.state = 'hidden';
     el.inert = true;
     if (def.scroll !== false) el.classList.add('rad-scroll');
+    // Una vista de hojas (core 0.21.0): en vez de ser una superficie entera,
+    // se reparte en hojas sueltas (.rad-sheet) con aire entre ellas. La piel
+    // pinta la vista como el telón y cada hoja como el escenario.
+    if (def.sheets === true) el.dataset.radSheets = '';
     if (def.label) el.setAttribute('aria-label', def.label);
     stage.append(el);
     entries.set(def.id, { def, el, mounted: false, stopWait: null, anim: null });
@@ -105,6 +109,10 @@ export function createRouter({ stage, views, initial }) {
     if (next === current) return;
     const prev = current;
     current = next;
+    // Mientras se ve una vista de hojas, el escenario lo sabe: la piel le
+    // apaga su canto y su sombra (las hojas traen los suyos), fundiéndolos a
+    // la par del cambio de vista.
+    stage.toggleAttribute('data-rad-sheets', next.def.sheets === true);
 
     if (next.el.dataset.state === 'leaving' && !instant) {
       comeBack(next, prev ? [prev] : []);

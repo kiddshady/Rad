@@ -110,7 +110,9 @@
   background-size: auto, auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;
   background-position: 0 0, 0 0, var(--skin-ox) var(--skin-oy), var(--skin-ox) var(--skin-oy), var(--skin-ox) var(--skin-oy);
   background-repeat: no-repeat;
-  box-shadow: 0 18px 50px #00000052, 0 2px 8px #0000003d;
+  box-shadow: var(--skin-sheet-shadow);
+  /* (con una vista de hojas apaga su sombra y su canto: ver abajo) */
+  transition: box-shadow var(--rad-dur-base) var(--rad-ease-in-out);
 }
 .rad-shell[data-rail] .rad-stage {
   --skin-ox: calc(var(--rad-rail-width) * -1);
@@ -137,7 +139,34 @@
   border-radius: inherit;
   box-shadow: var(--skin-rim);
   pointer-events: none;
+  transition: opacity var(--rad-dur-base) var(--rad-ease-in-out);
 }
+
+/* Hojas (core 0.21.0). Una vista de hojas pinta el TELÓN (el mismo del body,
+   corrido igual que el escenario): así el aire entre hojas se ve como el
+   fondo de la ventana, y la vista sigue tapando para el fundido del router.
+   Cada hoja es un escenario: velo y brillo encima del telón de la vista, su
+   canto y su sombra. Mientras se ve una vista así, el escenario apaga los
+   suyos a la par del fundido (la sombra va a transparente con la misma
+   forma, para que interpole). */
+.rad-stage[data-rad-sheets] { box-shadow: 0 18px 50px #00000000, 0 2px 8px #00000000; }
+.rad-stage[data-rad-sheets]::after { opacity: 0; }
+.rad-stage > .rad-view[data-rad-sheets] {
+  background-color: var(--rad-surface-0);
+  background-image: var(--skin-field-a), var(--skin-field-b), var(--skin-field-c);
+  background-size: 100vw 100vh, 100vw 100vh, 100vw 100vh;
+  background-position: var(--skin-ox) var(--skin-oy), var(--skin-ox) var(--skin-oy), var(--skin-ox) var(--skin-oy);
+  background-repeat: no-repeat;
+}
+.rad-sheet {
+  border-radius: var(--rad-radius-l);
+  background-image: var(--skin-sheen), linear-gradient(var(--rad-surface-1), var(--rad-surface-1));
+  background-repeat: no-repeat;
+  box-shadow: var(--skin-sheet-shadow);
+  /* la scrollbar de adentro corre pegada a la curva, como en la vista */
+  --rad-a-scroll-inset: var(--rad-space-3);
+}
+.rad-sheet::after { box-shadow: var(--skin-rim); }
 
 /* Statusbar */
 .rad-statusbar {

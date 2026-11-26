@@ -83,6 +83,14 @@
   background-color: var(--rad-surface-1);
   box-shadow: var(--rad-shadow-1);
 }
+/* Hojas (core 0.21.0): la vista de hojas es del color de la ventana y cada
+   hoja, del escenario, con su radio y su sombra. */
+.rad-stage > .rad-view[data-rad-sheets] { background: var(--rad-surface-0); }
+.rad-sheet {
+  border-radius: var(--rad-radius-l);
+  background-color: var(--rad-surface-1);
+  box-shadow: var(--rad-shadow-1);
+}
 .rad-shell[data-rail] .rad-stage {
   border-top-left-radius: var(--rad-radius-l);
 }

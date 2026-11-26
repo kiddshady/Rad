@@ -22,8 +22,8 @@ const release = hold();
 await Promise.all([datos.abrir(), llave.refrescar()]);
 
 const views = [
-  { id: 'chat', label: 'Chat', icon: ICONOS.chat, scroll: false, mount: (el, router) => montarChat(el, { router }) },
-  { id: 'notas', label: 'Notes', icon: ICONOS.nota, scroll: false, mount: (el, router) => montarNotas(el, { router }) },
+  { id: 'chat', label: 'Chat', icon: ICONOS.chat, scroll: false, sheets: true, mount: (el, router) => montarChat(el, { router }) },
+  { id: 'notas', label: 'Notes', icon: ICONOS.nota, scroll: false, sheets: true, mount: (el, router) => montarNotas(el, { router }) },
   { id: 'memoria', label: 'Memory', icon: ICONOS.memoria, mount: (el) => montarMemoria(el) },
   { id: 'skills', label: 'Skills', icon: ICONOS.skills, mount: (el) => montarSkills(el) },
   { id: 'tareas', label: 'Tasks', icon: ICONOS.reloj, mount: (el, router) => montarTareas(el, { router }) },

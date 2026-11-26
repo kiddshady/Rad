@@ -112,6 +112,8 @@
 
   /* El canto de una hoja y el resplandor del acento. */
   --skin-rim: inset 0 1px 0 #ffffff26, inset 0 0 0 1px #ffffff0f;
+  /* La sombra de una hoja: el escenario y las .rad-sheet (core 0.21.0). */
+  --skin-sheet-shadow: 0 18px 50px #00000052, 0 2px 8px #0000003d;
   --skin-glow: 0 6px 22px #7fd4f547, 0 1px 4px #7fd4f52e;
   /* La cola del anillo de carga. */
   --skin-busy-tail: #7b5cf0;

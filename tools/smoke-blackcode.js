@@ -5250,6 +5250,51 @@ await go('ajustes', 'about');
 }
 // </lista-chats>
 
+// Las hojas (core 0.21.0, pedido de Fran: «como en Verba»): Chat y Notes son
+// dos hojas sueltas con aire entre ellas, y el escenario apaga su canto
+// fundiéndose a la par del cambio de vista.
+// <hojas>
+{
+  await go('chat');
+  await settle();
+  const stage = document.querySelector('.rad-stage');
+  const canto = () => parseFloat(getComputedStyle(stage, '::after').opacity);
+  const vistaChat = view('chat');
+  const [ladoH, escenaH] = [vistaChat.querySelector('.dm-lado'), vistaChat.querySelector('.dm-escena')];
+  if (!stage.hasAttribute('data-rad-sheets') || !vistaChat.hasAttribute('data-rad-sheets')) fail('hojas: el chat no es una vista de hojas');
+  if (!ladoH?.classList.contains('rad-sheet') || !escenaH?.classList.contains('rad-sheet')) fail('hojas: el lado y la conversación no son hojas');
+  else {
+    const a = ladoH.getBoundingClientRect();
+    const b = escenaH.getBoundingClientRect();
+    const aire = r2(b.left - a.right);
+    const s = getComputedStyle(document.documentElement).getPropertyValue('--rad-space-2').trim();
+    if (aire !== parseFloat(s)) fail(`hojas: entre el lado y la conversación hay ${aire} px de aire (tenía que ser ${s})`);
+    // la vista pinta el telón (el aire se ve como el fondo de la ventana) y cada hoja el velo y su canto
+    if (!getComputedStyle(vistaChat).backgroundImage.includes('radial-gradient')) fail('hojas: la vista del chat no pinta el telón en el aire entre las hojas');
+    if (!(parseFloat(getComputedStyle(ladoH).borderTopRightRadius) > 0) || !getComputedStyle(ladoH, '::after').boxShadow.includes('inset')) fail('hojas: el lado no tiene la curva o el canto de una hoja');
+  }
+  if (canto() !== 0) fail(`hojas: con el chat a la vista el escenario sigue mostrando su canto (${canto()})`);
+  // Al pasar a una vista entera, el canto del escenario vuelve fundiéndose; y se va igual al volver.
+  const muestrear = async (accion) => {
+    const m = [];
+    let sigue = true;
+    const tic = () => { m.push(canto()); if (sigue) requestAnimationFrame(tic); };
+    requestAnimationFrame(tic);
+    accion();
+    await sleep(dur('base') + 200);
+    sigue = false;
+    return m;
+  };
+  const ida = await muestrear(() => document.querySelector('.rad-tab[data-view="memoria"]').click());
+  const vuelta = await muestrear(() => document.querySelector('.rad-tab[data-view="chat"]').click());
+  const medios = (m) => m.filter((x) => x > 0.05 && x < 0.95).length;
+  if (ida.at(-1) !== 1 || medios(ida) < 3) fail('hojas: al ir a Memory el canto del escenario no volvió fundiéndose: ' + ida.map((x) => r2(x)).join(' '));
+  if (vuelta.at(-1) !== 0 || medios(vuelta) < 3) fail('hojas: al volver al chat el canto del escenario no se fue fundiéndose: ' + vuelta.map((x) => r2(x)).join(' '));
+  if (!view('notas').hasAttribute('data-rad-sheets')) fail('hojas: Notes no es una vista de hojas');
+  data.hojas = `aire de ${getComputedStyle(document.documentElement).getPropertyValue('--rad-space-2').trim()}; el canto: ${medios(ida)} cuadros de ida y ${medios(vuelta)} de vuelta`;
+}
+// </hojas>
+
 // Para la captura y para la pasada 2: de vuelta en el chat.
 await go('chat');
 window.rad.store.write('smoke', { pass: 1, chat: chatId, chatVenice, frenado: data.frenado, horas: data.horasGuardadas });

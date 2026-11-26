@@ -306,6 +306,29 @@
   }
   .rad-view[data-state='hidden'] { visibility: hidden; }
 
+  /* Hojas (core 0.21.0): una vista con `sheets: true` se reparte en hojas
+     sueltas, cada una .rad-sheet, como paneles flotantes con aire entre
+     ellos. La vista sigue tapando (la piel la pinta como el telón) y cada
+     hoja se pinta como el escenario. El canto va en ::after, por encima de lo
+     que la hoja tenga adentro (como el del escenario); el aislamiento lo
+     deja adentro de la hoja. El reparto (columnas y aire) es de la app. */
+  .rad-sheet {
+    position: relative;
+    isolation: isolate;
+    min-width: 0;
+    min-height: 0;
+    /* (como el escenario: lo de adentro no se sale de la curva) */
+    overflow: hidden;
+  }
+  .rad-sheet::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2000;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
   /* Statusbar */
   .rad-statusbar {
     grid-area: status;

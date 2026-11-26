@@ -141,7 +141,8 @@ export function montarChat(el, { router }) {
   const canales = h('section', 'dm-canales', { 'data-grupo': 'canales', 'data-vacio': '', 'aria-label': 'Channels' }, h('div', 'dm-canales-todo', {}, h('div', 'dm-canales-fila', {}, canalesCabeza, canalesBorrar), canalesCaja));
   canales.inert = true;
   lista.append(fijados, recientes, canales);
-  const lado = h('aside', 'dm-lado', { 'data-rad-chrome': '' }, selector, cabezaLista, h('div', 'dm-buscar-fila', {}, cajaBuscar, botonSeleccionar), lista);
+  // (el lado y la escena son dos hojas sueltas, con aire entre ellas: core 0.21.0)
+  const lado = h('aside', 'dm-lado rad-sheet', { 'data-rad-chrome': '' }, selector, cabezaLista, h('div', 'dm-buscar-fila', {}, cajaBuscar, botonSeleccionar), lista);
 
   // ---------- La conversación ----------
   // (solo el nombre del chat: el agente y el modelo los dice la barra de estado)
@@ -213,7 +214,7 @@ export function montarChat(el, { router }) {
   // La escena: la conversación y, a su derecha, el panel que esté abierto (el
   // canvas, el navegador o la terminal). El panel empuja a la conversación; no
   // la tapa (salvo el navegador cuando se lo estira).
-  const escena = h('div', 'dm-escena');
+  const escena = h('div', 'dm-escena rad-sheet');
   // El hueco de la escena es uno solo: abrir un panel cierra el otro.
   const turnos = {
     pedir(quien) {
