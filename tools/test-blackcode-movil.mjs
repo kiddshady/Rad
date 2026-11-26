@@ -132,6 +132,12 @@ interfaz = (canal, p) => {
   else if (p.que === 'chat') responder(p.chat === 'c1' ? { ok: true, datos: { chat: { id: 'c1' }, mensajes: [], antes: p.antes } } : { ok: false, status: 404, error: 'That chat does not exist anymore.' });
   else if (p.que === 'crear') responder({ ok: true, datos: { id: 'nuevo' } });
   else if (p.que === 'enviar') responder({ ok: true, datos: { ok: true } });
+  else if (p.que === 'canvases') responder({ ok: true, datos: [{ id: 'cv1', agente: p.agente }] });
+  else if (p.que === 'canvas') responder(p.canvas === 'cv1' ? { ok: true, datos: { id: 'cv1', contenido: '# hola' } } : { ok: false, status: 404, error: 'That canvas does not exist anymore.' });
+  else if (p.que === 'tareas') responder({ ok: true, datos: { tareas: [], resultados: [], sinLeer: 2 } });
+  else if (p.que === 'resultado') responder({ ok: true, datos: { id: p.resultado } });
+  else if (p.que === 'tareaActivar') responder({ ok: true, datos: { ok: true, tarea: p.tarea, activa: p.activa } });
+  else if (p.que === 'tareaCorrer') responder({ ok: true, datos: { ok: true, tarea: p.tarea } });
   else if (p.que === 'imagen') {
     if (p.msg === 'data') responder({ ok: true, datos: { dataUrl: `data:image/png;base64,${PNG_1x1}` } });
     else if (p.msg === 'archivo') responder({ ok: true, datos: { archivo: path.join(tmp, 'tools', 'images', 'a.png') } });
@@ -155,6 +161,22 @@ ok('mandar pasa el texto y solo las imágenes de verdad', env.que === 'enviar' &
 ok('un JSON roto da 400', (await pedir('POST', '/api/chats', { clave, crudo: '{roto' })).status === 400);
 const colgada = await pedir('POST', '/api/chats/c1/stop', { clave });
 ok('si la interfaz no contesta, 503 (y no se cuelga)', colgada.status === 503, colgada.texto);
+
+// ---------- Canvases y tareas ----------
+const cvs = await pedir('GET', '/api/canvases?agente=z', { clave });
+ok('los canvas de un agente', cvs.status === 200 && cvs.json?.[0]?.agente === 'z' && pedidos.at(-1).que === 'canvases', cvs.texto);
+const cv = await pedir('GET', '/api/canvases/cv1?agente=z', { clave });
+// (el bug de la 1.12.0 en desarrollo: el id del canvas viajaba como `id` y pisaba el número del pedido, que se quedaba sin respuesta)
+ok('un canvas: su id no pisa el número del pedido', cv.status === 200 && cv.json?.contenido === '# hola' && pedidos.at(-1).canvas === 'cv1' && typeof pedidos.at(-1).id === 'number', cv.texto);
+ok('un canvas que no existe da 404', (await pedir('GET', '/api/canvases/nada?agente=z', { clave })).status === 404);
+const tt = await pedir('GET', '/api/tasks', { clave });
+ok('las tareas y su bandeja', tt.status === 200 && tt.json?.sinLeer === 2);
+const res = await pedir('GET', '/api/tasks/results/r9', { clave });
+ok('un resultado, por su id', res.status === 200 && res.json?.id === 'r9' && typeof pedidos.at(-1).id === 'number', res.texto);
+const act = await pedir('POST', '/api/tasks/t7/active', { clave, cuerpo: { activa: false } });
+ok('pausar una tarea', act.status === 200 && act.json?.tarea === 't7' && act.json?.activa === false, act.texto);
+const cor = await pedir('POST', '/api/tasks/t7/run', { clave });
+ok('correr una tarea ahora', cor.status === 200 && cor.json?.tarea === 't7', cor.texto);
 
 // ---------- Imágenes ----------
 const img = await pedir('GET', '/api/image/c1/data/0?max=480', { clave });
@@ -207,5 +229,5 @@ if (failures.length) {
   for (const f of failures) console.log('  ' + f);
   process.exit(1);
 }
-console.log(`test-blackcode-movil: ok (${hechas} comprobaciones: apagado de fábrica, la clave al prender y cifrada, ping abierto y lo demás con clave, la clave nunca en la interfaz, los pedidos por la interfaz y sus errores, una interfaz colgada, las imágenes y la carpeta de la app, el canal de eventos y la clave nueva, apagarlo, y el cableado)`);
+console.log(`test-blackcode-movil: ok (${hechas} comprobaciones: apagado de fábrica, la clave al prender y cifrada, ping abierto y lo demás con clave, la clave nunca en la interfaz, los pedidos por la interfaz y sus errores, una interfaz colgada, canvases y tareas (y que un dato llamado id no pise el pedido), las imágenes y la carpeta de la app, el canal de eventos y la clave nueva, apagarlo, y el cableado)`);
 process.exit(0);

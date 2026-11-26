@@ -1,5 +1,19 @@
 # Changelog
 
+## BlackCode 1.12.0 (2026-11-26)
+
+- **Canvases y Tasks en el celu.** El puente de BlackCode Mobile suma los
+  canvas de un agente (los suyos y los huérfanos sin dueño, que son de
+  todos), para leerlos, y las tareas programadas con su bandeja: listar,
+  pausar o reanudar, correr ahora y leer un resultado, que queda leído. Los
+  contesta la interfaz con los canales que ya usaba la pestaña Tasks y el
+  panel del canvas; un agente no abre el canvas de otro. Cuando cambian (una
+  corrida nueva, un canvas que escribe el agente) se le avisa al celu.
+- **Un pedido del celu ya no se queda sin respuesta** si lo que pide se
+  identifica con un `id` (un canvas, un resultado, una tarea): el número del
+  pedido viajaba en el mismo campo y lo pisaba. Ahora va al final y los
+  datos tienen sus nombres.
+
 ## BlackCode 1.11.0 (2026-11-26)
 
 - **Buscar en la lista de chats.** Un campo «Search chats» debajo de «New

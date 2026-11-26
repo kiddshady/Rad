@@ -120,7 +120,8 @@ function crear(rad, { electron = require('electron'), esperaMs = ESPERA_MS } = {
       const id = ++serie;
       const timer = setTimeout(() => { pendientes.delete(id); reject(new Fallo(503, 'BlackCode did not answer in time.')); }, esperaMs);
       pendientes.set(id, { resolve, reject, timer });
-      rad.send('movil:pedido', { id, que, ...datos });
+      // (el número del pedido y qué es van al final: un dato que se llame igual no los pisa)
+      rad.send('movil:pedido', { ...datos, id, que });
     });
   }
   rad.handle('movil:respuesta', (r) => {
@@ -214,6 +215,14 @@ function crear(rad, { electron = require('electron'), esperaMs = ESPERA_MS } = {
   }));
   ruta('POST', '/api/chats/:id/stop', ({ p }) => preguntar('frenar', { chat: p.id }));
   ruta('POST', '/api/chats/:id/confirm', ({ p, b }) => preguntar('confirmar', { chat: p.id, permitir: b.permitir === true, confiar: b.confiar === true }));
+  // los canvas de un agente (en el celu se leen, no se editan)
+  ruta('GET', '/api/canvases', ({ q }) => preguntar('canvases', { agente: String(q.get('agente') ?? '') }));
+  ruta('GET', '/api/canvases/:id', ({ p, q }) => preguntar('canvas', { canvas: p.id, agente: String(q.get('agente') ?? '') }));
+  // las tareas programadas y su bandeja
+  ruta('GET', '/api/tasks', () => preguntar('tareas'));
+  ruta('GET', '/api/tasks/results/:id', ({ p }) => preguntar('resultado', { resultado: p.id }));
+  ruta('POST', '/api/tasks/:id/active', ({ p, b }) => preguntar('tareaActivar', { tarea: p.id, activa: b.activa === true }));
+  ruta('POST', '/api/tasks/:id/run', ({ p }) => preguntar('tareaCorrer', { tarea: p.id }));
   ruta('GET', '/api/image/:chat/:msg/:n', async ({ p, q, res }) => {
     const im = await preguntar('imagen', { chat: p.chat, msg: p.msg, n: Number(p.n) });
     let buf = null;

@@ -5109,8 +5109,54 @@ await go('ajustes', 'about');
   if (bytes.datos?.dataUrl !== PNG) fail('celu: la referencia de la foto no lleva a la foto');
   if ((await atender({ que: 'imagen', chat: id, msg: mia?.id, n: 1 })).status !== 404) fail('celu: una foto que no existe no da 404');
   if ((await atender({ que: 'nada' })).status !== 400) fail('celu: un pedido desconocido no da 400');
+
+  // Los canvas del celu (1.12.0): los del agente, y uno de otro agente no se abre.
+  // (con un agente que tenga la tool del canvas, en un chat suyo: el primero del humo puede no tenerla)
+  const conCanvas = datosM.listaAgentes().find((a) => datosM.toolsDe(a).includes('canvas') && datosM.modeloConTools(a.proveedor, a.modelo));
+  if (!conCanvas) fail('celu: en el humo no hay ningún agente con la tool del canvas');
+  const agenteC = conCanvas?.id ?? est.datos.agentes[0]?.id;
+  const chatC = datosM.crearChat(agenteC, { elegir: false }).id;
+  const CANVAS_CELU = 'Smoke canvas del celu';
+  await datosM.enviar(chatC, 'TOOLS: ' + JSON.stringify([{ name: 'canvas', args: { action: 'create', title: CANVAS_CELU, content: '# Del celu\n\nUn **canvas** para leer.' } }]), null, { modo: 'auto' });
+  await until(() => !datosM.respondiendo(chatC), 20000);
+  const cvs = await atender({ que: 'canvases', agente: agenteC });
+  const delCelu = cvs.datos?.find((c) => c.titulo === CANVAS_CELU);
+  if (!cvs.ok || !delCelu || delCelu.tipo !== 'document') fail('celu: el canvas que creó el agente no está en su lista: ' + JSON.stringify(cvs).slice(0, 200));
+  const unCanvas = delCelu ? await atender({ que: 'canvas', canvas: delCelu.id, agente: agenteC }) : null;
+  if (!unCanvas?.ok || !unCanvas.datos.contenido.includes('Un **canvas** para leer.')) fail('celu: abrir el canvas no trae su texto: ' + JSON.stringify(unCanvas).slice(0, 200));
+  const otroAgente = est.datos.agentes.find((a) => a.id !== agenteC)?.id;
+  if (delCelu && otroAgente) {
+    if ((await atender({ que: 'canvas', canvas: delCelu.id, agente: otroAgente })).status !== 404) fail('celu: otro agente puede abrir un canvas que no es suyo');
+    if ((await atender({ que: 'canvases', agente: otroAgente })).datos?.some((c) => c.id === delCelu.id)) fail('celu: el canvas de un agente sale en la lista de otro');
+  }
+  if ((await atender({ que: 'canvases', agente: 'no-existe' })).status !== 404) fail('celu: los canvas de un agente que no existe no dan 404');
+
+  // Las tareas del celu: listarlas, pausar, correr ahora y leer el resultado (que queda leído).
+  const nuevaT = await window.rad.invoke('tareas:guardar', { titulo: 'Smoke del celu', prompt: 'Una corrida desde el celu.', agente: agenteC, spec: { kind: 'daily', a: '06:00' } });
+  const tt = await atender({ que: 'tareas' });
+  const laT = tt.datos?.tareas?.find((t) => t.id === nuevaT.id);
+  if (!tt.ok || !laT || laT.cuando !== 'every day at 06:00' || !laT.activa) fail('celu: la tarea nueva no está en la lista del celu: ' + JSON.stringify(laT ?? tt).slice(0, 200));
+  await atender({ que: 'tareaActivar', tarea: nuevaT.id, activa: false });
+  if ((await window.rad.invoke('tareas:leer')).tareas.find((t) => t.id === nuevaT.id)?.activa !== false) fail('celu: pausar desde el celu no pausó la tarea');
+  await atender({ que: 'tareaActivar', tarea: nuevaT.id, activa: true });
+  const corre = await atender({ que: 'tareaCorrer', tarea: nuevaT.id });
+  if (!corre.ok) fail('celu: «Run now» desde el celu no la corrió: ' + JSON.stringify(corre));
+  let suResultado = null;
+  await until(async () => { suResultado = (await window.rad.invoke('tareas:leer')).resultados.find((r) => r.tarea === nuevaT.id); return Boolean(suResultado); }, 20000);
+  const enLaBandeja = (await atender({ que: 'tareas' })).datos?.resultados?.find((r) => r.id === suResultado?.id);
+  if (!enLaBandeja || enLaBandeja.leida || !enLaBandeja.resumen.includes('Una corrida desde el celu')) fail('celu: el resultado no está en la bandeja del celu, sin leer y con su principio: ' + JSON.stringify(enLaBandeja).slice(0, 200));
+  const leido = suResultado ? await atender({ que: 'resultado', resultado: suResultado.id }) : null;
+  if (!leido?.ok || !leido.datos.salida.includes('Una corrida desde el celu')) fail('celu: abrir el resultado no trae su texto');
+  if ((await window.rad.invoke('tareas:leer')).resultados.find((r) => r.id === suResultado?.id)?.leida !== true) fail('celu: abrir un resultado desde el celu no lo marcó leído');
+  if ((await atender({ que: 'resultado', resultado: 'no-existe' })).status !== 404) fail('celu: un resultado que no existe no da 404');
+  // (lo de la prueba no queda: ni la tarea, ni su resultado, ni el canvas)
+  if (suResultado) await window.rad.invoke('tareas:quitar-resultado', suResultado.id);
+  await window.rad.invoke('tareas:quitar', nuevaT.id);
+  if (delCelu) await window.rad.invoke('canvas:borrar', { id: delCelu.id });
+  await datosM.borrarChat(chatC);
+
   await datosM.borrarChat(id);
-  data.celuPedidos = `${fin.datos?.mensajes?.length ?? 0} mensajes, y la foto por referencia`;
+  data.celuPedidos = `${fin.datos?.mensajes?.length ?? 0} mensajes, la foto por referencia, canvas del agente y tareas (pausar, correr, leer)`;
   // (Settings queda en About, como lo dejó la sección de antes: la pasada 2
   // comprueba que la app recuerde esa pestaña)
   await go('ajustes', 'about');

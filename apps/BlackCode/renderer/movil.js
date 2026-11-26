@@ -111,7 +111,59 @@ const PEDIDOS = {
     if (im?.archivo) return { archivo: im.archivo };
     throw new Fallo(404, 'no such image');
   },
+
+  // ---------- Los canvas (en el celu, solo para leer) ----------
+  // Los de un agente: los suyos y los huérfanos de antes sin dueño conocido,
+  // que son de todos (Fran, 1.8.2). Los de la papelera no.
+  async canvases({ agente }) {
+    if (!datos.agente(agente)) throw new Fallo(404, 'That agent does not exist.');
+    const todos = await window.rad.invoke('canvas:todos');
+    return (Array.isArray(todos) ? todos : [])
+      .filter((c) => !c.trashed && deEseAgente(c, agente))
+      .map((c) => ({ id: c.id, titulo: c.title, tipo: c.kind, lenguaje: c.language ?? null, version: c.version, tocado: fechaDe(c.updated_at), chat: c.conversationTitle ?? null }));
+  },
+  async canvas({ canvas: id, agente }) {
+    const c = await window.rad.invoke('canvas:abrir', String(id ?? ''));
+    if (!c || !deEseAgente(c, agente)) throw new Fallo(404, 'That canvas does not exist anymore.');
+    return { id: c.id, titulo: c.title, tipo: c.kind, lenguaje: c.language ?? null, version: c.version, tocado: fechaDe(c.updated_at), contenido: c.content ?? '' };
+  },
+
+  // ---------- Las tareas programadas y su bandeja ----------
+  // Las de todos los agentes, como la pestaña Tasks. De cada resultado va el
+  // principio: el texto entero sale por `resultado`, que además lo marca leído.
+  async tareas() {
+    const e = await window.rad.invoke('tareas:leer');
+    return {
+      corriendo: e.corriendo ?? null,
+      sinLeer: e.sinLeer ?? 0,
+      tareas: (e.tareas ?? []).map((t) => ({ id: t.id, titulo: t.titulo, agente: nombreDe(t.agente) || 'Deleted agent', cuando: t.cuando, activa: t.activa === true, actua: t.actuar === true, proxima: t.proxima ?? null, ultima: t.ultima ?? null, corriendo: t.corriendo === true })),
+      resultados: (e.resultados ?? []).map((r) => ({ id: r.id, titulo: r.titulo, agente: r.agenteNombre || nombreDe(r.agente), ts: r.ts, leida: r.leida === true, error: Boolean(r.error), resumen: limpio(r.error ? `Failed: ${r.error}` : r.salida).slice(0, 240) })),
+    };
+  },
+  async resultado({ resultado: id }) {
+    const r = ((await window.rad.invoke('tareas:leer')).resultados ?? []).find((x) => x.id === id);
+    if (!r) throw new Fallo(404, 'That result is not in the tray anymore.');
+    if (!r.leida) await window.rad.invoke('tareas:leida', r.id);
+    return { id: r.id, titulo: r.titulo, agente: r.agenteNombre || nombreDe(r.agente), ts: r.ts, ms: r.ms ?? null, salida: r.salida ?? '', error: r.error ?? null, cortada: r.cortada ?? null, pasos: (r.pasos ?? []).map((x) => ({ name: x.name, label: x.label ?? '', status: x.status })) };
+  },
+  async tareaActivar({ tarea: id, activa }) {
+    const r = await window.rad.invoke('tareas:activar', { id, activa: activa === true });
+    if (r && r.ok === false) throw new Fallo(400, r.error ?? 'Could not change the task.');
+    return { ok: true };
+  },
+  async tareaCorrer({ tarea: id }) {
+    const r = await window.rad.invoke('tareas:correr', id);
+    if (!r?.ok) throw new Fallo(409, r?.error ?? 'The task could not start.');
+    return { ok: true };
+  },
 };
+
+// (un canvas es del agente que lo creó; los huérfanos sin dueño, de todos)
+const deEseAgente = (c, agente) => !c.agent_id || c.agent_id === agente;
+// (SQLite guarda «2026-11-26 03:10:00» en UTC)
+const fechaDe = (s) => { const t = Date.parse(`${String(s ?? '').replace(' ', 'T')}Z`); return Number.isFinite(t) ? t : null; };
+// (el principio de un resultado, sin la marca del markdown, en una línea)
+const limpio = (s) => String(s ?? '').replace(/^#+\s*/gm, '').replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim();
 
 /** Contesta un pedido del puente: { ok, datos } o { ok: false, status, error }.
  *  (Exportado para el humo, que lo prueba sin un celu.) */
@@ -166,6 +218,12 @@ datos.on('turno', ({ chat, estado, texto } = {}) => {
   // los mensajes de ese chat ya no van a crecer
   for (const [id, e] of enviado) if (e.chat === chat) enviado.delete(id);
 });
+
+// Las tareas y los canvas cambian en el proceso principal: se avisa para que
+// el celu los pida de nuevo.
+window.rad.on('tareas:evento', () => mandar({ tipo: 'tareas' }));
+window.rad.on('canvas:evento', () => mandar({ tipo: 'canvas' }));
+datos.on('canvas', () => mandar({ tipo: 'canvas' }));
 
 export async function montarMovil() {
   window.rad.on('movil:clientes', (n) => { clientes = Number(n) || 0; });
