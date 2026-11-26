@@ -54,7 +54,7 @@ export function montarCanvas({ escena, turnos }) {
   const boton = (accion, nombre, etiqueta, extra = {}) => h('button', 'rad-iconbutton', { type: 'button', 'data-accion': accion, 'aria-label': etiqueta, 'data-rad-tip': etiqueta, 'data-rad-tip-side': 'bottom', ...extra }, icono(nombre));
   const bEditar = boton('canvas-editar', 'lapiz', 'Edit');
   const bCopiar = boton('canvas-copiar', 'copiar', 'Copy');
-  const bExportar = boton('canvas-exportar', 'bajar', 'Export to a file');
+  const bExportar = boton('canvas-exportar', 'exportar', 'Export to a file');
   const bBorrar = boton('canvas-borrar', 'tacho', 'Delete');
   const bCerrar = boton('canvas-cerrar', 'cerrar', 'Close');
   const bGuardar = h('button', 'rad-button', { type: 'button', 'data-variant': 'primary', 'data-accion': 'canvas-guardar', 'data-rad-tip': 'Save', 'data-rad-tip-key': 'Ctrl+S', 'data-rad-tip-side': 'bottom' }, 'Save');

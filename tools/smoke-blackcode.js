@@ -3798,8 +3798,13 @@ else {
       filasR().forEach((fila) => {
         const d = fila.querySelector('.dm-skill-descripcion');
         if (!d) return;
-        // (el resultado de esa fila: el de su tarea cuyo texto empieza como lo que se ve)
-        const r = todos.find((x) => x.titulo === fila.dataset.resultado && limpio(x).startsWith(d.textContent.replace(/…$/, '').slice(0, 60)));
+        // (el resultado de esa fila: el de su tarea con ese mismo texto, o el
+        // que empieza con todo lo que se ve. Por el principio solo no alcanza:
+        // las corridas de una misma tarea empiezan igual y difieren en la hora
+        // que llevan adentro, así que se emparejaba con otra corrida)
+        const deSuTarea = todos.filter((x) => x.titulo === fila.dataset.resultado);
+        const visto = d.textContent.replace(/…$/, '');
+        const r = deSuTarea.find((x) => limpio(x) === d.textContent) ?? deSuTarea.find((x) => limpio(x).startsWith(visto)) ?? deSuTarea.find((x) => limpio(x).startsWith(visto.slice(0, 60)));
         if (!r) { fail('tareas: una fila de la bandeja no muestra el principio de ningún resultado: «' + d.textContent.slice(0, 60) + '»'); return; }
         const entero = limpio(r);
         if (d.textContent.length < entero.length) {
@@ -5110,6 +5115,94 @@ await go('ajustes', 'about');
   // comprueba que la app recuerde esa pestaña)
   await go('ajustes', 'about');
 }
+
+// La lista de chats: buscar por el nombre y borrar varios de una, como en
+// Umbra pero sin carpetas (1.11.0, pedido de Fran).
+// <lista-chats>
+{
+  const datosM = await import('/datos.js');
+  await go('chat');
+  const lado = chatView.querySelector('.dm-lado');
+  const campo = lado.querySelector('[data-campo="buscar-chats"]');
+  const btnSel = lado.querySelector('[data-accion="seleccionar"]');
+  const todosB = lado.querySelector('[data-campo="seleccionar-todos"]');
+  const borrarB = lado.querySelector('[data-accion="borrar-seleccion"]');
+  const vivas = () => alive(lado.querySelectorAll('.dm-fila'));
+  const titulosVis = () => vivas().map((f) => f.querySelector('.dm-fila-titulo > :not(.rad-swap-out)')?.textContent ?? '');
+  if (!campo || !btnSel || !todosB || !borrarB) fail('lista: falta el campo para buscar, el botón de seleccionar o la barra de la selección');
+  else {
+    const a = datosM.agenteActual();
+    const antes = datosM.chatsDe(a.id).map((c) => c.id);
+    const abierto = datosM.chatActual()?.id ?? null;
+    const nuevos = ['Smoke búsqueda Química', 'Smoke búsqueda farmacia', 'Smoke otra cosa'].map((t) => { const c = datosM.crearChat(a.id, { elegir: false }); datosM.renombrarChat(c.id, t); return c.id; });
+    await settle();
+    if ((datosM.chatActual()?.id ?? null) !== abierto) fail('lista: crear un chat sin elegirlo cambió el chat abierto');
+
+    // Buscar: sin tildes ni mayúsculas, en el nombre.
+    type(campo, 'smoke BUSQUEDA quimica');
+    await settle();
+    if (JSON.stringify(titulosVis()) !== JSON.stringify(['Smoke búsqueda Química'])) fail('lista: buscar «smoke BUSQUEDA quimica» dejó a la vista ' + JSON.stringify(titulosVis()));
+    if (op(lado.querySelector('.dm-buscar-limpiar')) !== 1) fail('lista: con algo escrito no aparece la × para borrar la búsqueda');
+    type(campo, 'zzz nada de nada');
+    await settle();
+    const vacio = shown(lado.querySelector('.dm-chats-vacio'));
+    if (vacio !== 'No chats match “zzz nada de nada”.') fail(`lista: sin coincidencias la lista dice «${vacio}»`);
+    key(campo, 'Escape');
+    await settle();
+    if (campo.value !== '' || nuevos.some((id) => !titulosVis().includes(datosM.chat(id).titulo))) fail('lista: Esc en el campo no borró la búsqueda');
+    if (op(lado.querySelector('.dm-buscar-limpiar')) !== 0) fail('lista: sin nada escrito la × de la búsqueda sigue a la vista');
+
+    // Seleccionar: «New chat» deja su lugar a la barra, en orden.
+    btnSel.click();
+    await settle();
+    if (!lado.hasAttribute('data-seleccion') || op(lado.querySelector('.dm-sel')) !== 1 || op(lado.querySelector('.dm-nuevo')) !== 0) fail('lista: al entrar a seleccionar no se cambió «New chat» por la barra de la selección');
+    if (shown(lado.querySelector('.dm-sel-cuenta')) !== '' || !borrarB.disabled) fail('lista: sin nada marcado la barra dice «' + shown(lado.querySelector('.dm-sel-cuenta')) + '» o el tacho está prendido');
+    // con la búsqueda, «Select all» marca solo lo que se ve
+    type(campo, 'smoke búsqueda');
+    await settle();
+    todosB.click();
+    await settle();
+    const marcadas = vivas().filter((f) => f.hasAttribute('data-elegido'));
+    if (marcadas.length !== 2 || shown(lado.querySelector('.dm-sel-cuenta')) !== '2 selected' || borrarB.disabled || !todosB.checked) fail(`lista: «Select all» con la búsqueda marcó ${marcadas.length} («${shown(lado.querySelector('.dm-sel-cuenta'))}»)`);
+    // la casilla entra sin mover anchos: la fila corre su texto con transform
+    const corrida = marcadas[0] && new DOMMatrix(getComputedStyle(marcadas[0].querySelector('.dm-fila-abrir')).transform).m41;
+    if (!(corrida > 0) || op(marcadas[0].querySelector('.dm-fila-marca')) !== 1 || !marcadas[0].querySelector('.dm-fila-marca > input').checked) fail(`lista: la casilla de una fila marcada no se ve (texto corrido ${corrida} px)`);
+    // un clic en una fila la desmarca, y otro la vuelve a marcar (no abre el chat)
+    marcadas[1]?.querySelector('.dm-fila-abrir').click();
+    await settle();
+    if (shown(lado.querySelector('.dm-sel-cuenta')) !== '1 selected' || todosB.checked || (datosM.chatActual()?.id ?? null) !== abierto) fail('lista: seleccionando, un clic en una fila no la desmarcó o abrió el chat');
+    marcadas[1]?.querySelector('.dm-fila-abrir').click();
+    await settle();
+
+    // Borrar lo marcado: pregunta, borra solo eso, sale de la selección.
+    borrarB.click();
+    await until(() => modal(), 2000);
+    const dice = modal()?.innerText ?? '';
+    if (!dice.includes('Delete 2 chats?')) fail(`lista: el aviso de borrar dice «${dice.replace(/\s+/g, ' ').slice(0, 120)}»`);
+    primary()?.click();
+    await closed();
+    await until(() => !datosM.chat(nuevos[0]) && !datosM.chat(nuevos[1]), 4000);
+    await settle();
+    if (datosM.chat(nuevos[0]) || datosM.chat(nuevos[1]) || !datosM.chat(nuevos[2])) fail('lista: «Delete selected» no borró justo los dos marcados');
+    if (antes.some((id) => !datosM.chat(id))) fail('lista: «Delete selected» borró chats que no estaban marcados');
+    if (lado.hasAttribute('data-seleccion')) fail('lista: después de borrar sigue en la selección');
+    if ((datosM.chatActual()?.id ?? null) !== abierto) fail('lista: borrar otros chats cambió el chat abierto');
+    key(campo, 'Escape');
+    await settle();
+
+    // Esc sale de la selección, y cambiar de agente también.
+    btnSel.click();
+    await settle();
+    key(lado, 'Escape');
+    await settle();
+    if (lado.hasAttribute('data-seleccion') || op(lado.querySelector('.dm-nuevo')) !== 1) fail('lista: Esc no sacó de la selección');
+    enIngles('en la lista con la búsqueda');
+    await datosM.borrarChat(nuevos[2]);
+    await settle();
+    data.listaChats = 'buscar sin tildes, «Select all» con la búsqueda, desmarcar, borrar dos, Esc';
+  }
+}
+// </lista-chats>
 
 // Para la captura y para la pasada 2: de vuelta en el chat.
 await go('chat');

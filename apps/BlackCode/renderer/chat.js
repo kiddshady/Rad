@@ -84,6 +84,31 @@ export function montarChat(el, { router }) {
   ], { matchAnchorWidth: true });
 
   const nuevo = h('button', 'rad-button dm-nuevo', { type: 'button', 'data-accion': 'nuevo-chat' }, icono('mas'), 'New chat');
+
+  // ---------- Buscar y seleccionar ----------
+  // Como en Umbra, sin las carpetas (Fran no las usa): un campo que filtra los
+  // chats del agente por su nombre, y un modo de selección para borrar varios
+  // de una. En ese modo «New chat» deja su lugar a la barra de la selección
+  // (Select all, cuántos, borrar y salir), y cada fila muestra su casilla. Los
+  // chats de canal no se seleccionan: su grupo ya tiene su «borrar todos».
+  const campoBuscar = h('input', 'rad-input dm-buscar-campo', { type: 'text', placeholder: 'Search chats', 'aria-label': 'Search chats', spellcheck: 'false', autocomplete: 'off', 'data-campo': 'buscar-chats' });
+  const limpiarBuscar = h('button', 'rad-iconbutton dm-buscar-limpiar', { type: 'button', 'aria-label': 'Clear search', 'data-rad-tip': 'Clear', 'data-accion': 'buscar-limpiar', tabindex: '-1' }, icono('cerrar'));
+  const cajaBuscar = h('div', 'dm-buscar', {}, icono('lupa', 'dm-buscar-lupa'), campoBuscar, limpiarBuscar);
+  const botonSeleccionar = h('button', 'rad-iconbutton dm-seleccionar', { type: 'button', 'aria-label': 'Select chats', 'aria-pressed': 'false', 'data-rad-tip': 'Select chats', 'data-accion': 'seleccionar' }, icono('seleccionar'));
+  const todos = h('input', '', { type: 'checkbox', 'data-campo': 'seleccionar-todos' });
+  const cuentaSel = h('span', 'dm-sel-cuenta rad-swap');
+  const borrarSel = h('button', 'rad-iconbutton dm-sel-borrar', { type: 'button', 'aria-label': 'Delete selected', 'data-rad-tip': 'Delete selected', 'data-accion': 'borrar-seleccion', disabled: true }, icono('tacho'));
+  const salirSel = h('button', 'rad-iconbutton dm-sel-salir', { type: 'button', 'aria-label': 'Done', 'data-rad-tip': 'Done', 'data-rad-tip-key': 'Esc', 'data-accion': 'salir-seleccion' }, icono('cerrar'));
+  const barraSel = h('div', 'dm-sel', {}, h('label', 'rad-check dm-sel-todos', {}, todos, h('span', 'rad-check-box'), 'Select all'), cuentaSel, borrarSel, salirSel);
+  barraSel.inert = true;
+  wireControls(barraSel);
+  const cabezaLista = h('div', 'dm-lado-cabeza', {}, nuevo, barraSel);
+  let busqueda = '';                // lo que se busca, ya sin tildes ni mayúsculas
+  let seleccionando = false;
+  const elegidos = new Set();       // ids de los chats marcados
+  const sinTildes = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const coincide = (c) => !busqueda || sinTildes(c.titulo).includes(busqueda);
+
   const lista = h('div', 'dm-chats rad-scroll', { 'data-rad-line': 'bottom' });
   wireScroll(lista);
   // Adentro: los chats de siempre y, al fondo de todo, el grupo de los canales
@@ -116,7 +141,7 @@ export function montarChat(el, { router }) {
   const canales = h('section', 'dm-canales', { 'data-grupo': 'canales', 'data-vacio': '', 'aria-label': 'Channels' }, h('div', 'dm-canales-todo', {}, h('div', 'dm-canales-fila', {}, canalesCabeza, canalesBorrar), canalesCaja));
   canales.inert = true;
   lista.append(fijados, recientes, canales);
-  const lado = h('aside', 'dm-lado', { 'data-rad-chrome': '' }, selector, nuevo, lista);
+  const lado = h('aside', 'dm-lado', { 'data-rad-chrome': '' }, selector, cabezaLista, h('div', 'dm-buscar-fila', {}, cajaBuscar, botonSeleccionar), lista);
 
   // ---------- La conversación ----------
   // (solo el nombre del chat: el agente y el modelo los dice la barra de estado)
@@ -151,7 +176,7 @@ export function montarChat(el, { router }) {
   // Exportar el chat a Markdown (1.9.0, Fran): seleccionar y copiar se lleva
   // todo lo que se ve; esto da el chat limpio, sin horas ni tools (ver
   // exportar.js). El archivo lo escribe el proceso principal.
-  const botonExportar = h('button', 'rad-iconbutton dm-conv-exportar', { type: 'button', 'data-accion': 'exportar', 'aria-label': 'Export as Markdown', 'data-rad-tip': 'Export as Markdown', 'data-rad-tip-side': 'bottom' }, icono('bajar'));
+  const botonExportar = h('button', 'rad-iconbutton dm-conv-exportar', { type: 'button', 'data-accion': 'exportar', 'aria-label': 'Export as Markdown', 'data-rad-tip': 'Export as Markdown', 'data-rad-tip-side': 'bottom' }, icono('exportar'));
   botonExportar.addEventListener('click', async () => {
     const c = datos.chatActual();
     if (!c) return;
@@ -351,19 +376,33 @@ export function montarChat(el, { router }) {
     if (si) datos.borrarChat(c.id);
   }
 
+  // (el lugar vacío dice por qué: no hay chats, o no hay ninguno que se llame así)
+  const textoVacio = () => (busqueda ? `No chats match “${campoBuscar.value.trim()}”.` : 'No chats with this agent yet.');
   const fila = (c) => {
-    if (c.id === VACIO) return h('p', 'dm-chats-vacio', {}, 'No chats with this agent yet.');
+    if (c.id === VACIO) {
+      const p = h('p', 'dm-chats-vacio rad-swap');
+      swapText(p, textoVacio());
+      return p;
+    }
     // (un chat de canal lleva debajo cuándo fue: se arman solos, y así se los distingue)
     const abrir = h('button', 'dm-fila-abrir', { type: 'button' }, h('span', 'dm-fila-textos', {}, h('span', 'dm-fila-titulo rad-swap'), ...(c.voz === true ? [h('span', 'dm-fila-fecha rad-swap')] : [])), h('span', 'dm-fila-punto', { 'aria-hidden': 'true' }, h('i')));
     const mas = h('button', 'rad-iconbutton dm-fila-mas', { type: 'button', 'aria-label': 'Chat actions', 'data-rad-tip': 'Actions' }, icono('puntos'));
-    const nodo = h('div', 'dm-fila', { role: 'listitem' }, abrir, mas);
-    abrir.addEventListener('click', () => datos.elegirChat(nodo.dataset.radKey));
+    // La casilla de la selección: solo se ve en ese modo, y la marca el clic
+    // en la fila (no es un label: así un clic no la cambia dos veces).
+    const marca = h('span', 'rad-check dm-fila-marca', { 'aria-hidden': 'true' }, h('input', '', { type: 'checkbox', tabindex: '-1' }), h('span', 'rad-check-box'));
+    const nodo = h('div', 'dm-fila', { role: 'listitem' }, marca, abrir, mas);
+    wireControls(marca);
+    abrir.addEventListener('click', () => {
+      const id = nodo.dataset.radKey;
+      if (seleccionando && !nodo.hasAttribute('data-voz')) alternar(id);
+      else datos.elegirChat(id);
+    });
     menuButton(mas, () => acciones(nodo.dataset.radKey), { align: 'end' });
     ponerFila(nodo, c);
     return nodo;
   };
   const ponerFila = (nodo, c) => {
-    if (c.id === VACIO) return;
+    if (c.id === VACIO) { swapText(nodo, textoVacio()); return; }
     swapText(nodo.querySelector('.dm-fila-titulo'), c.titulo);
     const actual = datos.chatActual()?.id === c.id;
     if (actual) nodo.setAttribute('aria-current', 'true');
@@ -372,11 +411,20 @@ export function montarChat(el, { router }) {
     nodo.toggleAttribute('data-voz', c.voz === true);
     const fecha = nodo.querySelector('.dm-fila-fecha');
     if (fecha) swapText(fecha, cuando(c.tocado));
+    // (seleccionando, el botón de acciones se esconde: tampoco se llega con Tab)
+    nodo.querySelector('.dm-fila-mas').inert = seleccionando && c.voz !== true;
+    const marcado = seleccionando && elegidos.has(c.id);
+    nodo.querySelector('.dm-fila-marca > input').checked = marcado;
+    nodo.toggleAttribute('data-elegido', marcado);
+    // (en la selección, la fila es un botón que se prende y se apaga)
+    const abrir = nodo.querySelector('.dm-fila-abrir');
+    if (seleccionando && c.voz !== true) abrir.setAttribute('aria-pressed', String(marcado));
+    else abrir.removeAttribute('aria-pressed');
   };
   // (día y hora del último mensaje, como los escribe el sistema: «25/11 · 15:50»)
   const cuando = (ms) => { const d = new Date(ms); return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}`; };
   const dibujarLista = () => {
-    const suyos = datos.chatsDe(datos.agenteActual().id);
+    const suyos = datos.chatsDe(datos.agenteActual().id).filter(coincide);
     const deCanal = suyos.filter((c) => c.voz === true);
     const losDemas = suyos.filter((c) => c.voz !== true);
     const losFijados = losDemas.filter((c) => c.fijado === true);
@@ -386,7 +434,8 @@ export function montarChat(el, { router }) {
     reconcile(comunes, losRecientes.length ? losRecientes : (losFijados.length || deCanal.length ? [] : [{ id: VACIO }]), { key: (c) => c.id, create: fila, update: ponerFila });
     fijados.toggleAttribute('data-vacio', !losFijados.length);
     fijados.inert = !losFijados.length;
-    const fijadosAbiertos = datos.grupoAbierto('fijados');
+    // (mientras se busca, los grupos plegados se abren: lo que coincide se ve siempre)
+    const fijadosAbiertos = Boolean(busqueda) || datos.grupoAbierto('fijados');
     fij.cabeza.setAttribute('aria-expanded', String(fijadosAbiertos));
     fij.caja.toggleAttribute('data-abierto', fijadosAbiertos);
     fij.caja.inert = !fijadosAbiertos;
@@ -396,18 +445,111 @@ export function montarChat(el, { router }) {
     // de volver a verlos.
     rec.rotulo.toggleAttribute('data-vacio', !losFijados.length);
     rec.rotulo.inert = !losFijados.length;
-    const recientesAbiertos = !losFijados.length || datos.grupoAbierto('recientes');
+    const recientesAbiertos = !losFijados.length || Boolean(busqueda) || datos.grupoAbierto('recientes');
     rec.cabeza.setAttribute('aria-expanded', String(recientesAbiertos));
     rec.caja.toggleAttribute('data-abierto', recientesAbiertos);
     rec.caja.inert = !recientesAbiertos;
     reconcile(delCanal, deCanal, { key: (c) => c.id, create: fila, update: ponerFila });
     canales.toggleAttribute('data-vacio', !deCanal.length);
     canales.inert = !deCanal.length;
-    const abierto = datos.canalesAbiertos();
+    const abierto = Boolean(busqueda) || datos.canalesAbiertos();
     canalesCabeza.setAttribute('aria-expanded', String(abierto));
     canalesCaja.toggleAttribute('data-abierto', abierto);
     canalesCaja.inert = !abierto;
+    ponerSeleccion();
   };
+
+  // ---------- La selección ----------
+  /** Los chats que se pueden marcar: los del agente que se ven con la búsqueda, menos los de canal. */
+  const marcables = () => datos.chatsDe(datos.agenteActual().id).filter((c) => c.voz !== true && coincide(c));
+  const marcados = () => marcables().filter((c) => elegidos.has(c.id));
+  function ponerSeleccion() {
+    lado.toggleAttribute('data-seleccion', seleccionando);
+    botonSeleccionar.setAttribute('aria-pressed', String(seleccionando));
+    nuevo.inert = seleccionando;
+    barraSel.inert = !seleccionando;
+    // (lo que se borró, o ya no es de este agente, sale de la selección)
+    const vivos = new Set(datos.chatsDe(datos.agenteActual().id).map((c) => c.id));
+    for (const id of elegidos) if (!vivos.has(id)) elegidos.delete(id);
+    const total = marcables().length;
+    const n = marcados().length;
+    todos.checked = total > 0 && n === total;
+    todos.disabled = total === 0;
+    swapText(cuentaSel, n ? `${n} selected` : '');
+    borrarSel.disabled = n === 0;
+    botonSeleccionar.disabled = !seleccionando && !datos.chatsDe(datos.agenteActual().id).some((c) => c.voz !== true);
+  }
+  const repintarFilas = () => {
+    for (const nodo of lista.querySelectorAll('.dm-fila')) {
+      const c = datos.chat(nodo.dataset.radKey);
+      if (c) ponerFila(nodo, c);
+    }
+    ponerSeleccion();
+  };
+  function alternar(id) {
+    if (elegidos.has(id)) elegidos.delete(id);
+    else elegidos.add(id);
+    repintarFilas();
+  }
+  function entrarASeleccionar() {
+    if (seleccionando) return;
+    elegidos.clear();
+    seleccionando = true;
+    repintarFilas();
+  }
+  function salirDeSeleccionar() {
+    if (!seleccionando) return;
+    seleccionando = false;
+    elegidos.clear();
+    repintarFilas();
+  }
+  botonSeleccionar.addEventListener('click', () => (seleccionando ? salirDeSeleccionar() : entrarASeleccionar()));
+  salirSel.addEventListener('click', salirDeSeleccionar);
+  // «Select all» marca los que se ven (con la búsqueda puesta, solo los que coinciden); otra vez, ninguno.
+  todos.addEventListener('change', () => {
+    const lista2 = marcables();
+    const todosYa = lista2.length > 0 && lista2.every((c) => elegidos.has(c.id));
+    for (const c of lista2) { if (todosYa) elegidos.delete(c.id); else elegidos.add(c.id); }
+    repintarFilas();
+  });
+  borrarSel.addEventListener('click', async () => {
+    const a = datos.agenteActual();
+    const ids = marcados().map((c) => c.id);
+    if (!ids.length) return;
+    const sonTodos = !busqueda && ids.length === datos.chatsDe(a.id).filter((c) => c.voz !== true).length;
+    const si = await confirm({
+      title: ids.length === 1 ? 'Delete 1 chat?' : `Delete ${ids.length} chats?`,
+      text: sonTodos
+        ? `All of ${a.nombre}’s chats and their messages will be deleted. Channel chats stay. This can’t be undone.`
+        : `${ids.length === 1 ? 'It and all its' : 'They and all their'} messages will be deleted. This can’t be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!si) return;
+    salirDeSeleccionar();
+    for (const id of ids) await datos.borrarChat(id);
+  });
+
+  // ---------- La búsqueda ----------
+  const buscarYa = () => {
+    busqueda = sinTildes(campoBuscar.value.trim());
+    cajaBuscar.toggleAttribute('data-con-texto', campoBuscar.value.length > 0);
+    dibujarLista();
+  };
+  campoBuscar.addEventListener('input', buscarYa);
+  limpiarBuscar.addEventListener('click', () => { campoBuscar.value = ''; buscarYa(); campoBuscar.focus(); });
+  // Esc: primero borra lo buscado; con el campo vacío (o fuera de él), sale de la selección.
+  lado.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (e.target === campoBuscar && campoBuscar.value) { e.preventDefault(); campoBuscar.value = ''; buscarYa(); return; }
+    if (seleccionando) { e.preventDefault(); salirDeSeleccionar(); }
+  });
+  // cambiar de agente cierra la selección (los marcados eran del otro)
+  let agenteDeLaLista = datos.agenteActual()?.id;
+  datos.on('seleccion', () => {
+    const ahora = datos.agenteActual()?.id;
+    if (ahora !== agenteDeLaLista) { agenteDeLaLista = ahora; salirDeSeleccionar(); }
+  });
   canalesCabeza.addEventListener('click', () => datos.ponerCanalesAbiertos(!datos.canalesAbiertos()));
   // El tacho del grupo borra todos los chats de canal de este agente (pregunta antes).
   canalesBorrar.addEventListener('click', async () => {

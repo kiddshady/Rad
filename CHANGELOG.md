@@ -1,5 +1,25 @@
 # Changelog
 
+## BlackCode 1.11.0 (2026-11-26)
+
+- **Buscar en la lista de chats.** Un campo «Search chats» debajo de «New
+  chat» filtra los chats del agente por su nombre, sin importar tildes ni
+  mayúsculas. Mientras se busca, los grupos plegados se abren (lo que
+  coincide se ve siempre), y sin coincidencias la lista lo dice. La × o Esc
+  borran lo buscado.
+- **Borrar varios chats de una**, como en Umbra pero sin carpetas (Fran no
+  las usa). El botón de al lado de la búsqueda entra a seleccionar: «New
+  chat» deja su lugar a la barra de la selección (Select all, cuántos, borrar
+  y salir), y cada fila muestra su casilla; un clic la marca en vez de abrir
+  el chat. Select all marca lo que se ve con la búsqueda. Borrar pregunta
+  antes y sale de la selección; Esc y cambiar de agente también salen. Los
+  chats de canal no se seleccionan: su grupo ya tiene su «borrar todos». La
+  casilla entra sin mover anchos (el texto se corre con transform).
+- **Exportar con la flecha hacia arriba** (el del chat y el del canvas): la
+  de abajo parecía bajar o importar. Ícono `exportar`; `bajar` queda para
+  traer algo, como «Import» de Skills o «Save as…». Lo pidió Fran.
+- Íconos nuevos en `piezas.js`: `lupa`, `seleccionar` y `exportar`.
+
 ## BlackCode 1.10.0 (2026-11-25)
 
 - **El puente al celular**, para BlackCode Mobile (`S:\tools\BlackCodeMobile`,

@@ -32,6 +32,10 @@ export const ICONOS = {
   // (el visor de imágenes: acercar, alejar y que entre entera)
   lupaMas: svg('<circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 13.5 13.5M5 7h4M7 5v4"/>'),
   lupaMenos: svg('<circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 13.5 13.5M5 7h4"/>'),
+  // (la lista de chats: buscar por nombre, con la misma lupa sin signo, y
+  // entrar a seleccionar, una casilla con su tilde como la de Rad)
+  lupa: svg('<circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 13.5 13.5"/>'),
+  seleccionar: svg('<rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M5.25 8.25 7.25 10.25 10.75 6"/>'),
   ajustar: svg('<path d="M2.5 6V3.5a1 1 0 0 1 1-1H6M10 2.5h2.5a1 1 0 0 1 1 1V6M13.5 10v2.5a1 1 0 0 1-1 1H10M6 13.5H3.5a1 1 0 0 1-1-1V10"/>'),
   // (el enchufe va en diagonal, como la llave y la herramienta que tiene al lado)
   enchufe: svg('<g transform="translate(-.6 .6) rotate(45 8 8)"><path d="M6 2.5v3M10 2.5v3M4.5 5.5h7V8a3.5 3.5 0 0 1-7 0zM8 11.5v2"/></g>'),
@@ -58,6 +62,9 @@ export const ICONOS = {
   cerrar: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
   copiar: svg('<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>'),
   bajar: svg('<path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/>'),
+  // (exportar: la misma de bajar, con la flecha hacia arriba: sale de la app.
+  // Bajar queda para traer algo, como «Import» o «Save as…». Pedido de Fran.)
+  exportar: svg('<path d="M8 10.5v-8M4.5 6 8 2.5 11.5 6M3 13.5h10"/>'),
   volver: svg('<path d="M5.5 3.5l-3 3 3 3M2.5 6.5H9a3.5 3.5 0 0 1 0 7H6.5"/>'),
   // las notas
   nota: svg('<rect x="3.5" y="2.5" width="9" height="11" rx="1.5"/><path d="M6 5.75h4M6 8h4M6 10.25h2.5"/>'),

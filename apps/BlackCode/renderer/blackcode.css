@@ -293,6 +293,110 @@
   .dm-agente[aria-expanded='true'] .dm-agente-chevron { transform: rotate(180deg); }
   .dm-nuevo { justify-content: flex-start; padding-inline: var(--rad-space-3); }
 
+  /* Arriba de la lista: «New chat» o, seleccionando, la barra de la
+     selección. Las dos en la misma celda y en orden: la que se va se esfuma
+     del todo y recién entra la otra. */
+  .dm-lado-cabeza { flex: none; display: grid; }
+  .dm-lado-cabeza > * { grid-area: 1 / 1; }
+  .dm-lado-cabeza > .dm-nuevo,
+  .dm-lado[data-seleccion] .dm-lado-cabeza > .dm-sel {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity var(--rad-dur-base) var(--rad-ease-out) var(--rad-dur-fast),
+      visibility 0s linear var(--rad-dur-fast),
+      background-color var(--rad-dur-fast) var(--rad-ease-out),
+      box-shadow var(--rad-dur-fast) var(--rad-ease-out),
+      color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-lado-cabeza > .dm-sel,
+  .dm-lado[data-seleccion] .dm-lado-cabeza > .dm-nuevo {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out), visibility 0s linear var(--rad-dur-fast);
+  }
+  .dm-sel {
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-1);
+    min-height: var(--rad-control-height);
+    padding-inline-start: var(--rad-space-3);
+  }
+  .dm-sel-todos { flex: none; color: var(--rad-text-2); transition: color var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-sel-todos:hover { color: var(--rad-text-1); }
+  /* (la celda de relevo alinea su texto con --rad-a-swap-align: contra el tacho) */
+  .dm-sel-cuenta { flex: 1; min-width: 0; --rad-a-swap-align: end; padding-inline-end: var(--rad-space-1); font-size: var(--rad-text-s); color: var(--rad-text-3); white-space: nowrap; }
+  .dm-sel-borrar:disabled { opacity: 0.4; }
+
+  /* Buscar: la lupa adentro del campo, y la × para borrar lo escrito, que
+     aparece recién cuando hay algo. Al lado, la casilla que entra a seleccionar. */
+  .dm-buscar-fila { flex: none; display: flex; align-items: center; gap: var(--rad-space-1); }
+  .dm-buscar { position: relative; flex: 1; min-width: 0; display: grid; }
+  .dm-buscar-campo { padding-inline: calc(var(--rad-space-3) + var(--rad-icon-size) + var(--rad-space-2)) var(--rad-control-height); }
+  .dm-buscar-lupa {
+    position: absolute;
+    inset-inline-start: var(--rad-space-3);
+    top: 50%;
+    translate: 0 -50%;
+    color: var(--rad-text-3);
+    pointer-events: none;
+  }
+  .dm-buscar-limpiar {
+    position: absolute;
+    inset-inline-end: 0;
+    top: 0;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--rad-dur-fast) var(--rad-ease-in-out),
+      visibility 0s linear var(--rad-dur-fast),
+      background-color var(--rad-dur-fast) var(--rad-ease-out),
+      color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+  .dm-buscar[data-con-texto] .dm-buscar-limpiar {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity var(--rad-dur-base) var(--rad-ease-out),
+      visibility 0s,
+      background-color var(--rad-dur-fast) var(--rad-ease-out),
+      color var(--rad-dur-fast) var(--rad-ease-out);
+  }
+
+  /* La casilla de cada fila: solo seleccionando, y nunca en un chat de canal.
+     Entra sin mover el ancho de nada: la fila corre el texto con transform
+     (lo de la derecha, el botón de acciones, se esconde y le deja lugar) y
+     la casilla aparece en el hueco que queda a la izquierda. */
+  .dm-fila { position: relative; }
+  .dm-fila-marca {
+    position: absolute;
+    inset-inline-start: var(--rad-space-3);
+    top: 50%;
+    translate: 0 -50%;
+    opacity: 0;
+    scale: 0.7;
+    pointer-events: none;
+    color: var(--rad-text-3);
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out), scale var(--rad-dur-fast) var(--rad-ease-in-out);
+  }
+  .dm-fila-abrir { transition: transform var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-lado[data-seleccion] .dm-fila:not([data-voz]) .dm-fila-marca {
+    opacity: 1;
+    scale: 1;
+    transition: opacity var(--rad-dur-base) var(--rad-ease-out) var(--rad-dur-fast), scale var(--rad-dur-base) var(--rad-ease-out) var(--rad-dur-fast);
+  }
+  .dm-lado[data-seleccion] .dm-fila:not([data-voz]) .dm-fila-abrir { transform: translateX(calc(var(--rad-icon-size) + var(--rad-space-2))); }
+  .dm-lado[data-seleccion] .dm-fila:not([data-voz]) .dm-fila-mas { opacity: 0; pointer-events: none; }
+  .dm-lado[data-seleccion] .dm-fila[data-elegido] .dm-fila-marca { color: var(--rad-text-1); }
+  /* Seleccionando, lo resaltado es lo marcado, no el chat abierto. */
+  .dm-lado[data-seleccion] .dm-fila[aria-current='true']:not([data-elegido]) { background-color: transparent; box-shadow: none; color: var(--rad-text-2); }
+  .dm-lado[data-seleccion] .dm-fila[aria-current='true']:not([data-elegido]):hover { background-color: var(--rad-tint-hover); color: var(--rad-text-1); }
+  .dm-lado[data-seleccion] .dm-fila[data-elegido] {
+    background-color: var(--rad-surface-3);
+    box-shadow: var(--rad-shadow-1);
+    color: var(--rad-text-1);
+  }
+
   /* Una celda de relevo que corta su texto con puntos suspensivos. El tope
      va en el ítem: un texto que no parte renglón mide entero, y sin tope se
      sale de la celda en vez de cortarse. */
