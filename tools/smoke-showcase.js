@@ -584,6 +584,30 @@ else {
   if (document.querySelector('.rad-modal-layer')) fail('el modal quedó en el DOM después de cerrar');
   if (root.inert) fail('la app quedó inert después de cerrar el modal');
   if (document.activeElement !== modalBtn) fail('el foco no volvió al botón que abrió el modal');
+
+  // El foco vuelve SIN el anillo si el modal se abrió con el puntero, aunque
+  // lo cierre una tecla (Fran vio el anillo en la fila de un chat después de
+  // renombrarlo con Enter); abierto con el teclado, vuelve como siempre. El
+  // anillo de verdad necesita teclas de verdad: acá se mira con qué opciones
+  // se le devuelve el foco.
+  const visto = [];
+  const focusOriginal = HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus = function (opts) { if (this === modalBtn) visto.push(opts?.focusVisible); return focusOriginal.call(this, opts); };
+  try {
+    for (const como of ['puntero', 'teclado']) {
+      if (como === 'puntero') modalBtn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      else modalBtn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      modalBtn.click();
+      await frame();
+      keyOn(document.activeElement, 'Escape');
+      await sleep(400);
+    }
+  } finally {
+    HTMLElement.prototype.focus = focusOriginal;
+  }
+  if (visto[0] !== false) fail(`un modal abierto con el puntero devolvió el foco pudiendo prender el anillo (focusVisible: ${visto[0]})`);
+  if (visto[1] === false) fail('un modal abierto con el teclado devolvió el foco sin el anillo');
+  data.modalFoco = `abierto con el puntero, el foco vuelve sin anillo; con el teclado, con (${JSON.stringify(visto)})`;
 }
 
 // 10. Toasts: se apilan, uno del medio se va y los demás se acomodan; nunca

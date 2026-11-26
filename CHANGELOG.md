@@ -1,5 +1,26 @@
 # Changelog
 
+## BlackCode 1.14.1 (2026-11-26) · núcleo 0.21.2
+
+Ajustes que pidió Fran, probados por él en la app de dev:
+
+- **La terminal, a 11 px** (eligió 11 sobre 12). A 13, en el panel de 560 px
+  como mucho, entraban unas 56 columnas y la tabla de un `ls` de PowerShell
+  partía los nombres letra por letra.
+- **Su barra, del ancho de las demás.** xterm toma el ancho de la barra de
+  `overviewRuler.width` (de fábrica, 14 px: el pulgar quedaba de 9, casi el
+  doble que las otras); ahora usa `--rad-scroll-size`. Con eso xterm también
+  arma su regla de marcas, que dejaba una raya clara al costado: no se dibuja.
+- **Núcleo: el modal devuelve el foco sin el anillo si se abrió con el
+  puntero.** Al renombrar un chat y cerrar con Enter, la fila quedaba con el
+  anillo de foco (cerrar con una tecla dejaba a Chromium en modo teclado).
+  Ahora el modal recuerda con qué se abrió: con el puntero, `focus({
+  focusVisible: false })`; con el teclado, el anillo vuelve como siempre.
+  Probado con mouse y teclas de verdad por CDP (al revés incluido), y en el
+  humo de la vitrina se mira con qué opciones vuelve el foco.
+- **El enchufe de Integrations, con el cable más largo** (4 en vez de 2: casi
+  no se veía), centrado sin correrlo.
+
 ## BlackCode 1.14.0 (2026-11-26)
 
 - **Las notas, desde el celu.** El puente suma `GET /api/notes`, `POST

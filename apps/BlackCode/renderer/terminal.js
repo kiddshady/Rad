@@ -55,7 +55,10 @@ class Estilo extends HTMLElement {
 }
 if (!customElements.get('dm-estilo')) customElements.define('dm-estilo', Estilo);
 
-const TAMANO = 13;
+// El tamaño de la letra (Fran eligió 11, nov 2026): a 13 el panel, de 560 px
+// como mucho, daba unas 56 columnas y la tabla de un `ls` de PowerShell partía
+// los nombres letra por letra; a 11 entran unas 13 columnas más.
+const TAMANO = 11;
 const NOMBRES = { pwsh: 'PowerShell 7', powershell: 'Windows PowerShell 5.1', cmd: 'cmd', sh: 'sh' };
 
 // La paleta. Un tema de xterm son colores en un objeto, no CSS, así que se
@@ -182,6 +185,11 @@ export function montarTerminal({ escena, turnos, router, carpeta = () => '' }) {
         cursorBlink: true,
         // el de fábrica (1000) se queda corto apenas corre algo que escupe
         scrollback: 5000,
+        // El ancho de su barra: xterm lo toma de acá (de fábrica, 14 px, y el
+        // pulgar quedaba de 9, casi el doble que las otras; Fran la vio gruesa
+        // con la letra a 11). Con el token de la piel, la pista y el pulgar
+        // miden lo mismo que en el resto de la app. El fit lo descuenta igual.
+        overviewRuler: { width: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--rad-scroll-size')) || 10 },
       });
       fit = new FitAddon();
       nuevo.loadAddon(fit);

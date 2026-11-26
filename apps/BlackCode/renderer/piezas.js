@@ -38,7 +38,8 @@ export const ICONOS = {
   seleccionar: svg('<rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M5.25 8.25 7.25 10.25 10.75 6"/>'),
   ajustar: svg('<path d="M2.5 6V3.5a1 1 0 0 1 1-1H6M10 2.5h2.5a1 1 0 0 1 1 1V6M13.5 10v2.5a1 1 0 0 1-1 1H10M6 13.5H3.5a1 1 0 0 1-1-1V10"/>'),
   // (el enchufe va en diagonal, como la llave y la herramienta que tiene al lado)
-  enchufe: svg('<g transform="translate(-.6 .6) rotate(45 8 8)"><path d="M6 2.5v3M10 2.5v3M4.5 5.5h7V8a3.5 3.5 0 0 1-7 0zM8 11.5v2"/></g>'),
+  // (el cable mide 4: con 2 casi no se veía, Fran; así el dibujo queda centrado sin correrlo)
+  enchufe: svg('<g transform="rotate(45 8 8)"><path d="M6 2.5v3M10 2.5v3M4.5 5.5h7V8a3.5 3.5 0 0 1-7 0zM8 11.5v4"/></g>'),
   // La voz: la onda de Verba (las cinco barras de su marca, con las mismas
   // proporciones), en el trazo de acá. No es `canal`, que es el de los chats
   // que entran solos.

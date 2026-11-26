@@ -30,8 +30,20 @@ import { t } from './strings.js';
 let openCount = 0;
 const appRoot = () => document.querySelector('.rad-root');
 
+// Con qué se abrió el modal: lo dice la última entrada antes de abrirlo (se
+// escucha en captura, antes de que nadie la ataje). Al cerrar, el foco vuelve
+// a donde estaba; si el modal se abrió con el puntero, vuelve SIN el anillo.
+// Si no, cerrarlo con Enter o Escape (teclas) dejaba a Chromium en modo
+// teclado, y lo que recibía el foco prendía :focus-visible: la fila de un chat
+// quedaba con el anillo después de renombrarlo (Fran, nov 2026). Abierto con
+// el teclado, el anillo vuelve como siempre: ahí dice dónde se está.
+let ultimaFueTecla = false;
+window.addEventListener('keydown', () => { ultimaFueTecla = true; }, true);
+window.addEventListener('pointerdown', () => { ultimaFueTecla = false; }, true);
+
 export function openModal({ title, body, actions = [], dismissible = true, className = '', label = '' } = {}) {
   const previous = document.activeElement;
+  const conTeclado = ultimaFueTecla;
 
   const wrap = document.createElement('div');
   wrap.className = 'rad-modal-layer';
@@ -106,7 +118,7 @@ export function openModal({ title, body, actions = [], dismissible = true, class
     openCount--;
     if (root && openCount === 0) root.inert = false;
     Promise.all([dismiss(panel, { remove: false }), dismiss(scrim, { remove: false })]).then(() => { wrap.remove(); resolveRemoved(); });
-    if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
+    if (previous instanceof HTMLElement && previous.isConnected) previous.focus(conTeclado ? { preventScroll: true } : { preventScroll: true, focusVisible: false });
     resolveClosed(result);
     return closed;
   }

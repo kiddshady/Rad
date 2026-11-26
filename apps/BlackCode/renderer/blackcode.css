@@ -1478,6 +1478,10 @@
   }
   .dm-term-cuerpo .xterm-scrollable-element > .scrollbar.visible { transition: opacity var(--rad-dur-base) var(--rad-ease-out); }
   .dm-term-cuerpo .xterm-scrollable-element > .scrollbar.invisible.fade { transition: opacity var(--rad-dur-slow) var(--rad-ease-in-out); }
+  /* El ancho de la barra se le pasa a xterm como `overviewRuler.width`, y con
+     eso xterm también arma su regla de marcas, con un borde claro que quedaba
+     como una raya al costado. No hay marcas: la regla no se dibuja. */
+  .dm-term-cuerpo .xterm-decoration-overview-ruler { display: none; }
 
   /* ---------- El navegador ---------- */
   /* Sus dos renglones (pestañas y barra) y el hueco. La página NO es DOM: es
