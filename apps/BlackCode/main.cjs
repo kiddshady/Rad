@@ -67,6 +67,9 @@ function arrancar() {
   let pedidos = null;
   llave.wire(rad, { alCambiar: (proveedor) => pedidos?.alCambiarLlave(proveedor) });
   pedidos = chat.wire(rad, { llave });
+  // El puente al celular (BlackCode Mobile): apagado de fábrica, se prende en
+  // Settings › Integrations. Ver main/movil.cjs.
+  const movil = require('./main/movil.cjs').crear(rad);
 
   rad.start({
     skin: require('@rad/skin-mono'),
@@ -102,5 +105,6 @@ function arrancar() {
     // ¿La barra de Windows es clara u oscura? Se mira al abrir y cada vez que cambia el tema.
     bandeja.mirar();
     require('electron').nativeTheme.on('updated', () => { bandeja.mirar(); });
+    movil.aplicar();
   });
 }

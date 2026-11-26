@@ -426,13 +426,14 @@ export function chatActual() {
   return c && c.agente === a.id ? c : null;
 }
 
-export function crearChat(agenteId) {
+/** `elegir: false`: lo crea sin abrirlo (el celu crea chats sin cambiarle la vista a la PC). */
+export function crearChat(agenteId, { elegir = true } = {}) {
   const ahora = Date.now();
   // (nace en la carpeta de inicio, y de ahí en más recuerda la suya)
   const nuevo = { id: nuevoId(), agente: agenteId, titulo: TITULO_NUEVO, auto: true, cuenta: 0, creado: ahora, tocado: ahora, carpeta: carpetaInicio() };
   chats.update((v) => { v.lista.push(nuevo); return v; });
   avisar('chats');
-  elegirChat(nuevo.id);
+  if (elegir) elegirChat(nuevo.id);
   return nuevo;
 }
 

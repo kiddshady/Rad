@@ -4568,7 +4568,7 @@ else {
       if (tabs.map((t) => t.textContent.trim()).join() !== 'General,Providers,Tools,Images,Integrations,Voice,About' || tabs.some((t) => !t.querySelector('svg') || t.getAttribute('role') !== 'tab')) fail('ajustes: las pestañas son «' + tabs.map((t) => t.textContent.trim()).join() + '»');
       // cada tarjeta, en su pestaña
       const donde = JSON.stringify(Object.fromEntries(paneles().map((p) => [p.dataset.tab, [...p.querySelectorAll('.dm-ajustes-pila > *')].map((t) => t.dataset.tarjeta ?? t.dataset.proveedor).join(' ')])));
-      const va = JSON.stringify({ general: 'nombre carpeta titulos fondo', providers: 'anthropic venice', tools: 'tools busqueda subagentes', images: 'imagenes', integrations: 'mcp', voice: 'voz', about: 'acerca' });
+      const va = JSON.stringify({ general: 'nombre carpeta titulos fondo', providers: 'anthropic venice', tools: 'tools busqueda subagentes', images: 'imagenes', integrations: 'mcp movil', voice: 'voz', about: 'acerca' });
       if (donde !== va) fail('ajustes: las tarjetas quedaron repartidas así: ' + donde);
       await go('ajustes', 'general');
       await asentar();
@@ -5036,6 +5036,79 @@ await go('ajustes', 'about');
   if (etiqueta.left < b.left || etiqueta.right > b.right) fail('el rótulo más largo del botón de About no entra en el botón');
   enIngles('en About');
   data.botonAbout = `${anchos[0]} px en los cinco estados`;
+}
+
+// El celular: la tarjeta Phone y la mitad del puente que vive en la interfaz
+// (movil.js), que contesta con los chats vivos. La mitad HTTP (la clave, el
+// servidor, los eventos, las imágenes) la prueba tools/test-blackcode-movil.mjs.
+{
+  const datosM = await import('/datos.js');
+  const { atender } = await import('/movil.js');
+  // un puerto propio: una BlackCode instalada puede tener el puente prendido en el 3830
+  const PUERTO = 38000 + Math.floor(Math.random() * 1500);
+  await go('ajustes', 'integrations');
+  const tarjeta = view('ajustes').querySelector('[data-tarjeta="movil"]');
+  const sw = tarjeta?.querySelector('[data-campo="movil"]');
+  const dice = () => shown(tarjeta.querySelector('[data-estado="movil"] .dm-estado-texto'));
+  if (!tarjeta || !sw) fail('celu: no está la tarjeta Phone en Integrations');
+  else {
+    if (sw.checked || !dice().startsWith('Off')) fail(`celu: la tarjeta Phone no arranca apagada («${dice()}»)`);
+    if (!tarjeta.querySelector('[data-accion="movil-copiar"]').disabled) fail('celu: sin clave, «Copy key» está prendido');
+    await window.rad.invoke('movil:poner', { puerto: PUERTO });
+    sw.click();
+    await until(() => tarjeta.dataset.movil === 'escuchando', 5000);
+    await settle();
+    if (tarjeta.dataset.movil !== 'escuchando' || !dice().includes(`port ${PUERTO}`)) fail(`celu: al prenderlo la tarjeta dice «${dice()}» (${tarjeta.dataset.movil})`);
+    if (tarjeta.querySelector('[data-accion="movil-copiar"]').disabled) fail('celu: con la clave hecha, «Copy key» sigue apagado');
+    let reservadoM = false;
+    try { await window.rad.store.read('_movil_llave'); } catch { reservadoM = true; }
+    if (!reservadoM) fail('celu: la interfaz pudo leer el documento de la clave del puente');
+    enIngles('en la tarjeta Phone');
+    sw.click();
+    await until(() => tarjeta.dataset.movil === 'apagado', 5000);
+    await settle();
+    if ((await window.rad.invoke('movil:estado')).escuchando) fail('celu: apagar la tarjeta no apagó el puente');
+    data.celu = `tarjeta Phone en el puerto ${PUERTO}`;
+  }
+
+  // Lo que contesta la interfaz a cada pedido del celu.
+  const est = await atender({ que: 'estado' });
+  if (!est.ok || !est.datos.agentes.length || !Array.isArray(est.datos.chats)) fail('celu: el estado no trae agentes y chats: ' + JSON.stringify(est).slice(0, 200));
+  const elegido = datosM.chatActual()?.id ?? null;
+  const nuevo = await atender({ que: 'crear', agente: est.datos.agentes[0]?.id });
+  const id = nuevo.datos?.id;
+  if (!nuevo.ok || !datosM.chat(id)) fail('celu: crear un chat desde el celu no lo creó');
+  if ((datosM.chatActual()?.id ?? null) !== elegido) fail('celu: un chat creado desde el celu le cambió el chat abierto a la PC');
+  if ((await atender({ que: 'crear', agente: 'no-existe' })).status !== 404) fail('celu: crear un chat de un agente que no existe no da 404');
+  const env = await atender({ que: 'enviar', chat: id, texto: 'hola desde el humo', imagenes: [] });
+  if (!env.ok) fail('celu: mandar desde el celu falló: ' + JSON.stringify(env));
+  const ocupado = await atender({ que: 'enviar', chat: id, texto: 'otra' });
+  if (ocupado.ok || ocupado.status !== 409) fail('celu: mandar mientras el agente responde no da 409: ' + JSON.stringify(ocupado));
+  await until(() => !datosM.respondiendo(id), 20000);
+  const fin = await atender({ que: 'chat', chat: id });
+  const [yo, suyo] = fin.datos?.mensajes ?? [];
+  if (!fin.ok || fin.datos.mensajes.length !== 2 || yo?.rol !== 'user' || yo.texto !== 'hola desde el humo' || suyo?.rol !== 'assistant' || suyo.estado !== 'ok' || !suyo.texto.includes('hola desde el humo') || fin.datos.respondiendo || fin.datos.confirmacion !== null) {
+    fail('celu: el chat que ve el celu no es el que quedó: ' + JSON.stringify(fin).slice(0, 300));
+  }
+  const pagina = await atender({ que: 'chat', chat: id, antes: 1 });
+  if (pagina.datos?.mensajes?.length !== 1 || pagina.datos.desde !== 0 || pagina.datos.total !== 2) fail('celu: pedir hacia atrás no da la página: ' + JSON.stringify(pagina).slice(0, 200));
+  if ((await atender({ que: 'chat', chat: 'no-existe' })).status !== 404) fail('celu: un chat que no existe no da 404');
+  // Una foto del celu: viaja al modelo, y al celu vuelve como referencia, nunca adentro.
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  await atender({ que: 'enviar', chat: id, texto: 'mirá', imagenes: [PNG] });
+  await until(() => !datosM.respondiendo(id), 20000);
+  const conFoto = await atender({ que: 'chat', chat: id });
+  const mia = conFoto.datos?.mensajes?.[2];
+  if (mia?.imagenes?.length !== 1 || !mia.imagenes[0].startsWith(`/api/image/${id}/`) || JSON.stringify(conFoto).includes('base64')) fail('celu: la foto no vuelve como referencia: ' + JSON.stringify(mia).slice(0, 200));
+  const bytes = await atender({ que: 'imagen', chat: id, msg: mia?.id, n: 0 });
+  if (bytes.datos?.dataUrl !== PNG) fail('celu: la referencia de la foto no lleva a la foto');
+  if ((await atender({ que: 'imagen', chat: id, msg: mia?.id, n: 1 })).status !== 404) fail('celu: una foto que no existe no da 404');
+  if ((await atender({ que: 'nada' })).status !== 400) fail('celu: un pedido desconocido no da 400');
+  await datosM.borrarChat(id);
+  data.celuPedidos = `${fin.datos?.mensajes?.length ?? 0} mensajes, y la foto por referencia`;
+  // (Settings queda en About, como lo dejó la sección de antes: la pasada 2
+  // comprueba que la app recuerde esa pestaña)
+  await go('ajustes', 'about');
 }
 
 // Para la captura y para la pasada 2: de vuelta en el chat.

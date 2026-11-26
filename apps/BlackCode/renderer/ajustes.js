@@ -580,6 +580,61 @@ function tarjetaFondo() {
   return tarjeta;
 }
 
+// El celular: el puente que usa BlackCode Mobile (main/movil.cjs). La clave la
+// guarda cifrada el proceso principal y esta tarjeta nunca la ve: «Copy key» la
+// pone en el portapapeles desde allá. Apagado de fábrica.
+function tarjetaMovil() {
+  const activa = h('input', '', { type: 'checkbox', role: 'switch', 'data-campo': 'movil' });
+  const texto = h('span', 'dm-estado-texto rad-swap');
+  const estado = h('p', 'dm-estado', { role: 'status', 'data-estado': 'movil' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), texto);
+  const donde = h('p', 'dm-tarjeta-instr rad-swap', { 'data-estado': 'movil-donde' });
+  const copiar = h('button', 'rad-button', { type: 'button', 'data-variant': 'primary', 'data-accion': 'movil-copiar' }, 'Copy key');
+  const nueva = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'movil-nueva' }, 'New key');
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'movil' },
+    h('h2', 'dm-tarjeta-nombre', {}, 'Phone'),
+    h('p', 'dm-tarjeta-instr', {}, 'BlackCode Mobile talks to this PC over Tailscale: the same agents and chats, and the turns run here. Anyone who reaches this PC with the key can use your agents, so keep it behind Tailscale, never behind a port-forward.'),
+    h('label', 'rad-switch', {}, activa, h('span', 'rad-switch-track'), 'Let the phone connect'),
+    estado, donde,
+    h('div', 'dm-voz-whisper', {}, copiar, nueva));
+  wireControls(tarjeta);
+
+  let v = null;
+  const poner = (nuevo) => {
+    if (nuevo && typeof nuevo === 'object') v = nuevo;
+    if (!v) return;
+    activa.checked = v.activo;
+    let tono = 'idle';
+    let dice = 'Off: the phone cannot connect.';
+    if (v.activo && v.error) { tono = 'danger'; dice = v.error; }
+    else if (v.activo && v.escuchando) { tono = 'success'; dice = v.clientes ? `Listening on port ${v.puerto}. ${v.clientes === 1 ? 'A phone is' : `${v.clientes} phones are`} connected.` : `Listening on port ${v.puerto}. No phone connected.`; }
+    else if (v.activo) { dice = 'Starting…'; }
+    estado.dataset.tono = tono;
+    swapText(texto, dice);
+    const direccion = v.tailscale?.length ? `${v.equipo} or ${v.tailscale[0]}` : v.equipo;
+    swapText(donde, v.activo ? `On the phone, connect to ${direccion} (port ${v.puerto}) and paste the key.` : '');
+    copiar.disabled = !v.conLlave;
+    nueva.disabled = !v.conLlave;
+    tarjeta.dataset.movil = v.activo ? (v.escuchando ? 'escuchando' : 'prendido') : 'apagado';
+  };
+  activa.addEventListener('change', async () => {
+    try { poner(await window.rad.invoke('movil:poner', { activo: activa.checked })); }
+    catch (err) { toast({ text: String(err?.message ?? err), kind: 'danger' }); poner(); }
+  });
+  copiar.addEventListener('click', async () => {
+    const ok = await window.rad.invoke('movil:copiar').catch(() => false);
+    toast({ text: ok ? 'Key copied. Paste it in BlackCode Mobile.' : 'There is no key to copy.', kind: ok ? 'success' : 'warning' });
+  });
+  nueva.addEventListener('click', async () => {
+    const si = await confirm({ title: 'Make a new key?', text: 'Phones using the current key are disconnected and need the new one.', confirmLabel: 'New key' });
+    if (!si) return;
+    poner(await window.rad.invoke('movil:generar'));
+    toast({ text: 'New key ready. Copy it to the phone.', kind: 'success' });
+  });
+  window.rad.on('movil:estado', poner);
+  window.rad.invoke('movil:estado').then(poner).catch(() => {});
+  return tarjeta;
+}
+
 // La voz: darle una orden a un agente hablándole a un Atom Echo. La config y
 // la llave del Echo las guarda el proceso principal (voz.cjs): la llave entra
 // una vez, se cifra y no vuelve; acá solo se sabe si está puesta.
@@ -1118,7 +1173,7 @@ function armar() {
     providers: PROVEEDORES.map((p) => tarjetaLlave(p)),
     tools: [tarjetaTools(), tarjetaBusqueda(), tarjetaSubagentes()],
     images: [tarjetaImagenes()],
-    integrations: [tarjetaMcp()],
+    integrations: [tarjetaMcp(), tarjetaMovil()],
     voice: [laVoz],
     about: [tarjetaAcerca()],
   };

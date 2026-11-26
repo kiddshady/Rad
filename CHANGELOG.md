@@ -1,5 +1,25 @@
 # Changelog
 
+## BlackCode 1.10.0 (2026-11-25)
+
+- **El puente al celular**, para BlackCode Mobile (`S:\tools\BlackCodeMobile`,
+  la app de Android que Fran está armando): los mismos agentes y chats, y los
+  turnos corren en la PC. Se prende en Settings › Integrations › Phone
+  (apagado de fábrica); al prenderlo nace una clave de 24 caracteres, cifrada
+  con safeStorage, que la interfaz nunca ve: «Copy key» la copia desde el
+  proceso principal. La tarjeta dice a qué dirección conectarse (el nombre de
+  la PC o su IP de Tailscale) y cuántos celus hay conectados. Escucha en
+  0.0.0.0:3830 y va detrás de Tailscale, nunca de un port-forward.
+- **Cómo está hecho.** `main/movil.cjs` es solo transporte (HTTP, la clave, un
+  canal de eventos por celu, las imágenes); los pedidos los contesta la
+  interfaz (`renderer/movil.js`) con el estado vivo de los chats, por el
+  mismo camino que la voz del Atom Echo. Lo que pasa en los chats llega al
+  celu en vivo, también lo que se escribe en la PC, y el texto viaja en
+  pedazos con su posición. Las imágenes van por referencia, nunca adentro del
+  chat; desconectarse no frena un turno, solo el Stop. Un chat creado desde el
+  celu no cambia el que está abierto en la PC (`crearChat(…, { elegir: false })`).
+  Sale del puente de NeonCode, acotado a varios agentes.
+
 ## BlackCode 1.9.0 (2026-11-25)
 
 - **Quién dijo cada cosa.** Arriba del primer mensaje de cada turno va el
