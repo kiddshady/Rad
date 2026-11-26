@@ -566,15 +566,19 @@ function tarjetaFondo() {
     h('label', 'rad-switch', {}, input, h('span', 'rad-switch-track'), 'Keep running in the tray when the window is closed'),
     nota);
   wireControls(tarjeta);
+  // (el atajo global se menciona solo si quedó registrado: otro programa puede tenerlo)
+  let atajo = false;
   const poner = () => {
     const si = datosApp.enBandeja();
     input.checked = si;
+    const conAtajo = atajo ? ' Ctrl+Alt+B shows or hides it from anywhere.' : '';
     swapText(nota, si
-      ? 'Closing the window hides BlackCode in the system tray, and scheduled tasks keep running. Click its icon there to bring it back; quit from that icon’s menu.'
-      : 'Closing the window quits BlackCode. Scheduled tasks only run while it is open, and the ones that were due run when you open it again.');
+      ? `Closing the window hides BlackCode in the system tray, and scheduled tasks keep running. Click its icon there to bring it back; quit from that icon’s menu.${conAtajo}`
+      : `Closing the window quits BlackCode. Scheduled tasks only run while it is open, and the ones that were due run when you open it again.${conAtajo}`);
     tarjeta.dataset.bandeja = si ? 'si' : 'no';
   };
   input.addEventListener('change', () => datosApp.ponerEnBandeja(input.checked));
+  window.rad.invoke('atajo:estado').then((e) => { atajo = e?.registrado === true; poner(); }).catch(() => {});
   poner();
   datosApp.on('ajustes', poner);
   return tarjeta;

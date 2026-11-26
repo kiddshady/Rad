@@ -3936,6 +3936,20 @@ else {
       for (let i = 0; i < 40; i++) { b2 = await window.rad.invoke('bandeja:estado'); if (b2.visible) break; await sleep(50); }
       if (!b2.visible) fail('bandeja: la ventana no volvió de la bandeja');
       await sleep(400);
+      // El atajo global (1.13.2): Ctrl+Alt+B muestra o esconde. En el humo no se
+      // registra (no le roba el atajo a Fran), así que se corre su acción; y la
+      // ventana del humo nunca tiene el foco, así que siempre la trae (que
+      // esconda con el foco lo prueba tools/test-blackcode-atajo.mjs).
+      const at = await window.rad.invoke('atajo:estado');
+      if (at?.acelerador !== 'Control+Alt+B' || at.registrado !== false) fail('atajo: no es Ctrl+Alt+B, o en el humo quedó registrado: ' + JSON.stringify(at));
+      if (/Ctrl\+Alt\+B/.test(notaF())) fail('atajo: Settings lo menciona aunque no quedó registrado');
+      [...document.querySelectorAll('.rad-winbtn')].find((b) => b.getAttribute('aria-label') === 'Close').click();
+      for (let i = 0; i < 40; i++) { if (!(await window.rad.invoke('bandeja:estado')).visible) break; await sleep(50); }
+      await window.rad.invoke('atajo:alternar');
+      let b3 = null;
+      for (let i = 0; i < 40; i++) { b3 = await window.rad.invoke('bandeja:estado'); if (b3.visible) break; await sleep(50); }
+      if (!b3.visible) fail('atajo: Ctrl+Alt+B no trajo la ventana escondida en la bandeja');
+      await sleep(400);
     }
     // …y se puede apagar: lo lee el proceso principal de este documento.
     tarjetaF.querySelector('[data-campo="bandeja"]').click();

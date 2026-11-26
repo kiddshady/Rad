@@ -1,5 +1,18 @@
 # Changelog
 
+## BlackCode 1.13.2 (2026-11-26)
+
+- **Ctrl+Alt+B muestra o esconde BlackCode desde cualquier lado** (pedido de
+  Fran, enseguida como toggle): al frente y con el foco la esconde en la
+  bandeja (con la bandeja apagada, la minimiza); escondida, minimizada o
+  detrás de otra ventana, la trae al frente como el ícono de la bandeja. Es
+  un atajo global (`main/atajo.cjs`, sin Electron adentro): si otro programa
+  lo tiene tomado BlackCode sigue igual, sin atajo, y Settings › General lo
+  menciona solo si quedó registrado. Se suelta al cerrar. En el humo no se
+  registra (no le roba el atajo a Fran mientras corre).
+- Test con node pelado (16 comprobaciones, el toggle de ida y vuelta,
+  probado al revés) y su parte en el humo de la bandeja.
+
 ## BlackCode 1.13.1 (2026-11-26) · núcleo 0.21.1
 
 - **Notes: seleccionar y borrar varias**, como la lista de chats (pedido de

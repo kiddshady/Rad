@@ -70,6 +70,28 @@ function arrancar() {
   // El puente al celular (BlackCode Mobile): apagado de fábrica, se prende en
   // Settings › Integrations. Ver main/movil.cjs.
   const movil = require('./main/movil.cjs').crear(rad);
+  // Ctrl+Alt+B muestra o esconde BlackCode desde donde sea (toggle): al frente
+  // y con el foco, la esconde; si no, la trae como el clic en el ícono de la
+  // bandeja. En el humo no se registra. Ver main/atajo.cjs.
+  const { BrowserWindow, globalShortcut } = require('electron');
+  const atajo = require('./main/atajo.cjs').crear({
+    globalShortcut,
+    ventana: {
+      alFrente: () => { const w = BrowserWindow.getFocusedWindow(); return Boolean(w && w.isVisible() && !w.isMinimized()); },
+      mostrar: () => rad.tray?.show(),
+      // con la bandeja apagada no se esconde: se minimiza (escondida quedaría
+      // invisible y fuera de la barra de tareas)
+      esconder: () => {
+        if (rad.store.read('fondo')?.bandeja !== false) rad.tray?.hide();
+        else BrowserWindow.getFocusedWindow()?.minimize();
+      },
+    },
+    registrar: !process.env.RAD_SMOKE,
+  });
+  rad.handle('atajo:estado', () => atajo.estado());
+  // (solo en el humo: corre lo que haría el atajo, sin registrarlo)
+  if (process.env.RAD_SMOKE) rad.handle('atajo:alternar', () => { atajo.alternar(); return true; });
+  app.on('will-quit', () => atajo.apagar());
 
   rad.start({
     skin: require('@rad/skin-mono'),
@@ -106,5 +128,6 @@ function arrancar() {
     bandeja.mirar();
     require('electron').nativeTheme.on('updated', () => { bandeja.mirar(); });
     movil.aplicar();
+    atajo.prender();
   });
 }
