@@ -1,5 +1,24 @@
 # Changelog
 
+## BlackCode 1.13.1 (2026-11-26) · núcleo 0.21.1
+
+- **Notes: seleccionar y borrar varias**, como la lista de chats (pedido de
+  Fran): la casilla al lado de la búsqueda entra a seleccionar, los botones
+  de arriba dejan su lugar a la barra (Select all, cuántas, borrar, salir) y
+  cada nota muestra su casilla; la nota se corre con transform y su fecha se
+  apaga. Select all marca lo que se ve (con la búsqueda y fuera de las
+  carpetas plegadas). Borrar es definitivo, como el de una nota (Notes no
+  tiene papelera), y lo dice. Las carpetas no se seleccionan.
+- **La lista de chats y la de notas se esfuman también abajo**, y la pista
+  de la scrollbar se separa de las puntas lo mismo, así la curva de la hoja
+  no le corta el pulgar.
+- **Núcleo 0.21.1: sin la raya al pie de la hendidura.** Con una vista de
+  hojas el escenario ya no recorta (cada hoja recorta lo suyo): la sombra de
+  las dos hojas, que se suma en el aire del medio, se cortaba en seco en el
+  borde de abajo del escenario y dejaba una línea recta. Ahora sigue de
+  largo y se desvanece, como la del escenario.
+- El humo mide las tres cosas (probado al revés).
+
 ## BlackCode 1.13.0 (2026-11-26) · núcleo 0.21.0
 
 - **Chat y Notes en dos hojas sueltas**, como en Verba (pedido de Fran): el

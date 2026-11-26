@@ -109,7 +109,8 @@ export function montarChat(el, { router }) {
   const sinTildes = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const coincide = (c) => !busqueda || sinTildes(c.titulo).includes(busqueda);
 
-  const lista = h('div', 'dm-chats rad-scroll', { 'data-rad-line': 'bottom' });
+  // (esfumada de los dos lados: el borde de la hoja no hace de línea, Fran lo pidió en la 1.13.0)
+  const lista = h('div', 'dm-chats rad-scroll');
   wireScroll(lista);
   // Adentro: los chats de siempre y, al fondo de todo, el grupo de los canales
   // (lo que entró solo: lo dicho al Atom Echo). El grupo se pliega, y no ocupa

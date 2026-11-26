@@ -5274,6 +5274,12 @@ await go('ajustes', 'about');
     if (!(parseFloat(getComputedStyle(ladoH).borderTopRightRadius) > 0) || !getComputedStyle(ladoH, '::after').boxShadow.includes('inset')) fail('hojas: el lado no tiene la curva o el canto de una hoja');
   }
   if (canto() !== 0) fail(`hojas: con el chat a la vista el escenario sigue mostrando su canto (${canto()})`);
+  // (1.13.1) El escenario no recorta con una vista de hojas: la sombra de las
+  // hojas sale por abajo, y recortada dejaba una raya al pie del aire.
+  if (getComputedStyle(stage).overflow !== 'visible') fail(`hojas: con el chat a la vista el escenario recorta (overflow ${getComputedStyle(stage).overflow}) y corta la sombra de las hojas`);
+  // La lista de chats se esfuma también abajo, y la pista de la scrollbar se separa de las puntas.
+  const listaH = vistaChat.querySelector('.dm-chats');
+  if (listaH?.hasAttribute('data-rad-line') || !(parseFloat(getComputedStyle(listaH).getPropertyValue('--rad-a-scroll-inset')) > 0)) fail('hojas: la lista de chats no se esfuma abajo o su scrollbar no tiene respiro en las puntas');
   // Al pasar a una vista entera, el canto del escenario vuelve fundiéndose; y se va igual al volver.
   const muestrear = async (accion) => {
     const m = [];
@@ -5294,6 +5300,69 @@ await go('ajustes', 'about');
   data.hojas = `aire de ${getComputedStyle(document.documentElement).getPropertyValue('--rad-space-2').trim()}; el canto: ${medios(ida)} cuadros de ida y ${medios(vuelta)} de vuelta`;
 }
 // </hojas>
+
+// Notes: seleccionar y borrar varias, como en la lista de chats (1.13.1).
+// <notas-sel>
+{
+  await go('notas');
+  await settle();
+  const vN = view('notas');
+  const ladoN = vN.querySelector('.dm-notas-lado');
+  const buscarN = ladoN.querySelector('input[type="search"]');
+  const btnSelN = ladoN.querySelector('[data-accion="notas-seleccionar"]');
+  const todasN = ladoN.querySelector('[data-campo="notas-todas"]');
+  const borrarN = ladoN.querySelector('[data-accion="notas-borrar-seleccion"]');
+  const filasN = () => alive(ladoN.querySelectorAll('.dm-notas-nota'));
+  const tituloN = (f) => f.querySelector('.dm-notas-nota-titulo')?.textContent ?? '';
+  if (!btnSelN || !todasN || !borrarN) fail('notas: falta el botón de seleccionar o la barra de la selección');
+  else {
+    const antesN = (await window.rad.invoke('notas:lista')).map((n) => n.id);
+    const mias = [];
+    for (const t of ['Smoke sel uno', 'Smoke sel dos', 'Smoke sel tres']) mias.push((await window.rad.invoke('notas:crear', { content: `${t}\ncuerpo de prueba`, folderId: null }))?.id);
+    window.dispatchEvent(new Event('focus'));
+    await go('chat');
+    await go('notas');
+    await until(() => filasN().filter((f) => tituloN(f).startsWith('Smoke sel')).length === 3, 4000);
+    type(buscarN, 'smoke sel');
+    await settle();
+    btnSelN.click();
+    await settle();
+    if (!ladoN.hasAttribute('data-seleccion') || op(ladoN.querySelector('.dm-sel')) !== 1 || op(ladoN.querySelector('.dm-notas-acciones')) !== 0) fail('notas: al entrar a seleccionar no se cambiaron los botones por la barra de la selección');
+    todasN.click();
+    await settle();
+    if (shown(ladoN.querySelector('.dm-sel-cuenta')) !== '3 selected' || !todasN.checked) fail(`notas: «Select all» con la búsqueda dice «${shown(ladoN.querySelector('.dm-sel-cuenta'))}»`);
+    const uno = filasN().find((f) => tituloN(f) === 'Smoke sel uno');
+    uno?.click();
+    await settle();
+    if (shown(ladoN.querySelector('.dm-sel-cuenta')) !== '2 selected' || uno?.hasAttribute('data-elegido') || vN.querySelector('.dm-notas-hoja')?.hasAttribute('data-con-nota')) fail('notas: seleccionando, un clic en una nota no la desmarcó, o la abrió');
+    const corrida = new DOMMatrix(getComputedStyle(filasN().find((f) => f.hasAttribute('data-elegido')).querySelector('.dm-notas-nota-arriba')).transform).m41;
+    if (!(corrida > 0)) fail('notas: la casilla no le hizo lugar a la nota (sin corrimiento)');
+    borrarN.click();
+    await until(() => modal(), 2000);
+    const diceN = modal()?.innerText ?? '';
+    if (!diceN.includes('Delete 2 notes?')) fail(`notas: el aviso de borrar dice «${diceN.replace(/\s+/g, ' ').slice(0, 100)}»`);
+    primary()?.click();
+    await closed();
+    await until(async () => (await window.rad.invoke('notas:lista')).filter((n) => mias.includes(n.id)).length === 1, 4000);
+    await settle();
+    const quedan = await window.rad.invoke('notas:lista');
+    if (!quedan.some((n) => n.id === mias[0]) || quedan.some((n) => n.id === mias[1] || n.id === mias[2])) fail('notas: «Delete selected» no borró justo las dos marcadas');
+    if (antesN.some((id) => !quedan.some((n) => n.id === id))) fail('notas: «Delete selected» borró notas que no estaban marcadas');
+    if (ladoN.hasAttribute('data-seleccion')) fail('notas: después de borrar sigue en la selección');
+    // Esc sale de la selección (con la búsqueda vacía)
+    type(buscarN, '');
+    await settle();
+    btnSelN.click();
+    await settle();
+    key(ladoN, 'Escape');
+    await settle();
+    if (ladoN.hasAttribute('data-seleccion') || op(ladoN.querySelector('.dm-notas-acciones')) !== 1) fail('notas: Esc no sacó de la selección');
+    enIngles('en Notes con la selección');
+    await window.rad.invoke('notas:borrar', mias[0]);
+    data.notasSel = 'Select all con la búsqueda, desmarcar sin abrir, borrar dos, Esc';
+  }
+}
+// </notas-sel>
 
 // Para la captura y para la pasada 2: de vuelta en el chat.
 await go('chat');

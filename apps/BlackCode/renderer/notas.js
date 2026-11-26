@@ -97,11 +97,25 @@ export function montarNotas(el, { router }) {
   const nuevaCarpeta = h('button', 'rad-iconbutton', { type: 'button', 'data-accion': 'carpeta-nueva', 'aria-label': 'New folder', 'data-rad-tip': 'New folder' }, icono('carpetaMas'));
   const buscar = h('input', 'rad-input', { type: 'search', placeholder: 'Search notes', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Search notes' });
   const campoBuscar = h('label', 'rad-field', {}, buscar);
-  const lista = h('div', 'dm-notas-lista rad-scroll', { role: 'list', 'data-rad-line': 'bottom' });
+  const lista = h('div', 'dm-notas-lista rad-scroll', { role: 'list' });
   const vacia = h('p', 'dm-notas-vacia rad-swap');
   wireScroll(lista);
+  // Seleccionar y borrar varias, como en Chats (1.13.1, pedido de Fran): la
+  // casilla de al lado de la búsqueda entra a seleccionar, y los botones de
+  // arriba dejan su lugar a la barra de la selección. Las carpetas no se
+  // seleccionan: borrar todas sus notas no borra la carpeta.
+  const botonSeleccionar = h('button', 'rad-iconbutton dm-seleccionar', { type: 'button', 'aria-label': 'Select notes', 'aria-pressed': 'false', 'data-rad-tip': 'Select notes', 'data-accion': 'notas-seleccionar' }, icono('seleccionar'));
+  const todas = h('input', '', { type: 'checkbox', 'data-campo': 'notas-todas' });
+  const cuentaSel = h('span', 'dm-sel-cuenta rad-swap');
+  const borrarSel = h('button', 'rad-iconbutton dm-sel-borrar', { type: 'button', 'aria-label': 'Delete selected', 'data-rad-tip': 'Delete selected', 'data-accion': 'notas-borrar-seleccion', disabled: true }, icono('tacho'));
+  const salirSel = h('button', 'rad-iconbutton dm-sel-salir', { type: 'button', 'aria-label': 'Done', 'data-rad-tip': 'Done', 'data-rad-tip-key': 'Esc', 'data-accion': 'notas-salir-seleccion' }, icono('cerrar'));
+  const barraSel = h('div', 'dm-sel', {}, h('label', 'rad-check dm-sel-todos', {}, todas, h('span', 'rad-check-box'), 'Select all'), cuentaSel, borrarSel, salirSel);
+  barraSel.inert = true;
+  const acciones = h('div', 'dm-notas-acciones', {}, nueva, nuevaCarpeta);
+  let seleccionando = false;
+  const elegidas = new Set(); // ids de las notas marcadas
   const lado = h('aside', 'dm-lado dm-notas-lado rad-sheet', { 'data-rad-chrome': '' },
-    h('div', 'dm-notas-acciones', {}, nueva, nuevaCarpeta), campoBuscar, lista, vacia);
+    h('div', 'dm-lado-cabeza', {}, acciones, barraSel), h('div', 'dm-buscar-fila', {}, campoBuscar, botonSeleccionar), lista, vacia);
   wireControls(lado);
 
   // ---------- La hoja: la nota abierta ----------
@@ -257,6 +271,11 @@ export function montarNotas(el, { router }) {
     nodo.toggleAttribute('data-fijada', Boolean(n.pinned));
     nodo.toggleAttribute('data-adentro', Boolean(it.adentro));
     nodo.setAttribute('aria-current', String(abierta?.id === n.id));
+    const marcada = seleccionando && elegidas.has(n.id);
+    nodo.querySelector('.dm-fila-marca > input').checked = marcada;
+    nodo.toggleAttribute('data-elegido', marcada);
+    if (seleccionando) nodo.setAttribute('aria-pressed', String(marcada));
+    else nodo.removeAttribute('aria-pressed');
   }
   function crearItem(it) {
     if (it.tipo === 'carpeta') {
@@ -277,10 +296,18 @@ export function montarNotas(el, { router }) {
       ponerItem(nodo, it);
       return nodo;
     }
+    // (la casilla solo se ve seleccionando; la marca el clic en la nota)
+    const marca = h('span', 'rad-check dm-fila-marca', { 'aria-hidden': 'true' }, h('input', '', { type: 'checkbox', tabindex: '-1' }), h('span', 'rad-check-box'));
     const nodo = h('button', 'dm-notas-nota', { type: 'button', role: 'listitem' },
+      marca,
       h('span', 'dm-notas-nota-arriba', {}, h('span', 'dm-notas-nota-titulo'), icono('pin', 'dm-notas-nota-pin'), h('span', 'dm-notas-nota-fecha')),
       h('span', 'dm-notas-nota-resumen'));
-    nodo.addEventListener('click', (e) => abrir((e.currentTarget.dataset.radKey ?? it.k).slice(2)));
+    wireControls(marca);
+    nodo.addEventListener('click', (e) => {
+      const id = (e.currentTarget.dataset.radKey ?? it.k).slice(2);
+      if (seleccionando) alternar(id);
+      else abrir(id);
+    });
     ponerItem(nodo, it);
     return nodo;
   }
@@ -289,7 +316,71 @@ export function montarNotas(el, { router }) {
     reconcile(lista, lo, { key: (it) => it.k, create: crearItem, update: ponerItem });
     const hay = lo.some((it) => it.tipo === 'nota');
     swapText(vacia, hay ? '' : busqueda.trim() ? 'Nothing matches.' : notas.length ? '' : 'No notes yet.');
+    ponerSeleccion();
   }
+
+  // ---------- La selección ----------
+  /** Las notas que se pueden marcar: las que se ven (con la búsqueda, y fuera de las carpetas plegadas). */
+  const marcables = () => items().filter((it) => it.tipo === 'nota').map((it) => it.nota);
+  const marcadas = () => marcables().filter((n) => elegidas.has(n.id));
+  function ponerSeleccion() {
+    lado.toggleAttribute('data-seleccion', seleccionando);
+    botonSeleccionar.setAttribute('aria-pressed', String(seleccionando));
+    acciones.inert = seleccionando;
+    barraSel.inert = !seleccionando;
+    // (lo que se borró sale de la selección)
+    for (const id of elegidas) if (!notas.some((n) => n.id === id)) elegidas.delete(id);
+    const total = marcables().length;
+    const n = marcadas().length;
+    todas.checked = total > 0 && n === total;
+    todas.disabled = total === 0;
+    swapText(cuentaSel, n ? `${n} selected` : '');
+    borrarSel.disabled = n === 0;
+    botonSeleccionar.disabled = !seleccionando && notas.length === 0;
+  }
+  function alternar(id) {
+    if (elegidas.has(id)) elegidas.delete(id);
+    else elegidas.add(id);
+    pintarLista();
+  }
+  function entrarASeleccionar() { if (seleccionando) return; elegidas.clear(); seleccionando = true; pintarLista(); }
+  function salirDeSeleccionar() { if (!seleccionando) return; seleccionando = false; elegidas.clear(); pintarLista(); }
+  botonSeleccionar.addEventListener('click', () => (seleccionando ? salirDeSeleccionar() : entrarASeleccionar()));
+  salirSel.addEventListener('click', salirDeSeleccionar);
+  todas.addEventListener('change', () => {
+    const lo = marcables();
+    const ya = lo.length > 0 && lo.every((n) => elegidas.has(n.id));
+    for (const n of lo) { if (ya) elegidas.delete(n.id); else elegidas.add(n.id); }
+    pintarLista();
+  });
+  borrarSel.addEventListener('click', async () => {
+    const ids = marcadas().map((n) => n.id);
+    if (!ids.length) return;
+    const si = await confirm({
+      title: ids.length === 1 ? 'Delete 1 note?' : `Delete ${ids.length} notes?`,
+      text: `${ids.length === 1 ? 'It will' : 'They will'} be deleted for good: there is no trash here. This can’t be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!si) return;
+    salirDeSeleccionar();
+    // si la abierta está entre ellas, lo pendiente se cancela (un guardado demorado la volvería a escribir)
+    if (abierta?.id && ids.includes(abierta.id)) {
+      clearTimeout(reloj);
+      abierta = null;
+      editando = false;
+      await cola;
+      pintarHoja();
+    }
+    for (const id of ids) await pedir('notas:borrar', id);
+    await cargar();
+  });
+  // Esc: con algo escrito en la búsqueda, es del campo; si no, sale de la selección.
+  lado.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !seleccionando || (e.target === buscar && buscar.value)) return;
+    e.preventDefault();
+    salirDeSeleccionar();
+  });
   async function cargar() {
     const [n, c] = await Promise.all([pedir('notas:lista'), pedir('notas:carpetas')]);
     notas = Array.isArray(n) ? n : [];

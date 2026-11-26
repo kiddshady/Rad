@@ -320,6 +320,12 @@
     /* (como el escenario: lo de adentro no se sale de la curva) */
     overflow: hidden;
   }
+  /* Con una vista de hojas, el escenario NO recorta: cada hoja ya recorta lo
+     suyo, y su sombra tiene que poder salir por abajo como la del escenario.
+     Recortada en el borde del escenario dejaba una raya oscura y recta al pie
+     del aire entre dos hojas, donde se suman sus sombras (lo vio Fran en
+     BlackCode 1.13.0; core 0.21.1). */
+  .rad-stage[data-rad-sheets] { overflow: visible; }
   .rad-sheet::after {
     content: '';
     position: absolute;

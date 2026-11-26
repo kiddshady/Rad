@@ -301,7 +301,7 @@
      del todo y recién entra la otra. */
   .dm-lado-cabeza { flex: none; display: grid; }
   .dm-lado-cabeza > * { grid-area: 1 / 1; }
-  .dm-lado-cabeza > .dm-nuevo,
+  .dm-lado-cabeza > :not(.dm-sel),
   .dm-lado[data-seleccion] .dm-lado-cabeza > .dm-sel {
     opacity: 1;
     visibility: visible;
@@ -313,7 +313,7 @@
       color var(--rad-dur-fast) var(--rad-ease-out);
   }
   .dm-lado-cabeza > .dm-sel,
-  .dm-lado[data-seleccion] .dm-lado-cabeza > .dm-nuevo {
+  .dm-lado[data-seleccion] .dm-lado-cabeza > :not(.dm-sel) {
     opacity: 0;
     visibility: hidden;
     transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out), visibility 0s linear var(--rad-dur-fast);
@@ -417,9 +417,12 @@
     white-space: nowrap;
   }
 
-  /* La lista de chats llega hasta el borde de la hoja: abajo corta limpio. */
+  /* La lista de chats llega hasta el pie de la hoja: lo que recorta se esfuma
+     arriba y abajo, y la pista de la scrollbar se separa de las puntas lo
+     mismo, así la curva de la hoja no le corta el pulgar (1.13.1). */
   .dm-chats {
     --rad-fade: var(--rad-space-3);
+    --rad-a-scroll-inset: var(--rad-space-3);
     flex: 1;
     min-height: 0;
     display: flex;
@@ -1817,7 +1820,7 @@
   .dm-notas-lado { padding-bottom: 0; }
   .dm-notas-acciones { display: flex; gap: var(--rad-space-2); }
   .dm-notas-nueva { flex: 1; justify-content: flex-start; padding-inline: var(--rad-space-3); }
-  .dm-notas-lista { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; padding: var(--rad-space-1) 0 var(--rad-space-3); --rad-a-scroll-inset: var(--rad-space-1); }
+  .dm-notas-lista { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; padding: var(--rad-space-1) 0 var(--rad-space-3); --rad-a-scroll-inset: var(--rad-space-3); }
   .dm-notas-vacia { padding: 0 var(--rad-space-3) var(--rad-space-3); color: var(--rad-text-3); font-size: var(--rad-text-s); }
   .dm-notas-vacia:not(:has(> :not(.rad-swap-out):not(:empty))) { display: none; }
 
@@ -1860,6 +1863,22 @@
     transition: background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out);
   }
   .dm-notas-nota[data-adentro] { margin-left: var(--rad-space-3); }
+  /* Seleccionando (1.13.1), como los chats: la casilla aparece a la izquierda
+     y lo de la nota se corre con transform; la fecha se apaga y le deja lugar. */
+  .dm-notas-nota { position: relative; overflow: hidden; }
+  .dm-notas-nota > :not(.dm-fila-marca) { transition: transform var(--rad-dur-base) var(--rad-ease-in-out); }
+  .dm-notas-nota-fecha { transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out); }
+  .dm-notas-lado[data-seleccion] .dm-notas-nota > :not(.dm-fila-marca) { transform: translateX(calc(var(--rad-icon-size) + var(--rad-space-2))); }
+  .dm-notas-lado[data-seleccion] .dm-notas-nota-fecha { opacity: 0; }
+  .dm-notas-lado[data-seleccion] .dm-notas-nota .dm-fila-marca {
+    opacity: 1;
+    scale: 1;
+    transition: opacity var(--rad-dur-base) var(--rad-ease-out) var(--rad-dur-fast), scale var(--rad-dur-base) var(--rad-ease-out) var(--rad-dur-fast);
+  }
+  .dm-notas-lado[data-seleccion] .dm-notas-nota[data-elegido] .dm-fila-marca { color: var(--rad-text-1); }
+  .dm-notas-lado[data-seleccion] .dm-notas-nota[aria-current='true']:not([data-elegido]) { background: transparent; box-shadow: none; color: var(--rad-text-2); }
+  .dm-notas-lado[data-seleccion] .dm-notas-nota[data-elegido] { background: var(--rad-surface-3); box-shadow: var(--rad-shadow-1); color: var(--rad-text-1); }
+  .dm-notas-lado .dm-buscar-fila > .rad-field { flex: 1; min-width: 0; }
   .dm-notas-nota:hover { background: var(--rad-tint-hover); }
   .dm-notas-nota[aria-current='true'] { background: var(--rad-surface-2); box-shadow: var(--rad-shadow-1); color: var(--rad-text-1); }
   .dm-notas-nota-arriba { display: flex; align-items: center; gap: var(--rad-space-2); min-width: 0; }
