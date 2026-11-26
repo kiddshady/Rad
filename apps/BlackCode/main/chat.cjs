@@ -297,7 +297,8 @@ function wire(rad, { llave }) {
   // En el humo no hay ni Echo ni Whisper: los dos son de mentira, y el
   // guion los maneja por `voz:simular`.
   const ecoDeMentira = taller ? require('./eco-simulado.cjs').paraElHumo() : null;
-  const voz = require('./voz.cjs').wire(rad, { taller, cifrar, descifrar, agentes: losAgentes, simulada: ecoDeMentira });
+  // (la respuesta hablada puede ir con ElevenLabs: su llave es la de Settings › Providers)
+  const voz = require('./voz.cjs').wire(rad, { taller, cifrar, descifrar, agentes: losAgentes, simulada: ecoDeMentira, llaveElevenlabs: () => llave.leer(rad.store, 'elevenlabs') });
   if (taller) rad.handle('voz:simular', (que) => ({ ...ecoDeMentira.simular(que && typeof que === 'object' ? que : {}), llaveDeMentira: ecoDeMentira.llave }));
   // generate_image: la llave de Venice (la misma de los agentes de Venice), lo
   // que el usuario eligió en Settings (el modelo y el filtro de contenido
@@ -914,8 +915,12 @@ function wire(rad, { llave }) {
   });
 
   return {
-    // Cambió una llave: si es la de Venice, su lista de modelos se pide ya.
-    alCambiarLlave: (proveedor) => { if (proveedor === 'venice') traerVenice({ forzar: true }); },
+    // Cambió una llave: si es la de Venice, su lista de modelos se pide ya; si
+    // es la de ElevenLabs, las voces de esa cuenta.
+    alCambiarLlave: (proveedor) => {
+      if (proveedor === 'venice') traerVenice({ forzar: true });
+      if (proveedor === 'elevenlabs') voz.alCambiarLlave();
+    },
   };
 }
 

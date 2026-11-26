@@ -935,6 +935,35 @@
   .dm-voz-whisper .dm-estado { flex: 1; min-width: 0; }
   .dm-voz-ultima { margin: 0; font-size: var(--rad-text-s); color: var(--rad-text-2); overflow-wrap: anywhere; user-select: text; }
   .dm-voz-ultima[data-vacia] { display: none; }
+  /* Lo de cada motor de la voz (Qwen3-TTS o ElevenLabs) va en su caja, y la del
+     que no se usa se pliega. Es un relevo en orden: la que se va se apaga y se
+     pliega, y recién después se abre la otra y aparece lo de adentro. Plegada se
+     come el hueco que le deja la tarjeta (sin estirarse: un item estirado con
+     margen negativo crece lo que el margen le saca). */
+  .dm-voz-motor {
+    display: grid;
+    grid-template-rows: 0fr;
+    align-self: start;
+    margin-top: calc(var(--rad-space-3) * -1);
+    transition: grid-template-rows var(--rad-dur-base) var(--rad-ease-in-out) var(--rad-dur-fast), margin-top var(--rad-dur-base) var(--rad-ease-in-out) var(--rad-dur-fast);
+  }
+  .dm-voz-motor[data-abierto] {
+    grid-template-rows: 1fr;
+    margin-top: 0;
+    transition-delay: calc(var(--rad-dur-fast) + var(--rad-dur-base));
+  }
+  .dm-voz-motor-in {
+    display: grid;
+    gap: var(--rad-space-3);
+    min-height: 0;
+    /* (recorta para plegarse, pero deja ver el anillo de foco de lo de adentro) */
+    --dm-aro: calc(var(--rad-line-width) * 4);
+    overflow: clip;
+    overflow-clip-margin: padding-box var(--dm-aro);
+    opacity: 0;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in-out);
+  }
+  .dm-voz-motor[data-abierto] .dm-voz-motor-in { opacity: 1; transition-delay: calc(var(--rad-dur-fast) + var(--rad-dur-base) * 2); }
   /* En el chat: lo que se dijo (no se tipeó) lleva su marca debajo, y la fila
      de un chat de voz, un micrófono delante del nombre. */
   .dm-msg-voz { display: inline-flex; align-items: center; gap: var(--rad-space-1); font-size: var(--rad-text-xs, var(--rad-text-s)); color: var(--rad-text-3); }

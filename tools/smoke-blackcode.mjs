@@ -36,7 +36,43 @@ const PAGINAS = {
     + '<p><a href="/second">Second page</a></p></body></html>',
   '/second': '<!doctype html><html><head><meta charset="utf-8"><title>Second page</title></head><body style="background:#fff;font:16px sans-serif;padding:24px"><h1>Second page</h1><p>You are on the second page.</p></body></html>',
 };
+// Un ElevenLabs de mentira, en /eleven: la voz de la nube de las respuestas
+// habladas. Dos voces, dos modelos que hablan (y uno que no), y medio segundo
+// de audio por pedido. Lo que se le pidió queda anotado: después de la pasada
+// se mira que haya viajado lo elegido en Settings.
+const PEDIDOS_11 = [];
+const VOCES_11 = [{ voice_id: 'smokezac', name: 'Zac (smoke)', category: 'cloned' }, { voice_id: 'smokerachel', name: 'Rachel (smoke)', category: 'premade' }];
+async function elevenlabs(req, res, ruta) {
+  let cuerpo = '';
+  for await (const c of req) cuerpo += c;
+  const url = new URL(req.url, 'http://x');
+  const key = String(req.headers['xi-api-key'] ?? '');
+  PEDIDOS_11.push({ ruta, query: Object.fromEntries(url.searchParams), key, cuerpo: cuerpo ? JSON.parse(cuerpo) : null });
+  if (!key.includes(MARCA_DE_LLAVE)) { res.writeHead(401, { 'content-type': 'application/json' }); res.end(JSON.stringify({ detail: { status: 'invalid_api_key', message: 'Invalid API key' } })); return; }
+  if (ruta === '/v2/voices') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ voices: VOCES_11, has_more: false })); return; }
+  if (ruta === '/v1/models') {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify([
+      { model_id: 'eleven_flash_v2_5', name: 'Eleven Flash v2.5', can_do_text_to_speech: true },
+      { model_id: 'eleven_multilingual_v2', name: 'Eleven Multilingual v2', can_do_text_to_speech: true },
+      { model_id: 'eleven_multilingual_sts_v2', name: 'Speech to speech', can_do_text_to_speech: false },
+    ]));
+    return;
+  }
+  if (/^\/v1\/text-to-speech\/[^/]+\/stream$/.test(ruta) && req.method === 'POST') {
+    // un tono bajito, de a pedazos de largo impar
+    res.writeHead(200, { 'content-type': 'audio/pcm' });
+    const pcm = Buffer.alloc(24000);
+    for (let i = 0; i < pcm.length; i += 2) pcm.writeInt16LE(Math.round(Math.sin(i / 20) * 300), i);
+    for (let i = 0; i < pcm.length; i += 4801) { if (res.destroyed) return; res.write(pcm.subarray(i, i + 4801)); await new Promise((r) => setTimeout(r, 15)); }
+    res.end();
+    return;
+  }
+  res.writeHead(404); res.end();
+}
 const servidor = http.createServer((req, res) => {
+  const ruta11 = /^\/eleven(\/.*)$/.exec(new URL(req.url ?? '/', 'http://x').pathname)?.[1];
+  if (ruta11) { elevenlabs(req, res, ruta11).catch(() => { try { res.writeHead(500); res.end(); } catch { /* ya se fue */ } }); return; }
   const html = PAGINAS[new URL(req.url ?? '/', 'http://x').pathname];
   res.writeHead(html ? 200 : 404, { 'content-type': 'text/html; charset=utf-8' });
   res.end(html ?? 'not found');
@@ -102,6 +138,8 @@ function run(pass, data) {
     RAD_SMOKE_QUIT: 'close', // por el cierre normal: lo pendiente baja en before-quit
     RAD_DATA: data,
     BLACKCODE_PROVEEDOR: 'simulado',
+    // (la voz de ElevenLabs habla con el de mentira de arriba: sin esto, en modo simulado no habla con nadie)
+    ELEVENLABS_BASE_URL: `${SMOKE_URL}eleven`,
   };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.RAD_SKIN;
@@ -143,7 +181,7 @@ function checkDisk(data, report) {
     const text = fs.readFileSync(path.join(dir, f), 'utf8');
     if (text.includes(MARCA_DE_LLAVE)) failures.push(`una llave quedó en claro en ${f}`);
   }
-  for (const doc of ['_llave.json', '_llave_venice.json', '_llave_tavily.json']) {
+  for (const doc of ['_llave.json', '_llave_venice.json', '_llave_tavily.json', '_llave_elevenlabs.json']) {
     if (!files.includes(doc)) failures.push(`una llave no se guardó (falta ${doc})`);
   }
   // el buscador elegido quedó guardado donde lo lee el proceso principal
@@ -226,6 +264,15 @@ try {
   const first = await run(1, data);
   if (first.ok) {
     const disk = checkDisk(data, first);
+    // Lo que se le pidió a ElevenLabs: la voz, el modelo y el idioma elegidos,
+    // en PCM a 24 kHz y con la llave pegada en Providers.
+    {
+      const voces = PEDIDOS_11.filter((p) => p.ruta === '/v2/voices');
+      const dichos = PEDIDOS_11.filter((p) => p.ruta.startsWith('/v1/text-to-speech/'));
+      if (!voces.length || voces.some((p) => !p.key.includes(MARCA_DE_LLAVE))) disk.push(`ElevenLabs: las voces no se pidieron con la llave de Providers (${voces.length} pedidos)`);
+      if (!dichos.length) disk.push('ElevenLabs: «Say something» no le pidió audio');
+      else if (!dichos.every((p) => p.ruta === '/v1/text-to-speech/smokezac/stream' && p.query.output_format === 'pcm_24000' && p.cuerpo?.model_id === 'eleven_flash_v2_5' && p.cuerpo?.language_code === 'es' && p.cuerpo?.text)) disk.push(`ElevenLabs: el audio no se pidió con lo elegido: ${JSON.stringify(dichos.map((p) => ({ ruta: p.ruta, query: p.query, cuerpo: p.cuerpo }))).slice(0, 400)}`);
+    }
     // Buscar una actualización: abierta desde el repo no hay updater; la
     // empaquetada le pregunta a GitHub de verdad, y cualquiera de las tres
     // respuestas vale (al día, hay una nueva, o no se pudo: sin red, o el

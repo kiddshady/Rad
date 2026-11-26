@@ -1,5 +1,37 @@
 # Changelog
 
+## BlackCode 1.16.0 (2026-11-26)
+
+**ElevenLabs como segunda voz de las respuestas habladas** (pedido de Fran:
+«agregar como provider a elevenlabs… para hacer unas pruebas con los créditos
+que tengo»):
+
+- **La llave va en Settings › Providers**, como las de los modelos, con el
+  ojito y cifrada (`_llave_elevenlabs`). Se comprueba pidiendo la primera voz
+  de la cuenta (`GET /v2/voices?page_size=1`), que no gasta créditos; si la
+  llave no puede leer las voces, lo dice y explica qué permiso falta.
+- **En Voice › Spoken answers hay un select «Voice engine»:** Qwen3-TTS (esta
+  PC, como hasta ahora) o ElevenLabs. Lo de cada motor va en su caja y la del
+  que no se usa se pliega, con un relevo en orden (la que se va se apaga y se
+  pliega, y recién después se abre la otra).
+- **Las voces salen de la cuenta** (las de la biblioteca y las clonadas en su
+  web; Fran ya tiene a Zac ahí): BlackCode no crea ni sube nada. El modelo
+  arranca en **Flash v2.5** (eligió Fran: el más rápido y el que gasta la
+  mitad), y los demás salen de `GET /v1/models` (solo los que hablan).
+- **Suena igual que Qwen:** `main/elevenlabs.cjs` tiene la misma forma que
+  `habla.cjs` y pide PCM de 16 bits a 24 kHz por streaming
+  (`output_format=pcm_24000`), así que el audio va por el mismo camino a la
+  interfaz. Una frase por pedido, con `previous_text`/`next_text` para que
+  suene de corrido y `language_code` (salvo con Multilingual v2, que no lo
+  acepta). La palabra clave y Stop cortan el pedido en curso, y lo que
+  faltaba no se pide.
+- **Sin gastar créditos en las pruebas:** en modo simulado no sale a
+  internet; el humo y `tools/test-blackcode-elevenlabs.mjs` (36
+  comprobaciones) hablan con un ElevenLabs de mentira en 127.0.0.1
+  (`ELEVENLABS_BASE_URL`). El humo mira el relevo de las cajas cuadro por
+  cuadro, y el `.mjs` que el audio se haya pedido con la voz, el modelo y el
+  idioma elegidos.
+
 ## BlackCode 1.15.0 (2026-11-26)
 
 Ajustes que pidió Fran, probados por él en la app de dev:

@@ -4516,6 +4516,114 @@ else {
     await quieto(chatV.id);
     await callado();
 
+    // ElevenLabs: la otra voz, en la nube. De fábrica el motor es Qwen3-TTS y la
+    // caja de ElevenLabs está plegada. Al elegirla, el relevo va en orden (la de
+    // Qwen se apaga y se pliega, y recién después se abre la otra); sin llave lo
+    // dice; con la llave de Providers trae las voces de la cuenta (del
+    // ElevenLabs de mentira de smoke-blackcode.mjs), se elige una, y «Say
+    // something» suena por la misma interfaz. Lo que viajó lo mira el .mjs.
+    {
+      const caja = (m) => tarjetaV.querySelector('.dm-voz-motor[data-motor="' + m + '"]');
+      const dentro = (m) => caja(m).querySelector('.dm-voz-motor-in');
+      const llaveM = await import('/llave.js');
+      // (el paso anterior termina en el chat: con Settings cerrado, las cajas no miden nada)
+      await go('ajustes', 'voice');
+      await settle();
+      if (!(caja('qwen').getBoundingClientRect().height > 40)) fail('elevenlabs: abierta, la caja de Qwen mide ' + caja('qwen').getBoundingClientRect().height + ' px');
+      {
+        const e = await estadoV();
+        if (e.habla.motor !== 'qwen' || e.habla.modelo11 !== 'eleven_flash_v2_5' || e.habla.voz11 !== '' || !caja('qwen').hasAttribute('data-abierto') || caja('elevenlabs').hasAttribute('data-abierto') || !caja('elevenlabs').inert || caja('qwen').inert) fail('elevenlabs: de fábrica el motor no es Qwen3-TTS con la caja de ElevenLabs plegada: ' + JSON.stringify({ motor: e.habla.motor, modelo11: e.habla.modelo11 }));
+        if (!(caja('elevenlabs').getBoundingClientRect().height < 1)) fail('elevenlabs: plegada, la caja ocupa ' + caja('elevenlabs').getBoundingClientRect().height + ' px');
+      }
+      campoV('voz-habla-motor').scrollIntoView({ block: 'center' });
+      await settle();
+      // el relevo, cuadro por cuadro
+      const cuadros = [];
+      campoV('voz-habla-motor').click();
+      await until(() => menus().length > 0, 2000);
+      // (se mide desde el clic, en paralelo: pick() espera a que todo se asiente, y
+      // para entonces la caja de Qwen ya se plegó; el cambio llega después de ida
+      // y vuelta al proceso principal, así que el plazo va con margen)
+      const muestreo = (async () => {
+        const t0 = performance.now();
+        const fin = dur('fast') * 2 + dur('base') * 2 + 900;
+        while (performance.now() - t0 < fin) {
+          cuadros.push({ hq: caja('qwen').getBoundingClientRect().height, h11: caja('elevenlabs').getBoundingClientRect().height, oq: Number(getComputedStyle(dentro('qwen')).opacity), o11: Number(getComputedStyle(dentro('elevenlabs')).opacity) });
+          await new Promise((r) => { const t = setTimeout(r, 50); requestAnimationFrame(() => { clearTimeout(t); r(); }); });
+        }
+      })();
+      await pick('ElevenLabs');
+      await muestreo;
+      await until(async () => (await estadoV()).habla.motor === 'elevenlabs', 2000);
+      {
+        const ult = cuadros.at(-1);
+        if ((await estadoV()).habla.motor !== 'elevenlabs' || tarjetaV.dataset.motor !== 'elevenlabs') fail('elevenlabs: elegirla en el select no cambió el motor');
+        if (!caja('elevenlabs').hasAttribute('data-abierto') || caja('elevenlabs').inert || !caja('qwen').inert || ult.hq > 1 || !(ult.h11 > 40) || ult.o11 < 0.99) fail('elevenlabs: al elegirla no quedó abierta su caja y plegada la de Qwen: ' + JSON.stringify(ult));
+        if (!cuadros.some((c) => c.h11 > 2 && c.h11 < ult.h11 - 2)) fail('elevenlabs: la caja se abrió de golpe (alturas: ' + cuadros.map((c) => Math.round(c.h11)).join(' ') + ')');
+        if (!cuadros.some((c) => c.hq > 2 && c.hq < cuadros[0].hq - 2)) fail('elevenlabs: la caja de Qwen se plegó de golpe (alturas: ' + cuadros.map((c) => Math.round(c.hq)).join(' ') + ')');
+        if (cuadros.some((c) => c.oq > 0.05 && c.o11 > 0.05)) fail('elevenlabs: el relevo no va en orden: lo de las dos cajas se ve a la vez');
+        if (cuadros.some((c) => c.o11 > 0.05 && c.hq > 1)) fail('elevenlabs: lo de adentro aparece antes de que la otra caja termine de plegarse');
+      }
+      // Sin llave: lo dice, y no se puede probar.
+      if (llaveM.de('elevenlabs').estado !== 'falta' || !dice('voz-elevenlabs').includes('No ElevenLabs key') || !boton('voz-habla-probar').disabled || !dice('voz-habla').includes('No ElevenLabs key')) fail('elevenlabs: sin llave no lo dice o se puede probar: «' + dice('voz-elevenlabs') + '» / «' + dice('voz-habla') + '»');
+      enIngles('en la caja de ElevenLabs');
+      // La llave, en su tarjeta de Providers.
+      await go('ajustes', 'providers');
+      {
+        const t = view('ajustes').querySelector('[data-proveedor="elevenlabs"]');
+        if (!t || !t.textContent.includes('ElevenLabs key') || !t.textContent.includes('spends credits')) fail('elevenlabs: no hay tarjeta de su llave en Providers, o no avisa que gasta créditos');
+        type(t.querySelector('[data-campo="llave"]'), 'elevenlabs-humo-de-blackcode-no-es-una-llave-2222');
+        t.querySelector('[data-accion="guardar-llave"]').click();
+        await until(() => llaveM.de('elevenlabs').estado === 'lista', 3000);
+        if (llaveM.de('elevenlabs').estado !== 'lista') fail('elevenlabs: la llave no se guardó');
+        enIngles('en la tarjeta de la llave de ElevenLabs');
+      }
+      await go('ajustes', 'voice');
+      // Con la llave, llegan las voces de la cuenta.
+      await until(() => tarjetaV.dataset.voces11 === '2', 6000);
+      await settle();
+      if (tarjetaV.dataset.voces11 !== '2' || campoV('voz-habla-voz11').disabled || !dice('voz-elevenlabs').includes('2 voices')) fail('elevenlabs: con la llave no trajo las dos voces de la cuenta: «' + dice('voz-elevenlabs') + '» (' + tarjetaV.dataset.voces11 + ')');
+      if (!boton('voz-habla-probar').disabled) fail('elevenlabs: sin voz elegida igual se puede probar');
+      // el modelo: los dos que hablan, con Flash v2.5 elegido
+      campoV('voz-habla-modelo11').click();
+      await until(() => menus().length > 0, 2000);
+      {
+        const items = [...menus()[0].querySelectorAll('.rad-menu-item')].map((i) => i.textContent.trim());
+        if (items.join() !== 'Eleven Flash v2.5,Eleven Multilingual v2') fail('elevenlabs: los modelos del select son «' + items.join() + '»');
+        if (!shown(campoV('voz-habla-modelo11').querySelector('.rad-select-value')).includes('Flash v2.5')) fail('elevenlabs: no arranca con Flash v2.5');
+      }
+      key(menus()[0], 'Escape');
+      await until(() => menus().length === 0, 2000);
+      await settle();
+      campoV('voz-habla-voz11').click();
+      await until(() => menus().length > 0, 2000);
+      await pick('Zac (smoke)');
+      await until(async () => (await estadoV()).habla.voz11 === 'smokezac', 2000);
+      await settle();
+      if ((await estadoV()).habla.voz11 !== 'smokezac' || !dice('voz-elevenlabs').includes('It will speak as Zac (smoke)') || boton('voz-habla-probar').disabled || !dice('voz-habla').includes('Ready to speak with ElevenLabs')) fail('elevenlabs: al elegir la voz no queda lista: «' + dice('voz-elevenlabs') + '» / «' + dice('voz-habla') + '»');
+      enIngles('con la voz de ElevenLabs elegida');
+      // «Say something» suena por la misma interfaz, y termina sin error.
+      const dichosQwen = (await sim({})).voz.dichos.length;
+      boton('voz-habla-probar').click();
+      await until(() => parlante.hablando(), 4000);
+      if (!parlante.hablando()) fail('elevenlabs: «Say something» no sonó: ' + JSON.stringify(parlante.medidas()) + ' / ' + JSON.stringify((await estadoV()).habla));
+      await callado();
+      await settle();
+      {
+        const e = await estadoV();
+        if (e.habla.estado === 'error' || parlante.hablando()) fail('elevenlabs: la prueba terminó con error: ' + e.habla.error);
+        if ((await sim({})).voz.dichos.length !== dichosQwen) fail('elevenlabs: con ElevenLabs elegida, igual habló el motor de Qwen');
+      }
+      // De vuelta a Qwen3-TTS (para lo que sigue y para la pasada 2).
+      campoV('voz-habla-motor').click();
+      await until(() => menus().length > 0, 2000);
+      await pick('Qwen3-TTS');
+      await until(async () => (await estadoV()).habla.motor === 'qwen', 2000);
+      await sleep(dur('fast') * 2 + dur('base') * 2 + 200);
+      if ((await estadoV()).habla.motor !== 'qwen' || !caja('qwen').hasAttribute('data-abierto') || !caja('elevenlabs').inert || caja('elevenlabs').getBoundingClientRect().height > 1) fail('elevenlabs: al volver a Qwen3-TTS no se plegó la caja de ElevenLabs');
+      data.elevenlabs = 'el motor se elige en Voice con un relevo en orden, la llave va en Providers, las voces salen de la cuenta y «Say something» suena por la misma interfaz';
+    }
+
     // Se apaga: suelta el modelo y deja de decir. Queda prendida para la pasada 2.
     await go('ajustes', 'voice');
     const apagadas0 = (await sim({})).voz.apagadas;
@@ -4690,7 +4798,7 @@ else {
       if (tabs.map((t) => t.textContent.trim()).join() !== 'General,Providers,Tools,Images,Integrations,Voice,About' || tabs.some((t) => !t.querySelector('svg') || t.getAttribute('role') !== 'tab')) fail('ajustes: las pestañas son «' + tabs.map((t) => t.textContent.trim()).join() + '»');
       // cada tarjeta, en su pestaña
       const donde = JSON.stringify(Object.fromEntries(paneles().map((p) => [p.dataset.tab, [...p.querySelectorAll('.dm-ajustes-pila > *')].map((t) => t.dataset.tarjeta ?? t.dataset.proveedor).join(' ')])));
-      const va = JSON.stringify({ general: 'nombre carpeta titulos fondo', providers: 'anthropic venice', tools: 'tools busqueda subagentes', images: 'imagenes', integrations: 'mcp movil', voice: 'voz', about: 'acerca' });
+      const va = JSON.stringify({ general: 'nombre carpeta titulos fondo', providers: 'anthropic venice elevenlabs', tools: 'tools busqueda subagentes', images: 'imagenes', integrations: 'mcp movil', voice: 'voz', about: 'acerca' });
       if (donde !== va) fail('ajustes: las tarjetas quedaron repartidas así: ' + donde);
       await go('ajustes', 'general');
       await asentar();

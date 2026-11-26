@@ -27,9 +27,15 @@ const IDIOMAS = ['es', 'en', 'auto'];
 // La llave de la API de ESPHome: 32 bytes en base64.
 const esLlave = (t) => typeof t === 'string' && /^[A-Za-z0-9+/]{43}=$/.test(t.trim()) && Buffer.from(t.trim(), 'base64').length === 32;
 
-function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
+// Con qué voz contesta: Qwen3-TTS en esta PC o ElevenLabs en la nube.
+const MOTORES = ['qwen', 'elevenlabs'];
+const esIdVoz11 = (t) => typeof t === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(t);
+const esModelo11 = (t) => typeof t === 'string' && /^[a-z0-9_.-]{1,64}$/.test(t);
+
+function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveElevenlabs = () => null }) {
   const electron = require('electron');
   const MODELOS_HABLA = require('./habla.cjs').MODELOS;
+  const elevenlabs = require('./elevenlabs.cjs');
   const leer = () => { const d = rad.store.read(DOC); return d && typeof d === 'object' ? d : {}; };
   const config = () => {
     const d = leer();
@@ -48,6 +54,10 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
         python: typeof d.habla?.python === 'string' ? d.habla.python : '',
         modelo: MODELOS_HABLA.some((m) => m.id === d.habla?.modelo) ? d.habla.modelo : MODELOS_HABLA[0].id,
         muestra: typeof d.habla?.muestra === 'string' ? d.habla.muestra : '',
+        // con ElevenLabs: una voz de la cuenta del usuario y un modelo
+        motor: MOTORES.includes(d.habla?.motor) ? d.habla.motor : 'qwen',
+        voz11: esIdVoz11(d.habla?.voz11) ? d.habla.voz11 : '',
+        modelo11: esModelo11(d.habla?.modelo11) ? d.habla.modelo11 : elevenlabs.MODELO,
       },
     };
   };
@@ -68,12 +78,49 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
     alFin: (f) => rad.send('voz:dicho', { turno: f.turno, callado: f.callado === true, error: f.error ?? '' }),
     alCambiar: () => avisar(),
   };
-  const habla = simulada?.crearHabla ? simulada.crearHabla(paraElHabla) : require('./habla.cjs').crear({
+  const qwen = simulada?.crearHabla ? simulada.crearHabla(paraElHabla) : require('./habla.cjs').crear({
     python: () => config().habla.python,
     script: scriptHabla,
     config: () => { const c = config(); return { modelo: c.habla.modelo, muestra: c.habla.muestra, idioma: c.idioma }; },
     ...paraElHabla,
   });
+  // …o ElevenLabs, con una voz de la cuenta del usuario. Este es el de verdad
+  // también en el humo: ahí habla con un servidor de mentira
+  // (ELEVENLABS_BASE_URL), y sin él, en modo simulado, no sale a internet.
+  const once = elevenlabs.crear({
+    llave: llaveElevenlabs,
+    config: () => { const c = config(); return { voz: c.habla.voz11, modelo: c.habla.modelo11, idioma: c.idioma }; },
+    ...paraElHabla,
+  });
+  const motor = () => (config().habla.motor === 'elevenlabs' ? once : qwen);
+  // Lo que usa el resto de la app: el motor elegido. Callar y apagar van a los
+  // dos, por si se cambió de motor mientras hablaba.
+  const habla = {
+    calentar: () => motor().calentar(),
+    decir: (texto) => motor().decir(texto),
+    callar: () => { const a = qwen.callar(); const b = once.callar(); return a || b; },
+    apagar: () => { qwen.apagar(); once.apagar(); },
+    estado: () => motor().estado(),
+  };
+  // Las voces de la cuenta de ElevenLabs y sus modelos: se piden al abrir
+  // Settings y cuando cambia la llave (no gastan créditos).
+  let cat11 = { estado: 'off', voces: [], modelos: [], error: '' };
+  let turnoCat = 0;
+  async function traerCatalogo11({ forzar = false } = {}) {
+    if (!llaveElevenlabs()) { turnoCat++; cat11 = { estado: 'sin-llave', voces: [], modelos: [], error: '' }; avisar(); return cat11; }
+    if (!forzar && (cat11.estado === 'listo' || cat11.estado === 'cargando')) return cat11;
+    const turno = ++turnoCat;
+    cat11 = { ...cat11, estado: 'cargando', error: '' };
+    avisar();
+    try {
+      const r = await elevenlabs.catalogo(llaveElevenlabs());
+      if (turno === turnoCat) cat11 = { estado: 'listo', voces: r.voces, modelos: r.modelos, error: '' };
+    } catch (err) {
+      if (turno === turnoCat) cat11 = { estado: 'error', voces: [], modelos: [], error: String(err?.message ?? err).slice(0, 300) };
+    }
+    avisar();
+    return cat11;
+  }
   // Callar: el motor deja de generar y la interfaz corta lo que suena.
   const callar = () => { const habia = habla.callar(); rad.send('voz:callar', {}); return habia; };
   // A Whisper le ayuda saber qué nombres puede oír: los de los agentes.
@@ -99,7 +146,7 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
 
   const vista = () => {
     const { hayLlave, ...c } = config();
-    return { ...c, hayLlave, cifrado: cifrar('x') !== null, eco: eco.estado(), whisper: escucha.estado(), habla: { ...c.habla, ...habla.estado() }, modelosHabla: MODELOS_HABLA };
+    return { ...c, hayLlave, cifrado: cifrar('x') !== null, eco: eco.estado(), whisper: escucha.estado(), habla: { ...c.habla, ...habla.estado() }, modelosHabla: MODELOS_HABLA, elevenlabs: cat11 };
   };
   avisar = () => rad.send('voz:evento', vista());
 
@@ -128,14 +175,19 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
     if (c.habla && typeof c.habla === 'object') {
       const h = { ...(d.habla && typeof d.habla === 'object' ? d.habla : {}) };
       const estaba = h.activa === true;
-      const clave = [h.python ?? '', h.modelo ?? '', h.muestra ?? ''].join('|');
+      const claveDe = (x) => [x.python ?? '', x.modelo ?? '', x.muestra ?? '', x.motor ?? '', x.voz11 ?? '', x.modelo11 ?? ''].join('|');
+      const clave = claveDe(h);
       if (typeof c.habla.activa === 'boolean') h.activa = c.habla.activa;
       if (typeof c.habla.python === 'string') h.python = c.habla.python.trim().slice(0, 400);
       if (typeof c.habla.muestra === 'string') h.muestra = c.habla.muestra.trim().slice(0, 400);
       if (MODELOS_HABLA.some((m) => m.id === c.habla.modelo)) h.modelo = c.habla.modelo;
+      if (MOTORES.includes(c.habla.motor)) h.motor = c.habla.motor;
+      if (c.habla.voz11 === '' || esIdVoz11(c.habla.voz11)) h.voz11 = c.habla.voz11;
+      if (esModelo11(c.habla.modelo11)) h.modelo11 = c.habla.modelo11;
       d.habla = h;
-      // apagarla, o cambiarle el Python, el modelo o la muestra, suelta el proceso: el próximo arranca con lo nuevo
-      if ((estaba && !h.activa) || clave !== [h.python ?? '', h.modelo ?? '', h.muestra ?? ''].join('|')) { callar(); habla.apagar(); }
+      // apagarla, o cambiarle el motor, el Python, el modelo, la muestra o la
+      // voz, suelta lo que tuviera: lo próximo que diga arranca con lo nuevo
+      if ((estaba && !h.activa) || clave !== claveDe(h)) { callar(); habla.apagar(); }
     }
     rad.store.write(DOC, d);
     // solo lo que cambia la conexión la reinicia (elegir otro agente no corta nada)
@@ -173,6 +225,8 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
   });
   rad.handle('voz:callar', () => ({ ok: true, habia: callar() }));
   rad.handle('voz:probar-habla', () => (simulada ? simulada.probar() : require('./habla.cjs').probar({ python: config().habla.python })));
+  // Las voces y los modelos de ElevenLabs (con `forzar`, se vuelven a pedir).
+  rad.handle('voz:elevenlabs', (que) => traerCatalogo11({ forzar: que?.forzar === true }));
   // La muestra de la voz a clonar: un archivo de audio que elige el usuario.
   rad.handle('voz:elegir-muestra', async (_q, ctx) => {
     if (taller) return path.join(taller, 'voice-sample.wav'); // (en el humo no se abre un diálogo)
@@ -246,7 +300,9 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null }) {
   // cuando la app está lista: antes de eso safeStorage no descifra, la llave
   // saldría vacía y el Echo contestaría que le falta.
   electron.app.whenReady().then(() => eco.arrancar());
-  return { eco, escucha, habla, vista, hablaActiva: () => config().habla.activa };
+  // Cambió la llave de ElevenLabs: lo que se sabía de la cuenta ya no vale.
+  const alCambiarLlave = () => { once.apagar(); cat11 = { estado: 'off', voces: [], modelos: [], error: '' }; traerCatalogo11({ forzar: true }); };
+  return { eco, escucha, habla, vista, alCambiarLlave, hablaActiva: () => config().habla.activa };
 }
 
 module.exports = { wire, esLlave, DOC, VOICE_NOTE };

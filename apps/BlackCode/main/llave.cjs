@@ -1,6 +1,7 @@
 'use strict';
 
-// Las llaves de las APIs: una por proveedor (Anthropic y Venice).
+// Las llaves de las APIs: una por proveedor (Anthropic, Venice, la voz de
+// ElevenLabs y los buscadores).
 //
 // Se guardan cifradas con safeStorage y nunca en claro: lo que va al store es
 // el blob en base64, en un documento con _ (el renderer no puede leerlo ni
@@ -40,6 +41,14 @@ const PROVEEDORES = {
     doc: '_llave_venice',
     pista: (key) => `…${key.slice(-4)}`,
     comprobar: null, // su lista de modelos no pide llave: no hay pedido gratis que la pruebe
+  },
+  // La voz de ElevenLabs para las respuestas habladas (Settings › Voice). No es
+  // un proveedor de modelos de chat, pero su llave vive con las de ellos. Se
+  // comprueba pidiendo la primera voz de la cuenta, que no gasta créditos.
+  elevenlabs: {
+    doc: '_llave_elevenlabs',
+    pista: (key) => `…${key.slice(-4)}`,
+    comprobar: (key) => require('./elevenlabs.cjs').comprobar(key),
   },
   // Los buscadores de web_search que piden llave. No son proveedores de
   // modelos: acá solo se guardan sus llaves, igual de cifradas. No se

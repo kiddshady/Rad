@@ -31,6 +31,17 @@ const PROVEEDORES = [
     sitio: 'https://venice.ai/settings/api',
     rotulo: 'Open the Venice API settings',
   },
+  // No es para agentes: es la voz de las respuestas habladas (Settings › Voice).
+  {
+    id: 'elevenlabs',
+    nombre: 'ElevenLabs',
+    texto: 'For spoken answers, in the Voice tab: the agent can speak with a voice from your ElevenLabs account instead of Qwen3-TTS. Every spoken answer spends credits from that account.',
+    ejemplo: 'Your ElevenLabs API key',
+    sitio: 'https://elevenlabs.io/app/settings/api-keys',
+    rotulo: 'Open the ElevenLabs API keys',
+    alQuitar: 'Spoken answers with ElevenLabs won’t work until you paste another one.',
+    rechazos: { 'sin-voces': 'it cannot read the voices of your account. Give it the Voices permission (read), or create one without restrictions.' },
+  },
 ];
 
 // Con qué busca web_search. DuckDuckGo no pide llave; los otros dos son APIs
@@ -77,7 +88,7 @@ function describir(p, e, c) {
   if (c.fase === 'comprobando') return { tono: 'idle', texto: `Saved (${e.pista}). Asking ${p.nombre} whether it accepts it…` };
   if (c.fase === 'aceptada') return { tono: 'success', texto: `${p.nombre} accepts it. Saved and encrypted on this PC: ${e.pista}` };
   if (c.fase === 'rechazada') {
-    return { tono: 'danger', texto: `${p.nombre} rejects it (${e.pista}): ${RECHAZOS[c.motivo] ?? 'it did not say why.'}`, detalle: c.detalle };
+    return { tono: 'danger', texto: `${p.nombre} rejects it (${e.pista}): ${p.rechazos?.[c.motivo] ?? RECHAZOS[c.motivo] ?? 'it did not say why.'}`, detalle: c.detalle };
   }
   if (c.fase === 'sin-comprobar') {
     const porque = c.motivo === 'conexion' ? `there is no connection to ${p.nombre}` : `${p.nombre} did not answer properly`;
@@ -787,6 +798,22 @@ function tarjetaVoz() {
   huecoModeloH.append(pistaModeloH);
   const probarH = h('button', 'rad-button', { type: 'button', 'data-accion': 'voz-habla-probar' }, 'Say something');
   const callarH = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'voz-habla-callar' }, 'Stop');
+  // Con qué voz: Qwen3-TTS en esta PC, o ElevenLabs con una voz de la cuenta.
+  // Lo de cada motor va en su caja, y la del que no se usa se pliega.
+  const huecoMotor = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-voz-rotulo-motor' }, 'Voice engine'));
+  const cajaQwen = h('div', 'dm-voz-motor', { 'data-motor': 'qwen' }, h('div', 'dm-voz-motor-in', {}, cajaPythonH, cajaMuestra, huecoModeloH));
+  const texto11 = h('span', 'dm-estado-texto rad-swap');
+  const estado11 = h('p', 'dm-estado', { role: 'status', 'data-estado': 'voz-elevenlabs' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), texto11);
+  const recargar11 = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'voz-elevenlabs-recargar' }, 'Reload voices');
+  const huecoVoz11 = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-voz-rotulo-voz11' }, 'Voice'));
+  const pistaVoz11 = h('span', 'rad-field-hint', {}, 'The voices in your ElevenLabs account: the ones you added from the library and the ones you cloned there.');
+  huecoVoz11.append(pistaVoz11);
+  const huecoModelo11 = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-voz-rotulo-modelo11' }, 'Model'));
+  const pistaModelo11 = h('span', 'rad-field-hint', {}, 'Flash v2.5 is the fastest and spends half the credits per character; Multilingual v2 and v3 sound richer and take longer to start.');
+  huecoModelo11.append(pistaModelo11);
+  const caja11 = h('div', 'dm-voz-motor', { 'data-motor': 'elevenlabs' }, h('div', 'dm-voz-motor-in', {},
+    h('div', 'dm-voz-whisper', {}, estado11, recargar11),
+    h('div', 'dm-voz-par', {}, huecoVoz11, huecoModelo11)));
 
   const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'voz' },
     h('h2', 'dm-tarjeta-nombre', {}, 'Voice'),
@@ -801,10 +828,10 @@ function tarjetaVoz() {
     h('label', 'rad-switch', {}, actua, h('span', 'rad-switch-track'), 'Let voice act'),
     nota,
     h('h3', 'dm-subtarjeta-nombre', {}, 'Spoken answers'),
-    h('p', 'dm-tarjeta-instr', {}, 'The agent answers what you said out loud, through this PC’s speakers, with a cloned voice (Qwen3-TTS, on this PC). It is told to answer in a sentence or two. Say the wake word again to make it stop.'),
+    h('p', 'dm-tarjeta-instr', {}, 'The agent answers what you said out loud, through this PC’s speakers: with a cloned voice on this PC (Qwen3-TTS), or with a voice from your ElevenLabs account. It is told to answer in a sentence or two. Say the wake word again to make it stop.'),
     h('label', 'rad-switch', {}, hablaActiva, h('span', 'rad-switch-track'), 'Answer out loud'),
     h('div', 'dm-voz-whisper', {}, estadoH, callarH, probarH),
-    cajaPythonH, cajaMuestra, huecoModeloH);
+    huecoMotor, cajaQwen, caja11);
   wireControls(tarjeta);
 
   let selAgente = null;
@@ -935,8 +962,67 @@ function tarjetaVoz() {
     selModeloH.el.dataset.campo = 'voz-habla-modelo';
     huecoModeloH.insertBefore(selModeloH.el, pistaModeloH);
   };
+  // --- el motor, y la voz y el modelo de ElevenLabs
+  let selMotor = null;
+  let selVoz11 = null;
+  let selModelo11 = null;
+  let firma11 = '';
+  const MOTORES_VOZ = [{ value: 'qwen', label: 'Qwen3-TTS (this PC)' }, { value: 'elevenlabs', label: 'ElevenLabs' }];
+  const armarMotor = () => {
+    selMotor = createSelect({ options: MOTORES_VOZ, value: datosApp.voz().habla?.motor ?? 'qwen', onChange: (id) => datosApp.guardarVoz({ habla: { motor: id } }) });
+    selMotor.el.setAttribute('aria-labelledby', 'dm-voz-rotulo-motor');
+    selMotor.el.dataset.campo = 'voz-habla-motor';
+    huecoMotor.append(selMotor.el);
+  };
+  // Las listas salen de la cuenta: se rearman solo cuando cambian.
+  const armar11 = () => {
+    const v = datosApp.voz();
+    const c = v.elevenlabs ?? {};
+    const voces = c.voces ?? [];
+    const modelos = c.modelos ?? [];
+    const firma = JSON.stringify([voces.map((x) => [x.id, x.nombre]), modelos.map((x) => [x.id, x.nombre])]);
+    if (firma === firma11 && selVoz11) return;
+    firma11 = firma;
+    selVoz11?.close();
+    selVoz11?.el.remove();
+    selModelo11?.close();
+    selModelo11?.el.remove();
+    selVoz11 = createSelect({ options: voces.map((x) => ({ value: x.id, label: x.nombre })), value: v.habla?.voz11 ?? '', placeholder: voces.length ? 'Choose a voice' : 'No voices', onChange: (id) => datosApp.guardarVoz({ habla: { voz11: id } }) });
+    selVoz11.el.setAttribute('aria-labelledby', 'dm-voz-rotulo-voz11');
+    selVoz11.el.dataset.campo = 'voz-habla-voz11';
+    selVoz11.el.disabled = !voces.length;
+    huecoVoz11.insertBefore(selVoz11.el, pistaVoz11);
+    // (sin la lista todavía, el modelo elegido se muestra igual: es un id conocido)
+    const opciones = modelos.length ? modelos : [{ id: v.habla?.modelo11 ?? 'eleven_flash_v2_5', nombre: (v.habla?.modelo11 ?? 'eleven_flash_v2_5') === 'eleven_flash_v2_5' ? 'Eleven Flash v2.5' : v.habla?.modelo11 }];
+    selModelo11 = createSelect({ options: opciones.map((x) => ({ value: x.id, label: x.nombre })), value: v.habla?.modelo11 ?? '', onChange: (id) => datosApp.guardarVoz({ habla: { modelo11: id } }) });
+    selModelo11.el.setAttribute('aria-labelledby', 'dm-voz-rotulo-modelo11');
+    selModelo11.el.dataset.campo = 'voz-habla-modelo11';
+    selModelo11.el.disabled = !modelos.length;
+    huecoModelo11.insertBefore(selModelo11.el, pistaModelo11);
+  };
+  const describir11 = (v) => {
+    const c = v.elevenlabs ?? {};
+    const e = llave.de('elevenlabs');
+    if (e.estado === 'ilegible') return { tono: 'danger', texto: 'The ElevenLabs key can no longer be read. Paste it again in Providers.' };
+    if (e.estado !== 'lista') return { tono: 'warning', texto: 'No ElevenLabs key yet: paste one in the Providers tab.' };
+    if (c.estado === 'cargando') return { tono: 'idle', texto: 'Asking ElevenLabs for the voices in your account…' };
+    if (c.estado === 'error') return { tono: 'danger', texto: c.error || 'The voices could not be loaded.' };
+    if (c.estado !== 'listo') return { tono: 'idle', texto: 'The voices load when you open this tab.' };
+    if (!c.voces?.length) return { tono: 'warning', texto: 'Your ElevenLabs account has no voices yet: add one from the library on their site.' };
+    const elegida = c.voces.find((x) => x.id === v.habla?.voz11);
+    if (!v.habla?.voz11) return { tono: 'warning', texto: `${c.voces.length === 1 ? 'One voice' : `${c.voces.length} voices`} in your account. Choose the one to speak with.` };
+    if (!elegida) return { tono: 'danger', texto: 'The chosen voice is no longer in your account. Choose another one.' };
+    return { tono: 'success', texto: `It will speak as ${elegida.nombre}. Every spoken answer spends credits.` };
+  };
   const describirHabla = (v) => {
     const hb = v.habla ?? {};
+    if (hb.motor === 'elevenlabs') {
+      if (hb.estado === 'error') return { tono: 'danger', texto: hb.error || 'ElevenLabs could not speak.' };
+      if (hb.hablando || parlante.hablando()) return { tono: 'success', texto: 'Speaking…' };
+      if (llave.de('elevenlabs').estado !== 'lista') return { tono: hb.activa ? 'warning' : 'idle', texto: 'No ElevenLabs key yet.' };
+      if (!hb.voz11) return { tono: hb.activa ? 'warning' : 'idle', texto: 'No ElevenLabs voice chosen yet.' };
+      return { tono: 'success', texto: 'Ready to speak with ElevenLabs.' };
+    }
     if (probandoH) return { tono: 'idle', texto: 'Asking that Python whether it has the voice…' };
     if (hb.estado === 'error') return { tono: 'danger', texto: hb.error || 'The voice stopped.' };
     if (hb.hablando || parlante.hablando()) return { tono: 'success', texto: 'Speaking…' };
@@ -958,7 +1044,25 @@ function tarjetaVoz() {
     estadoH.dataset.tono = d.tono;
     swapText(textoH, d.texto);
     if (selModeloH && hb.modelo && selModeloH.value !== hb.modelo) selModeloH.value = hb.modelo;
-    probarH.disabled = !hb.python || !hb.muestra;
+    const con11 = hb.motor === 'elevenlabs';
+    armar11();
+    if (selMotor && selMotor.value !== (hb.motor ?? 'qwen')) selMotor.value = hb.motor ?? 'qwen';
+    if (selVoz11 && hb.voz11 && selVoz11.value !== hb.voz11) selVoz11.value = hb.voz11;
+    if (selModelo11 && hb.modelo11 && selModelo11.value !== hb.modelo11) selModelo11.value = hb.modelo11;
+    // la caja del motor que no se usa se pliega, y no se puede tocar
+    cajaQwen.toggleAttribute('data-abierto', !con11);
+    caja11.toggleAttribute('data-abierto', con11);
+    cajaQwen.inert = con11;
+    caja11.inert = !con11;
+    const d11 = describir11(v);
+    estado11.dataset.tono = d11.tono;
+    swapText(texto11, d11.texto);
+    recargar11.disabled = llave.de('elevenlabs').estado !== 'lista' || v.elevenlabs?.estado === 'cargando';
+    // (el anillo va en el renglón del estado: la caja recorta para plegarse y se comería el resplandor)
+    setBusy(estado11.parentElement, con11 && v.elevenlabs?.estado === 'cargando');
+    tarjeta.dataset.motor = con11 ? 'elevenlabs' : 'qwen';
+    tarjeta.dataset.voces11 = String(v.elevenlabs?.voces?.length ?? 0);
+    probarH.disabled = con11 ? llave.de('elevenlabs').estado !== 'lista' || !hb.voz11 : !hb.python || !hb.muestra;
     // (el motor termina de generar antes de que termine de sonar: se puede callar mientras suene)
     const suena = hb.hablando === true || parlante.hablando();
     callarH.disabled = !suena;
@@ -990,10 +1094,14 @@ function tarjetaVoz() {
     if (!r?.ok) toast({ text: r?.error ?? 'It could not speak.', kind: 'danger' });
   });
   callarH.addEventListener('click', () => window.rad.invoke('voz:callar'));
+  const pedir11 = (forzar = false) => { if (llave.de('elevenlabs').estado === 'lista') window.rad.invoke('voz:elevenlabs', { forzar }).catch(() => {}); };
+  recargar11.addEventListener('click', () => pedir11(true));
   armarModeloH();
+  armarMotor();
   ponerHabla();
   datosApp.on('voz', ponerHabla);
   parlante.alCambiar(ponerHabla);
+  llave.on(ponerHabla);
 
   armarAgente();
   armarIdioma();
@@ -1001,7 +1109,12 @@ function tarjetaVoz() {
   datosApp.on('voz', poner);
   datosApp.on('agentes', () => { armarAgente(); poner(); });
   // (a Python se le pregunta la primera vez que se abre Settings, no al abrir la app)
-  tarjeta.preguntar = () => { if (!prueba && !probando) preguntar(); if (!pruebaH && !probandoH) preguntarH(); };
+  tarjeta.preguntar = () => {
+    if (!prueba && !probando) preguntar();
+    if (!pruebaH && !probandoH) preguntarH();
+    // (las voces de ElevenLabs también se piden acá, no al abrir la app)
+    if (!['listo', 'cargando'].includes(datosApp.voz().elevenlabs?.estado)) pedir11();
+  };
   return tarjeta;
 }
 

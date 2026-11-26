@@ -648,7 +648,8 @@ function mundo({ config = {}, llave = 'LLAVE-BUENA', opciones = {} } = {}) {
   ok('la respuesta hablada viene apagada y solo habla si está prendida (o es la prueba de Settings)', fuente.includes('activa: d.habla?.activa === true,') && fuente.includes("if (!c.habla.activa && !prueba) return { ok: false, error: 'Spoken answers are off.' };"));
   ok('el motor viaja fuera del asar', fuente.includes("path.join(process.resourcesPath, 'motor', 'escucha_motor.py')"));
   const chat = fs.readFileSync(path.join(APP, 'main', 'chat.cjs'), 'utf8');
-  ok('la voz se cablea con el cifrado de la app, y de mentira en el humo', chat.includes("require('./voz.cjs').wire(rad, { taller, cifrar, descifrar, agentes: losAgentes, simulada: ecoDeMentira });") && chat.includes("const ecoDeMentira = taller ? require('./eco-simulado.cjs').paraElHumo() : null;"));
+  ok('la voz se cablea con el cifrado de la app, y de mentira en el humo', chat.includes("require('./voz.cjs').wire(rad, { taller, cifrar, descifrar, agentes: losAgentes, simulada: ecoDeMentira, llaveElevenlabs: () => llave.leer(rad.store, 'elevenlabs') });") && chat.includes("const ecoDeMentira = taller ? require('./eco-simulado.cjs').paraElHumo() : null;"));
+  ok('una llave de ElevenLabs nueva hace que se vuelvan a pedir las voces de la cuenta', chat.includes("if (proveedor === 'elevenlabs') voz.alCambiarLlave();"));
   const paquete = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
   ok('el paquete lleva la librería del Echo y los motores de Whisper y de la voz', typeof paquete.dependencies['esphome-client'] === 'string' && JSON.stringify(paquete.build.extraResources) === JSON.stringify([{ from: 'motor', to: 'motor', filter: ['*.py'] }]) && fs.existsSync(path.join(APP, 'motor', 'escucha_motor.py')) && fs.existsSync(path.join(APP, 'motor', 'habla_motor.py')));
   const interfaz = fs.readFileSync(path.join(APP, 'renderer', 'voz.js'), 'utf8');
