@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const APP = path.join(ROOT, 'apps', 'BlackCode');
-const { crear, runRemember, runRecall, CORE_CHARS, LISTA_CHARS, HECHO_MAX, DETALLE_MAX } = require(path.join(APP, 'main', 'memoria.cjs'));
+const { crear, crearPorAgente, repartir, runRemember, runRecall, CORE_CHARS, LISTA_CHARS, HECHO_MAX, DETALLE_MAX } = require(path.join(APP, 'main', 'memoria.cjs'));
 
 const failures = [];
 let hechas = 0;
@@ -26,6 +26,12 @@ function nueva(doc = undefined) {
   const caja = { doc, guardados: 0, cambios: 0, reloj: 1000 };
   const m = crear({ leer: () => caja.doc, escribir: (d) => { caja.doc = JSON.parse(JSON.stringify(d)); caja.guardados++; }, ahora: () => caja.reloj++, alCambiar: () => { caja.cambios++; } });
   return { m, caja };
+}
+// La memoria de la app entera, por agente (1.18.0), sobre un documento en memoria.
+function porAgente(doc = undefined, migrar = null) {
+  const caja = { doc, guardados: 0, cambios: [], reloj: 1000 };
+  const pa = crearPorAgente({ leer: () => caja.doc, escribir: (d) => { caja.doc = JSON.parse(JSON.stringify(d)); caja.guardados++; }, ahora: () => caja.reloj++, alCambiar: (a) => { caja.cambios.push(a); }, migrar });
+  return { pa, caja };
 }
 
 // ---------- vacía ----------
@@ -180,11 +186,17 @@ function nueva(doc = undefined) {
 {
   const tools = require(path.join(APP, 'main', 'tools', 'memoria.cjs'));
   ok('sin configurar, las tools no están listas y lo dicen', tools.lista() === false && (await tools.runners.remember({}, { fact: 'x' })) === 'error: memory is not set up in this app' && (await tools.runners.recall({}, { id: 'm1' })) === 'error: memory is not set up in this app');
-  const { m, caja } = nueva();
-  tools.configurar({ memoria: m });
-  ok('configuradas, corren contra la memoria de la app', tools.lista() === true && (await tools.runners.remember({}, { fact: 'From the tool' })) === 'saved to memory as m1' && caja.doc.entradas.length === 1);
-  ok('y recall lee', (await tools.runners.recall({}, { query: 'tool' })).includes('(m1) From the tool'));
-  ok('sin argumentos no tiran', (await tools.runners.remember({}, undefined)) === 'error: empty fact');
+  const { pa, caja } = porAgente();
+  tools.configurar({ memoria: pa });
+  const zac = { agente: 'zac' };
+  const mat = { agente: 'mat' };
+  ok('configuradas, corren contra la memoria del agente de la corrida', tools.lista() === true && (await tools.runners.remember(zac, { fact: 'From the tool' })) === 'saved to memory as m1' && caja.doc.agentes.zac.entradas.length === 1 && !caja.doc.agentes.mat);
+  ok('y recall lee la suya', (await tools.runners.recall(zac, { query: 'tool' })).includes('(m1) From the tool'));
+  ok('otro agente no la encuentra: ni buscando ni por id', (await tools.runners.recall(mat, { query: 'tool' })) === 'No memory entry matches "tool".' && /^error: there is no memory entry "m1"/.test(await tools.runners.recall(mat, { id: 'm1' })));
+  ok('lo que anota el otro va a la suya, con sus propios ids', (await tools.runners.remember(mat, { fact: 'Pentesting lab' })) === 'saved to memory as m1' && caja.doc.agentes.mat.entradas.length === 1 && caja.doc.agentes.zac.entradas.length === 1);
+  ok('…y el primero no la ve', !(await tools.runners.recall(zac, { query: 'pentesting' })).includes('Pentesting'));
+  ok('una corrida sin agente no tiene memoria', (await tools.runners.remember({}, { fact: 'x' })) === 'error: memory belongs to an agent, and this run has none' && (await tools.runners.recall({ agente: '' }, { query: 'x' })) === 'error: memory belongs to an agent, and this run has none');
+  ok('sin argumentos no tiran', (await tools.runners.remember(zac, undefined)) === 'error: empty fact');
   tools.configurar({ memoria: null });
 
   const defs = require(path.join(APP, 'main', 'tools', 'defs.cjs'));
@@ -218,11 +230,13 @@ function nueva(doc = undefined) {
 // ---------- la sesión: el bloque llega al system, antes del protocolo ----------
 {
   const herramientas = require(path.join(APP, 'main', 'tools', 'index.cjs'));
-  const { m } = nueva();
+  const { pa } = porAgente();
+  const m = pa.de('zac');
   m.ponerCore('I am the user.', '');
   m.agregar({ hecho: 'Likes tests' });
-  herramientas.iniciar({ memoria: m });
+  herramientas.iniciar({ memoria: pa });
   const s = herramientas.crearSesion({ reqId: 'r1', convoId: 'c1', ac: new AbortController(), tools: ['remember', 'recall'], confirma: false });
+  s.run.agente = 'zac';
   ok('con la memoria configurada, las tools se ofrecen', s.nombres.join() === 'remember,recall', s.nombres.join());
   ok('sin texto en la corrida, el system no trae memoria', !s.sistema('Be brief.').includes('## Memory'));
   s.run.memoria = m.bloque({ recall: true, remember: true });
@@ -234,7 +248,84 @@ function nueva(doc = undefined) {
   ok('remember corre por el motor de verdad', !r.error && r.out === 'saved to memory as m2', JSON.stringify(r));
   const l = await s.correr('recall', { query: 'session' });
   ok('y recall también', !l.error && l.out.includes('(m2) Ran in a session'), JSON.stringify(l).slice(0, 160));
+  ok('lo anotado en la sesión de zac quedó en la de zac y en ninguna otra', pa.de('zac').estado().entradas.length === 2 && pa.de('mat').estado().entradas.length === 0);
   herramientas.cerrar();
+}
+
+// ---------- por agente: cada uno tiene su cajón, sin cruces ----------
+{
+  const { pa, caja } = porAgente();
+  ok('sin agente no hay memoria', pa.de('') === null && pa.de(undefined) === null && pa.de(null) === null);
+  const zac = pa.de('zac');
+  const mat = pa.de('mat');
+  ok('el mismo agente da el mismo cajón', pa.de('zac') === zac && pa.de(' zac ') === zac);
+  zac.ponerCore('Zac core.', '');
+  zac.agregar({ hecho: 'Zac fact', detalle: 'Zac detail' });
+  mat.agregar({ hecho: 'Mat fact' });
+  ok('cada uno tiene lo suyo', zac.estado().entradas.map((e) => e.hecho).join() === 'Zac fact' && mat.estado().entradas.map((e) => e.hecho).join() === 'Mat fact');
+  ok('el Core también es de cada uno', zac.estado().core === 'Zac core.' && mat.estado().core === '');
+  ok('el bloque de uno no trae nada del otro', !mat.bloque({ recall: true, remember: true }).includes('Zac') && !zac.bloque({ recall: true, remember: true }).includes('Mat'));
+  ok('buscar no cruza', mat.buscar('zac').length === 0 && zac.buscar('mat').length === 0);
+  ok('los ids son de cada cajón', mat.entrada('m1')?.hecho === 'Mat fact' && zac.entrada('m1')?.hecho === 'Zac fact');
+  ok('borrar en uno no toca el otro', mat.borrar('m1').ok && zac.estado().entradas.length === 1 && mat.estado().entradas.length === 0);
+  ok('el documento es v2 con un cajón por agente', caja.doc.version === 2 && Object.keys(caja.doc.agentes).sort().join() === 'mat,zac' && pa.agentes().sort().join() === 'mat,zac');
+  ok('cada cambio dice de qué agente fue', caja.cambios.join() === 'zac,zac,mat,mat', caja.cambios.join());
+  // un agente llamado como una propiedad de Object no rompe nada
+  const raro = pa.de('__proto__');
+  raro.agregar({ hecho: 'Weird' });
+  ok('un id raro es un cajón más', pa.de('__proto__').estado().entradas.length === 1 && pa.de('constructor').estado().entradas.length === 0 && zac.estado().entradas.length === 1);
+}
+
+// ---------- lo de antes de la 1.18: se reparte una vez, sin mirar el contenido ----------
+{
+  // dos agentes; los chats guardan la hora de cada mensaje del usuario y qué
+  // tools corrió cada respuesta (sin los argumentos)
+  const chats = [{ id: 'c1', agente: 'zac' }, { id: 'c2', agente: 'mat' }, { id: 'c3', agente: 'zac' }, { id: 'c4', agente: 'borrado' }];
+  const docs = {
+    c1: { mensajes: [{ rol: 'user', texto: 'a', t: 1000 }, { rol: 'assistant', texto: 'b', tools: [{ name: 'remember', status: 'ok' }] }, { rol: 'user', texto: 'c', t: 5000 }, { rol: 'assistant', texto: 'd' }] },
+    c2: { mensajes: [{ rol: 'user', texto: 'a', t: 2000 }, { rol: 'assistant', texto: 'b', tools: [{ name: 'remember', status: 'ok' }, { name: 'recall', status: 'ok' }] }] },
+    // un remember que falló no hace dueño a nadie
+    c3: { mensajes: [{ rol: 'user', texto: 'a', t: 8000 }, { rol: 'assistant', texto: 'b', tools: [{ name: 'remember', status: 'error' }] }] },
+    c4: { mensajes: [{ rol: 'user', texto: 'a', t: 9000 }, { rol: 'assistant', texto: 'b', tools: [{ name: 'remember', status: 'ok' }] }] },
+  };
+  const viejo = {
+    core: 'About me.',
+    sig: 7,
+    entradas: [
+      { id: 'm1', hecho: 'one', creado: 1500, de: 'agent' },  // turno de zac (c1, desde 1000)
+      { id: 'm2', hecho: 'two', creado: 2500, de: 'agent' },  // los dos turnos lo cubren: el más cercano es el de mat (desde 2000)
+      { id: 'm3', hecho: 'three', creado: 3000, de: 'user' }, // a mano: a todos
+      { id: 'm4', hecho: 'four', creado: 8500, de: 'agent' }, // el de c3 falló; el de c2 sigue abierto: mat
+      { id: 'm5', hecho: 'five', creado: 500, de: 'agent' },  // antes de cualquier turno: de nadie
+      { id: 'm6', hecho: 'six', creado: 9500, de: 'agent' },  // el agente de c4 ya no existe: el turno abierto más cercano que queda es el de mat
+    ],
+  };
+  const r = repartir(viejo, { agentes: ['zac', 'mat'], chats, leerChat: (id) => docs[id] });
+  const ids = (a) => r.agentes[a].entradas.map((e) => e.id).join();
+  ok('repartir: cada recuerdo del agente va al turno que empezó más cerca antes', ids('zac') === 'm1,m3' && ids('mat') === 'm2,m3,m4,m6', `zac ${ids('zac')} · mat ${ids('mat')}`);
+  ok('repartir: lo que no se puede atribuir queda aparte, sin perderse', r.sinDueño.map((e) => e.id).join() === 'm5');
+  ok('repartir: el Core va copiado a todos', r.agentes.zac.core === 'About me.' && r.agentes.mat.core === 'About me.');
+  ok('repartir: cada cajón sigue numerando desde donde iba (los ids no se repiten con los viejos)', r.agentes.zac.sig === 7 && r.agentes.mat.sig === 7);
+  ok('repartir: un agente que ya no existe no recibe nada', !('borrado' in r.agentes));
+  // empate exacto entre dos agentes: de nadie
+  const empate = repartir({ entradas: [{ id: 'm1', hecho: 'x', creado: 1500, de: 'agent' }] }, { agentes: ['zac', 'mat'], chats: [{ id: 'a', agente: 'zac' }, { id: 'b', agente: 'mat' }], leerChat: () => ({ mensajes: [{ rol: 'user', texto: 'q', t: 1000 }, { rol: 'assistant', texto: 'r', tools: [{ name: 'remember', status: 'ok' }] }] }) });
+  ok('repartir: si dos agentes empatan, no es de ninguno', empate.sinDueño.length === 1 && !empate.agentes.zac.entradas.length && !empate.agentes.mat.entradas.length);
+
+  // el documento viejo se reparte la primera vez que se lee, y una sola vez
+  let migraciones = 0;
+  const { pa, caja } = porAgente(JSON.parse(JSON.stringify(viejo)), (d) => { migraciones++; return repartir(d, { agentes: ['zac', 'mat'], chats, leerChat: (id) => docs[id] }); });
+  ok('al leer, lo viejo queda repartido', pa.de('zac').estado().entradas.map((e) => e.id).join() === 'm1,m3' && pa.de('mat').estado().core === 'About me.');
+  pa.de('mat').estado();
+  pa.de('zac').agregar({ hecho: 'new one' });
+  ok('…una sola vez, y lo nuevo sigue la numeración', migraciones === 1 && caja.doc.version === 2 && pa.de('zac').entrada('m7')?.hecho === 'new one');
+  ok('…y guarda aparte lo de nadie', caja.doc.sinDueño?.map((e) => e.id).join() === 'm5');
+  const sinMigrar = porAgente({ core: 'x', entradas: [{ id: 'm1', hecho: 'y', de: 'agent' }] });
+  ok('sin quien reparta, lo viejo no se lo queda nadie (ni se mezcla)', sinMigrar.pa.de('zac').estado().entradas.length === 0 && sinMigrar.pa.de('zac').estado().core === '');
+  sinMigrar.pa.de('zac').agregar({ hecho: 'z' });
+  ok('…pero queda de respaldo, entero, aunque después se guarde algo', sinMigrar.caja.doc.anterior?.entradas?.[0]?.hecho === 'y' && sinMigrar.caja.doc.anterior.core === 'x');
+  ok('el reparto guarda el viejo de respaldo también', caja.doc.anterior?.entradas?.length === 6);
+  const tira = porAgente({ core: 'x', entradas: [] }, () => { throw new Error('boom'); });
+  ok('si el reparto tira, la app sigue y lo viejo queda de respaldo', tira.pa.de('zac').estado().entradas.length === 0 && tira.caja.doc.anterior?.core === 'x');
 }
 
 if (failures.length) {
@@ -242,5 +333,5 @@ if (failures.length) {
   for (const f of failures) console.error('  ' + f);
   process.exit(1);
 }
-console.log(`test-blackcode-memoria: ok (${hechas} comprobaciones: vacía, anotar, editar y borrar, el bloque del system, el tope que deja afuera las más viejas y lo dice, el Core con su base, buscar, remember y recall, el cableado y la sesión)`);
+console.log(`test-blackcode-memoria: ok (${hechas} comprobaciones: vacía, anotar, editar y borrar, el bloque del system, el tope que deja afuera las más viejas y lo dice, el Core con su base, buscar, remember y recall, el cableado, la sesión, por agente sin cruces y el reparto de lo de antes)`);
 process.exit(0);

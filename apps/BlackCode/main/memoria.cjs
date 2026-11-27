@@ -1,7 +1,13 @@
 'use strict';
 
-// La memoria: lo que BlackCode sabe del usuario de un chat a otro, y de un
-// agente a otro. Es UNA sola para toda la app.
+// La memoria: lo que BlackCode sabe del usuario de un chat a otro.
+//
+// Es POR AGENTE (1.18.0, pedido de Fran el 27/11/2026: «necesito que las
+// memorias sean por agente, puras, sin cruces con otros»; trabajando con Mat
+// en ciberseguridad le aparecían recuerdos de Zac, y al revés). Hasta la 1.17
+// era una sola para toda la app, como en NeonCode, que tenía un único agente.
+// Cada agente tiene su cajón con su Core y su lista; `crear` es UN cajón, y
+// `crearPorAgente` el documento entero, que reparte los cajones por agente.
 //
 // Viene de la memoria de NeonCode 1.11.3 (los dos documentos, Core y Recall, y
 // la tool `remember`), sin su recuerdo automático por similitud: allá, antes
@@ -223,4 +229,103 @@ function runRecall(memoria, { id, query } = {}) {
   return `Memory entries matching "${consulta.slice(0, 80)}" (${hallados.length}, newest first):\n${lineas.join('\n')}`.slice(0, RECALL_CHARS);
 }
 
-module.exports = { crear, runRemember, runRecall, CORE_CHARS, LISTA_CHARS, HECHO_MAX, DETALLE_MAX };
+// ---------- Por agente ----------
+
+/**
+ * El documento entero: `{ version: 2, agentes: { <id del agente>: cajón } }`,
+ * donde cada cajón es lo que guarda `crear` (`{ core, entradas, sig }`).
+ * `de(agente)` da la memoria de ese agente, con la misma forma que `crear`;
+ * sin agente da null (nadie lee ni anota en la memoria «de la app»: ya no hay).
+ * Un documento de antes de la 1.18 (una sola memoria) se reparte la primera vez
+ * que se lee, con `migrar(viejo)` → `{ agentes, sinDueño }` (ver `repartir`).
+ * `alCambiar(agente)` dice de quién fue el cambio.
+ */
+function crearPorAgente({ leer, escribir, ahora = Date.now, alCambiar = () => {}, migrar = null }) {
+  const doc = () => {
+    const d = leer();
+    if (d && d.version === 2 && d.agentes && typeof d.agentes === 'object') return d;
+    if (d && (typeof d.core === 'string' || Array.isArray(d.entradas))) {
+      // (el documento viejo queda entero en `anterior`, de respaldo: no lo ve
+      // ningún agente ni la interfaz, y si el reparto falla nada se pierde)
+      let r = null;
+      try { r = migrar ? migrar(d) : null; } catch { r = null; }
+      const nuevo = { version: 2, agentes: r?.agentes ?? {}, ...(r?.sinDueño?.length ? { sinDueño: r.sinDueño } : {}), anterior: d };
+      escribir(nuevo);
+      return nuevo;
+    }
+    return { version: 2, agentes: {} };
+  };
+  const cajones = new Map();
+  return {
+    de(agente) {
+      const id = typeof agente === 'string' ? agente.trim() : '';
+      if (!id) return null;
+      if (!cajones.has(id)) {
+        cajones.set(id, crear({
+          leer: () => { const d = doc(); return Object.hasOwn(d.agentes, id) ? d.agentes[id] : undefined; },
+          escribir: (cajon) => { const d = doc(); escribir({ ...d, agentes: { ...d.agentes, [id]: cajon } }); },
+          ahora,
+          alCambiar: () => alCambiar(id),
+        }));
+      }
+      return cajones.get(id);
+    },
+    /** Los agentes que tienen algo guardado (para los tests y el diagnóstico). */
+    agentes: () => Object.keys(doc().agentes),
+  };
+}
+
+/**
+ * Reparte una memoria de antes de la 1.18 entre los agentes, SIN mirar lo que
+ * dice ningún recuerdo (Fran: «manipulalas si querés pero no veas el
+ * contenido»). Los chats no guardan los argumentos de `remember`, pero sí la
+ * hora de cada mensaje del usuario y qué tools corrió cada respuesta: un
+ * recuerdo que anotó un agente es del turno (con un `remember` que salió bien)
+ * que empezó más cerca ANTES de su hora. Si dos agentes empatan, es de nadie.
+ *   - El Core va copiado a todos los agentes: lo escribió el usuario sobre sí
+ *     mismo (y no se puede saber qué línea agregó cuál agente). Fran eligió eso.
+ *   - Lo que anotó el usuario a mano también va a todos, por lo mismo.
+ *   - Lo que anotó un agente y no se puede atribuir queda en `sinDueño`: en el
+ *     documento, sin perderse, pero no lo ve ningún agente.
+ * `agentes`: los ids que existen; `chats`: la lista `{ id, agente }`;
+ * `leerChat(id)`: el documento del chat (con `mensajes`).
+ */
+function repartir(viejo, { agentes = [], chats = [], leerChat = () => null } = {}) {
+  const entradas = Array.isArray(viejo?.entradas) ? viejo.entradas.filter((e) => e && typeof e.id === 'string' && typeof e.hecho === 'string') : [];
+  const core = typeof viejo?.core === 'string' ? viejo.core : '';
+  const sig = Number.isInteger(viejo?.sig) && viejo.sig > 0 ? viejo.sig : entradas.length + 1;
+  const existen = new Set(agentes.filter((a) => typeof a === 'string' && a));
+  // los turnos con un remember que salió bien: [desde, hasta) y de qué agente
+  const turnos = [];
+  for (const c of chats) {
+    if (!c || !existen.has(c.agente)) continue;
+    const ms = leerChat(c.id)?.mensajes;
+    if (!Array.isArray(ms)) continue;
+    const delUsuario = (m) => m?.rol === 'user' && Number.isFinite(m.t);
+    for (let i = 0; i < ms.length; i++) {
+      if (!(Array.isArray(ms[i]?.tools) && ms[i].tools.some((t) => t?.name === 'remember' && t.status === 'ok'))) continue;
+      let j = i; while (j >= 0 && !delUsuario(ms[j])) j--;
+      let k = i + 1; while (k < ms.length && !delUsuario(ms[k])) k++;
+      turnos.push({ agente: c.agente, desde: j >= 0 ? ms[j].t : 0, hasta: k < ms.length ? ms[k].t : Infinity });
+    }
+  }
+  const dueño = (e) => {
+    const t = Number(e.creado);
+    if (!Number.isFinite(t) || !t) return null;
+    const en = turnos.filter((x) => t >= x.desde && t < x.hasta).sort((a, b) => b.desde - a.desde);
+    if (!en.length) return null;
+    const empatan = en.filter((x) => x.desde === en[0].desde);
+    return empatan.every((x) => x.agente === en[0].agente) ? en[0].agente : null;
+  };
+  const cajon = () => ({ core, entradas: [], sig });
+  const salida = Object.fromEntries([...existen].map((a) => [a, cajon()]));
+  const sinDueño = [];
+  for (const e of entradas) {
+    if (e.de !== 'agent') { for (const a of existen) salida[a].entradas.push({ ...e }); continue; }
+    const d = dueño(e);
+    if (d) salida[d].entradas.push({ ...e }); else sinDueño.push({ ...e });
+  }
+  return { agentes: salida, sinDueño };
+}
+
+module.exports = { crear, crearPorAgente, repartir, runRemember, runRecall, CORE_CHARS, LISTA_CHARS, HECHO_MAX, DETALLE_MAX };

@@ -1713,6 +1713,21 @@
   /* About you: de alto fijo (el doble de los 132 px que tenía), sin la manija
      de la esquina para estirarlo (Fran, 25/11/2026). Lo que no entra, scrollea. */
   .dm-memoria-core { resize: none; height: 264px; line-height: 1.55; }
+  /* Cada agente tiene su memoria (1.18.0): el select de la cabecera elige de
+     cuál. Al cambiar, lo escrito en las tarjetas se funde por color (no por
+     opacity, que pierde ClearType): se va en base acelerando, cambia, y vuelve
+     en slow frenando, como el ojito de las llaves. Las tarjetas no se mueven:
+     son las mismas, cambia lo de adentro. El cajón no es una caja: las
+     tarjetas siguen siendo hijas de la página para su separación. */
+  .dm-memoria-cajon { display: contents; }
+  .dm-memoria-agente { min-width: 200px; }
+  .dm-memoria-cajon[data-relevo] .dm-tarjeta *,
+  .dm-memoria-cajon[data-relevo] .dm-tarjeta *::placeholder {
+    color: transparent;
+    transition: color var(--rad-dur-base) var(--rad-ease-in);
+  }
+  .dm-memoria-cajon[data-volviendo] .dm-tarjeta *,
+  .dm-memoria-cajon[data-volviendo] .dm-tarjeta *::placeholder { transition: color var(--rad-dur-slow) var(--rad-ease-out); }
   .dm-memoria-pie { display: flex; align-items: baseline; justify-content: space-between; gap: var(--rad-space-3); min-height: 1.5em; }
   .dm-memoria-cuenta { font-size: var(--rad-text-xs); color: var(--rad-text-3); transition: color var(--rad-dur-fast) var(--rad-ease-out); }
   /* pasado del tope: lo que sobra no entra al contexto */

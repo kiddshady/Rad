@@ -1,5 +1,37 @@
 # Changelog
 
+## BlackCode 1.18.0 (2026-11-27)
+
+**La memoria es por agente.** Hasta ahora era una sola para toda la app (así
+vino de NeonCode, que tenía un único agente): trabajando con Mat en algo de
+ciberseguridad le aparecían a Fran recuerdos de Zac, y a Zac los de Mat. Lo
+pidió así: «necesito que las memorias sean por agente, puras, sin cruces con
+otros».
+
+- **Cada agente tiene su cajón**: su «About you» y su lista. `remember` y
+  `recall` trabajan sobre el del agente de la corrida (el del padre en un
+  subagente, el de la tarea en una tarea); el bloque del system sale del
+  cajón del agente del turno; un agente nuevo arranca vacío. Una corrida sin
+  agente no tiene memoria.
+- **La vista Memory muestra un agente a la vez**, elegido con un select en la
+  cabecera (Fran lo eligió sobre pestañas); arranca en el agente del chat y
+  lo sigue cuando se cambia de agente ahí (el select es para mirar otro). Al
+  cambiar, lo escrito en las tarjetas se funde por color, cambia y vuelve, en
+  orden. Lo pendiente del «About you» del que se deja se guarda antes.
+- **Lo que había se reparte solo** la primera vez que la app lee la memoria,
+  sin mirar lo que dice ningún recuerdo (Fran pidió que no se leyera): cada
+  recuerdo que anotó un agente va al agente del turno con un `remember` que
+  empezó más cerca antes de su hora; si dos empatan, no va a ninguno. El
+  «About you» y lo agregado a mano van copiados a todos (elección de Fran:
+  son sobre él; los recorta después). El documento viejo queda entero de
+  respaldo en el mismo archivo, sin que lo vea ningún agente. Probado en seco
+  sobre los datos de Fran (solo cuentas): Zac 4, Mat 4, ninguno sin dueño.
+- Tests: por agente sin cruces (tools, bloque, buscar, ids, borrar), el
+  reparto (turno más cercano, empate, remember fallido, agente borrado) y el
+  respaldo. El humo cambia de agente en la vista, mira el relevo en orden y
+  que otro agente no reciba la memoria del primero, ni en la vista ni en el
+  system.
+
 ## BlackCode 1.17.0 (2026-11-26) · @rad/fonts 0.3.0
 
 Lote que pidió Fran, probado por él en la app de dev:

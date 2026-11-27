@@ -469,8 +469,8 @@ tener tools prendidas (archivos, comandos y jobs, código, SQLite, web, abrir co
 cómo están armadas, en `apps/BlackCode/docs/tools.md`. Las respuestas dibujan las
 fórmulas en LaTeX (KaTeX, con mhchem). A un mensaje se le adjuntan imágenes y
 archivos de texto con el botón +, pegando o soltándolos sobre la conversación
-(`renderer/adjuntos.js`). La vista Memory guarda lo que la app recuerda del
-usuario de un chat a otro: un texto fijo que va siempre al contexto y una lista
+(`renderer/adjuntos.js`). La vista Memory guarda lo que cada agente recuerda del
+usuario de un chat a otro, cada uno lo suyo y sin cruces: un texto fijo que va siempre al contexto y una lista
 de recuerdos de una línea que anotan los agentes (`main/memoria.cjs`), sin
 embeddings. La vista Skills guarda procedimientos escritos por el usuario
 (`main/skills.cjs`): el agente ve la lista y carga el que le sirve, y lo que

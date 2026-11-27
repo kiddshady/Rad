@@ -500,8 +500,10 @@ hijo leyó se queda en el hijo. Viene de NeonCode 1.11.3 (`runDelegate`,
 
 ## La memoria
 
-Desde la 0.15.0. Lo que la app recuerda del usuario de un chat a otro, y de un
-agente a otro: es UNA para toda la app. Está en `main/memoria.cjs` (no en
+Desde la 0.15.0. Lo que cada agente recuerda del usuario de un chat a otro.
+**Es POR AGENTE desde la 1.18.0** (Fran: «necesito que las memorias sean por
+agente, puras, sin cruces con otros»; hasta la 1.17 era UNA para toda la app,
+y a Zac le aparecían los recuerdos de ciberseguridad de Mat). Está en `main/memoria.cjs` (no en
 `main/tools/`: también la ven los agentes sin ninguna tool) y sus dos tools,
 en `main/tools/memoria.cjs`. Viene de la memoria de NeonCode 1.11.3, sin su
 recuerdo automático por similitud (embeddings): acá el agente ve la lista y
@@ -532,6 +534,28 @@ decide qué leer.
   el aviso es `memoria:evento`). La lista se cambia de a una entrada. El Core
   es un texto y se guarda entero: va con la `base` con la que se abrió, y lo
   que un agente le agregó mientras tanto se conserva (el cuidado de NeonCode).
+- **Por agente (1.18.0).** Cada agente tiene su cajón con su Core y su lista
+  (`crearPorAgente`; documento `{ version: 2, agentes: { <id>: { core,
+  entradas, sig } } }`). `remember` y `recall` usan el de `run.agente`: el de
+  la corrida, el del padre en un subagente, el de la tarea en una tarea; una
+  corrida sin agente no tiene memoria. El bloque del system sale del cajón del
+  agente del turno. Los ids (`m1`…) son de cada cajón. Un agente nuevo arranca
+  vacío. Borrar un agente no borra su cajón (queda en el documento, sin que
+  nadie lo vea), como sus canvas. La vista muestra un agente a la vez, con un
+  select en la cabecera (Fran lo eligió sobre pestañas); arranca en el agente
+  del chat y lo sigue cuando se cambia ahí (evento `seleccion` de datos.js).
+  Al cambiar, lo de las tarjetas se funde por color y vuelve, en orden
+  (`data-relevo` → `data-volviendo` en `.dm-memoria-cajon`). Cada canal recibe
+  `{ agente, … }`; con un agente que no existe, `memoria:leer` da null.
+- **Lo de antes de la 1.18** se reparte la primera vez que se lee (`repartir`),
+  sin mirar lo que dice ningún recuerdo: los chats no guardan los argumentos
+  de `remember`, pero sí la hora de cada mensaje del usuario y qué tools
+  corrió cada respuesta. Un recuerdo que anotó un agente es del turno con un
+  `remember` que salió bien que empezó más cerca antes de su hora; si dos
+  agentes empatan, de nadie (`sinDueño`, en el documento, sin que lo vea
+  ningún agente). El Core y lo que el usuario agregó a mano van copiados a
+  todos (eligió Fran: es sobre él; cada uno lo recorta después). El documento
+  viejo queda entero en `anterior`, de respaldo.
 - **No vino:** el recuerdo por similitud, los embeddings y su motor local.
 
 ## Los chats de antes

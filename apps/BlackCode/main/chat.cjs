@@ -138,15 +138,26 @@ function wire(rad, { llave }) {
   // y lo que «borran» va a una papelera que es otra carpeta ahí mismo.
   // Tampoco abren nada: os_open anota lo que habría abierto.
   const taller = llave.SIMULADO && process.env.RAD_DATA ? path.join(process.env.RAD_DATA, 'workspace') : null;
-  // La memoria: lo que la app recuerda del usuario de un chat a otro. Vive en
-  // un documento que la interfaz no puede leer (empieza con _): el único que
-  // lo escribe es este proceso, y la vista Memory pide cada cambio por su canal.
+  // La memoria: lo que cada agente recuerda del usuario de un chat a otro. Es
+  // POR AGENTE desde la 1.18.0: ninguno ve ni anota en la de otro. Vive en un
+  // documento que la interfaz no puede leer (empieza con _): el único que lo
+  // escribe es este proceso, y la vista Memory pide cada cambio por su canal,
+  // diciendo de qué agente. Una memoria de antes (una sola para todos) se
+  // reparte la primera vez que se lee: ver `repartir` en memoria.cjs.
   const DOC_MEMORIA = '_memoria';
-  const memoria = require('./memoria.cjs').crear({
+  const moduloMemoria = require('./memoria.cjs');
+  const memoria = moduloMemoria.crearPorAgente({
     leer: () => rad.store.read(DOC_MEMORIA),
     escribir: (doc) => { rad.store.write(DOC_MEMORIA, doc).catch(() => {}); },
-    alCambiar: () => rad.send('memoria:evento', {}),
+    alCambiar: (agente) => rad.send('memoria:evento', { agente }),
+    migrar: (viejo) => moduloMemoria.repartir(viejo, {
+      agentes: (rad.store.read('agentes')?.lista ?? []).map((a) => a?.id),
+      chats: Array.isArray(rad.store.read('chats')?.lista) ? rad.store.read('chats').lista : [],
+      leerChat: (id) => (/^[\w-]+$/.test(String(id)) ? rad.store.read(`chat-${id}`) : null),
+    }),
   });
+  /** La memoria de un agente que existe, o null. */
+  const memoriaDe = (agente) => ((rad.store.read('agentes')?.lista ?? []).some((a) => a?.id === agente) ? memoria.de(agente) : null);
   // Las skills: procedimientos que el usuario les deja a sus agentes. Como la
   // memoria, en un documento que la interfaz no lee. Cuando un agente propone
   // una, la interfaz se entera para avisarle al usuario que hay algo que revisar.
@@ -433,11 +444,13 @@ function wire(rad, { llave }) {
   // ---------- La memoria ----------
   // Los canales de su vista. La lista se cambia de a una entrada; el Core es
   // un texto y viaja con la `base` con la que se abrió (ver memoria.cjs).
-  rad.handle('memoria:leer', () => memoria.estado());
-  rad.handle('memoria:core', (que) => memoria.ponerCore(que?.texto, que?.base));
-  rad.handle('memoria:agregar', (que) => memoria.agregar({ hecho: que?.hecho, detalle: que?.detalle, de: 'user' }));
-  rad.handle('memoria:editar', (que) => memoria.editar(String(que?.id ?? ''), { hecho: que?.hecho, detalle: que?.detalle }));
-  rad.handle('memoria:borrar', (id) => memoria.borrar(String(id ?? '')));
+  // (cada pedido dice de qué agente: la vista muestra uno a la vez)
+  const NO_AGENTE = { ok: false, error: 'no such agent' };
+  rad.handle('memoria:leer', (que) => memoriaDe(que?.agente)?.estado() ?? null);
+  rad.handle('memoria:core', (que) => { const m = memoriaDe(que?.agente); return m ? m.ponerCore(que?.texto, que?.base) : null; });
+  rad.handle('memoria:agregar', (que) => memoriaDe(que?.agente)?.agregar({ hecho: que?.hecho, detalle: que?.detalle, de: 'user' }) ?? NO_AGENTE);
+  rad.handle('memoria:editar', (que) => memoriaDe(que?.agente)?.editar(String(que?.id ?? ''), { hecho: que?.hecho, detalle: que?.detalle }) ?? NO_AGENTE);
+  rad.handle('memoria:borrar', (que) => memoriaDe(que?.agente)?.borrar(String(que?.id ?? '')) ?? NO_AGENTE);
 
   // ---------- Las skills ----------
   // Los canales de su vista. Aprobar y descartar una propuesta son del
@@ -766,7 +779,7 @@ function wire(rad, { llave }) {
     // este turno ya lo sabe: lo acaba de escribir). Con tools, la lleva la
     // corrida; sin tools (un modelo que no las acepta), va con las instrucciones.
     if (pedido.memoria) {
-      const bloque = memoria.bloque({ recall: sesion?.nombres.includes('recall') === true, remember: sesion?.nombres.includes('remember') === true });
+      const bloque = memoriaDe(pedido.agente)?.bloque({ recall: sesion?.nombres.includes('recall') === true, remember: sesion?.nombres.includes('remember') === true }) ?? '';
       if (sesion) sesion.run.memoria = bloque;
       else if (bloque) pedido.instrucciones = [pedido.instrucciones, bloque].filter(Boolean).join('\n\n');
     }
@@ -849,7 +862,7 @@ function wire(rad, { llave }) {
     }
     const tiene = (t) => Array.isArray(agente.tools) && agente.tools.includes(t);
     if (tiene('remember') || tiene('recall')) {
-      const bloque = memoria.bloque({ recall: sesion?.nombres.includes('recall') === true, remember: sesion?.nombres.includes('remember') === true });
+      const bloque = memoriaDe(tarea.agente)?.bloque({ recall: sesion?.nombres.includes('recall') === true, remember: sesion?.nombres.includes('remember') === true }) ?? '';
       if (sesion) sesion.run.memoria = bloque;
       else if (bloque) pedido.instrucciones = [pedido.instrucciones, bloque].filter(Boolean).join('\n\n');
     }

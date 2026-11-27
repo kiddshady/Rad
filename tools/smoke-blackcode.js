@@ -2567,7 +2567,10 @@ else {
   {
     const datosM = await import('/datos.js');
     datosM.ponerModoTools('auto');
-    const mem = () => window.rad.invoke('memoria:leer');
+    // (cada agente tiene su memoria desde la 1.18.0: todo esto es la del agente del chat)
+    const agenteM0 = datosM.agenteActual().id;
+    const mem = (agente = agenteM0) => window.rad.invoke('memoria:leer', { agente });
+    if ((await window.rad.invoke('memoria:leer', {})) !== null || (await window.rad.invoke('memoria:leer', { agente: 'no-such-agent' })) !== null) fail('memoria: se puede leer una memoria sin agente o de uno que no existe');
     const filasM = () => alive(view('memoria').querySelectorAll('.dm-memoria-fila'));
     const hechos = () => filasM().map((f) => f.querySelector('.dm-memoria-hecho').textContent);
     const listo2 = async () => { await sleep(200); for (let i = 0; i < 400 && (composer.querySelector('.rad-busy') || ultimo()?.dataset.estado !== 'ok'); i++) await sleep(50); await settle(); };
@@ -2643,11 +2646,11 @@ else {
     // trae su línea (el usuario no lo estaba editando).
     await go('memoria');
     await until(() => filasM().length === 2, 3000);
-    if (hechos().join(' | ') !== 'Uses PowerShell 7 | Has a cat named Miso' || !filasM()[0].textContent.includes('noted by an agent')) fail('memoria: la lista no muestra lo que anotó el agente, lo más nuevo arriba: ' + hechos().join(' | '));
+    if (hechos().join(' | ') !== 'Uses PowerShell 7 | Has a cat named Miso' || !filasM()[0].textContent.includes('noted by ' + datosM.agente(agenteM0).nombre)) fail('memoria: la lista no muestra lo que anotó el agente, lo más nuevo arriba: ' + hechos().join(' | '));
     if (areaCore.value !== 'I am the smoke user.\nAnswer briefly.\n- Never forgets this\n') fail('memoria: el texto fijo no trae la línea que agregó el agente: ' + JSON.stringify(areaCore.value));
     // El usuario edita el texto mientras un agente le agrega otra línea: no se pisan.
     type(areaCore, 'I am the smoke user, edited.\n- Never forgets this\n');
-    await window.rad.invoke('memoria:core', { texto: (await mem()).core + '- Added behind your back\n', base: (await mem()).core });
+    await window.rad.invoke('memoria:core', { agente: agenteM0, texto: (await mem()).core + '- Added behind your back\n', base: (await mem()).core });
     await until(() => guardadoM() === 'Saved', 4000);
     await settle();
     const coreFinal = (await mem()).core;
@@ -2692,22 +2695,77 @@ else {
     if (eco().includes('memory:')) fail('memoria: con el grupo Memory apagado igual le llegó la memoria: ' + /memory:[^\n]*/.exec(eco())?.[0]);
     datosM.ponerTools(agenteM.id, susTools);
     await settle();
-    // Un modelo que no acepta tools también la ve, si tiene el grupo prendido.
+    // Cada agente tiene SU memoria (1.18.0, Fran: «puras, sin cruces con
+    // otros»): otro agente, con el grupo Memory prendido, no ve nada de la del
+    // primero. Y un modelo que no acepta tools también ve la suya.
     const sinTools = datosM.crearAgente({ nombre: 'No tools model', proveedor: 'venice', modelo: 'venice-uncensored-1-2', instrucciones: 'Short.', tools: datosM.todasLasTools() });
     const chatST = datosM.crearChat(sinTools.id);
     await settle();
     await datosM.enviar(chatST.id, 'Who am I?');
     await listo2();
-    if (!eco().includes('memory: core yes, 1 entry')) fail('memoria: a un modelo sin tools no le llegó la memoria: ' + (/memory:[^\n]*|The Venice key[^\n]*/.exec(eco())?.[0] ?? eco().slice(0, 120)));
+    if (eco().includes('memory:')) fail('memoria: a otro agente le llegó la memoria del primero: ' + /memory:[^\n]*/.exec(eco())?.[0]);
+    if ((await mem(sinTools.id))?.entradas.length !== 0 || (await mem(sinTools.id)).core !== '') fail('memoria: un agente nuevo no arranca con la memoria vacía');
+    // La vista: el select de la cabecera cambia de agente, con relevo, y cada uno muestra lo suyo.
+    await go('memoria');
+    const selM = vista.querySelector('[data-campo="memoria-agente"]');
+    if (!selM) fail('memoria: la vista no tiene el select de agente');
+    else {
+      const tituloM = () => shown(vista.querySelector('[data-tarjeta="recuerdos"] .dm-tarjeta-nombre'));
+      // la vista sigue al agente del chat: el chat nuevo es del segundo
+      if (datosM.agenteActual().id === sinTools.id) {
+        await until(() => tituloM().includes('No tools model') && !vista.querySelector('.dm-memoria-cajon[data-relevo], .dm-memoria-cajon[data-volviendo]'), 3000);
+        if (!tituloM().includes('No tools model')) fail('memoria: la vista no siguió al agente del chat («' + tituloM() + '»)');
+      }
+      // se arranca del primero (con su texto fijo) para ver el relevo hacia el segundo
+      if (!tituloM().includes(datosM.agente(agenteM0).nombre)) {
+        selM.click();
+        await until(() => menus().length > 0, 2000);
+        await pick(datosM.agente(agenteM0).nombre);
+        await until(() => tituloM().includes(datosM.agente(agenteM0).nombre) && !vista.querySelector('.dm-memoria-cajon[data-relevo], .dm-memoria-cajon[data-volviendo]'), 3000);
+        await settle();
+      }
+      // (lo que pasa por el cajón se anota mientras pasa: el relevo dura menos que un settle)
+      const pasos = [];
+      const obs = new MutationObserver(() => { const c = vista.querySelector('.dm-memoria-cajon'); pasos.push((c.hasAttribute('data-relevo') ? 'R' : '') + (c.hasAttribute('data-volviendo') ? 'V' : '') + ':' + areaCore.value.length); });
+      obs.observe(vista.querySelector('.dm-memoria-cajon'), { attributes: true, attributeFilter: ['data-relevo', 'data-volviendo'] });
+      selM.click();
+      await until(() => menus().length > 0, 2000);
+      const eligio = await pick('No tools model');
+      if (eligio === false) fail('memoria: el select no ofrece el agente nuevo');
+      else {
+        await until(() => pasos.length >= 3, 3000);
+        obs.disconnect();
+        // se funde con el texto del primero, vuelve ya con el del segundo (vacío), y termina
+        if (!(pasos[0]?.startsWith('R:') && pasos[0] !== 'R:0' && pasos[1] === 'V:0' && pasos[2] === ':0')) fail('memoria: cambiar de agente no hace el relevo en orden (se va con lo viejo, vuelve con lo nuevo): ' + pasos.join(' '));
+        await until(() => !vista.querySelector('.dm-memoria-cajon[data-relevo], .dm-memoria-cajon[data-volviendo]') && vista.querySelector('.dm-memoria-vacia'), 3000);
+        await settle();
+        if (filasM().length || areaCore.value !== '' || !shown(vista.querySelector('[data-tarjeta="recuerdos"] .dm-tarjeta-nombre')).includes('No tools model')) fail('memoria: la vista del otro agente muestra lo del primero: ' + hechos().join(' | ') + ' / ' + JSON.stringify(areaCore.value));
+        // lo que se agrega a mano ahí es de ese agente y de ningún otro
+        vista.querySelector('[data-accion="memoria-nueva"]').click();
+        await until(() => modal(), 2000);
+        type(modal().querySelector('[data-campo="hecho"]'), 'Only for the no tools model');
+        primary().click();
+        await closed();
+        await until(() => filasM().length === 1, 3000);
+        if ((await mem(sinTools.id)).entradas.map((e) => e.hecho).join() !== 'Only for the no tools model' || (await mem()).entradas.some((e) => e.hecho.includes('no tools'))) fail('memoria: lo agregado en la vista del segundo agente no quedó solo en la suya');
+      }
+    }
+    await go('chat');
+    await datosM.enviar(chatST.id, 'And now?');
+    await listo2();
+    if (!eco().includes('memory: core no, 1 entry')) fail('memoria: a un modelo sin tools no le llegó SU memoria: ' + (/memory:[^\n]*|The Venice key[^\n]*/.exec(eco())?.[0] ?? eco().slice(0, 120)));
     await datosM.borrarAgente(sinTools.id);
+    // (la vista sigue al agente del chat, y el que miraba ya no existe)
     datosM.elegirAgente(agenteM.id);
     await settle();
 
     // Queda como estaba: vacía (las pruebas que siguen cuentan los renglones de
     // la respuesta de mentira, y la pasada 2 no espera memoria).
-    await window.rad.invoke('memoria:borrar', 'm1');
-    await window.rad.invoke('memoria:core', { texto: '', base: (await mem()).core });
+    await window.rad.invoke('memoria:borrar', { agente: agenteM0, id: 'm1' });
+    await window.rad.invoke('memoria:core', { agente: agenteM0, texto: '', base: (await mem()).core });
     await go('memoria');
+    await until(() => shown(vista.querySelector('[data-tarjeta="recuerdos"] .dm-tarjeta-nombre')).includes(datosM.agente(agenteM0).nombre), 3000);
+    if (!shown(vista.querySelector('[data-tarjeta="recuerdos"] .dm-tarjeta-nombre')).includes(datosM.agente(agenteM0).nombre)) fail('memoria: borrado el agente que se miraba y vuelto al primero en el chat, la vista no lo siguió');
     await until(() => filasM().length === 0 && areaCore.value === '', 3000);
     if (filasM().length || areaCore.value !== '' || !vista.querySelector('.dm-memoria-vacia')) fail('memoria: vaciarla no dejó la vista vacía');
 
@@ -2746,7 +2804,7 @@ else {
     }
     await go('chat');
     datosM.ponerModoTools('manual');
-    data.memoria = 'texto fijo guardado solo, agregar a mano con detalle, remember (y repetido), recall por id y por palabras, core, la memoria en el system del turno siguiente, la carrera del texto fijo, buscar, cambiar, borrar, grupo apagado y modelo sin tools';
+    data.memoria = 'texto fijo guardado solo, agregar a mano con detalle, remember (y repetido), recall por id y por palabras, core, la memoria en el system del turno siguiente, la carrera del texto fijo, buscar, cambiar, borrar, grupo apagado, por agente sin cruces (otro agente no la recibe, el select con su relevo en orden, agregar a mano en el otro, la vista sigue al agente del chat) y modelo sin tools con la suya';
   }
 
   // 11m. Las skills: procedimientos que el usuario les deja a sus agentes. El
