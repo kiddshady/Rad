@@ -1,5 +1,27 @@
 # Changelog
 
+## BlackCode 1.21.2 (2026-11-27) · núcleo 0.21.3
+
+Dos arreglos estéticos que pidió Fran.
+
+- **El formulario del agente scrollea con esfumado, como Settings.** Antes
+  scrolleaba el modal entero (el título y los botones se iban con el
+  formulario) y lo recortado se cortaba en seco. Ahora el modal no
+  scrollea: «New agent» y los botones quedan quietos, y el cuerpo es un
+  `rad-scroll` del núcleo, que esfuma arriba y abajo lo que recorta. El
+  cuerpo va de borde a borde (la scrollbar sigue contra el canto) y el
+  esfumado ocupa el lugar del gap: el aire hasta los botones es el de antes;
+  bajo el título, 12 px más.
+- **La esquina del panel ya no se pone en punta al pasar de Memory a Notes**
+  (núcleo). Notes es una vista de hojas: al ir a ella el escenario deja de
+  recortar en el acto (para que la sombra de las hojas no se corte), y
+  Memory, que se iba esfumando, mostraba sus esquinas cuadradas unos 130 ms.
+  Medido por CDP sobre el píxel de la esquina: subía de 41 a 58–60 durante
+  ese rato; ahora queda en 39–41. Cada `.rad-view` lleva
+  `border-radius: inherit` (las esquinas del escenario).
+- El humo comprueba las dos cosas (y las dos comprobaciones fallan sin el
+  arreglo).
+
 ## BlackCode 1.21.1 (2026-11-27)
 
 **En Telegram, la negrita de un agente salía en cursiva.** Fran lo vio

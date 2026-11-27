@@ -3,6 +3,7 @@
 import { openModal, confirm } from '/@core/modal.js';
 import { createSelect, setFieldError, wireControls } from '/@core/controls.js';
 import { swapText } from '/@core/motion.js';
+import { wireScroll } from '/@core/scroll.js';
 import { reconcile } from '/@core/list.js';
 import { toast } from '/@core/toast.js';
 import * as datos from './datos.js';
@@ -143,7 +144,13 @@ export function abrirAgente(agente = null) {
       { id: 'cancel', label: 'Cancel' },
       { id: 'ok', label: agente ? 'Save' : 'Create agent', variant: 'primary', onClick: guardar },
     ],
+    // (el título y los botones quedan quietos y scrollea solo el formulario,
+    // con el esfumado de arriba y de abajo, como Settings: Fran, 27/11/2026)
+    className: 'dm-agente-modal',
   });
+  const cuerpo = modal.el.querySelector('.rad-modal-body');
+  cuerpo.classList.add('rad-scroll');
+  wireScroll(cuerpo);
   // Enter en el nombre es lo mismo que el botón primario.
   nombre.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || e.isComposing) return;

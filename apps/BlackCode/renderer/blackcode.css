@@ -177,6 +177,22 @@
      560 desde Inter (1.17.0): dibuja más ancho que Segoe y a 540 ese nombre
      ya no entraba (el humo lo agarró por 2 px). */
   .rad-modal:has(.dm-form) { --rad-modal-width: 560px; }
+  /* Lo largo scrollea adentro (27/11/2026, Fran: «cuando se scrollea no hay
+     fade, como debería haber», como en Settings). El modal no scrollea: el
+     título y los botones quedan quietos, y el cuerpo es un `rad-scroll` del
+     núcleo, que esfuma lo que recorta arriba y abajo. El cuerpo llega de
+     borde a borde del modal (la scrollbar va contra el canto, como antes) y
+     arranca pegado al título y termina pegado a los botones: el esfumado
+     ocupa el lugar del gap, no lo suma. Abajo, el pie pierde su margen
+     (como en All canvases), así el aire hasta los botones queda como estaba. */
+  .rad-modal.dm-agente-modal { overflow: hidden; }
+  .dm-agente-modal > .rad-modal-body.rad-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: calc(-1 * var(--rad-space-3)) calc(-1 * var(--rad-space-5));
+    padding-inline: var(--rad-space-5);
+  }
+  .dm-agente-modal > .rad-modal-actions { margin-top: 0; }
   .dm-form { display: grid; gap: var(--rad-space-4); }
   .dm-form .rad-select { width: 100%; }
   .dm-form-par { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--rad-space-3); align-items: start; }

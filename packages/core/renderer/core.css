@@ -303,6 +303,12 @@
     min-width: 0;
     min-height: 0;
     background: inherit;
+    /* Las mismas esquinas que el escenario (core 0.21.3). Casi siempre las
+       recorta él, pero al ir a una vista de hojas deja de recortar en el acto
+       (ver más abajo), y la vista que se va, esfumándose, mostraba sus
+       esquinas en punta un par de cuadros: Fran lo vio en BlackCode al pasar
+       de Memory a Notes, «primero se dibuja la esquina en punta». */
+    border-radius: inherit;
   }
   .rad-view[data-state='hidden'] { visibility: hidden; }
 

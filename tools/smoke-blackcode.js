@@ -391,6 +391,28 @@ else {
     if (ti.rows !== 14 || ti.offsetHeight < renglon * 14 || getComputedStyle(ti).resize !== 'none') fail(`el campo de instrucciones del agente mide ${ti.offsetHeight} px (${ti.rows} renglones de ${renglon} px, resize ${getComputedStyle(ti).resize}): tienen que ser 14 renglones, fijo`);
     if (modal().offsetHeight > innerHeight) fail(`con el campo de instrucciones más alto, el formulario del agente no entra en la ventana (${modal().offsetHeight} de ${innerHeight} px)`);
   }
+  {
+    // Lo largo scrollea adentro, con el esfumado de Settings (Fran, 1.21.2):
+    // el modal no scrollea, el título y los botones quedan quietos, y el
+    // cuerpo es un rad-scroll que esfuma arriba y abajo lo que recorta.
+    const panel = modal();
+    const cuerpo = panel.querySelector('.rad-modal-body');
+    const titulo = panel.querySelector('.rad-modal-title').getBoundingClientRect().top;
+    const botones = panel.querySelector('.rad-modal-actions').getBoundingClientRect().top;
+    if (getComputedStyle(panel).overflowY !== 'hidden' || !cuerpo.classList.contains('rad-scroll') || !(cuerpo.scrollHeight > cuerpo.clientHeight + 50)) fail(`modal del agente: no scrollea el cuerpo solo (overflow del modal ${getComputedStyle(panel).overflowY}, clases «${cuerpo.className}», ${cuerpo.scrollHeight}/${cuerpo.clientHeight} px)`);
+    else {
+      if (!cuerpo.classList.contains('at-top') || cuerpo.classList.contains('at-bottom')) fail(`modal del agente: arriba de todo, el esfumado no es el de arriba de todo (${cuerpo.className})`);
+      cuerpo.scrollTop = (cuerpo.scrollHeight - cuerpo.clientHeight) / 2;
+      await sleep(dur('base') + 120);
+      const mascara = getComputedStyle(cuerpo).maskImage;
+      if (cuerpo.classList.contains('at-top') || cuerpo.classList.contains('at-bottom') || !/transparent|rgba\(0, 0, 0, 0\)/.test(mascara) || !/calc\(100% - 24px\)/.test(mascara) || /rgb\(0, 0, 0\) 0px/.test(mascara)) fail(`modal del agente: en el medio no se esfuma de los dos lados (${cuerpo.className} · ${mascara.slice(0, 140)})`);
+      const tituloAhora = panel.querySelector('.rad-modal-title').getBoundingClientRect().top;
+      const botonesAhora = panel.querySelector('.rad-modal-actions').getBoundingClientRect().top;
+      if (Math.abs(tituloAhora - titulo) > 0.5 || Math.abs(botonesAhora - botones) > 0.5) fail(`modal del agente: al scrollear se movió el título (${r2(titulo)} → ${r2(tituloAhora)}) o los botones (${r2(botones)} → ${r2(botonesAhora)})`);
+      cuerpo.scrollTop = 0;
+      await sleep(dur('base') + 60);
+    }
+  }
   type(modal().querySelector('[data-campo="instrucciones"]'), INSTRUCCIONES);
   primary().click();
   await frame();
@@ -1813,6 +1835,21 @@ else {
   {
     const datosM = await import('/datos.js');
     datosM.ponerModoTools('auto');
+    // De Memory a Notes, la esquina no se pone en punta (core 0.21.3). Notes es
+    // una vista de hojas: el escenario deja de recortar en el acto, y Memory,
+    // que se va esfumando, mostraba sus esquinas cuadradas un par de cuadros
+    // (Fran lo vio). La vista tiene que traer las esquinas del escenario.
+    {
+      await go('memoria');
+      document.querySelector('.rad-tab[data-view="notas"]').click();
+      await frame();
+      const sale = view('memoria');
+      const esc = document.querySelector('.rad-stage');
+      const radio = (el) => getComputedStyle(el).borderTopLeftRadius;
+      if (sale.dataset.state !== 'leaving' || !esc.hasAttribute('data-rad-sheets') || getComputedStyle(esc).overflow !== 'visible') fail(`esquina: el cambio a Notes no es el que se prueba (Memory ${sale.dataset.state}, escenario ${esc.hasAttribute('data-rad-sheets') ? 'de hojas' : 'común'}, overflow ${getComputedStyle(esc).overflow})`);
+      else if (!(parseFloat(radio(esc)) > 0) || radio(sale) !== radio(esc)) fail(`esquina: Memory se va sin las esquinas del escenario (${radio(sale)}, el escenario ${radio(esc)}): se ve en punta mientras se esfuma`);
+      await settle();
+    }
     await go('notas');
     const v = view('notas');
     const hoja = v.querySelector('.dm-notas-hoja');
