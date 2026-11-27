@@ -1700,6 +1700,38 @@ else {
       data.navegadorEstirado = 'de ' + Math.round(casa) + ' a ' + Math.round(tope) + ' px en ' + pasos.size + ' pasos, deja ' + Math.round(asoma) + ' px de chat a la vista, mismo vidrio, recorta sin empujar, y vuelve en ' + vuelta.size + ' pasos';
     }
 
+    // El pulgar de la conversación (27/11/2026, Fran: al cerrar el navegador
+    // la barra quedaba flotando donde estaba, porque la conversación sigue
+    // angosta hasta que el panel termina de irse). Al cerrar se funde con el
+    // panel, ANTES de que la conversación se ensanche, y vuelve a entrar en su
+    // lugar nuevo; al abrir, entra fundiéndose en el lugar nuevo.
+    {
+      const pulgar = () => parseFloat(getComputedStyle(thread()).getPropertyValue('--dm-pulgar'));
+      const anchoH = () => Math.round(thread().getBoundingClientRect().width);
+      const muestras = async (ms) => { const out = []; for (const t0 = performance.now(); performance.now() - t0 < ms;) { await frame(); out.push([anchoH(), pulgar()]); } return out; };
+      const angosto = anchoH();
+      if (pulgar() !== 100) fail('pulgar: con el navegador abierto y quieto el pulgar no se ve entero (' + pulgar() + ' %)');
+      botonNav.click();
+      const alCerrar = await muestras(dur('base') * 2 + 400);
+      const angostas = alCerrar.filter(([w]) => w === angosto);
+      const anchas = alCerrar.filter(([w]) => w > angosto + 50);
+      const ver = (lista) => lista.map(([w, p]) => w + ':' + Math.round(p)).join(' ');
+      if (!angostas.length || !anchas.length) fail('pulgar: al cerrar, la conversación no pasó de angosta a ancha (' + ver(alCerrar) + ')');
+      else {
+        if (Math.min(...angostas.map(([, p]) => p)) > 5) fail('pulgar: al cerrar el navegador el pulgar sigue a la vista en el lugar viejo (' + ver(angostas) + ')');
+        if (!angostas.some(([, p]) => p > 5 && p < 95)) fail('pulgar: al cerrar el navegador el pulgar se fue de golpe (' + ver(angostas) + ')');
+        if (!anchas.some(([, p]) => p > 0 && p < 95)) fail('pulgar: ensanchada la conversación el pulgar volvió de golpe (' + ver(anchas) + ')');
+        if (pulgar() !== 100) fail('pulgar: después de cerrar el navegador el pulgar quedó en ' + pulgar() + ' %');
+      }
+      botonNav.click();
+      const alAbrir = await muestras(dur('base') + 300);
+      if (!alAbrir.length || alAbrir[0][0] !== angosto || !(alAbrir[0][1] < 95)) fail('pulgar: al abrir el navegador el pulgar aparece de golpe en el lugar nuevo (' + ver(alAbrir) + ')');
+      await until(() => nav.hasAttribute('data-abierto') && pulgar() === 100, 3000);
+      await sleep(dur('base') + 160);
+      if (pulgar() !== 100) fail('pulgar: con el navegador abierto de nuevo, el pulgar quedó en ' + pulgar() + ' %');
+      data.pulgar = 'se funde al cerrar el panel antes de que la conversación se ensanche, vuelve en su lugar, y entra fundiéndose al abrir';
+    }
+
     // La estrella: en una página que ya es un marcador se RELLENA, y nada más.
     // El botón no queda «apretado» (sin el fondo ni el reborde que la piel le
     // pone a un aria-pressed): se ve igual que su vecino.
@@ -1963,6 +1995,60 @@ else {
     await settle();
     enIngles('en las notas');
 
+    // Las carpetas sin contador de notas, y el clic derecho (27/11/2026, Fran):
+    // en una nota, sus acciones, sobre ESA nota y no sobre la abierta; en una
+    // carpeta, las mismas del botón de los tres puntos, que sigue estando.
+    {
+      const carpetaW = alive(v.querySelectorAll('.dm-notas-carpeta')).find((n) => n.textContent.includes('Work'));
+      if (v.querySelector('.dm-notas-carpeta-cuenta') || carpetaW?.querySelector('.dm-notas-carpeta-cabeza').textContent !== 'Work') fail('notas: la carpeta sigue mostrando cuántas notas tiene («' + carpetaW?.textContent + '»)');
+      const derecho = (el) => { const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: r.left + 30, clientY: r.top + r.height / 2 })); };
+      const itemsMenu = () => [...(menus()[0]?.querySelectorAll('.rad-menu-item') ?? [])].map((i) => i.textContent);
+      const ideas = () => notasL().find((n) => n.textContent.includes('Ideas'));
+      const abiertaAntes = shown(v.querySelector('.dm-notas-donde'));
+      derecho(ideas());
+      await until(() => menus().length > 0, 2000);
+      if (itemsMenu().join() !== 'Edit,Pin,Move to a folder…,Delete') fail('notas: el clic derecho en una nota trae ' + itemsMenu().join());
+      await pick('Pin');
+      await until(() => ideas()?.hasAttribute('data-fijada'), 3000);
+      if (!ideas()?.hasAttribute('data-fijada')) fail('notas: «Pin» del clic derecho no fijó la nota');
+      if (!notasL().find((n) => n.textContent.includes('Shopping'))?.hasAttribute('data-fijada') || boton('nota-fijar').getAttribute('aria-pressed') !== 'true') fail('notas: «Pin» del clic derecho tocó la nota abierta en vez de la del menú');
+      derecho(ideas());
+      await until(() => menus().length > 0, 2000);
+      await pick('Unpin');
+      await until(() => !ideas()?.hasAttribute('data-fijada'), 3000);
+      if (ideas()?.hasAttribute('data-fijada')) fail('notas: «Unpin» del clic derecho no la soltó');
+      // «Move to a folder…» abre las carpetas en el mismo lugar
+      derecho(ideas());
+      await until(() => menus().length > 0, 2000);
+      await pick('Move to a folder');
+      await until(() => menus().length > 0 && itemsMenu().includes('No folder'), 2000);
+      if (!itemsMenu().includes('Work') || !itemsMenu().includes('No folder')) fail('notas: «Move to a folder…» no abrió las carpetas: ' + itemsMenu().join());
+      await pick('No folder');
+      await until(() => carpetasL().join() === 'Work,Unfiled', 3000);
+      if (carpetasL().join() !== 'Work,Unfiled' || shown(v.querySelector('.dm-notas-donde')) !== abiertaAntes) fail('notas: mover desde el clic derecho dejó las carpetas ' + carpetasL().join() + ' y la abierta en «' + shown(v.querySelector('.dm-notas-donde')) + '»');
+      derecho(ideas());
+      await until(() => menus().length > 0, 2000);
+      await pick('Move to a folder');
+      await until(() => itemsMenu().includes('No folder'), 2000);
+      await pick('Work');
+      await until(() => carpetasL().join() === 'Work', 3000);
+      // la carpeta: lo mismo que su botón, que sigue ahí
+      derecho(carpetaW);
+      await until(() => menus().length > 0, 2000);
+      if (itemsMenu().join() !== 'New note here,Rename,Delete folder') fail('notas: el clic derecho en una carpeta trae ' + itemsMenu().join());
+      key(menus()[0], 'Escape');
+      await until(() => !menus().length, 2000);
+      await settle();
+      if (!carpetaW.querySelector('.dm-notas-carpeta-mas')) fail('notas: la carpeta perdió el botón de los tres puntos');
+      carpetaW.querySelector('.dm-notas-carpeta-mas')?.click();
+      await until(() => menus().length > 0, 2000);
+      if (itemsMenu().join() !== 'New note here,Rename,Delete folder') fail('notas: el botón de la carpeta trae ' + itemsMenu().join());
+      key(menus()[0], 'Escape');
+      await until(() => !menus().length, 2000);
+      await settle();
+      data.notasMenu = 'carpetas sin contador; clic derecho en la nota (fijar, soltar y mover esa, no la abierta) y en la carpeta, con su botón';
+    }
+
     // Borrar desde acá es para siempre, y pregunta.
     boton('nota-borrar').click();
     await until(() => modal(), 2000);
@@ -1973,8 +2059,26 @@ else {
     if (titulos().join() !== 'Ideas' || hoja.hasAttribute('data-con-nota')) fail('notas: después de borrar quedó: ' + titulos().join());
     await corre({ name: 'notepad', args: { query: 'shopping' } });
     if (!lee('notepad').startsWith('No notes matching')) fail('notas: la nota borrada por el usuario sigue en la libreta: ' + lee('notepad').slice(0, 120));
+
+    // Borrar una carpeta se lleva sus notas (27/11/2026, pedido de Fran; antes
+    // quedaban sueltas): el aviso dice cuántas, y si la abierta estaba
+    // adentro, la hoja se cierra.
+    notasL()[0]?.click();
+    await until(() => hoja.hasAttribute('data-con-nota'), 2000);
+    alive(v.querySelectorAll('.dm-notas-carpeta')).find((n) => n.textContent.includes('Work'))?.querySelector('.dm-notas-carpeta-mas')?.click();
+    await until(() => menus().length > 0, 2000);
+    await pick('Delete folder');
+    await until(() => modal(), 2000);
+    if (!modal()?.textContent.includes('and its note will be deleted for good')) fail('notas: borrar una carpeta con una nota no avisa que se la lleva: «' + modal()?.textContent + '»');
+    primary()?.click();
+    await closed();
+    await until(() => !carpetasL().length && !notasL().length, 3000);
+    if (carpetasL().length || notasL().length || hoja.hasAttribute('data-con-nota')) fail('notas: después de borrar la carpeta quedaron carpetas ' + carpetasL().join() + ', notas ' + titulos().join() + (hoja.hasAttribute('data-con-nota') ? ', y la hoja abierta' : ''));
+    await corre({ name: 'notepad', args: { query: 'ideas' } });
+    // (era la última: la libreta queda vacía y lo dice así)
+    if (!/^(No notes matching|The notepad is empty)/.test(lee('notepad'))) fail('notas: la nota de la carpeta borrada sigue en la libreta: ' + lee('notepad').slice(0, 120));
     datosM.ponerModoTools('manual');
-    data.notas = 'escrita y guardada sola, leída y corregida por el agente, borrador protegido, papelera y restore, fijar, buscar, mover, plegar y borrar';
+    data.notas = 'escrita y guardada sola, leída y corregida por el agente, borrador protegido, papelera y restore, fijar, buscar, mover, plegar, borrar, y borrar la carpeta con sus notas';
     await go('chat');
   }
 
@@ -3598,6 +3702,33 @@ else {
     datosQ.ponerNombreUsuario('');
     await settle();
     if (delUsuario[0]?.querySelector(':scope > .dm-msg-quien')?.textContent !== 'You') fail('nombres: sin nombre en Settings, el mensaje no dice «You»');
+    // Una respuesta frenada antes de escribir nada, y sin tools (27/11/2026,
+    // Fran: quedaba el nombre del agente colgando, solo): no abre el turno, no
+    // se ve, y se va plegándose, no de golpe. En un chat aparte, que se borra.
+    {
+      const antes = datosQ.chatActual()?.id;
+      const aparte = datosQ.crearChat(datosQ.agenteActual().id);
+      datosQ.elegirChat(aparte.id);
+      await settle();
+      // (sin esperar un cuadro: a los 30 ms el simulado ya escribe)
+      datosQ.enviar(aparte.id, 'stop me before you write');
+      await sleep(0);
+      const t = [...(thread()?.querySelectorAll('.dm-msg[data-rol="assistant"]') ?? [])].pop();
+      datosQ.frenar(aparte.id);
+      const altos = [];
+      for (const t0 = performance.now(); performance.now() - t0 < dur('base') + 500;) { await frame(); if (t?.isConnected) altos.push(Math.round(t.getBoundingClientRect().height)); }
+      const ultimoF = (await datosQ.hilo(aparte.id)).get().mensajes.at(-1);
+      if (ultimoF?.rol !== 'assistant' || ultimoF.estado !== 'frenado' || ultimoF.texto) fail('nombres: la prueba no frenó la respuesta antes de que escribiera: ' + JSON.stringify(ultimoF));
+      else {
+        if (!t || t.hasAttribute('data-turno') || getComputedStyle(t).display !== 'none') fail('nombres: una respuesta frenada sin texto ni tools deja el nombre del agente colgando');
+        // (pasa por altos intermedios: el primero es el de «Thinking»)
+        if (!altos.some((a) => a > 1 && a < altos[0] - 1)) fail('nombres: la respuesta frenada vacía se fue de golpe, sin plegarse (altos: ' + altos.join(' ') + ')');
+      }
+      if (antes) datosQ.elegirChat(antes);
+      await settle();
+      await datosQ.borrarChat(aparte.id);
+      await settle();
+    }
     data.nombres = 'el nombre del usuario en Settings (guardado), arriba de sus mensajes; el del agente una vez por turno, también sobre un primer tramo vacío; exportar a .md con aviso; vacío, «You»';
   }
 

@@ -253,11 +253,15 @@ function renameFolder(id, name) {
 /** Borra una carpeta; sus notas quedan SUELTAS (folder_id → NULL), no se
  *  destruyen. En una transacción para que un fallo no deje notas apuntando a una
  *  carpeta que ya no existe. */
-function deleteFolder(id) {
+// [BlackCode] `conNotas`: las notas de adentro se borran con la carpeta, para
+// siempre como el borrado del usuario (sin papelera). Es lo que hace la vista
+// Notes desde el 27/11/2026, pedido de Fran; sin la opción sigue como allá.
+function deleteFolder(id, { conNotas = false } = {}) {
   if (!id) return false;
   const d = ready();
   d.transaction(() => {
-    d.prepare('UPDATE notes SET folder_id = NULL WHERE folder_id = ?').run(String(id));
+    if (conNotas) d.prepare('DELETE FROM notes WHERE folder_id = ?').run(String(id));
+    else d.prepare('UPDATE notes SET folder_id = NULL WHERE folder_id = ?').run(String(id));
     d.prepare('DELETE FROM note_folders WHERE id = ?').run(String(id));
   })();
   return true;

@@ -682,11 +682,21 @@ export function montarChat(el, { router }) {
   // de las tools son del mismo turno y no lo repiten. El del agente es su
   // nombre de ahora (renombrarlo cambia sus chats); el del usuario, el de
   // Settings, o «You».
+  // Un tramo vacío del agente (ver ponerMensaje) abre el turno solo si debajo
+  // vienen sus tools: ahí queda su nombre, arriba de las filas. Sin tools
+  // debajo (una respuesta frenada antes de escribir nada) no queda nada que
+  // nombrar, y el nombre colgaba solo (Fran, 27/11/2026): el turno lo abre el
+  // tramo siguiente, si lo hay.
+  const tramoVacio = (m) => m.rol === 'assistant' && !m.texto && m.estado !== 'escribiendo' && m.estado !== 'error';
   const marcarTurnos = (mensajes) => {
     const abre = new Set();
+    let falta = true; // el turno todavía no tiene quién lleve el nombre
     mensajes.forEach((m, i) => {
-      const ant = mensajes[i - 1];
-      if (m.rol === 'user' || (m.rol === 'assistant' && (!ant || ant.rol === 'user'))) abre.add(m.id);
+      if (m.rol === 'user') { abre.add(m.id); falta = true; return; }
+      if (!falta) return;
+      if (m.rol === 'assistant' && tramoVacio(m) && mensajes[i + 1]?.rol !== 'tool') return;
+      if (m.rol === 'assistant') abre.add(m.id);
+      falta = false;
     });
     const agente = datos.agenteActual()?.nombre || 'Agent';
     const yo = datos.nombreUsuario();
@@ -696,8 +706,32 @@ export function montarChat(el, { router }) {
       nodo.toggleAttribute('data-turno', abre.has(nodo.dataset.radKey));
       const nombre = nodo.dataset.rol === 'user' ? yo : agente;
       if (q.textContent !== nombre) q.textContent = nombre;
+      // un tramo que se veía y quedó vacío sin abrir el turno se va del flujo:
+      // que no sea de golpe (el que ya llega vacío, al abrir el chat, no anda)
+      const oculto = nodo.hasAttribute('data-vacio') && !nodo.hasAttribute('data-turno');
+      if (oculto && nodo._visible) plegar(nodo, hilo.col);
+      nodo._visible = !oculto;
     }
   };
+  // Esfuma y pliega un mensaje que sale del flujo (el CSS lo deja en
+  // `display: none`): mientras dura, `data-plegando` lo sostiene. El margen
+  // negativo se come el hueco de la columna, así al salir no salta nada.
+  // Con medidas en píxeles: `interpolate-size` dejaba el alto en `auto`
+  // hasta el final y saltaba (Chromium 152).
+  function plegar(nodo, col) {
+    if (nodo.hasAttribute('data-plegando')) return;
+    const desde = opacityNow(nodo);
+    nodo.setAttribute('data-plegando', '');
+    const alto = nodo.getBoundingClientRect().height;
+    const hueco = parseFloat(getComputedStyle(col).rowGap) || 0;
+    const dura = ms('dur-base');
+    const a = nodo.animate([
+      { opacity: desde, height: `${alto}px`, marginTop: '0px' },
+      { opacity: 0, offset: 0.45 },
+      { opacity: 0, height: '0px', marginTop: `${-hueco}px` },
+    ], { duration: dura, easing: token('ease-in-out') });
+    whenDone(a, dura + SAFETY_MS, () => { a.cancel(); nodo.removeAttribute('data-plegando'); });
+  }
   const dibujarMensajes = () => {
     if (!hilo) return;
     const lista2 = hilo.doc?.get().mensajes ?? [];

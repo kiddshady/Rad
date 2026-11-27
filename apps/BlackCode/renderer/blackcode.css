@@ -5,6 +5,10 @@
 /* La hoja de xterm (la terminal), en una subcapa: las reglas de esta capa le
    ganan sin pelear la especificidad. */
 @import url('vendor/xterm/xterm.css') layer(app.vendor);
+/* Cuánto se ve el pulgar de la scrollbar de la conversación (ver «La escena»).
+   Registrada para que se pueda fundir: el pulgar es un pseudo-elemento y no
+   acepta transiciones propias, pero sí toma el valor andando de su dueño. */
+@property --dm-pulgar { syntax: '<percentage>'; inherits: true; initial-value: 100%; }
 @layer app {
   /* ---------- La letra ----------
      Elegida por Fran en el typo lab (26/11/2026) junto con Inter (va en
@@ -1618,6 +1622,31 @@
   .dm-escena > .dm-conv { clip-path: inset(-100vh var(--dm-conv-corte, 0px) -100vh -100vw); }
   /* Al abrir y al cerrar, el recorte entra y sale con el panel. */
   .dm-escena[data-relevo] > .dm-conv { transition: clip-path var(--rad-dur-base) var(--rad-ease-in-out); }
+  /* El pulgar de la conversación, cuando un panel se abre o se cierra (Fran,
+     27/11/2026: al cerrar el navegador la barra quedaba flotando en el aire).
+     El hueco del panel se suelta recién cuando el panel terminó de irse, y
+     hasta ahí la conversación sigue angosta: su pulgar quedaba solo en el
+     medio, donde ya no había nada. Ahora se funde junto con el panel y vuelve
+     a entrar en su lugar cuando la conversación ya se ensanchó. Al abrir, el
+     hueco se toma de un paso y el pulgar salta: entra fundiéndose en el lugar
+     nuevo. El valor lo toma el pseudo-elemento de su dueño (`--dm-pulgar`,
+     registrada arriba de todo). */
+  .dm-hilo { transition: --dm-pulgar var(--rad-dur-fast) var(--rad-ease-out); }
+  .dm-hilo::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--rad-scroll-thumb) var(--dm-pulgar), transparent);
+    background-clip: content-box;
+  }
+  .dm-hilo::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--rad-scroll-thumb-hover) var(--dm-pulgar), transparent);
+    background-clip: content-box;
+  }
+  /* (cerrándose: el hueco sigue tomado, pero ya no hay ningún panel abierto) */
+  .dm-escena[data-panel]:not(:has(> [data-abierto])) .dm-hilo {
+    --dm-pulgar: 0%;
+    transition: --dm-pulgar var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  .dm-escena[data-panel]:has(> [data-abierto]) .dm-hilo { animation: dm-pulgar-entra var(--rad-dur-base) var(--rad-ease-out); }
+  @keyframes dm-pulgar-entra { from { --dm-pulgar: 0%; } }
   /* La manija: una franja angosta sobre el borde izquierdo, con una marca corta
      al medio. Se ve tenue en reposo (un borde que no anuncia que se arrastra no
      lo arrastra nadie) y se enciende al acercarse y mientras se agarra. */
@@ -1982,7 +2011,6 @@
   .dm-notas-carpeta-chevron { transition: transform var(--rad-dur-base) var(--rad-ease-in-out); }
   .dm-notas-carpeta[data-plegada] .dm-notas-carpeta-chevron { transform: rotate(-90deg); }
   .dm-notas-carpeta-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dm-notas-carpeta-cuenta { font-family: var(--rad-font-mono); font-weight: var(--rad-weight-regular); letter-spacing: 0; }
   .dm-notas-carpeta-mas { opacity: 0; transition: opacity var(--rad-dur-fast) var(--rad-ease-out); }
   .dm-notas-carpeta:hover .dm-notas-carpeta-mas, .dm-notas-carpeta-mas:focus-visible, .dm-notas-carpeta-mas[aria-expanded='true'] { opacity: 1; }
 
@@ -2090,6 +2118,12 @@
      (el agente llamó tools sin escribir antes): ahí queda solo su nombre,
      arriba de las tools. */
   .dm-msg[data-vacio]:not([data-turno]) { display: none; }
+  /* Y no se va de golpe (27/11/2026: al frenar una respuesta antes de que
+     escriba, el «Thinking» con el nombre se apagaba en seco): mientras dura
+     `data-plegando` sigue en el flujo y chat.js lo esfuma y lo pliega (plegar).
+     (Con `interpolate-size` el alto quedaba en `auto` hasta el final y
+     saltaba: Chromium 152.) */
+  .dm-msg[data-vacio][data-plegando]:not([data-turno]) { display: grid; overflow: clip; }
   .dm-msg[data-vacio][data-turno] > :not(.dm-msg-quien) { display: none; }
 
   /* Quién lo dijo (1.9.0): arriba del primer mensaje de cada turno, chico y

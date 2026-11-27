@@ -25,7 +25,7 @@
 // lo que cambia allá se trata como lo que escribe un agente (cambioAfuera).
 
 import { openModal, confirm } from '/@core/modal.js';
-import { menuButton } from '/@core/menu.js';
+import { menuButton, contextMenu, openMenu } from '/@core/menu.js';
 import { toast } from '/@core/toast.js';
 import { reconcile } from '/@core/list.js';
 import { swapText } from '/@core/motion.js';
@@ -191,8 +191,7 @@ export function montarNotas(el, { router }) {
     hoja.toggleAttribute('data-editando', editando);
     swapText(donde, abierta ? (nombreCarpeta(abierta.folder_id) ?? 'Unfiled') : '');
     swapText(bEditar.querySelector('.dm-notas-editar-texto'), editando ? 'Done' : 'Edit');
-    bFijar.setAttribute('aria-pressed', String(Boolean(abierta?.pinned)));
-    bFijar.setAttribute('data-rad-tip', abierta?.pinned ? 'Unpin' : 'Pin');
+    pintarFijar();
     for (const b of [bFijar, bMover, bBorrar]) b.disabled = !abierta?.id;
     cuerpo._md = null;
     cuerpo.replaceChildren();
@@ -259,18 +258,18 @@ export function montarNotas(el, { router }) {
       const suyas = visibles.filter((n) => n.folder_id === c.id);
       // buscando, solo las carpetas con resultados, y abiertas
       if (q && !suyas.length) continue;
-      out.push({ k: `c:${c.id}`, tipo: 'carpeta', carpeta: c, cuantas: suyas.length });
+      // (sin contador de notas: Fran, 27/11/2026, «no son necesarios»)
+      out.push({ k: `c:${c.id}`, tipo: 'carpeta', carpeta: c });
       if (q || !plegadas.has(c.id)) for (const n of suyas) out.push({ k: `n:${n.id}`, tipo: 'nota', nota: n, adentro: true });
     }
     const sueltas = visibles.filter((n) => !n.folder_id || !carpetas.some((c) => c.id === n.folder_id));
-    if (grupos.length && sueltas.length) out.push({ k: 'c:', tipo: 'carpeta', carpeta: { id: '', name: 'Unfiled' }, cuantas: sueltas.length, fija: true });
+    if (grupos.length && sueltas.length) out.push({ k: 'c:', tipo: 'carpeta', carpeta: { id: '', name: 'Unfiled' }, fija: true });
     if (q || !plegadas.has('')) for (const n of sueltas) out.push({ k: `n:${n.id}`, tipo: 'nota', nota: n, adentro: grupos.length > 0 });
     return out;
   }
   function ponerItem(nodo, it) {
     if (it.tipo === 'carpeta') {
       nodo.querySelector('.dm-notas-carpeta-nombre').textContent = it.carpeta.name;
-      nodo.querySelector('.dm-notas-carpeta-cuenta').textContent = String(it.cuantas);
       nodo.toggleAttribute('data-plegada', !busqueda.trim() && plegadas.has(it.carpeta.id));
       return;
     }
@@ -289,19 +288,14 @@ export function montarNotas(el, { router }) {
   }
   function crearItem(it) {
     if (it.tipo === 'carpeta') {
-      const cabeza = h('button', 'dm-notas-carpeta-cabeza', { type: 'button' }, icono('chevron', 'dm-notas-carpeta-chevron'), icono('carpeta'), h('span', 'dm-notas-carpeta-nombre'), h('span', 'dm-notas-carpeta-cuenta'));
+      const cabeza = h('button', 'dm-notas-carpeta-cabeza', { type: 'button' }, icono('chevron', 'dm-notas-carpeta-chevron'), icono('carpeta'), h('span', 'dm-notas-carpeta-nombre'));
       const nodo = h('div', 'dm-notas-carpeta', { role: 'listitem' }, cabeza);
       const id = it.carpeta.id;
       cabeza.addEventListener('click', () => { if (plegadas.has(id)) plegadas.delete(id); else plegadas.add(id); pintarLista(); });
       if (!it.fija) {
         const mas = h('button', 'rad-iconbutton dm-notas-carpeta-mas', { type: 'button', 'aria-label': 'Folder actions', 'data-rad-tip': 'Actions' }, icono('puntos'));
         nodo.append(mas);
-        menuButton(mas, () => [
-          { id: 'nota', label: 'New note here', icon: icono('mas').innerHTML, onSelect: () => notaNueva(id) },
-          { id: 'renombrar', label: 'Rename', icon: icono('lapiz').innerHTML, onSelect: () => renombrarCarpeta(id) },
-          { separator: true },
-          { id: 'eliminar', label: 'Delete folder', danger: true, icon: icono('tacho').innerHTML, onSelect: () => borrarCarpeta(id) },
-        ], { align: 'end' });
+        menuButton(mas, () => accionesCarpeta(id), { align: 'end' });
       }
       ponerItem(nodo, it);
       return nodo;
@@ -414,54 +408,130 @@ export function montarNotas(el, { router }) {
     await pedir('notas:carpeta-renombrar', { id, name: nombre });
     await cargar();
   }
+  // La carpeta se va CON sus notas, para siempre (27/11/2026, pedido de Fran;
+  // antes quedaban sueltas). El aviso dice cuántas se van.
   async function borrarCarpeta(id) {
-    const si = await confirm({ title: 'Delete this folder?', text: `“${nombreCarpeta(id)}” will be deleted. Its notes are kept, without a folder.`, confirmLabel: 'Delete folder', danger: true });
+    const cuantas = notas.filter((n) => n.folder_id === id).length;
+    const nombre = nombreCarpeta(id);
+    const si = await confirm({
+      title: 'Delete this folder?',
+      text: cuantas
+        ? `“${nombre}” and its ${cuantas === 1 ? 'note' : `${cuantas} notes`} will be deleted for good: there is no trash here. This can’t be undone.`
+        : `“${nombre}” will be deleted. It has no notes.`,
+      confirmLabel: 'Delete folder',
+      danger: true,
+    });
     if (!si) return;
+    if (abierta?.folder_id === id) {
+      if (abierta.id) {
+        // la abierta se va con la carpeta: lo pendiente se cancela (un guardado
+        // demorado la volvería a escribir)
+        clearTimeout(reloj);
+        abierta = null;
+        editando = false;
+        await cola;
+        pintarHoja();
+      } else {
+        // una nueva que todavía no se guardó no está en la carpeta: queda suelta
+        abierta.folder_id = null;
+      }
+    }
     await pedir('notas:carpeta-borrar', id);
-    if (abierta?.folder_id === id) abierta.folder_id = null;
     await cargar();
   }
-  async function mover(folderId) {
-    if (!abierta?.id) return;
-    await asentar();
-    await pedir('notas:mover', { id: abierta.id, folderId });
-    abierta.folder_id = folderId;
+  // ---------- Las acciones de una nota ----------
+  // Valen para cualquier nota de la lista, no solo la abierta: las usan los
+  // botones de la cabecera (sobre la abierta) y el menú del clic derecho
+  // (sobre la que se tocó). Lo de la abierta se asienta antes, para que un
+  // guardado demorado no pise lo que se acaba de hacer.
+  const esLaAbierta = (id) => Boolean(id) && abierta?.id === id;
+  async function mover(id, folderId) {
+    if (!id) return;
+    if (esLaAbierta(id)) await asentar();
+    await pedir('notas:mover', { id, folderId });
+    if (esLaAbierta(id)) abierta.folder_id = folderId;
     await cargar();
   }
+  async function fijar(id, pinned) {
+    if (!id) return;
+    if (esLaAbierta(id)) { await asentar(); abierta.pinned = pinned; pintarFijar(); }
+    await pedir('notas:fijar', { id, pinned });
+    await cargar();
+  }
+  async function borrarNota(id) {
+    if (!id) return;
+    const titulo = esLaAbierta(id) ? tituloDe(texto()) : tituloDe(notas.find((n) => n.id === id)?.content ?? '');
+    const si = await confirm({ title: 'Delete this note?', text: `“${titulo}” will be deleted for good: there is no trash here. This can’t be undone.`, confirmLabel: 'Delete', danger: true });
+    if (!si) return;
+    // (otra que la abierta: la hoja no se toca, y lo que se esté escribiendo sigue ahí)
+    const eraLaAbierta = esLaAbierta(id);
+    if (eraLaAbierta) {
+      // lo pendiente se cancela: un guardado demorado volvería a escribir la nota
+      clearTimeout(reloj);
+      abierta = null;
+      editando = false;
+      await cola;
+    }
+    await pedir('notas:borrar', id);
+    if (eraLaAbierta) pintarHoja();
+    await cargar();
+  }
+  function pintarFijar() {
+    bFijar.setAttribute('aria-pressed', String(Boolean(abierta?.pinned)));
+    bFijar.setAttribute('data-rad-tip', abierta?.pinned ? 'Unpin' : 'Pin');
+  }
+  /** Las carpetas para mover la nota `id` (el botón de la cabecera y el clic derecho). */
+  function itemsMover(id) {
+    const enCual = (esLaAbierta(id) ? abierta.folder_id : notas.find((n) => n.id === id)?.folder_id) ?? null;
+    return [
+      ...[...carpetas].sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true })).map((c) => ({ id: c.id, label: c.name, checked: enCual === c.id, onSelect: () => mover(id, c.id) })),
+      { id: 'ninguna', label: 'No folder', checked: !enCual, onSelect: () => mover(id, null) },
+      { separator: true },
+      { id: 'nueva', label: 'New folder…', icon: icono('carpetaMas').innerHTML, onSelect: async () => { const c = await carpetaNueva(); if (c) mover(id, c.id); } },
+    ];
+  }
+  // Clic derecho sobre una nota (Fran, 27/11/2026): lo mismo que la cabecera
+  // hace con la abierta. «Move to a folder…» abre las carpetas en el mismo
+  // punto (el menú del núcleo no tiene submenús).
+  function accionesNota(id, punto) {
+    const n = notas.find((x) => x.id === id);
+    if (!n) return null;
+    const pinned = esLaAbierta(id) ? Boolean(abierta.pinned) : Boolean(n.pinned);
+    return [
+      { id: 'editar', label: 'Edit', icon: icono('lapiz').innerHTML, onSelect: async () => { await abrir(id); editar(); } },
+      { id: 'fijar', label: pinned ? 'Unpin' : 'Pin', icon: icono('pin').innerHTML, onSelect: () => fijar(id, !pinned) },
+      { id: 'mover', label: 'Move to a folder…', icon: icono('carpeta').innerHTML, onSelect: () => openMenu({ at: punto, items: itemsMover(id) }) },
+      { separator: true },
+      { id: 'borrar', label: 'Delete', danger: true, icon: icono('tacho').innerHTML, onSelect: () => borrarNota(id) },
+    ];
+  }
+  // Las de una carpeta: el botón de los tres puntos y el clic derecho.
+  const accionesCarpeta = (id) => [
+    { id: 'nota', label: 'New note here', icon: icono('mas').innerHTML, onSelect: () => notaNueva(id) },
+    { id: 'renombrar', label: 'Rename', icon: icono('lapiz').innerHTML, onSelect: () => renombrarCarpeta(id) },
+    { separator: true },
+    { id: 'eliminar', label: 'Delete folder', danger: true, icon: icono('tacho').innerHTML, onSelect: () => borrarCarpeta(id) },
+  ];
+  // Delegado: uno solo para toda la lista. Seleccionando no hay menú de nota
+  // (el clic marca y desmarca); las carpetas lo siguen teniendo, como su botón.
+  contextMenu(lista, (e) => {
+    const nodo = e.target.closest('.dm-notas-nota, .dm-notas-carpeta');
+    const clave = nodo?.dataset.radKey ?? '';
+    // (la tecla de menú no trae punto: el segundo menú sale junto a la fila)
+    const punto = e.clientX || e.clientY ? { x: e.clientX, y: e.clientY } : nodo?.getBoundingClientRect();
+    if (clave.startsWith('n:')) return seleccionando ? null : accionesNota(clave.slice(2), punto);
+    if (clave.startsWith('c:') && clave.length > 2) return accionesCarpeta(clave.slice(2));
+    return null;
+  });
 
   // ---------- Los controles ----------
   nueva.addEventListener('click', () => notaNueva(null));
   nuevaCarpeta.addEventListener('click', carpetaNueva);
   buscar.addEventListener('input', () => { busqueda = buscar.value; pintarLista(); });
   bEditar.addEventListener('click', () => (editando ? terminar() : editar()));
-  bFijar.addEventListener('click', async () => {
-    if (!abierta?.id) return;
-    await asentar();
-    abierta.pinned = !abierta.pinned;
-    await pedir('notas:fijar', { id: abierta.id, pinned: abierta.pinned });
-    bFijar.setAttribute('aria-pressed', String(abierta.pinned));
-    await cargar();
-  });
-  menuButton(bMover, () => [
-    ...[...carpetas].sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true })).map((c) => ({ id: c.id, label: c.name, checked: abierta?.folder_id === c.id, onSelect: () => mover(c.id) })),
-    { id: 'ninguna', label: 'No folder', checked: !abierta?.folder_id, onSelect: () => mover(null) },
-    { separator: true },
-    { id: 'nueva', label: 'New folder…', icon: icono('carpetaMas').innerHTML, onSelect: async () => { const c = await carpetaNueva(); if (c) mover(c.id); } },
-  ], { align: 'end' });
-  bBorrar.addEventListener('click', async () => {
-    if (!abierta?.id) return;
-    const si = await confirm({ title: 'Delete this note?', text: `“${tituloDe(texto())}” will be deleted for good: there is no trash here. This can’t be undone.`, confirmLabel: 'Delete', danger: true });
-    if (!si) return;
-    // lo pendiente se cancela: un guardado demorado volvería a escribir la nota
-    clearTimeout(reloj);
-    const id = abierta.id;
-    abierta = null;
-    editando = false;
-    await cola;
-    await pedir('notas:borrar', id);
-    pintarHoja();
-    await cargar();
-  });
+  bFijar.addEventListener('click', () => { if (abierta?.id) fijar(abierta.id, !abierta.pinned); });
+  menuButton(bMover, () => itemsMover(abierta?.id), { align: 'end' });
+  bBorrar.addEventListener('click', () => { if (abierta?.id) borrarNota(abierta.id); });
 
   // ---------- Lo que pasa afuera ----------
   // El agente (u otra ventana) cambió las notas. Si la abierta cambió y acá no

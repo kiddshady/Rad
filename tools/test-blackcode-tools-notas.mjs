@@ -215,6 +215,16 @@ try {
   ok_('la nota sigue viva', !!store.get(n2.id));
   t('…y quedó suelta', store.get(n2.id).folder_id, null);
 
+  seccion('[BlackCode] con conNotas, la carpeta se va con sus notas');
+  {
+    const fC = store.createFolder('Con notas');
+    const adentro = store.create({ content: 'adentro', folderId: fC.id });
+    const afuera = store.create({ content: 'afuera' });
+    t('deleteFolder con conNotas', store.deleteFolder(fC.id, { conNotas: true }), true);
+    t('  la carpeta y la de adentro se fueron, la suelta queda', [store.listFolders().some((f) => f.id === fC.id), store.get(adentro.id), !!store.get(afuera.id)], [false, null, true]);
+    store.remove(afuera.id);
+  }
+
   seccion('el tope se queda con las NUEVAS, no con las viejas');
   // el bug que Umbra tuvo: con LIMIT sobre un orden ascendente, pasada la cuota
   // todo lo escrito DESPUÉS desaparecía del panel
@@ -531,8 +541,14 @@ try {
       [true, carpeta.id, true, null, false]);
     t('foldersList', ipc.foldersList().some((f) => f.id === carpeta.id && f.name === 'Panel'), true);
     t('foldersRename', [ipc.foldersRename({ id: carpeta.id, name: 'Del panel' }), ipc.foldersList().find((f) => f.id === carpeta.id).name, ipc.foldersRename()], [true, 'Del panel', false]);
-    t('foldersDelete deja sueltas sus notas', [ipc.foldersDelete(carpeta.id), ipc.foldersList().some((f) => f.id === carpeta.id), store.get(b.id).folder_id, ipc.foldersDelete()],
-      [true, false, null, false]);
+    // [BlackCode] desde el 27/11/2026 la carpeta se va CON sus notas (pedido
+    // de Fran), para siempre como el borrado del usuario. (b sale antes: la
+    // usa lo que sigue.)
+    ipc.setFolder({ id: b.id, folderId: null });
+    const c = ipc.create({ content: 'se va con la carpeta', folderId: carpeta.id });
+    t('foldersDelete se lleva sus notas', [ipc.foldersDelete(carpeta.id), ipc.foldersList().some((f) => f.id === carpeta.id), store.get(c.id), store.get(b.id)?.folder_id, ipc.foldersDelete()],
+      [true, false, null, null, false]);
+    t('  de verdad: no quedan en la papelera', [store.restore(c.id), crudo(DB, (d) => d.prepare('SELECT count(*) AS n FROM notes_trash WHERE id = ?').get(c.id).n)], [null, 0]);
 
     // el borrado del panel es el del USUARIO: permanente, sin papelera
     t('remove borra', [ipc.remove(b.id), store.get(b.id)], [true, null]);
@@ -612,6 +628,7 @@ try {
     ok_('deleteFolder que falla a mitad de camino tira', /no se puede la carpeta/.test(tira(() => store.deleteFolder(carpeta.id))));
     t('  y la nota NO quedó suelta: sigue en su carpeta', store.get(n.id).folder_id, carpeta.id);
     t('  el del panel da false', notas.ipc.foldersDelete(carpeta.id), false);
+    t('  y sus notas NO se borraron a medias', store.get(n.id)?.folder_id, carpeta.id);
     crudo(DB, (d) => d.exec('DROP TRIGGER no_carpeta'));
     t('después de los tres fallos la base sigue escribiendo', [store.deleteFolder(carpeta.id), store.get(n.id).folder_id, !!store.create({ content: 'otra más' })], [true, null, true]);
     notas.cerrar();

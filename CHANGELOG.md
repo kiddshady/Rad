@@ -1,5 +1,38 @@
 # Changelog
 
+## BlackCode 1.22.0 (2026-11-27)
+
+Un lote de cinco cosas que Fran fue encontrando y probó en dev («impecable
+todo»).
+
+- **Clic derecho en Notes.** En una nota: *Edit*, *Pin*/*Unpin*, *Move to a
+  folder…* y *Delete*, sobre ESA nota y no sobre la abierta (las acciones de
+  la cabecera pasaron a tomar el id de la nota). El menú del núcleo no tiene
+  submenús: *Move to a folder…* abre las carpetas en el mismo punto. En una
+  carpeta, lo mismo que el botón de los tres puntos, que se queda («que estén
+  ambos»). «Unfiled» no tiene menú, y seleccionando, el clic derecho en una
+  nota no abre nada.
+- **Las carpetas de Notes sin contador** de notas («no son necesarios»).
+- **Borrar una carpeta se lleva sus notas**, para siempre como el borrado
+  del usuario (antes quedaban sueltas). El aviso dice cuántas se van; si la
+  abierta estaba adentro, la hoja se cierra y lo pendiente no se guarda; una
+  nueva sin guardar queda suelta. En el store, `deleteFolder(id, { conNotas })`
+  (sin la opción sigue como en NeonCode); el test lo prueba, y falla con la
+  opción apagada.
+- **La scrollbar de la conversación ya no queda flotando al cerrar un panel**
+  (navegador, canvas, terminal). El hueco del panel se suelta recién cuando
+  el panel terminó de irse, y hasta ahí la conversación sigue angosta: su
+  pulgar quedaba solo en el medio. Ahora se funde con el panel y vuelve a
+  entrar en su lugar; al abrir, entra fundiéndose en el lugar nuevo. El
+  pulgar es un pseudo-elemento y no acepta transiciones, pero toma el valor
+  andando de su dueño: `--dm-pulgar`, registrada con `@property`.
+- **Una respuesta frenada antes de escribir nada ya no deja el nombre del
+  agente colgando.** Un tramo vacío abre el turno solo si debajo vienen sus
+  tools; si no, el nombre pasa al tramo siguiente. Y el tramo se pliega en
+  vez de irse de golpe, con WAAPI y medidas en píxeles: `interpolate-size`
+  en Chromium 152 deja el alto en `auto` hasta el final y salta.
+- El humo comprueba todo lo anterior.
+
 ## BlackCode 1.21.2 (2026-11-27) · núcleo 0.21.3
 
 Dos arreglos estéticos que pidió Fran.

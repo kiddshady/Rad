@@ -357,7 +357,7 @@ async function runNotepadWrite(run, { action, id, content, edits, replace_all: r
 //   foldersList    note-folders:list
 //   foldersCreate  note-folders:create  name
 //   foldersRename  note-folders:rename  { id, name }
-//   foldersDelete  note-folders:delete  id
+//   foldersDelete  note-folders:delete  id — [BlackCode] con sus notas adentro
 const ipc = {
   list: () => { try { return notesStore.list(); } catch { return []; } },
   create: ({ content, folderId } = {}) => {
@@ -385,8 +385,10 @@ const ipc = {
   foldersRename: ({ id, name } = {}) => {
     try { return notesStore.renameFolder(id, name); } catch { return false; }
   },
+  // [BlackCode] la carpeta se va CON sus notas (27/11/2026, pedido de Fran):
+  // el usuario ya lo confirmó en la vista, y es para siempre
   foldersDelete: (id) => {
-    try { return notesStore.deleteFolder(id); } catch { return false; }
+    try { return notesStore.deleteFolder(id, { conNotas: true }); } catch { return false; }
   },
 };
 
