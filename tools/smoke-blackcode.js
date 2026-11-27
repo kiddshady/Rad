@@ -4274,6 +4274,8 @@ else {
       if (s.conexiones !== 1 || s.suscripto !== 1 || s.llave !== true || s.host !== 'fake-atom.local' || s.eventos.length !== 0) fail('voz: no conectó como se esperaba: ' + JSON.stringify(s));
       // (y quedó anotado a quién le habla, aunque fuera el que ya se veía elegido)
       if ((await estadoV()).agente !== agenteV.id) fail('voz: al prenderla no quedó guardado el agente que recibe lo dicho: «' + (await estadoV()).agente + '»');
+      // Whisper empieza a cargar apenas conecta, no recién con la palabra clave
+      if (s.cargas !== 1) fail('voz: el modelo no empezó a cargar al conectar el Echo (cargas: ' + s.cargas + ')');
       if (tarjetaV.querySelector('.rad-busy')) await until(() => !tarjetaV.querySelector('.rad-busy'), 3000);
     }
 
@@ -4282,7 +4284,7 @@ else {
     await until(() => tarjetaV.dataset.fase === 'listening', 2000);
     await settle();
     if (!dice('voz-eco').includes('Listening…') || statusRight() !== 'Listening…') fail('voz: mientras el Echo escucha no se dice: tarjeta «' + dice('voz-eco') + '», barra «' + statusRight() + '»');
-    if ((await sim({})).cargas !== 1) fail('voz: el modelo no empezó a cargar al oír la palabra clave');
+    if ((await sim({})).cargas !== 2) fail('voz: el modelo no se pidió de nuevo al oír la palabra clave (por si se había caído)');
     // …y dice algo: va a un chat de voz del agente, sin sacar al usuario de Settings.
     if (chatView.querySelector('[data-grupo="canales"]').offsetHeight !== 0 || !chatView.querySelector('[data-grupo="canales"]').inert) fail('canales: el grupo Channels se ve sin que haya ningún chat de canal (' + chatView.querySelector('[data-grupo="canales"]').offsetHeight + ' px)');
     const chatAntes = datosM.chatActual()?.id;

@@ -175,6 +175,17 @@ function pythonDeMentira() {
   await hasta(() => py.lanzados[0]?.pedidos.some((x) => x.op === 'salir'), 600);
   ok('escucha: se apaga sola tras un rato sin uso', py.lanzados[0].pedidos.some((x) => x.op === 'salir'));
   py.lanzados[0].salir(0);
+  // …salvo que haya que mantenerlo (el Echo conectado): ahí sigue, y cuando
+  // deja de haber que mantenerlo se apaga en el rato siguiente
+  let mantener = true;
+  const fija = escucha.crear({ script: 'm.py', lanzar: py.lanzar, ociosoMs: 40, plazoMs: 60, mantener: () => mantener });
+  fija.calentar();
+  await new Promise((r) => setTimeout(r, 250));
+  ok('escucha: con el Echo conectado no se apaga sola', !py.lanzados[1].pedidos.some((x) => x.op === 'salir') && fija.vivo());
+  mantener = false;
+  await hasta(() => py.lanzados[1].pedidos.some((x) => x.op === 'salir'), 600);
+  ok('escucha: al dejar de mantenerla, se apaga en el rato siguiente', py.lanzados[1].pedidos.some((x) => x.op === 'salir'));
+  py.lanzados[1].salir(0);
   const lento = escucha.crear({ script: 'm.py', lanzar: py.lanzar, ociosoMs: 5000, plazoMs: 40 });
   ok('escucha: un pedido que no vuelve vence', await lento.transcribir(tono(100)).then(() => false, (err) => /too long/.test(err.message)));
   lento.apagar();

@@ -864,10 +864,10 @@ function tarjetaVoz() {
     if (probando) return { tono: 'idle', texto: 'Asking Python whether it has Whisper…' };
     if (w.estado === 'error') return { tono: 'danger', texto: w.error || 'Whisper stopped.' };
     if (w.estado === 'loading' || w.estado === 'starting') return { tono: 'idle', texto: 'Loading the model…' };
-    if (w.estado === 'ready') return { tono: 'success', texto: `The model is loaded${w.gpu ? ` on ${w.gpu}` : w.dispositivo === 'cpu' ? ' on the CPU' : ''}. It unloads after five minutes without use.` };
+    if (w.estado === 'ready') return { tono: 'success', texto: `The model is loaded${w.gpu ? ` on ${w.gpu}` : w.dispositivo === 'cpu' ? ' on the CPU' : ''}. It stays loaded while the Echo is connected.` };
     if (!prueba) return { tono: 'idle', texto: 'Not checked yet.' };
     if (!prueba.ok) return { tono: 'danger', texto: prueba.error || 'Whisper could not be loaded.' };
-    return { tono: 'success', texto: `Whisper is installed${prueba.gpu ? ` and will use ${prueba.gpu}` : ', and will run on the CPU'}. ${prueba.modelo ? 'The model loads when the wake word is heard.' : 'The model is not downloaded yet: the first phrase will download it (1.5 GB).'}` };
+    return { tono: 'success', texto: `Whisper is installed${prueba.gpu ? ` and will use ${prueba.gpu}` : ', and will run on the CPU'}. ${prueba.modelo ? 'The model loads when the Echo connects.' : 'The model is not downloaded yet: the first phrase will download it (1.5 GB).'}` };
   };
   const poner = () => {
     const v = datosApp.voz();

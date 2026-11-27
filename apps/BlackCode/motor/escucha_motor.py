@@ -55,6 +55,12 @@ def main():
             if cuda:
                 torch.cuda.empty_cache()
             modelos[clave] = whisper.load_model(nombre, device=dispositivo)
+            if dispositivo == "cuda":
+                # un ensayo con un segundo de silencio: la primera frase en la
+                # placa tardaba 0,9 s y las demás 0,3 (lo que se arma la primera
+                # vez); así la primera orden de verdad ya sale rápida
+                modelos[clave].transcribe(np.zeros(16000, dtype=np.float32), language="es", fp16=True, verbose=None)
+                torch.cuda.empty_cache()
             decir({"ev": "cargado", "modelo": nombre, "dispositivo": dispositivo, "tardo": time.time() - t0})
         return modelos[clave], dispositivo
 
@@ -71,6 +77,11 @@ def main():
             initial_prompt=op.get("prompt") or None,
             verbose=None,
         )
+        # Lo que el modelo usó para esta frase vuelve a la placa: queda cargado
+        # mientras el Echo esté conectado, y sin esto retenía ~5 GB en vez de
+        # ~3,4 (medido el 27/11/2026 en la 3060; no cambia lo que tarda).
+        if dispositivo == "cuda":
+            torch.cuda.empty_cache()
         segs = [{
             "t": s["text"].strip(),
             "lp": round(float(s["avg_logprob"]), 3), "ns": round(float(s["no_speech_prob"]), 3),

@@ -6,7 +6,9 @@
 // del usuario: no viajan con la app. El proceso se levanta con la primera
 // frase —el modelo empieza a cargar apenas el Echo oye la palabra clave,
 // mientras el usuario todavía habla— y se apaga tras un rato sin uso, para
-// devolver la memoria de la placa.
+// devolver la memoria de la placa. Salvo que `mantener()` diga que no: con el
+// Echo conectado queda cargado siempre, porque en frío tarda unos 14 s y la
+// primera orden después de un rato esperaba unos 10 s de más.
 //
 // Sin Electron: el proceso se lanza con lo que le pasen (los tests le dan uno
 // de mentira) y el audio no toca el disco.
@@ -53,8 +55,9 @@ function textoDe(segs) {
  * @param {string} o.script           la ruta a escucha_motor.py
  * @param {Function} o.lanzar         (comando, args, opciones) → proceso (por defecto, spawn)
  * @param {Function} o.alCambiar      cambió el estado
+ * @param {() => boolean} o.mantener  mientras diga que sí, el rato sin uso no lo apaga
  */
-function crear({ python = () => 'python', script, lanzar = spawn, ociosoMs = OCIOSO_MS, plazoMs = PLAZO_MS, modelo = MODELO, dispositivo = () => 'auto', alCambiar = () => {} } = {}) {
+function crear({ python = () => 'python', script, lanzar = spawn, ociosoMs = OCIOSO_MS, plazoMs = PLAZO_MS, modelo = MODELO, dispositivo = () => 'auto', mantener = () => false, alCambiar = () => {} } = {}) {
   let proc = null;
   let n = 0;
   let ocio = null;
@@ -65,7 +68,9 @@ function crear({ python = () => 'python', script, lanzar = spawn, ociosoMs = OCI
 
   const descansar = () => {
     clearTimeout(ocio);
-    ocio = setTimeout(() => { if (!pendientes.size) apagar(); else descansar(); }, ociosoMs);
+    // (si hay que mantenerlo, se vuelve a mirar en otro rato: cuando el Echo se
+    // desconecta, se apaga a lo sumo un rato después)
+    ocio = setTimeout(() => { if (!pendientes.size && !mantener()) apagar(); else descansar(); }, ociosoMs);
     ocio.unref?.();
   };
 

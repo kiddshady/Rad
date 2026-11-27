@@ -1,5 +1,26 @@
 # Changelog
 
+## BlackCode 1.20.0 (2026-11-27)
+
+**Whisper queda cargado mientras el Atom Echo está conectado.** Medido en la
+3060: en frío tarda unos 14 s, y como se descargaba a los cinco minutos sin
+uso, la primera orden después de un rato esperaba unos 10 s de más (la carga
+arrancaba con la palabra clave y solo una parte quedaba tapada por lo que se
+hablaba). Fran eligió dejarlo siempre cargado.
+
+- `escucha.cjs` acepta `mantener()`: mientras diga que sí, el rato sin uso no
+  lo apaga. `voz.cjs` lo ata a «la escucha prendida y el Echo conectado»; si
+  el Echo se desconecta, se apaga a lo sumo cinco minutos después.
+- El modelo empieza a cargar apenas el Echo conecta (al abrir la app o al
+  volver después de un corte), no recién con la palabra clave.
+- Al cargar hace un ensayo con un segundo de silencio: la primera frase en la
+  placa tardaba 0,9 s y ahora 0,4 (las demás, 0,3).
+- Después de cada frase devuelve a la placa la memoria de trabajo
+  (`torch.cuda.empty_cache()`): cargado ocupaba ~5 GB y ahora ~3,4, sin
+  cambiar lo que tarda.
+- Settings › Voice dice que el modelo queda cargado mientras el Echo esté
+  conectado, y que carga cuando el Echo conecta.
+
 ## BlackCode 1.19.1 (2026-11-27)
 
 **La tool `remember` ya no le dice al agente que su memoria la ven todos.**

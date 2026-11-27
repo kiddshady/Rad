@@ -65,9 +65,14 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
 
   const script = electron.app.isPackaged ? path.join(process.resourcesPath, 'motor', 'escucha_motor.py') : path.join(__dirname, '..', 'motor', 'escucha_motor.py');
   let avisar = () => {};
+  // Con el Echo conectado, Whisper queda cargado: en frío tarda unos 14 s, y
+  // con la descarga a los cinco minutos la primera orden después de un rato
+  // esperaba unos 10 s de más (medido el 27/11/2026).
+  const conectado = () => config().activa && eco.estado().conexion === 'connected';
   const escucha = simulada?.escucha ?? require('./escucha.cjs').crear({
     python: () => config().python || 'python',
     script,
+    mantener: conectado,
     alCambiar: () => avisar(),
   });
   // La voz con la que contesta: Qwen3-TTS, en otro Python del usuario. El audio
@@ -126,6 +131,7 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
   // A Whisper le ayuda saber qué nombres puede oír: los de los agentes.
   const pista = () => [...new Set([...agentes().map((a) => String(a?.nombre ?? '').trim()).filter(Boolean), 'BlackCode'])].join(', ').slice(0, 300);
   let cuenta = 0;
+  let estabaConectado = false;
   const eco = require('./eco.cjs').crear({
     // (antes de conectar, el cifrado que Electron no trae: ver chacha.cjs)
     cargar: simulada ? async () => simulada.lib : async () => { await require('./chacha.cjs').instalar(); return import('esphome-client'); },
@@ -140,7 +146,14 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
       const c = config();
       rad.send('voz:frase', { n: ++cuenta, texto: f.texto, agente: c.agente, actua: c.actua, tardo: f.ms });
     },
-    alCambiar: () => avisar(),
+    // apenas conecta (al abrir la app, o al volver después de un corte), el
+    // modelo empieza a cargar: así la primera orden ya lo encuentra listo
+    alCambiar: (s) => {
+      const ahora = s?.conexion === 'connected';
+      if (ahora && !estabaConectado && config().activa) { try { escucha.calentar(); } catch { /* si no arranca, Settings lo dice */ } }
+      estabaConectado = ahora;
+      avisar();
+    },
     ...(simulada ? { resolver: async (h) => h } : {}),
   });
 
