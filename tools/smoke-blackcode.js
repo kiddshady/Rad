@@ -5517,7 +5517,75 @@ await go('ajustes', 'about');
     window.removeEventListener('blackcode:notas', oir);
     if (carpetaN?.id) await window.rad.invoke('notas:carpeta-borrar', carpetaN.id);
   }
-  data.celuPedidos = `${fin.datos?.mensajes?.length ?? 0} mensajes, la foto por referencia, canvas del agente, tareas (pausar, correr, leer), borrar el chat y las notas (crear, guardar, fijar, mover, borrar; la PC al día)`;
+
+  // Los agentes, su memoria y las skills desde el celu (1.19.0), con los
+  // stores de verdad: un agente nace, se edita, se mueve y se borra; su
+  // memoria se escribe sin cruzarse con la de otro; una skill se escribe, se
+  // apaga y se borra, y una propuesta se aprueba. La vista Agents de la PC se
+  // pone al día sola.
+  {
+    const cat = (await atender({ que: 'agentesCatalogo' })).datos;
+    const prov = cat?.proveedores?.find((p) => p.modelos.length);
+    if (!prov || !cat.grupos?.length || !cat.nuevas?.length) fail('celu: el catálogo de agentes vino sin proveedores con modelos, grupos o tools de arranque: ' + JSON.stringify(cat).slice(0, 300));
+    if ((await atender({ que: 'agenteGuardar', nombre: '  ', proveedor: prov?.id, modelo: prov?.modelos[0]?.id })).status !== 400) fail('celu: un agente sin nombre no da 400');
+    if ((await atender({ que: 'agenteGuardar', nombre: 'X', proveedor: prov?.id, modelo: 'no-existe' })).status !== 400) fail('celu: un modelo que no está en la lista no da 400');
+    if ((await atender({ que: 'agenteGuardar', nombre: 'X', proveedor: 'no-existe', modelo: 'm' })).status !== 400) fail('celu: un proveedor que no existe no da 400');
+    const g0 = cat?.grupos?.[0];
+    const alta = await atender({ que: 'agenteGuardar', nombre: '  Phone   agent ', proveedor: prov?.id, modelo: prov?.modelos[0]?.id, instrucciones: 'From the phone.', tools: [...(g0?.tools ?? []), 'no-existe'] });
+    const aid = alta.datos?.id;
+    const nuevoA = aid ? datosM.agente(aid) : null;
+    if (!nuevoA || nuevoA.nombre !== 'Phone agent' || nuevoA.instrucciones !== 'From the phone.' || JSON.stringify(nuevoA.tools) !== JSON.stringify(g0?.tools)) fail('celu: el agente creado no quedó como se mandó: ' + JSON.stringify(nuevoA));
+    if (!(await atender({ que: 'estado' })).datos?.agentes?.some((a) => a.id === aid && a.conQue && Array.isArray(a.grupos))) fail('celu: el agente nuevo no está en el estado (con conQue y grupos)');
+    await go('agentes');
+    const tarjetaA = () => alive(view('agentes').querySelectorAll('.dm-tarjeta')).find((t) => t.dataset.radKey === aid);
+    if (!(await until(() => tarjetaA()?.querySelector('.dm-tarjeta-nombre')?.textContent === 'Phone agent', 3000))) fail('celu: la vista Agents de la PC no mostró el agente creado en el celu');
+    const ed = await atender({ que: 'agenteGuardar', agente: aid, nombre: 'Phone agent 2', proveedor: prov?.id, modelo: prov?.modelos.at(-1)?.id, instrucciones: '', tools: [] });
+    if (!ed.ok || datosM.agente(aid)?.nombre !== 'Phone agent 2' || datosM.agente(aid)?.tools.length !== 0 || datosM.agente(aid)?.modelo !== prov?.modelos.at(-1)?.id) fail('celu: editar el agente no anduvo: ' + JSON.stringify(ed) + ' ' + JSON.stringify(datosM.agente(aid)));
+    if (!(await until(() => tarjetaA()?.querySelector('.dm-tarjeta-nombre')?.textContent === 'Phone agent 2', 3000))) fail('celu: la tarjeta de la PC no se enteró del cambio de nombre');
+    const leidoA = (await atender({ que: 'agente', agente: aid })).datos;
+    if (!leidoA || leidoA.ultimo !== true || leidoA.unico !== false || leidoA.instrucciones !== '') fail('celu: el agente leído no dice dónde está: ' + JSON.stringify(leidoA));
+    if ((await atender({ que: 'agenteMover', agente: aid, hacia: 1 })).status !== 409) fail('celu: bajar al último no da 409');
+    if (!(await atender({ que: 'agenteMover', agente: aid, hacia: -1 })).ok || datosM.listaAgentes().at(-1)?.id === aid) fail('celu: subir el agente no lo movió');
+    await atender({ que: 'agenteMover', agente: aid, hacia: 1 });
+
+    // la memoria: la del agente nuevo, sin cruzarse con la de otro
+    const otroM = datosM.listaAgentes().find((a) => a.id !== aid)?.id;
+    const antesOtro = (await atender({ que: 'memoria', agente: otroM })).datos;
+    const r1 = await atender({ que: 'memoriaAgregar', agente: aid, hecho: 'Likes mate from the phone', detalle: 'cebado' });
+    if (!r1.ok || !r1.datos?.id) fail('celu: agregar un recuerdo no anduvo: ' + JSON.stringify(r1));
+    if ((await atender({ que: 'memoriaAgregar', agente: aid, hecho: '   ' })).status !== 400) fail('celu: un recuerdo vacío no da 400');
+    let memA = (await atender({ que: 'memoria', agente: aid })).datos;
+    if (memA?.entradas?.length !== 1 || memA.entradas[0].hecho !== 'Likes mate from the phone' || memA.entradas[0].detalle !== 'cebado') fail('celu: la memoria del agente no tiene el recuerdo: ' + JSON.stringify(memA?.entradas));
+    const despuesOtro = (await atender({ que: 'memoria', agente: otroM })).datos;
+    if (JSON.stringify(despuesOtro?.entradas?.map((e) => e.id)) !== JSON.stringify(antesOtro?.entradas?.map((e) => e.id))) fail('celu: el recuerdo de un agente se cruzó a la memoria de otro');
+    if (!(await atender({ que: 'memoriaEditar', agente: aid, recuerdo: r1.datos?.id, hecho: 'Likes matitos', detalle: '' })).ok) fail('celu: cambiar el recuerdo no anduvo');
+    if ((await atender({ que: 'memoriaEditar', agente: aid, recuerdo: 'm999', hecho: 'x' })).status !== 404) fail('celu: cambiar un recuerdo que no existe no da 404');
+    const core = await atender({ que: 'memoriaCore', agente: aid, texto: 'Phone core', base: memA?.core ?? '' });
+    memA = (await atender({ que: 'memoria', agente: aid })).datos;
+    if (core.datos?.core !== 'Phone core' || memA?.core !== 'Phone core' || memA.entradas[0]?.hecho !== 'Likes matitos' || memA.entradas[0]?.detalle) fail('celu: «About you» o el cambio del recuerdo no quedaron: ' + JSON.stringify({ core: core.datos, memA }));
+    if (!(await atender({ que: 'memoriaBorrar', agente: aid, recuerdo: r1.datos?.id })).ok || (await atender({ que: 'memoria', agente: aid })).datos?.entradas?.length) fail('celu: borrar el recuerdo no lo borró');
+    if ((await atender({ que: 'memoria', agente: 'no-existe' })).status !== 404) fail('celu: la memoria de un agente que no existe no da 404');
+
+    // las skills
+    const nombreS = `celu-${Date.now().toString(36)}`;
+    if ((await atender({ que: 'skillGuardar', nombre: 'Con Espacios', descripcion: 'd', cuerpo: 'c' })).status !== 400) fail('celu: un nombre de skill que no sirve no da 400');
+    if (!(await atender({ que: 'skillGuardar', nombre: nombreS, descripcion: 'Use it from the phone', cuerpo: '# Steps\n1. one' })).ok) fail('celu: escribir una skill no anduvo');
+    const laS = () => atender({ que: 'skills' }).then((r) => r.datos?.skills?.find((s) => s.nombre === nombreS));
+    if ((await laS())?.cuerpo !== '# Steps\n1. one') fail('celu: la skill escrita no está');
+    if (!(await atender({ que: 'skillActivar', skill: nombreS, activa: false })).ok || (await laS())?.activa !== false) fail('celu: apagar la skill no anduvo');
+    if (!(await atender({ que: 'skillGuardar', nombre: `${nombreS}-b`, descripcion: 'Renamed', cuerpo: 'x', original: nombreS })).ok || (await laS()) || !(await atender({ que: 'skills' })).datos?.skills?.some((s) => s.nombre === `${nombreS}-b` && s.activa === false)) fail('celu: renombrar la skill no anduvo (o la prendió)');
+    const md = await atender({ que: 'skillDeMd', texto: '---\nname: from-md\ndescription: Imported\n---\nDo it.', archivo: 'SKILL.md' });
+    if (md.datos?.nombre !== 'from-md' || md.datos?.cuerpo?.trim() !== 'Do it.') fail('celu: importar un .md no trajo sus campos: ' + JSON.stringify(md));
+    if ((await atender({ que: 'skillDeMd', texto: '---\nname: x\n---\n', archivo: 'a.md' })).status !== 400) fail('celu: un .md sin instrucciones no da 400');
+    if ((await atender({ que: 'skillRevisar', skill: `${nombreS}-b` })).status !== 404) fail('celu: revisar sin propuesta no da 404');
+    if (!(await atender({ que: 'skillBorrar', skill: `${nombreS}-b` })).ok || (await atender({ que: 'skillBorrar', skill: `${nombreS}-b` })).status !== 404) fail('celu: borrar la skill no anduvo (o borrarla otra vez no da 404)');
+
+    // borrar el agente: el último no se borra, y este se lleva su memoria
+    if (!(await atender({ que: 'agenteBorrar', agente: aid })).ok || datosM.agente(aid)) fail('celu: borrar el agente no lo borró');
+    if ((await atender({ que: 'agenteBorrar', agente: aid })).status !== 404) fail('celu: borrar un agente que ya no existe no da 404');
+    if (!(await until(() => !tarjetaA(), 3000))) fail('celu: el agente borrado en el celu sigue en la vista Agents de la PC');
+  }
+  data.celuPedidos = `${fin.datos?.mensajes?.length ?? 0} mensajes, la foto por referencia, canvas del agente, tareas (pausar, correr, leer), borrar el chat, las notas (crear, guardar, fijar, mover, borrar; la PC al día) y agentes, memoria y skills`;
   // (Settings queda en About, como lo dejó la sección de antes: la pasada 2
   // comprueba que la app recuerde esa pestaña)
   await go('ajustes', 'about');

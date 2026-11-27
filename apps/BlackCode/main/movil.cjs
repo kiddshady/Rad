@@ -233,6 +233,30 @@ function crear(rad, { electron = require('electron'), esperaMs = ESPERA_MS } = {
   ruta('POST', '/api/notes/:id/pin', ({ p, b }) => preguntar('notaFijar', { nota: p.id, fijada: b.fijada === true }));
   ruta('POST', '/api/notes/:id/folder', ({ p, b }) => preguntar('notaMover', { nota: p.id, carpeta: carpetaDe(b) }));
   ruta('DELETE', '/api/notes/:id', ({ p }) => preguntar('notaBorrar', { nota: p.id }));
+  // los agentes (1.19.0): el formulario entero, crear, mover y borrar
+  const texto = (x) => (typeof x === 'string' ? x : '');
+  const camposAgente = (b) => ({ nombre: texto(b.nombre), proveedor: texto(b.proveedor), modelo: texto(b.modelo), instrucciones: texto(b.instrucciones), tools: Array.isArray(b.tools) ? b.tools.filter((t) => typeof t === 'string') : [] });
+  ruta('GET', '/api/agents/catalog', () => preguntar('agentesCatalogo'));
+  ruta('POST', '/api/agents', ({ b }) => preguntar('agenteGuardar', camposAgente(b)));
+  ruta('GET', '/api/agents/:id', ({ p }) => preguntar('agente', { agente: p.id }));
+  ruta('POST', '/api/agents/:id', ({ p, b }) => preguntar('agenteGuardar', { ...camposAgente(b), agente: p.id }));
+  ruta('POST', '/api/agents/:id/move', ({ p, b }) => preguntar('agenteMover', { agente: p.id, hacia: Number(b.hacia) < 0 ? -1 : 1 }));
+  ruta('DELETE', '/api/agents/:id', ({ p }) => preguntar('agenteBorrar', { agente: p.id }));
+  // la memoria de un agente (1.19.0): «About you» y la lista
+  ruta('GET', '/api/memory/:agente', ({ p }) => preguntar('memoria', { agente: p.agente }));
+  ruta('POST', '/api/memory/:agente/core', ({ p, b }) => preguntar('memoriaCore', { agente: p.agente, texto: texto(b.texto), base: typeof b.base === 'string' ? b.base : null }));
+  ruta('POST', '/api/memory/:agente', ({ p, b }) => preguntar('memoriaAgregar', { agente: p.agente, hecho: texto(b.hecho), detalle: texto(b.detalle) }));
+  ruta('POST', '/api/memory/:agente/:id', ({ p, b }) => preguntar('memoriaEditar', { agente: p.agente, recuerdo: p.id, hecho: texto(b.hecho), detalle: texto(b.detalle) }));
+  ruta('DELETE', '/api/memory/:agente/:id', ({ p }) => preguntar('memoriaBorrar', { agente: p.agente, recuerdo: p.id }));
+  // las skills (1.19.0): escribir, cambiar, apagar, borrar, importar y revisar propuestas
+  ruta('GET', '/api/skills', () => preguntar('skills'));
+  ruta('POST', '/api/skills', ({ b }) => preguntar('skillGuardar', { nombre: texto(b.nombre), descripcion: texto(b.descripcion), cuerpo: texto(b.cuerpo), original: texto(b.original) || null }));
+  ruta('POST', '/api/skills/from-md', ({ b }) => preguntar('skillDeMd', { texto: texto(b.texto), archivo: texto(b.archivo) }));
+  ruta('GET', '/api/skills/:nombre/review', ({ p }) => preguntar('skillRevisar', { skill: p.nombre }));
+  ruta('POST', '/api/skills/:nombre/active', ({ p, b }) => preguntar('skillActivar', { skill: p.nombre, activa: b.activa === true }));
+  ruta('POST', '/api/skills/:nombre/approve', ({ p }) => preguntar('skillAprobar', { skill: p.nombre }));
+  ruta('POST', '/api/skills/:nombre/discard', ({ p }) => preguntar('skillDescartar', { skill: p.nombre }));
+  ruta('DELETE', '/api/skills/:nombre', ({ p }) => preguntar('skillBorrar', { skill: p.nombre }));
   ruta('GET', '/api/image/:chat/:msg/:n', async ({ p, q, res }) => {
     const im = await preguntar('imagen', { chat: p.chat, msg: p.msg, n: Number(p.n) });
     let buf = null;

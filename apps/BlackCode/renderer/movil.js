@@ -54,7 +54,11 @@ const PEDIDOS = {
     const agentes = datos.listaAgentes();
     return {
       usuario: datos.nombreUsuario(),
-      agentes: agentes.map((a) => ({ id: a.id, nombre: a.nombre, proveedor: a.proveedor, modelo: datos.nombreModelo(a.proveedor, a.modelo), ve: datos.modeloVe(a.proveedor, a.modelo) })),
+      agentes: agentes.map((a) => ({
+        id: a.id, nombre: a.nombre, proveedor: a.proveedor, modelo: datos.nombreModelo(a.proveedor, a.modelo), ve: datos.modeloVe(a.proveedor, a.modelo),
+        // (para la lista de Agents del celu: con qué habla y qué grupos de tools usa de verdad)
+        conQue: datos.modeloDe(a), grupos: datos.modeloConTools(a.proveedor, a.modelo) ? datos.gruposDe(a) : [],
+      })),
       chats: agentes.flatMap((a) => datos.chatsDe(a.id)).sort((x, y) => y.tocado - x.tocado).map((c) => ({
         id: c.id, agente: c.agente, titulo: c.titulo, fijado: c.fijado === true, canal: c.voz === true, tocado: c.tocado, cuenta: c.cuenta ?? 0, respondiendo: datos.respondiendo(c.id),
       })),
@@ -211,7 +215,139 @@ const PEDIDOS = {
     notasTocadas();
     return { ok: true };
   },
+
+  // ---------- Los agentes (1.19.0) ----------
+  // Fran: «que sea el lugar donde pueda modificar a mis agentes… si estoy
+  // lejos de la UCX igual pueda cambiarles el modelo, ajustar qué tools usan,
+  // modificar el system prompt… e incluso crear un agente nuevo». Lo mismo que
+  // el formulario de la PC (agentes.js), con las mismas funciones de datos.js:
+  // el que guarda es la interfaz, y la vista Agents de la PC se pone al día sola.
+  /** Lo que hace falta para el formulario: proveedores con sus modelos y los grupos de tools. */
+  agentesCatalogo() {
+    return {
+      inicial: datos.PROVEEDOR_INICIAL,
+      proveedores: datos.proveedores().map((p) => ({
+        id: p.id, nombre: p.nombre, inicial: p.inicial ?? '',
+        modelos: (p.modelos ?? []).map((m) => ({ id: m.id, nombre: m.nombre, nota: m.nota ?? '', tools: datos.modeloConTools(p.id, m.id), ve: datos.modeloVe(p.id, m.id) })),
+      })),
+      grupos: datos.gruposTools().map((g) => ({ id: g.id, nombre: g.nombre, tools: g.tools, opcional: g.opcional === true, detalle: g.mcp ? datos.detalleMcp(g) : g.tools.join(', ') })),
+      // (un agente nuevo nace con estas prendidas, como en la PC)
+      nuevas: datos.todasLasTools(),
+    };
+  },
+  agente({ agente: id }) {
+    const a = datos.agente(id);
+    if (!a) throw new Fallo(404, 'That agent does not exist anymore.');
+    const lista = datos.listaAgentes();
+    const lugar = lista.findIndex((x) => x.id === id);
+    return {
+      id: a.id, nombre: a.nombre, proveedor: a.proveedor, modelo: a.modelo, instrucciones: a.instrucciones ?? '', tools: datos.toolsDe(a),
+      chats: datos.chatsDe(a.id).length, primero: lugar === 0, ultimo: lugar === lista.length - 1, unico: lista.length <= 1,
+    };
+  },
+  /** Crea un agente (sin `agente`) o guarda uno que existe. */
+  agenteGuardar({ agente: id, nombre, proveedor, modelo, instrucciones, tools }) {
+    const antes = id ? datos.agente(id) : null;
+    if (id && !antes) throw new Fallo(404, 'That agent does not exist anymore.');
+    const v = valoresDeAgente({ nombre, proveedor, modelo, instrucciones, tools }, antes);
+    if (antes) { datos.editarAgente(antes.id, v); return { id: antes.id }; }
+    return { id: datos.crearAgente(v).id };
+  },
+  agenteMover({ agente: id, hacia }) {
+    if (!datos.agente(id)) throw new Fallo(404, 'That agent does not exist anymore.');
+    if (!datos.moverAgente(id, Number(hacia) < 0 ? -1 : 1)) throw new Fallo(409, 'It is already at that end of the list.');
+    return { ok: true };
+  },
+  async agenteBorrar({ agente: id }) {
+    if (!datos.agente(id)) throw new Fallo(404, 'That agent does not exist anymore.');
+    if (datos.listaAgentes().length <= 1) throw new Fallo(409, 'At least one agent has to remain.');
+    if (!(await datos.borrarAgente(id))) throw new Fallo(500, 'The agent could not be deleted.');
+    return { ok: true };
+  },
+
+  // ---------- La memoria de cada agente (1.19.0) ----------
+  // Los mismos canales que la vista Memory de la PC, siempre con el agente:
+  // cada uno tiene la suya y ninguna se cruza (1.18.0).
+  async memoria({ agente }) {
+    agenteQueExiste(agente);
+    const e = await window.rad.invoke('memoria:leer', { agente });
+    if (!e) throw new Fallo(404, 'That agent does not exist anymore.');
+    return e;
+  },
+  async memoriaCore({ agente, texto, base }) {
+    agenteQueExiste(agente);
+    const final = await window.rad.invoke('memoria:core', { agente, texto: String(texto ?? ''), base: typeof base === 'string' ? base : null });
+    if (typeof final !== 'string') throw new Fallo(500, 'It could not be saved.');
+    return { core: final };
+  },
+  async memoriaAgregar({ agente, hecho, detalle }) {
+    agenteQueExiste(agente);
+    return resultadoDe(await window.rad.invoke('memoria:agregar', { agente, hecho: String(hecho ?? ''), detalle: String(detalle ?? '') }));
+  },
+  async memoriaEditar({ agente, recuerdo, hecho, detalle }) {
+    agenteQueExiste(agente);
+    return resultadoDe(await window.rad.invoke('memoria:editar', { agente, id: String(recuerdo ?? ''), hecho: String(hecho ?? ''), detalle: String(detalle ?? '') }));
+  },
+  async memoriaBorrar({ agente, recuerdo }) {
+    agenteQueExiste(agente);
+    return resultadoDe(await window.rad.invoke('memoria:borrar', { agente, id: String(recuerdo ?? '') }));
+  },
+
+  // ---------- Las skills (1.19.0) ----------
+  // Las de todos los agentes, como la vista Skills: escribir, cambiar, apagar,
+  // borrar, importar de un .md y decidir sobre lo que proponen los agentes.
+  skills() { return window.rad.invoke('skills:leer'); },
+  async skillRevisar({ skill }) {
+    const r = await window.rad.invoke('skills:revisar', String(skill ?? ''));
+    if (!r) throw new Fallo(404, 'That proposal is gone.');
+    return r;
+  },
+  async skillGuardar({ nombre, descripcion, cuerpo, original }) {
+    return resultadoDe(await window.rad.invoke('skills:guardar', { nombre: String(nombre ?? ''), descripcion: String(descripcion ?? ''), cuerpo: String(cuerpo ?? ''), original: original ? String(original) : null }));
+  },
+  async skillActivar({ skill, activa }) { return resultadoDe(await window.rad.invoke('skills:activar', { nombre: String(skill ?? ''), activa: activa === true })); },
+  async skillBorrar({ skill }) { return resultadoDe(await window.rad.invoke('skills:borrar', String(skill ?? ''))); },
+  async skillAprobar({ skill }) { return resultadoDe(await window.rad.invoke('skills:aprobar', String(skill ?? ''))); },
+  async skillDescartar({ skill }) { return resultadoDe(await window.rad.invoke('skills:descartar', String(skill ?? ''))); },
+  async skillDeMd({ texto, archivo }) {
+    if (typeof texto !== 'string' || texto.length > 200000) throw new Fallo(400, 'That file is too big to be a skill.');
+    const campos = await window.rad.invoke('skills:de-md', { texto, archivo: String(archivo ?? '') });
+    if (!campos?.cuerpo) throw new Fallo(400, 'That file has no instructions in it.');
+    return campos;
+  },
 };
+
+// (lo que contesta el proceso principal: { ok, … } o { ok: false, error })
+function resultadoDe(r) {
+  if (r?.ok) return r;
+  const error = String(r?.error ?? 'unknown error');
+  // «not found» y parecidos son un 404; un dato que no sirve, un 400
+  throw new Fallo(/not found|gone|nothing to|no such agent/.test(error) ? 404 : 400, `${error.charAt(0).toUpperCase()}${error.slice(1).replace(/\.$/, '')}.`);
+}
+function agenteQueExiste(id) {
+  if (!id || !datos.agente(id)) throw new Fallo(404, 'That agent does not exist anymore.');
+}
+
+/** Lo que manda el celu para un agente, revisado como el formulario de la PC.
+ *  `antes`: el agente que se edita (su modelo puede no estar más en la lista
+ *  del proveedor, y sus marcas de servidores MCP apagados se conservan). */
+function valoresDeAgente({ nombre, proveedor, modelo, instrucciones, tools }, antes = null) {
+  const limpio = String(nombre ?? '').replace(/\s+/g, ' ').trim();
+  if (!limpio) throw new Fallo(400, 'Give it a name.');
+  if (limpio.length > 40) throw new Fallo(400, 'The name goes up to 40 characters.');
+  const prov = datos.proveedores().find((p) => p.id === proveedor);
+  if (!prov) throw new Fallo(400, 'That provider does not exist.');
+  const mod = String(modelo ?? '');
+  const suyo = antes && antes.proveedor === prov.id && antes.modelo === mod;
+  if (!mod || (!suyo && !(prov.modelos ?? []).some((m) => m.id === mod))) {
+    throw new Fallo(400, (prov.modelos ?? []).length ? `That model is not in ${prov.nombre}’s list.` : `There are no ${prov.nombre} models to choose from yet.`);
+  }
+  // (solo las tools que existen; las marcas de un servidor MCP apagado no tienen grupo, pero se conservan)
+  const validas = new Set(datos.gruposTools().flatMap((g) => g.tools));
+  const pedidas = Array.isArray(tools) ? tools.filter((t) => typeof t === 'string' && validas.has(t)) : [];
+  const sinFila = antes ? datos.toolsDe(antes).filter((t) => datos.esMarcaMcp(t) && !validas.has(t)) : [];
+  return { nombre: limpio, proveedor: prov.id, modelo: mod, instrucciones: String(instrucciones ?? ''), tools: [...new Set([...pedidas, ...sinFila])] };
+}
 
 // (una nota vacía no existe: borrar el texto no la borra, como en la PC)
 function textoDeNota(contenido) {
@@ -307,6 +443,15 @@ let notasPendiente = null;
 const avisarNotas = () => { clearTimeout(notasPendiente); notasPendiente = setTimeout(() => mandar({ tipo: 'notas' }), 250); };
 window.rad.on('notas:evento', avisarNotas);
 window.addEventListener('blackcode:notas', avisarNotas);
+// Los agentes (y lo que su formulario ofrece: modelos y tools), la memoria de
+// cada uno y las skills: cambian acá, desde un celu o por un agente.
+let agentesPendiente = null;
+const avisarAgentes = () => { clearTimeout(agentesPendiente); agentesPendiente = setTimeout(() => mandar({ tipo: 'agentes' }), 250); };
+datos.on('agentes', avisarAgentes);
+datos.on('modelos', avisarAgentes);
+datos.on('tools', avisarAgentes);
+window.rad.on('memoria:evento', (ev) => mandar({ tipo: 'memoria', agente: ev?.agente ?? null }));
+window.rad.on('skills:evento', () => mandar({ tipo: 'skills' }));
 
 export async function montarMovil() {
   window.rad.on('movil:clientes', (n) => { clientes = Number(n) || 0; });

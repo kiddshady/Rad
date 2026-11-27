@@ -1,5 +1,43 @@
 # Changelog
 
+## BlackCode 1.19.0 (2026-11-27)
+
+**El celu edita los agentes, su memoria y las skills.** Fran: «necesito que
+efectivamente sea el lugar donde pueda modificar a mis agentes… si estoy lejos
+de la UCX igual pueda cambiarles el modelo, ajustar qué tools usan, modificar
+el system prompt… e incluso crear un agente nuevo», y lo mismo con Memory y
+Skills: «con todo esto va a ser prácticamente el control remoto de BlackCode».
+Esta versión es la mitad de la PC: el puente (`main/movil.cjs` y
+`renderer/movil.js`) suma lo que BlackCode Mobile necesita para eso.
+
+- **Agentes:** `GET /api/agents/catalog` (los proveedores con sus modelos,
+  los grupos de tools y con cuáles nace uno nuevo), `GET /api/agents/:id`,
+  `POST /api/agents` (crear), `POST /api/agents/:id` (guardar),
+  `POST /api/agents/:id/move` y `DELETE /api/agents/:id`. Los guarda la
+  interfaz con las mismas funciones que el formulario de la PC, revisando lo
+  que llega como él: nombre obligatorio y de hasta 40, un proveedor que
+  exista, un modelo de su lista (o el que el agente ya tenía aunque haya
+  salido de ella), solo tools que existen, y las marcas de un servidor MCP
+  apagado se conservan. El último agente no se borra. `/api/state` dice
+  además con qué habla cada uno y qué grupos de tools usa de verdad.
+- **Memoria:** `GET /api/memory/:agente`, `POST /api/memory/:agente/core`
+  (con su base, como la vista: lo que un agente agregó mientras tanto se
+  conserva), y agregar, cambiar y borrar recuerdos. Siempre con el agente: la
+  de uno nunca se cruza con la de otro.
+- **Skills:** leerlas, escribirlas y renombrarlas, apagarlas, borrarlas,
+  importar un `.md` (`POST /api/skills/from-md`) y ver, aprobar o descartar
+  lo que propone un agente (`/review`, `/approve`, `/discard`).
+- **Eventos nuevos para el celu:** `agentes` (cambió un agente, o lo que su
+  formulario ofrece: modelos y tools), `memoria` (con el agente) y `skills`.
+- Lo que llega del celu viaja con su nombre (`agente`, `recuerdo`, `skill`),
+  nunca como `id`, que pisaría el número del pedido (el bug de la 1.12.0).
+- Tests: el puente (las rutas nuevas, que `catalog` no se tome por un
+  agente, que solo `true` prenda una skill, que mover sea de a un lugar) y
+  el humo con los stores de verdad: un agente nace, se edita, se mueve y se
+  borra desde el celu y la vista Agents de la PC lo sigue sola; un recuerdo
+  no se cruza a otro agente; una skill se escribe, se apaga, se renombra
+  (sigue apagada), se importa de un `.md` y se borra.
+
 ## BlackCode 1.18.1 (2026-11-27)
 
 **Borrar un agente se lleva todo lo suyo.** Hasta ahora sus chats y sus tareas

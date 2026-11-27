@@ -142,6 +142,14 @@ interfaz = (canal, p) => {
   else if (p.que === 'notas') responder({ ok: true, datos: { notas: [{ id: 'n1', contenido: '# Compras' }], carpetas: [] } });
   else if (p.que === 'notaCrear') responder({ ok: true, datos: { id: 'n2' } });
   else if (['notaGuardar', 'notaFijar', 'notaMover', 'notaBorrar'].includes(p.que)) responder(p.nota === 'n1' ? { ok: true, datos: { ok: true } } : { ok: false, status: 404, error: 'That note does not exist anymore.' });
+  else if (p.que === 'agentesCatalogo') responder({ ok: true, datos: { proveedores: [{ id: 'anthropic' }], grupos: [] } });
+  else if (['agente', 'agenteMover', 'agenteBorrar'].includes(p.que)) responder(p.agente === 'z' ? { ok: true, datos: { id: 'z', hacia: p.hacia } } : { ok: false, status: 404, error: 'That agent does not exist anymore.' });
+  else if (p.que === 'agenteGuardar') responder({ ok: true, datos: { id: p.agente ?? 'a2' } });
+  else if (p.que === 'memoria') responder(p.agente === 'z' ? { ok: true, datos: { core: '', entradas: [] } } : { ok: false, status: 404, error: 'That agent does not exist anymore.' });
+  else if (['memoriaCore', 'memoriaAgregar', 'memoriaEditar', 'memoriaBorrar'].includes(p.que)) responder({ ok: true, datos: { ok: true } });
+  else if (p.que === 'skills') responder({ ok: true, datos: { skills: [{ nombre: 'informe' }] } });
+  else if (p.que === 'skillRevisar') responder(p.skill === 'informe' ? { ok: true, datos: { nombre: 'informe' } } : { ok: false, status: 404, error: 'That proposal is gone.' });
+  else if (['skillGuardar', 'skillActivar', 'skillBorrar', 'skillAprobar', 'skillDescartar', 'skillDeMd'].includes(p.que)) responder({ ok: true, datos: { ok: true } });
   else if (p.que === 'imagen') {
     if (p.msg === 'data') responder({ ok: true, datos: { dataUrl: `data:image/png;base64,${PNG_1x1}` } });
     else if (p.msg === 'archivo') responder({ ok: true, datos: { archivo: path.join(tmp, 'tools', 'images', 'a.png') } });
@@ -209,8 +217,53 @@ const nb = await pedir('DELETE', '/api/notes/n1', { clave });
 ok('borrar una nota', nb.status === 200 && pedidos.at(-1).que === 'notaBorrar' && pedidos.at(-1).nota === 'n1', nb.texto);
 ok('borrar una que no existe da 404', (await pedir('DELETE', '/api/notes/nada', { clave })).status === 404);
 
+// ---------- Agentes, memoria y skills (1.19.0) ----------
+ok('los agentes piden la clave', (await pedir('GET', '/api/agents/catalog')).status === 401 && (await pedir('POST', '/api/agents', { cuerpo: { nombre: 'x' } })).status === 401);
+const cat = await pedir('GET', '/api/agents/catalog', { clave });
+// (catalog va antes que /api/agents/:id: si no, «catalog» sería un agente)
+ok('el catálogo del formulario', cat.status === 200 && pedidos.at(-1).que === 'agentesCatalogo' && cat.json?.proveedores?.[0]?.id === 'anthropic', cat.texto);
+const ag = await pedir('GET', '/api/agents/z', { clave });
+ok('un agente: viaja como agente, no como id', ag.status === 200 && pedidos.at(-1).agente === 'z' && typeof pedidos.at(-1).id === 'number', ag.texto);
+ok('un agente que no existe da 404', (await pedir('GET', '/api/agents/nada', { clave })).status === 404);
+await pedir('POST', '/api/agents', { clave, cuerpo: { nombre: 'Mat', proveedor: 'venice', modelo: 'm', instrucciones: 'hola', tools: ['fs_read', 42, null], id: 'pisado' } });
+const altaA = pedidos.at(-1);
+ok('crear un agente: los campos, solo tools de texto y sin agente', altaA.que === 'agenteGuardar' && altaA.nombre === 'Mat' && altaA.proveedor === 'venice' && altaA.instrucciones === 'hola' && JSON.stringify(altaA.tools) === '["fs_read"]' && altaA.agente === undefined && typeof altaA.id === 'number', JSON.stringify(altaA));
+await pedir('POST', '/api/agents/z', { clave, cuerpo: { nombre: 7, tools: 'todo' } });
+ok('guardar un agente: lo que no es texto viaja vacío', pedidos.at(-1).agente === 'z' && pedidos.at(-1).nombre === '' && Array.isArray(pedidos.at(-1).tools) && pedidos.at(-1).tools.length === 0, JSON.stringify(pedidos.at(-1)));
+await pedir('POST', '/api/agents/z/move', { clave, cuerpo: { hacia: -5 } });
+ok('mover un agente: solo un lugar', pedidos.at(-1).que === 'agenteMover' && pedidos.at(-1).hacia === -1);
+ok('borrar un agente pide la clave', (await pedir('DELETE', '/api/agents/z')).status === 401);
+ok('borrar un agente', (await pedir('DELETE', '/api/agents/z', { clave })).status === 200 && pedidos.at(-1).que === 'agenteBorrar');
+const mem = await pedir('GET', '/api/memory/z', { clave });
+ok('la memoria de un agente', mem.status === 200 && pedidos.at(-1).que === 'memoria' && pedidos.at(-1).agente === 'z', mem.texto);
+ok('la memoria de un agente que no existe da 404', (await pedir('GET', '/api/memory/nada', { clave })).status === 404);
+await pedir('POST', '/api/memory/z/core', { clave, cuerpo: { texto: 'soy Fran', base: 'soy' } });
+ok('«About you» con su base', pedidos.at(-1).que === 'memoriaCore' && pedidos.at(-1).texto === 'soy Fran' && pedidos.at(-1).base === 'soy');
+await pedir('POST', '/api/memory/z', { clave, cuerpo: { hecho: 'toma mate', detalle: '' } });
+ok('agregar un recuerdo', pedidos.at(-1).que === 'memoriaAgregar' && pedidos.at(-1).hecho === 'toma mate');
+await pedir('POST', '/api/memory/z/m3', { clave, cuerpo: { hecho: 'toma matitos' } });
+ok('cambiar un recuerdo: viaja como recuerdo, no como id', pedidos.at(-1).que === 'memoriaEditar' && pedidos.at(-1).recuerdo === 'm3' && pedidos.at(-1).agente === 'z' && typeof pedidos.at(-1).id === 'number');
+await pedir('DELETE', '/api/memory/z/m3', { clave });
+ok('borrar un recuerdo', pedidos.at(-1).que === 'memoriaBorrar' && pedidos.at(-1).recuerdo === 'm3');
+const sk = await pedir('GET', '/api/skills', { clave });
+ok('las skills', sk.status === 200 && sk.json?.skills?.[0]?.nombre === 'informe', sk.texto);
+ok('revisar una propuesta', (await pedir('GET', '/api/skills/informe/review', { clave })).status === 200 && pedidos.at(-1).skill === 'informe');
+ok('una propuesta que no existe da 404', (await pedir('GET', '/api/skills/nada/review', { clave })).status === 404);
+await pedir('POST', '/api/skills', { clave, cuerpo: { nombre: 'informe', descripcion: 'd', cuerpo: 'c', original: '' } });
+ok('guardar una skill nueva: sin original', pedidos.at(-1).que === 'skillGuardar' && pedidos.at(-1).original === null);
+await pedir('POST', '/api/skills/from-md', { clave, cuerpo: { texto: '---\nname: x\n---\nhola', archivo: 'SKILL.md' } });
+ok('importar un .md (no es una skill llamada from-md)', pedidos.at(-1).que === 'skillDeMd' && pedidos.at(-1).archivo === 'SKILL.md');
+await pedir('POST', '/api/skills/informe/active', { clave, cuerpo: { activa: 'si' } });
+ok('apagar una skill: solo true la prende', pedidos.at(-1).que === 'skillActivar' && pedidos.at(-1).activa === false);
+for (const [ruta, que] of [['approve', 'skillAprobar'], ['discard', 'skillDescartar']]) {
+  await pedir('POST', `/api/skills/informe/${ruta}`, { clave });
+  ok(`${ruta} de una propuesta`, pedidos.at(-1).que === que && pedidos.at(-1).skill === 'informe');
+}
+await pedir('DELETE', '/api/skills/informe', { clave });
+ok('borrar una skill', pedidos.at(-1).que === 'skillBorrar');
+
 // ---------- Imágenes ----------
-const img = await pedir('GET', '/api/image/c1/data/0?max=480', { clave });
+const img =await pedir('GET', '/api/image/c1/data/0?max=480', { clave });
 ok('una imagen del chat sale achicada en JPEG', img.status === 200 && img.tipo === 'image/jpeg' && img.texto === 'jpeg:480x240' && achicados.at(-1)?.width === 480, `${img.status} ${img.tipo} ${img.texto}`);
 fs.writeFileSync(path.join(tmp, 'tools', 'images', 'a.png'), Buffer.from(PNG_1x1, 'base64'));
 const arch = await pedir('GET', '/api/image/c1/archivo/0', { clave });
@@ -260,5 +313,5 @@ if (failures.length) {
   for (const f of failures) console.log('  ' + f);
   process.exit(1);
 }
-console.log(`test-blackcode-movil: ok (${hechas} comprobaciones: apagado de fábrica, la clave al prender y cifrada, ping abierto y lo demás con clave, la clave nunca en la interfaz, los pedidos por la interfaz y sus errores, una interfaz colgada, borrar un chat, canvases, tareas y notas (y que un dato llamado id no pise el pedido), las imágenes y la carpeta de la app, el canal de eventos y la clave nueva, apagarlo, y el cableado)`);
+console.log(`test-blackcode-movil: ok (${hechas} comprobaciones: apagado de fábrica, la clave al prender y cifrada, ping abierto y lo demás con clave, la clave nunca en la interfaz, los pedidos por la interfaz y sus errores, una interfaz colgada, borrar un chat, canvases, tareas, notas, agentes, memoria y skills (y que un dato llamado id no pise el pedido), las imágenes y la carpeta de la app, el canal de eventos y la clave nueva, apagarlo, y el cableado)`);
 process.exit(0);
