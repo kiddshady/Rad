@@ -161,7 +161,9 @@ async function eliminar(agente) {
   const n = datos.chatsDe(agente.id).length;
   const si = await confirm({
     title: `Delete ${agente.nombre}?`,
-    text: n ? `The agent and its ${cuantos(n, 'chat', 'chats')} will be deleted. This can’t be undone.` : 'The agent will be deleted. This can’t be undone.',
+    text: n
+      ? `The agent will be deleted with its ${cuantos(n, 'chat', 'chats')}, its canvases and its memory. This can’t be undone.`
+      : 'The agent will be deleted with its canvases and its memory. This can’t be undone.',
     confirmLabel: 'Delete',
     danger: true,
   });

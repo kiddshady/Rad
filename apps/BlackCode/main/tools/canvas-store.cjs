@@ -217,6 +217,19 @@ function orphanConversation(conversationId, agentId = null) {
   ).run(agentId || null, String(conversationId)).changes;
 }
 
+// [BlackCode 1.18.1] Se borró un agente: sus canvas se van con él, de verdad
+// (sin papelera: ya no queda nadie que los pueda ver ni restaurar). Son suyos
+// los que anotó al nacer (`agent_id`) y los de antes de la 1.8.2, que no lo
+// anotaban, si su chat es de él (`conversationIds`, sus chats). Los de la
+// papelera también. Uno huérfano viejo, sin agente ni chat, no es de nadie
+// conocido y se queda. Devuelve cuántos se borraron.
+function removeByAgent(agentId, conversationIds = []) {
+  if (!agentId) return 0;
+  const chats = (Array.isArray(conversationIds) ? conversationIds : []).filter(Boolean).map(String);
+  const enSusChats = chats.length ? ` OR (agent_id IS NULL AND conversation_id IN (${chats.map(() => '?').join(', ')}))` : '';
+  return ready().prepare(`DELETE FROM canvases WHERE agent_id = ?${enSusChats}`).run(String(agentId), ...chats).changes;
+}
+
 // [BlackCode] Cierra la base: al salir de la app, o antes de abrir otra ruta. Allá no
 // existía (canvas.db quedaba abierta hasta que moría el proceso). No tira si
 // ya estaba cerrada, y el init() siguiente la vuelve a abrir.
@@ -229,6 +242,6 @@ function close() {
 
 module.exports = {
   init, close, create, get, update, listByConversation, listAll,
-  remove, trash, restore, listTrash, purgeTrash, orphanConversation,
+  remove, trash, restore, listTrash, purgeTrash, orphanConversation, removeByAgent,
   TRASH_DIAS,
 };

@@ -402,8 +402,8 @@ export async function borrarAgente(id) {
   avisar('agentes');
   avisar('chats');
   avisar('seleccion');
-  // (sus canvas quedan, anotados a su nombre aunque el agente ya no exista: ninguno otro los ve)
-  window.rad.invoke('canvas:huerfanos', { chats: suyos.map((c) => c.id), agente: id }).catch(() => {});
+  // (se lleva lo suyo: sus canvas y su memoria se borran con él)
+  window.rad.invoke('agente:enterrar', { agente: id, chats: suyos.map((c) => c.id) }).catch(() => {});
   // (sus tareas programadas se van con él)
   window.rad.invoke('tareas:sin-agente', id).catch(() => {});
   await Promise.all(suyos.map((c) => removeDoc(`chat-${c.id}`)));

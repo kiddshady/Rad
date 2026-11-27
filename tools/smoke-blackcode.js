@@ -2755,6 +2755,9 @@ else {
     await listo2();
     if (!eco().includes('memory: core no, 1 entry')) fail('memoria: a un modelo sin tools no le llegó SU memoria: ' + (/memory:[^\n]*|The Venice key[^\n]*/.exec(eco())?.[0] ?? eco().slice(0, 120)));
     await datosM.borrarAgente(sinTools.id);
+    // (1.18.1: se llevó su memoria; enterrarlo otra vez ya no encuentra nada que olvidar)
+    if ((await window.rad.invoke('agente:enterrar', { agente: sinTools.id, chats: [] }))?.memoria !== false) fail('memoria: borrar el agente no se llevó su memoria');
+    if ((await mem()).entradas.length !== 1) fail('memoria: borrar otro agente tocó la memoria del primero');
     // (la vista sigue al agente del chat, y el que miraba ya no existe)
     datosM.elegirAgente(agenteM.id);
     await settle();
@@ -3710,7 +3713,7 @@ else {
     await closed();
     await listoM();
     if (fila('mcp_smoke_echo')?.dataset.estado !== 'ok' || salidaM('mcp_smoke_echo') !== 'echo: hola') fail('mcp: la llamada quedó en «' + fila('mcp_smoke_echo')?.dataset.estado + '» con «' + salidaM('mcp_smoke_echo').slice(0, 120) + '»');
-    if (fila('mcp_smoke_echo')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'plug') fail('mcp: la fila de una tool de MCP no lleva el enchufe');
+    if (fila('mcp_smoke_echo')?.querySelector('.dm-tool-icono')?.dataset.icono !== 'enchufe' || !fila('mcp_smoke_echo')?.querySelector('.dm-tool-icono svg')?.innerHTML.includes('rotate(45')) fail('mcp: la fila de una tool de MCP no lleva el enchufe de Integrations');
     // …cada llamada. Y al servidor le llegó su variable. Rechazada, no corre.
     await pedir([[{ name: 'mcp_smoke_whoami', args: {} }]]);
     await until(() => permiso(), 6000);

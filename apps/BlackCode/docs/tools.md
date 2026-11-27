@@ -177,15 +177,22 @@ volcarlo en el mensaje. Cómo está armado:
   `edit` y `update` siguen acotados al chat, como siempre.
 - **De quién es un canvas** (1.8.2). En la 1.8.0 el dueño salía solo del chat,
   y un canvas «sin chat» no era de nadie: Zac no encontraba dos que el panel
-  mostraba. Un canvas queda sin chat de tres formas: se borra su chat (la app
-  lo desengancha para no perderlo), se borra el agente entero, o lo crea una
-  tarea programada (que no tiene chat). Ahora cada canvas guarda su agente al
+  mostraba. Un canvas queda sin chat de dos formas: se borra su chat (la app
+  lo desengancha para no perderlo) o lo crea una tarea programada (que no
+  tiene chat). Hasta la 1.18.0 también al borrar el agente entero. Ahora cada canvas guarda su agente al
   nacer (`agent_id`, columna agregada por `ALTER` en las bases que ya
   existían), y al desenganchar un chat se anota el agente en los que no lo
   tenían (`canvas:huerfanos` recibe `{ chats, agente }`). El dueño es ese
   agente; si no lo tiene, el de su chat; y un huérfano viejo, sin agente ni
   chat, es de TODOS (decisión de Fran). Borrar un chat no borra sus canvas:
   siguen siendo de su agente (también decisión de Fran).
+- **Borrar un agente se lleva sus canvas** (1.18.1, Fran: «que se lleve todo a
+  la tumba»). `agente:enterrar` recibe `{ agente, chats }` y
+  `removeByAgent` borra de verdad, sin papelera (ya no queda quién los vea ni
+  los restaure): los que anotan ese agente, los de antes de la 1.8.2 que no
+  lo anotaban si su chat era de él, y los de la papelera. Un huérfano viejo
+  sin agente ni chat no es de nadie conocido y queda. Los canvas de agentes
+  borrados antes de la 1.18.1 siguen en la base.
 - La interfaz está en `renderer/canvas.js`. Un documento se pinta con
   `markdown.js`; el código va sin resaltado.
 
@@ -540,8 +547,9 @@ decide qué leer.
   la corrida, el del padre en un subagente, el de la tarea en una tarea; una
   corrida sin agente no tiene memoria. El bloque del system sale del cajón del
   agente del turno. Los ids (`m1`…) son de cada cajón. Un agente nuevo arranca
-  vacío. Borrar un agente no borra su cajón (queda en el documento, sin que
-  nadie lo vea), como sus canvas. La vista muestra un agente a la vez, con un
+  vacío. Borrar un agente se lleva su cajón entero, Core incluido
+  (`olvidar`, 1.18.1; antes quedaba en el documento sin que nadie lo viera):
+  lo hace `agente:enterrar`, junto con sus canvas. La vista muestra un agente a la vez, con un
   select en la cabecera (Fran lo eligió sobre pestañas); arranca en el agente
   del chat y lo sigue cuando se cambia ahí (evento `seleccion` de datos.js).
   Al cambiar, lo de las tarjetas se funde por color y vuelve, en orden

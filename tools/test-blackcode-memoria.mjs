@@ -328,10 +328,29 @@ function porAgente(doc = undefined, migrar = null) {
   ok('si el reparto tira, la app sigue y lo viejo queda de respaldo', tira.pa.de('zac').estado().entradas.length === 0 && tira.caja.doc.anterior?.core === 'x');
 }
 
+// ---------- borrar un agente se lleva su memoria (1.18.1) ----------
+{
+  const { pa, caja } = porAgente();
+  pa.de('zac').ponerCore('Soy Fran', '');
+  pa.de('zac').agregar({ hecho: 'algo de Zac', de: 'agent' });
+  pa.de('mat').ponerCore('Soy Fran también', '');
+  pa.de('mat').agregar({ hecho: 'algo de Mat', de: 'agent' });
+  caja.cambios.length = 0;
+  ok('olvidar sin agente no hace nada', pa.olvidar('') === false && pa.olvidar(null) === false);
+  ok('olvidar un agente sin nada guardado dice que no había', pa.olvidar('nadie') === false);
+  ok('olvidar a Zac dice que había', pa.olvidar('zac') === true);
+  ok('  su cajón ya no está en el documento', !Object.hasOwn(caja.doc.agentes, 'zac') && pa.agentes().join() === 'mat');
+  ok('  avisa del cambio de Zac', caja.cambios.join() === 'zac');
+  ok('  lo de Mat queda entero', pa.de('mat').estado().core === 'Soy Fran también' && pa.de('mat').estado().entradas.length === 1);
+  const otra = pa.de('zac').estado();
+  ok('  un agente nuevo con el mismo id arranca vacío', otra.core === '' && otra.entradas.length === 0);
+  ok('olvidarlo dos veces no rompe', pa.olvidar('zac') === false);
+}
+
 if (failures.length) {
   console.error(`test-blackcode-memoria: ${failures.length} falla(s) de ${hechas}`);
   for (const f of failures) console.error('  ' + f);
   process.exit(1);
 }
-console.log(`test-blackcode-memoria: ok (${hechas} comprobaciones: vacía, anotar, editar y borrar, el bloque del system, el tope que deja afuera las más viejas y lo dice, el Core con su base, buscar, remember y recall, el cableado, la sesión, por agente sin cruces y el reparto de lo de antes)`);
+console.log(`test-blackcode-memoria: ok (${hechas} comprobaciones: vacía, anotar, editar y borrar, el bloque del system, el tope que deja afuera las más viejas y lo dice, el Core con su base, buscar, remember y recall, el cableado, la sesión, por agente sin cruces, el reparto de lo de antes y lo que se lleva un agente al borrarse)`);
 process.exit(0);

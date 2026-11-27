@@ -1,5 +1,38 @@
 # Changelog
 
+## BlackCode 1.18.1 (2026-11-27)
+
+**Borrar un agente se lleva todo lo suyo.** Hasta ahora sus chats y sus tareas
+se iban con él, pero sus canvas quedaban sueltos en la base y su memoria en su
+cajón, sin que nadie los viera. Fran: «que se lleve todo a la tumba».
+
+- **Sus canvas se borran de verdad**, sin pasar por la papelera: los que
+  anotan su agente, los de antes de la 1.8.2 que no lo anotaban si su chat
+  era de él, y los que ya estaban en la papelera. Un canvas huérfano viejo,
+  sin agente ni chat, no es de nadie conocido y queda.
+- **Su memoria entera se borra**: su «About you» y su lista. La de los demás
+  agentes no se toca, y uno nuevo arranca vacío aunque se llame igual.
+- El aviso antes de borrar lo dice: «…with its chats, its canvases and its
+  memory».
+- **Las tools de un servidor MCP llevan el enchufe de Integrations**, el de
+  Settings, en diagonal, en vez del vertical que vino de NeonCode. Va el
+  mismo dibujo de `piezas.js`, no una copia. El humo comprueba que la fila
+  de una tool de MCP lo lleva.
+- **El navegador redondea la página a 8 px, no a 12.** La scrollbar flotante
+  de Chromium, ancha (con el mouse encima), va a 1 px del borde con puntas de
+  ~5 px, y la curva de 12 le comía las de arriba y de abajo: hasta 47 px de la
+  barra según la escala. Con 8 no toca nada a 100 % ni a 150 %, y a 125 %
+  apenas el borde suavizado (18 % en 3 px). Medido sobre la barra de verdad
+  (Electron 44.10.1, el mismo de Prism, donde Fran lo vio). Y 8 es además el
+  radio concéntrico con el panel: 16 de la piel menos los 8 de margen del
+  hueco. Cambian juntos `setBorderRadius` de la vista y `.dm-nav-hueco`.
+- Lo de agentes borrados antes de esta versión sigue en la base, y el
+  respaldo de la memoria de antes de la 1.18 también.
+- Tests: `removeByAgent` (los suyos de las cuatro formas, los de otro
+  agente y el huérfano sin dueño quedan) y `olvidar` (su cajón se va, el
+  otro queda entero, olvidar dos veces no rompe). El humo comprueba que
+  borrar un agente se lleva su memoria y no toca la del otro.
+
 ## BlackCode 1.18.0 (2026-11-27)
 
 **La memoria es por agente.** Hasta ahora era una sola para toda la app (así

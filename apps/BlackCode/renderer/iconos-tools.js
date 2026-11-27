@@ -41,7 +41,6 @@ const PATHS = {
   // con trazo 2). Reemplazó a los cuatro cuadrados de NeonCode (1.5.2 en el
   // resto de la app; en la fila de la tool, 1.8.1).
   documento: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 11l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z",
-  plug: "M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z",
   sparkle: "M10 3c0 3.9 3.1 7 7 7-3.9 0-7 3.1-7 7 0-3.9-3.1-7-7-7 3.9 0 7-3.1 7-7zM17.5 14.5c0 1.7 1.3 3 3 3-1.7 0-3 1.3-3 3 0-1.7-1.3-3-3-3 1.7 0 3-1.3 3-3z",
   // la memoria: el `chip` de NeonCode, tal cual (el cuerpo, un cuadrado adentro
   // con el centro hueco, y las patas)
@@ -70,14 +69,19 @@ const DE_TOOL = {
   canvas: 'documento', notepad: 'notepad', notepad_write: 'notepad',
   chat_search: 'bubble', chat_read: 'bubble', rag_search: 'library', schedule: 'clock',
   skill: 'sparkle', create_skill: 'sparkle', list_skills: 'sparkle',
-  mcp: 'plug', delegate: 'delegate',
+  mcp: 'enchufe', delegate: 'delegate',
   remember: 'memory', recall: 'memory',
   generate_image: 'varita',
 };
 
 /** El nombre del ícono de una tool, o null si no tiene uno propio. */
 // (las tools de un servidor MCP se llaman `mcp_<servidor>_<tool>`: todas llevan el enchufe)
-const nombreDe = (tool) => DE_TOOL[tool] ?? (typeof tool === 'string' && tool.startsWith('mcp_') ? 'plug' : null);
+const nombreDe = (tool) => DE_TOOL[tool] ?? (typeof tool === 'string' && tool.startsWith('mcp_') ? 'enchufe' : null);
+
+// Los que no son de NeonCode sino de la app: van tal cual los dibuja piezas.js,
+// en su grilla de 16. El enchufe es el de Integrations en Settings, en
+// diagonal (Fran lo pidió en vez del vertical de NeonCode, 27/11/2026).
+const DE_LA_APP = new Set(['enchufe']);
 export const iconoDeTool = (tool) => nombreDe(tool);
 
 /** El ícono de una tool en su caja, como icono() de piezas.js. Una tool sin
@@ -85,6 +89,11 @@ export const iconoDeTool = (tool) => nombreDe(tool);
 export function iconoTool(tool, extra = '') {
   const nombre = nombreDe(tool);
   if (!nombre) return icono('tool', extra);
+  if (DE_LA_APP.has(nombre)) {
+    const caja = icono(nombre, extra);
+    caja.dataset.icono = nombre;
+    return caja;
+  }
   const caja = h('span', `rad-icon ${extra}`.trim(), { 'data-icono': nombre });
   caja.innerHTML = `<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${PATHS[nombre]}"/></svg>`;
   return caja;

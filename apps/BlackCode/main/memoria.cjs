@@ -270,6 +270,19 @@ function crearPorAgente({ leer, escribir, ahora = Date.now, alCambiar = () => {}
       }
       return cajones.get(id);
     },
+    /** Se borró el agente: su cajón se va con él, entero (Core y lista). Lo
+     *  de los demás no se toca. Devuelve si había algo que borrar. */
+    olvidar(agente) {
+      const id = typeof agente === 'string' ? agente.trim() : '';
+      if (!id) return false;
+      cajones.delete(id);
+      const d = doc();
+      if (!Object.hasOwn(d.agentes, id)) return false;
+      const { [id]: _, ...resto } = d.agentes;
+      escribir({ ...d, agentes: resto });
+      alCambiar(id);
+      return true;
+    },
     /** Los agentes que tienen algo guardado (para los tests y el diagnóstico). */
     agentes: () => Object.keys(doc().agentes),
   };

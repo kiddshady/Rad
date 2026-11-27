@@ -105,11 +105,11 @@ try {
   t('los runners', Object.keys(canvas.runners), ['canvas']);
   t('lo que exporta canvas-store.cjs', Object.keys(almacen).sort(), [
     'init', 'close', 'create', 'get', 'update', 'listByConversation', 'listAll',
-    'remove', 'trash', 'restore', 'listTrash', 'purgeTrash', 'orphanConversation', 'TRASH_DIAS',
+    'remove', 'trash', 'restore', 'listTrash', 'purgeTrash', 'orphanConversation', 'removeByAgent', 'TRASH_DIAS',
   ].sort());
   t('`store` es el store sin init ni close', Object.keys(store).sort(), [
     'create', 'get', 'update', 'listByConversation', 'listAll',
-    'remove', 'trash', 'restore', 'listTrash', 'purgeTrash', 'orphanConversation', 'TRASH_DIAS',
+    'remove', 'trash', 'restore', 'listTrash', 'purgeTrash', 'orphanConversation', 'removeByAgent', 'TRASH_DIAS',
   ].sort());
   t('la papelera dura 7 días', [almacen.TRASH_DIAS, store.TRASH_DIAS], [7, 7]);
   canvas.cerrar();
@@ -162,6 +162,32 @@ try {
   t('orphanConversation suelta los del chat', store.orphanConversation('chat-B'), 1);
   t('el canvas sobrevive al borrado del chat', store.get(codeC.id).conversation_id, null);
   ok_('y sigue apareciendo en la biblioteca', store.listAll().some((x) => x.id === codeC.id));
+
+  seccion('borrar un agente se lleva sus canvas (1.18.1)');
+  {
+    const deZac = store.create({ conversationId: 'chat-zac1', agentId: 'zac', title: 'de Zac' });
+    const deZacSuelto = store.create({ conversationId: 'chat-zac2', agentId: 'zac', title: 'de Zac, chat borrado' });
+    store.orphanConversation('chat-zac2', 'zac');
+    const deZacViejo = store.create({ conversationId: 'chat-zac1', title: 'de Zac, sin agente anotado' });
+    const deZacPapelera = store.create({ conversationId: 'chat-zac1', agentId: 'zac', title: 'de Zac, en la papelera' });
+    store.trash(deZacPapelera.id);
+    const deMat = store.create({ conversationId: 'chat-mat1', agentId: 'mat', title: 'de Mat' });
+    const deMatViejo = store.create({ conversationId: 'chat-mat1', title: 'de Mat, sin agente anotado' });
+    const deNadie = store.create({ conversationId: 'chat-x', title: 'huérfano viejo' });
+    store.orphanConversation('chat-x');
+    const hay = (id) => crudo(DB, (d) => Boolean(d.prepare('SELECT 1 FROM canvases WHERE id = ?').get(id)));
+    t('removeByAgent sin agente no borra nada', store.removeByAgent('', ['chat-zac1']), 0);
+    t('borra los cuatro de Zac', store.removeByAgent('zac', ['chat-zac1']), 4);
+    ok_('  el de su chat', !hay(deZac.id));
+    ok_('  el de un chat suyo ya borrado', !hay(deZacSuelto.id));
+    ok_('  el de antes de la 1.8.2, por su chat', !hay(deZacViejo.id));
+    ok_('  el de la papelera, también de verdad', !hay(deZacPapelera.id));
+    ok_('los de Mat quedan', hay(deMat.id) && hay(deMatViejo.id));
+    ok_('el huérfano sin dueño queda', hay(deNadie.id));
+    t('sin sus chats, solo los anotados', store.removeByAgent('mat'), 1);
+    ok_('  el viejo de Mat, sin agente anotado, queda', hay(deMatViejo.id));
+    store.remove(deMatViejo.id); store.remove(deNadie.id);
+  }
 
   seccion('unwrapOuterFence (la manía de envolver todo en ```)');
   const unwrap = canvas.unwrapOuterFence;
@@ -611,5 +637,5 @@ if (failures.length) {
   for (const f of failures) console.error('  ' + f);
   process.exit(1);
 }
-console.log(`test-blackcode-tools-canvas: ok (${hechas} comprobaciones: cableado, el store, borrar y huérfanos, unwrapOuterFence, la tool con create, read, update y list, delete a la papelera, edit por fragmentos, el diff de la tarjeta, el bloque del system prompt y el nombre al exportar, que son las de NeonCode; más listarTodos, guardar, lo que llega por configurar, la base que se abre sola, se cierra, se cambia y no abre, y el get del adaptador)`);
+console.log(`test-blackcode-tools-canvas: ok (${hechas} comprobaciones: cableado, el store, borrar y huérfanos, lo que se lleva un agente al borrarse, unwrapOuterFence, la tool con create, read, update y list, delete a la papelera, edit por fragmentos, el diff de la tarjeta, el bloque del system prompt y el nombre al exportar, que son las de NeonCode; más listarTodos, guardar, lo que llega por configurar, la base que se abre sola, se cierra, se cambia y no abre, y el get del adaptador)`);
 process.exit(0);

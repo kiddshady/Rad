@@ -1901,8 +1901,16 @@ class AgentBrowser {
     // carga, y en esta app un frame blanco es un fogonazo (misma razón por la
     // que la ventana nace fuera de pantalla).
     view.setBackgroundColor('#0d0d11');
-    // Las esquinas de la casa. El panel que la rodea tiene 14px.
-    try { view.setBorderRadius(12); } catch { /* Electron viejo: se ve cuadrada y ya */ }
+    // Las esquinas: 8 px, el mismo radio que el hueco (.dm-nav-hueco), y los dos
+    // tienen que calzar. Sale de dos cuentas que dan lo mismo:
+    //   - Concéntrico con el panel: el panel redondea a 16 (--rad-radius-l de
+    //     la piel) y el hueco va 8 adentro (--rad-space-2): 16 - 8 = 8.
+    //   - La scrollbar flotante de Chromium, ANCHA (con el mouse encima): su
+    //     carril va a 1 px del borde con puntas de ~5 px. Con 12 (lo de antes,
+    //     1.18.0) la curva le comía hasta 47 px de las puntas de arriba y de
+    //     abajo; con 8 no toca nada a 100 % ni a 150 %, y a 125 % apenas el
+    //     borde suavizado (18 % en 3 px). Medido sobre la barra de verdad.
+    try { view.setBorderRadius(8); } catch { /* Electron viejo: se ve cuadrada y ya */ }
 
     const tab = { id: ++this._seq, view };
     this._blindarView(tab);

@@ -1690,13 +1690,15 @@
   .dm-nav [data-accion='nav-estrella'][aria-pressed='true']:hover { background-color: var(--rad-tint-hover); }
   .dm-nav [data-accion='nav-estrella'] svg { transition: fill var(--rad-dur-fast) var(--rad-ease-out); fill: transparent; }
   .dm-nav [data-accion='nav-estrella'][aria-pressed='true'] svg { fill: currentColor; }
-  /* El hueco. El radio es el de la capa nativa (12 px), no un token: tienen
-     que calzar. */
+  /* El hueco. El radio es el de la capa nativa (8 px, setBorderRadius en
+     agent-browser.cjs), no un token: tienen que calzar. Es concéntrico con el
+     panel (16 - 8 de margen) y deja entera la scrollbar ancha de la página:
+     la cuenta está allá. */
   .dm-nav-hueco {
     position: relative;
     min-height: 0;
     margin: 0 var(--rad-space-2) var(--rad-space-2);
-    border-radius: 12px;
+    border-radius: 8px;
     overflow: hidden;
     background: color-mix(in srgb, var(--rad-surface-0) 70%, transparent);
     display: grid;

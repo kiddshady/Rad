@@ -603,6 +603,20 @@ function wire(rad, { llave }) {
     for (const c of chats) lienzo.store.orphanConversation(String(c), agente);
     return { ok: true };
   });
+  // Se borró un AGENTE (1.18.1): se lleva todo lo suyo. Sus canvas (también los
+  // de la papelera) y su memoria entera, About you incluido. Fran: «que se
+  // lleve todo a la tumba». `chats` son los suyos, que la interfaz ya soltó:
+  // con ellos se reconocen los canvas de antes de la 1.8.2, que no anotaban
+  // su agente. Las tareas se van por su lado (tareas:sin-agente).
+  rad.handle('agente:enterrar', (pedido) => {
+    const agente = typeof pedido?.agente === 'string' ? pedido.agente.trim() : '';
+    if (!agente) return { ok: false, error: 'no such agent' };
+    const chats = Array.isArray(pedido?.chats) ? pedido.chats.map(String) : [];
+    let canvas = 0;
+    try { canvas = lienzo.store.removeByAgent(agente, chats); } catch { canvas = 0; }
+    const memoriaBorrada = memoria.olvidar(agente);
+    return { ok: true, canvas, memoria: memoriaBorrada };
+  });
   rad.handle('canvas:exportar', async (c) => {
     let nombre = lienzo.nombreDeExport({ title: c?.title, kind: c?.kind, language: c?.language });
     // un canvas que ya se llama «sum.js» no sale como «sum.js.js»
