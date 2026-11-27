@@ -3,3 +3,4 @@ dist/
 out/
 *.log
 .smoke/
+tools/typo-lab/guardado.json

@@ -1,0 +1,253 @@
+/* El panel del typo lab. Va como hoja construida (adoptedStyleSheets) sobre
+   BlackCode: solo tokens del contrato, así se viste con la piel activa. La
+   letra del panel es --tl-ui / --tl-mono, que el panel fija con la de la piel
+   al entrar: lo que se prueba no lo deforma. */
+
+.tl-panel, .tl-pastilla, .tl-lista-caja {
+  position: fixed;
+  font-family: var(--tl-ui);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--rad-text-1);
+  background: var(--skin-float-solid, var(--rad-surface-3));
+  background-color: rgb(from var(--skin-float-solid, var(--rad-surface-3)) r g b / 1);
+  box-shadow: var(--rad-shadow-2);
+  border-radius: var(--rad-radius-l);
+  --rad-a-in: rad-pop-in var(--rad-dur-base) var(--rad-ease-out) both;
+  --rad-a-out: rad-pop-out var(--rad-dur-fast) var(--rad-ease-in) both;
+  --rad-a-dy: var(--rad-space-2);
+}
+.tl-panel[hidden], .tl-pastilla[hidden] { display: none; }
+
+.tl-panel {
+  right: var(--rad-space-4);
+  bottom: calc(var(--rad-statusbar-height) + var(--rad-space-3));
+  width: 340px;
+  max-height: calc(100vh - var(--rad-titlebar-height) - var(--rad-statusbar-height) - var(--rad-space-6));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+.tl-panel[data-arrastrando], .tl-pastilla[data-arrastrando] { cursor: grabbing; }
+
+.tl-cabeza {
+  display: flex;
+  align-items: center;
+  gap: var(--rad-space-2);
+  padding: var(--rad-space-2) var(--rad-space-2) var(--rad-space-1) var(--rad-space-4);
+  cursor: grab;
+  user-select: none;
+}
+.tl-titulo {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--rad-space-2);
+  font-weight: 600;
+  font-size: 13px;
+}
+.tl-titulo-icono { display: grid; color: var(--rad-text-2); }
+.tl-titulo-icono svg { width: var(--rad-icon-size); height: var(--rad-icon-size); }
+
+.tl-cuerpo {
+  overflow-y: auto;
+  padding: var(--rad-space-1) var(--rad-space-4) var(--rad-space-3);
+  display: grid;
+  gap: var(--rad-space-4);
+  align-content: start;
+  --rad-a-scroll-inset: var(--rad-space-2);
+}
+.tl-grupo { display: grid; gap: var(--rad-space-1); }
+.tl-grupo-titulo {
+  font-size: 11px;
+  color: var(--rad-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--rad-space-1);
+}
+
+.tl-fila {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--rad-space-2);
+  min-height: 30px;
+}
+.tl-rotulo {
+  color: var(--rad-text-2);
+  display: flex;
+  align-items: baseline;
+  gap: var(--rad-space-2);
+  transition: color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.tl-fila[data-cambiado] .tl-rotulo { color: var(--rad-text-1); }
+.tl-def {
+  font-family: var(--tl-mono);
+  font-size: 11px;
+  color: var(--rad-text-3);
+  opacity: 0;
+  transition: opacity var(--rad-dur-fast) var(--rad-ease-out);
+}
+.tl-fila[data-cambiado] .tl-def { opacity: 1; }
+
+/* El volver de cada fila: se ve solo si la fila cambió. */
+.tl-volver {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--rad-dur-fast) var(--rad-ease-in), background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.tl-fila[data-cambiado] .tl-volver {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity var(--rad-dur-base) var(--rad-ease-out), background-color var(--rad-dur-fast) var(--rad-ease-out), color var(--rad-dur-fast) var(--rad-ease-out);
+}
+
+/* El botón de la familia: el nombre se ve en su letra. */
+.tl-fuente {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--rad-space-2);
+  min-width: 0;
+  height: 30px;
+  padding-inline: var(--rad-space-3) var(--rad-space-2);
+  border-radius: var(--rad-radius-m);
+  background: var(--rad-tint-hover);
+  background-color: transparent;
+  box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line-strong);
+  cursor: pointer;
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out), box-shadow var(--rad-dur-fast) var(--rad-ease-out);
+}
+.tl-fuente:hover, .tl-fuente[aria-expanded='true'] { background-color: var(--rad-tint-hover); }
+.tl-fuente:focus-visible { box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line-strong), 0 0 0 2px var(--rad-focus); }
+.tl-fuente-nombre {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.tl-fuente-chevron { display: grid; color: var(--rad-text-3); transition: transform var(--rad-dur-base) var(--rad-ease-out); }
+.tl-fuente[aria-expanded='true'] .tl-fuente-chevron { transform: rotate(180deg); }
+
+/* Menos, el valor y más. */
+.tl-paso {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  justify-self: start;
+  width: 132px;
+  border-radius: var(--rad-radius-m);
+  box-shadow: inset 0 0 0 var(--rad-line-width) var(--rad-line);
+}
+.tl-valor {
+  text-align: center;
+  font-family: var(--tl-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--rad-text-1);
+  user-select: text;
+}
+.tl-paso .rad-iconbutton { width: 30px; height: 28px; }
+
+.tl-pie {
+  display: flex;
+  gap: var(--rad-space-2);
+  padding: var(--rad-space-3) var(--rad-space-4) var(--rad-space-4);
+}
+.tl-pie .rad-button { font-family: var(--tl-ui); }
+.tl-comparar { flex: 1; }
+.tl-comparar[data-apretado] { background-color: var(--rad-tint-press); }
+
+/* Plegado: una pastilla en el mismo rincón. */
+/* Sin `all: unset`: sin capa, le borraría la animación de entrada del núcleo. */
+.tl-pastilla {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  outline: none;
+  box-sizing: border-box;
+  position: fixed;
+  right: var(--rad-space-4);
+  bottom: calc(var(--rad-statusbar-height) + var(--rad-space-3));
+  display: flex;
+  align-items: center;
+  gap: var(--rad-space-2);
+  height: 34px;
+  padding-inline: var(--rad-space-3) var(--rad-space-4);
+  font-family: var(--tl-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rad-text-1);
+  background-color: rgb(from var(--skin-float-solid, var(--rad-surface-3)) r g b / 1);
+  box-shadow: var(--rad-shadow-2);
+  border-radius: var(--rad-radius-pill);
+  cursor: pointer;
+  transition: box-shadow var(--rad-dur-fast) var(--rad-ease-out);
+  --rad-a-in: rad-pop-in var(--rad-dur-base) var(--rad-ease-out) both;
+  --rad-a-out: rad-pop-out var(--rad-dur-fast) var(--rad-ease-in) both;
+  --rad-a-dy: var(--rad-space-2);
+}
+.tl-pastilla:focus-visible { box-shadow: var(--rad-shadow-2), 0 0 0 2px var(--rad-focus); }
+
+/* La lista de familias. */
+.tl-lista-caja {
+  width: 300px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: var(--rad-space-2);
+  padding: var(--rad-space-3);
+  box-sizing: border-box;
+  overflow: hidden;
+  --rad-a-dy: 0px;
+}
+.tl-buscar { font-family: var(--tl-ui); }
+.tl-solo-mono { font-size: 12px; color: var(--rad-text-2); padding-inline: var(--rad-space-1); }
+.tl-lista {
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  margin-inline: calc(var(--rad-space-1) * -1);
+  --rad-a-scroll-inset: var(--rad-space-2);
+}
+.tl-item {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: baseline;
+  gap: var(--rad-space-2);
+  min-height: 32px;
+  padding: var(--rad-space-1) var(--rad-space-3);
+  border-radius: var(--rad-radius-s);
+  cursor: pointer;
+  /* lo que no se ve no se pinta: así no se cargan 300 fuentes de una */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 32px;
+  transition: background-color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.tl-item[data-activo] { background-color: var(--rad-tint-hover); }
+.tl-item[aria-selected='true'] .tl-item-nombre { color: var(--rad-text-1); }
+.tl-item-nombre {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  line-height: 24px;
+  color: var(--rad-text-2);
+  transition: color var(--rad-dur-fast) var(--rad-ease-out);
+}
+.tl-item[data-activo] .tl-item-nombre { color: var(--rad-text-1); }
+.tl-item-nota { font-size: 11px; color: var(--rad-text-3); }
+.tl-item[aria-selected='true']::after {
+  content: '';
+  align-self: center;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rad-text-1);
+}
+.tl-vacio { padding: var(--rad-space-4) var(--rad-space-3); color: var(--rad-text-3); }
