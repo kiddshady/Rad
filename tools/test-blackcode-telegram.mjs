@@ -92,6 +92,11 @@ const enviadosDe = (falso, metodo) => falso.enviados.filter((x) => x.metodo === 
   ok('comprobar: un token malo dice que Telegram lo rechazó', /rejected/.test(error), error);
   ok('comprobar: el token no aparece en el error', !error.includes('AAotro'), error);
   ok('esToken: la forma de un token', telegram.esToken(falso.TOKEN) && !telegram.esToken('hola') && !telegram.esToken('123:abc') && !telegram.esToken(`${falso.TOKEN} x`));
+  // La nota del turno: markdown común (Zac escribía la negrita como en Telegram, con un asterisco, y salía cursiva)
+  const nota = telegram.TELEGRAM_NOTE;
+  ok('nota: pide markdown común, con la negrita de dos asteriscos', /ordinary Markdown/.test(nota) && nota.includes('**double asterisks**') && /do not use Telegram’s own \*single-asterisk\* bold/.test(nota), nota);
+  ok('nota: dice que las imágenes de run_code también llegan', /generate_image/.test(nota) && /run_code/.test(nota));
+  ok('nota: …y que un asterisco solo es cursiva, como lo convierte el formato', formato.aHtml('*x*') === '<i>x</i>' && formato.aHtml('**x**') === '<b>x</b>');
 }
 
 // Sin dueño: el que escribe es un candidato, y se le dice cómo vincular (una vez por minuto).

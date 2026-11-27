@@ -50,7 +50,10 @@ const COMANDOS = [
   { command: 'help', description: 'What this bot does' },
 ];
 // Lo que se le dice al agente en un turno que vino de Telegram.
-const TELEGRAM_NOTE = '[Telegram] The user is writing to you from Telegram on their phone, away from this PC’s screen. Keep replies compact. Telegram shows bold, italic, code, code blocks and links; headings come out as bold lines and tables as plain fixed-width text, so prefer short lists. The images you generate are sent to them; other files you make stay on this PC, so say where you left them.';
+// (1.21.1: Zac escribía la negrita como en Telegram, `*así*`, y en markdown
+// común un asterisco solo es cursiva: le salía todo en cursiva. La nota le
+// dice que escriba markdown común, que la conversión la hace BlackCode.)
+const TELEGRAM_NOTE = '[Telegram] The user is writing to you from Telegram on their phone, away from this PC’s screen. Keep replies compact. Write ordinary Markdown, exactly as you would in this app: BlackCode converts it for Telegram. So bold is **double asterisks** and italic is *single asterisks* or _underscores_; do not use Telegram’s own *single-asterisk* bold. Telegram shows bold, italic, code, code blocks and links; headings come out as bold lines and tables as plain fixed-width text, so prefer short lists. The images you make with generate_image and the images (charts, molecules, plots) that run_code saves are sent to them as photos; other files you make stay on this PC, so say where you left them.';
 const TELEGRAM_VOICE_NOTE = '[Telegram voice] The user sent this as a voice message on Telegram (transcribed by Whisper, so it may have small mistakes), and your final reply will be sent back to them as a voice message read by a text-to-speech voice. Answer in the language the user spoke, in one to three short plain sentences, the way you would say it out loud: no markdown, no lists, no code, no URLs, no emoji. If you ran tools, say only what matters about the result.';
 const AYUDA = 'You are talking to <b>%AGENTE%</b> in BlackCode, on your PC.\n\nWrite, or send a photo, a text file or a voice message. Everything goes to the same chat until you send /new.\n\n/new starts a new chat\n/stop stops the answer in progress';
 

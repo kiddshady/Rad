@@ -1,5 +1,16 @@
 # Changelog
 
+## BlackCode 1.21.1 (2026-11-27)
+
+**En Telegram, la negrita de un agente salía en cursiva.** Fran lo vio
+probando el puente con su bot: Zac escribía la negrita como se escribe en
+Telegram (`*así*`), y en markdown común un asterisco solo es cursiva, que es
+lo que BlackCode convierte. La nota que acompaña a un turno de Telegram ahora
+le pide markdown común, con la negrita de dos asteriscos, y le aclara que las
+imágenes de `run_code` (gráficos, moléculas) también le llegan al celu: Zac
+no estaba seguro. El test de Telegram lo comprueba (y falla con la nota de
+antes).
+
 ## BlackCode 1.21.0 (2026-11-27)
 
 **Telegram: hablarle a un agente desde Telegram, con un bot propio.** Fran lo
