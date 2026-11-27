@@ -274,6 +274,15 @@ if (marker?.pass === 1) {
     if (e.habla.activa !== true || e.habla.python !== 'C:\\env\\Scripts\\python.exe' || !e.habla.muestra.endsWith('voice-sample.wav') || !e.habla.modelo.includes('1.7B')) fail('habla: al reabrir la app la respuesta hablada no volvió como se dejó: ' + JSON.stringify(e.habla));
     data.voz = 'la escucha quedó prendida y se conectó sola al abrir, con su llave; la respuesta hablada volvió como se dejó';
   }
+  // Telegram vuelve con la app: quedó prendido y vinculado, así que se conectó solo con el token que se guardó cifrado.
+  {
+    await until(async () => (await window.rad.invoke('telegram:estado')).conexion === 'connected', 6000);
+    const e = await window.rad.invoke('telegram:estado');
+    const s = await window.rad.invoke('telegram:simular', {});
+    if (e.activo !== true || e.hayToken !== true || e.conexion !== 'connected' || e.dueno?.id !== s.dueno || e.bot?.usuario !== s.bot || e.actua !== false) fail('telegram: al reabrir la app el bot no volvió prendido, vinculado y conectado: ' + JSON.stringify(e).slice(0, 300));
+    if (JSON.stringify(e).includes(s.token.split(':')[1])) fail('telegram: al reabrir, el token llegó a la interfaz');
+    data.telegram2 = 'el bot volvió prendido, vinculado y conectado con su token cifrado';
+  }
   data.persistencia = `3 agentes (uno de Venice), el chat con 4 mensajes (la frenada con ${marker.frenado} caracteres), llaves: Anthropic ${llave.anthropic?.estado}, Venice ${llave.venice?.estado}`;
   window.rad.store.write('smoke', { pass: 2 });
   return { failures, data };
@@ -4890,7 +4899,7 @@ else {
       if (tabs.map((t) => t.textContent.trim()).join() !== 'General,Providers,Tools,Images,Integrations,Voice,About' || tabs.some((t) => !t.querySelector('svg') || t.getAttribute('role') !== 'tab')) fail('ajustes: las pestañas son «' + tabs.map((t) => t.textContent.trim()).join() + '»');
       // cada tarjeta, en su pestaña
       const donde = JSON.stringify(Object.fromEntries(paneles().map((p) => [p.dataset.tab, [...p.querySelectorAll('.dm-ajustes-pila > *')].map((t) => t.dataset.tarjeta ?? t.dataset.proveedor).join(' ')])));
-      const va = JSON.stringify({ general: 'nombre carpeta titulos fondo', providers: 'anthropic venice elevenlabs', tools: 'tools busqueda subagentes', images: 'imagenes', integrations: 'mcp movil', voice: 'voz', about: 'acerca' });
+      const va = JSON.stringify({ general: 'nombre carpeta titulos fondo', providers: 'anthropic venice elevenlabs', tools: 'tools busqueda subagentes', images: 'imagenes', integrations: 'mcp movil telegram', voice: 'voz', about: 'acerca' });
       if (donde !== va) fail('ajustes: las tarjetas quedaron repartidas así: ' + donde);
       await go('ajustes', 'general');
       await asentar();
@@ -5794,6 +5803,257 @@ await go('ajustes', 'about');
   }
 }
 // </notas-sel>
+
+// <telegram>
+// Telegram: hablarle a un agente desde Telegram, con un bot propio. El proceso
+// principal lee los mensajes del bot (acá, un Telegram de mentira que el guion
+// maneja por `telegram:simular`), deja pasar solo los de la cuenta vinculada
+// y la interfaz los manda al chat de Telegram del agente elegido (en Channels),
+// sin sacar al usuario de donde está; la respuesta vuelve en HTML. Viene
+// apagado, el token se guarda cifrado y no vuelve a la interfaz, lo que pide
+// permiso llega con botones, /new abre otro chat, y un audio pasa por Whisper
+// y se contesta con una nota de voz.
+{
+  const datosT = await import('/datos.js');
+  const sim = (que = {}) => window.rad.invoke('telegram:simular', que);
+  const estadoT = () => window.rad.invoke('telegram:estado');
+  const enviados = async (metodo) => (await sim({})).enviados.filter((x) => x.metodo === metodo);
+  const cuantos = async (metodo) => (await enviados(metodo)).length;
+  const agenteT = datosT.agenteActual();
+  const chatsT = () => datosT.chatsDe(agenteT.id).filter((c) => c.canal === 'telegram');
+  const quietoT = async (chatId) => { await sleep(150); await until(() => !datosT.respondiendo(chatId), 20000); await settle(); };
+  const base0 = await sim({});
+  const TOKEN = base0.token;
+  const secreto = TOKEN.split(':')[1];
+
+  // De fábrica: apagado, sin token, sin preguntarle nada a Telegram.
+  {
+    const e = await estadoT();
+    if (e.activo !== false || e.hayToken !== false || e.dueno !== null || e.actua !== false || e.conVoz !== true || e.conexion !== 'off') fail('telegram: no viene apagado de fábrica: ' + JSON.stringify(e).slice(0, 300));
+    if ('token' in e) fail('telegram: el estado que llega a la interfaz trae el token');
+    if (await window.rad.store.read('_telegram').then(() => true, () => false)) fail('telegram: la interfaz puede leer el documento de Telegram (ahí va el token)');
+    if (base0.consultas !== 0) fail('telegram: apagado, igual le preguntó a Telegram por mensajes');
+  }
+  await go('ajustes', 'integrations');
+  const tarjetaT = view('ajustes').querySelector('[data-tarjeta="telegram"]');
+  const campoT = (c) => tarjetaT.querySelector('[data-campo="' + c + '"]');
+  const errorT = () => { const f = campoT('telegram-token').closest('.rad-field'); return f.hasAttribute('data-invalid') ? f.textContent : ''; };
+  const diceT = (cual) => shown(tarjetaT.querySelector('[data-estado="' + cual + '"] .rad-swap'));
+  const botonT = (accion) => tarjetaT.querySelector('[data-accion="' + accion + '"]');
+  if (!tarjetaT) fail('telegram: no está la tarjeta Telegram en Settings › Integrations');
+  tarjetaT.scrollIntoView({ block: 'center' });
+  await settle();
+  if (campoT('telegram-activa').checked || campoT('telegram-actua').checked || !campoT('telegram-voz').checked || !diceT('telegram').startsWith('Off')) fail('telegram: la tarjeta no lo muestra apagado: «' + diceT('telegram') + '»');
+  if (campoT('telegram-token').type !== 'password' || !diceT('telegram-token').startsWith('No token saved') || !botonT('telegram-quitar-token').disabled) fail('telegram: el token no figura como sin guardar, o su campo no es de contraseña');
+  if (!botonT('telegram-vincular').disabled || !botonT('telegram-desvincular').disabled) fail('telegram: sin nadie que vincular, los botones de la cuenta están prendidos');
+  enIngles('en la tarjeta Telegram');
+
+  // El token: uno mal formado se rechaza sin preguntar; uno que Telegram no conoce, también; el bueno se guarda.
+  type(campoT('telegram-token'), 'hola');
+  botonT('telegram-guardar-token').click();
+  await until(() => errorT(), 2000);
+  if (!errorT().includes('does not look like a bot token') || (await estadoT()).hayToken) fail('telegram: un token mal formado no dio su error, o se guardó: «' + errorT() + '»');
+  type(campoT('telegram-token'), '7000001:AAotro-token-que-no-sirve-para-nada-000');
+  botonT('telegram-guardar-token').click();
+  await until(() => errorT().includes('rejected'), 3000);
+  if (!errorT().includes('Telegram rejected that token') || (await estadoT()).hayToken) fail('telegram: un token que Telegram rechaza no dio su error, o se guardó: «' + errorT() + '»');
+  type(campoT('telegram-token'), TOKEN);
+  botonT('telegram-guardar-token').click();
+  await until(() => tarjetaT.dataset.token === 'si', 3000);
+  await settle();
+  if (campoT('telegram-token').value !== '' || errorT() || !diceT('telegram-token').includes('@zac_smoke_bot') || botonT('telegram-quitar-token').disabled) fail('telegram: al guardar el token el campo no quedó vacío, o no dice de qué bot es: «' + diceT('telegram-token') + '»');
+  if (JSON.stringify(await estadoT()).includes(secreto) || document.body.innerHTML.includes(secreto)) fail('telegram: el token volvió a la interfaz');
+  if ((await sim({})).consultas !== 0) fail('telegram: con el bot apagado, guardar el token ya se puso a leer mensajes');
+  // El agente: el que está en pantalla.
+  campoT('telegram-agente').click();
+  await until(() => menus().length === 1, 2000);
+  await sleep(dur('base') + 80);
+  await pick(agenteT.nombre);
+  await sleep(150);
+
+  // Se prende: se conecta, y pide que se vincule una cuenta.
+  campoT('telegram-activa').click();
+  await until(() => tarjetaT.dataset.conexion === 'connected', 4000);
+  await settle();
+  if (!diceT('telegram').includes('Connected as @zac_smoke_bot. Link your account below.')) fail('telegram: al prenderlo no dice que conectó y que falta vincular: «' + diceT('telegram') + '»');
+  if ((await estadoT()).agente !== agenteT.id) fail('telegram: no quedó guardado el agente elegido');
+  if (!diceT('telegram-dueno').startsWith('Not linked. Send any message to @zac_smoke_bot')) fail('telegram: sin vincular no dice cómo: «' + diceT('telegram-dueno') + '»');
+  if (!(await enviados('setMyCommands')).length) fail('telegram: no se puso el menú de comandos del bot');
+
+  // Alguien escribe antes de vincular: no llega a ningún chat, y se le dice cómo vincular.
+  const chatAntesT = datosT.chatActual()?.id;
+  await sim({ que: 'mensaje', texto: 'hola' });
+  await until(() => tarjetaT.dataset.dueno === 'candidato', 4000);
+  await settle();
+  if (!diceT('telegram-dueno').startsWith('Fran Smoke (@fran_smoke) wrote to @zac_smoke_bot') || botonT('telegram-vincular').disabled) fail('telegram: quien escribió no aparece para vincularlo: «' + diceT('telegram-dueno') + '»');
+  if (chatsT().length || !(await enviados('sendMessage')).some((x) => /Settings › Integrations › Telegram/.test(x.params.text))) fail('telegram: antes de vincular, lo escrito llegó a un chat o no se le dijo cómo vincular');
+  botonT('telegram-vincular').click();
+  await until(() => tarjetaT.dataset.dueno === 'si', 3000);
+  await settle();
+  if (!diceT('telegram-dueno').startsWith('Linked to Fran Smoke (@fran_smoke)') || botonT('telegram-desvincular').disabled || !botonT('telegram-vincular').disabled) fail('telegram: al vincular no dice con quién: «' + diceT('telegram-dueno') + '»');
+  if ((await estadoT()).dueno?.id !== base0.dueno) fail('telegram: no quedó vinculada la cuenta que escribió');
+  if (!await until(async () => (await enviados('sendMessage')).some((x) => x.params.text.startsWith('Linked.') && x.params.text.includes(agenteT.nombre)), 3000)) fail('telegram: al vincular no se le avisó en Telegram con quién habla');
+
+  // Un extraño, ya vinculado: ni chat ni respuesta.
+  await sim({ que: 'limpiar' });
+  await sim({ que: 'mensaje', texto: 'soy otro', de: 'otro' });
+  await sleep(600);
+  if (chatsT().length || (await cuantos('sendMessage'))) fail('telegram: un extraño recibió respuesta o llegó a un chat');
+
+  // El dueño escribe: va al chat de Telegram del agente, sin sacar al usuario de Settings, y la respuesta vuelve.
+  await sim({ que: 'mensaje', texto: 'Hello from Telegram' });
+  await until(() => chatsT().length === 1, 5000);
+  const chatT = chatsT()[0];
+  if (!chatT) fail('telegram: el mensaje del dueño no abrió un chat de Telegram');
+  else {
+    await quietoT(chatT.id);
+    await until(async () => (await cuantos('sendMessage')) >= 1, 4000);
+    const hilo = (await datosT.hilo(chatT.id)).get().mensajes;
+    const mio = hilo.find((m) => m.rol === 'user');
+    if (!mio || mio.texto !== 'Hello from Telegram' || mio.canal !== 'telegram' || mio.voz) fail('telegram: el mensaje no quedó en el chat como llegado de Telegram: ' + JSON.stringify(mio));
+    const suyo = hilo.find((m) => m.rol === 'assistant');
+    const fue = (await enviados('sendMessage')).map((x) => x.params);
+    if (!suyo || suyo.estado !== 'ok' || !fue.length || fue.some((p) => p.chat_id !== base0.dueno || p.parse_mode !== 'HTML')) fail('telegram: la respuesta no volvió a Telegram en HTML: ' + JSON.stringify(fue).slice(0, 300));
+    const todo = fue.map((p) => p.text).join('\n');
+    // (la respuesta de mentira trae negrita, un bloque de código y una tabla)
+    if (!todo.includes('Hello from Telegram') || !todo.includes('<b>not</b>') || !todo.includes('<pre><code class="language-js">') || todo.includes('**') || todo.includes('```')) fail('telegram: la respuesta no se pasó bien al HTML de Telegram: ' + todo.slice(0, 300));
+    if (!(await enviados('sendChatAction')).some((x) => x.params.action === 'typing')) fail('telegram: mientras contestaba no se mostró «escribiendo…»');
+    // el agente sabe que lo leen en Telegram (las instrucciones llevan la nota)
+    const nInstr = Number(/- instructions: (\d+) characters/.exec(suyo?.texto ?? '')?.[1]);
+    if (!(nInstr > (agenteT.instrucciones?.length ?? 0) + 300)) fail('telegram: el turno no le dijo al agente que viene de Telegram (instrucciones: ' + nInstr + ' caracteres)');
+    if (datosT.chatActual()?.id !== chatAntesT || !ajustesAbierto()) fail('telegram: un mensaje de Telegram sacó al usuario de donde estaba');
+  }
+  await go('chat');
+  // En la lista: en Channels, con su marca; y el mensaje dice de dónde vino.
+  {
+    const filaT = rows().find((r) => r.closest('[data-grupo="canales"]') && shown(r.querySelector('.dm-fila-fecha')).startsWith('Telegram · '));
+    if (!filaT) fail('telegram: el chat no aparece en Channels marcado como de Telegram');
+    // (se abre por datos: si el grupo quedó plegado de antes, la fila es inert)
+    datosT.elegirChat(chatT?.id);
+    await until(() => msgs().length >= 2, 3000);
+    await settle();
+    const meta = [...chatView.querySelectorAll('.dm-msg-voz')].map((n) => n.textContent);
+    if (!meta.includes('Sent from Telegram') || !chatView.querySelector('.dm-msg-voz svg')) fail('telegram: el mensaje no dice que llegó de Telegram: ' + JSON.stringify(meta));
+    // un chat de Telegram no se fija (ya tiene su grupo)
+    datosT.fijarChat(chatT?.id, true);
+    if (datosT.chat(chatT?.id)?.fijado) fail('telegram: un chat de Telegram se pudo fijar');
+  }
+
+  // Lo que pide permiso llega con botones; «Allow» desde Telegram lo deja correr, y la tarjeta se cierra.
+  const pideT = (archivo) => 'TOOLS: [{"name":"fs_write","args":{"path":"' + archivo + '","content":"from telegram\\n"}}]';
+  await go('ajustes', 'integrations');
+  await sim({ que: 'limpiar' });
+  await sim({ que: 'mensaje', texto: pideT('tg-allow.txt') });
+  const tarjetaTg = async () => (await enviados('sendMessage')).find((x) => x.params.reply_markup?.inline_keyboard);
+  await until(async () => Boolean(await tarjetaTg()), 6000);
+  {
+    const t = await tarjetaTg();
+    const teclas = t?.params.reply_markup.inline_keyboard.flat() ?? [];
+    if (!t || !t.params.text.includes(agenteT.nombre + ' needs your permission') || !t.params.text.includes('tg-allow.txt') || teclas.map((b) => b.text).join() !== 'Allow,Always in this chat,Deny') fail('telegram: lo que pide permiso no llegó con sus botones: ' + JSON.stringify(t?.params).slice(0, 300));
+    if (!datosT.confirmacion(chatT?.id)) fail('telegram: el turno no quedó esperando permiso');
+    const allow = teclas.find((b) => b.text === 'Allow')?.callback_data;
+    await sim({ que: 'boton', boton: allow, mensaje: t?.id });
+    await quietoT(chatT?.id);
+    const hilo = (await datosT.hilo(chatT?.id)).get().mensajes;
+    const fila = hilo.filter((m) => m.rol === 'tool').at(-1);
+    if (fila?.estado !== 'ok' || datosT.confirmacion(chatT?.id)) fail('telegram: «Allow» desde Telegram no dejó correr la tool: ' + JSON.stringify(fila));
+    const ed = (await enviados('editMessageText')).find((x) => x.params.message_id === t?.id);
+    if (!ed || !ed.params.text.endsWith('<i>Allowed.</i>')) fail('telegram: la tarjeta no se cerró diciendo qué se eligió: ' + JSON.stringify(ed?.params));
+    // …y después de la tool, la respuesta llega (lo que escribió el agente en el turno)
+    if (!await until(async () => (await enviados('sendMessage')).some((x) => !x.params.reply_markup && x.params.text.includes('Tool run')), 4000)) fail('telegram: después de permitir la tool, la respuesta del turno no llegó a Telegram');
+    // el mismo botón, otra vez: ya está contestado
+    await sim({ que: 'boton', boton: allow, mensaje: t?.id });
+    if (!await until(async () => (await enviados('answerCallbackQuery')).some((x) => x.params.text === 'This was already answered.'), 3000)) fail('telegram: un botón viejo no avisó que ya estaba contestado');
+  }
+  // …y si se contesta en la PC, los botones del celu se van.
+  await sim({ que: 'limpiar' });
+  await sim({ que: 'mensaje', texto: pideT('tg-pc.txt') });
+  await until(async () => Boolean(await tarjetaTg()), 6000);
+  {
+    const t = await tarjetaTg();
+    datosT.confirmar(chatT?.id, false);
+    await quietoT(chatT?.id);
+    await until(async () => (await enviados('editMessageText')).some((x) => x.params.message_id === t?.id), 3000);
+    const ed = (await enviados('editMessageText')).find((x) => x.params.message_id === t?.id);
+    if (!ed || !ed.params.text.endsWith('<i>Answered on the PC.</i>')) fail('telegram: contestada en la PC, la tarjeta del celu no se cerró: ' + JSON.stringify(ed?.params));
+    const fila = (await datosT.hilo(chatT?.id)).get().mensajes.filter((m) => m.rol === 'tool').at(-1);
+    if (fila?.estado === 'ok') fail('telegram: denegada en la PC, la tool corrió igual');
+  }
+
+  // /new arranca otro chat; lo que sigue va ahí.
+  await sim({ que: 'limpiar' });
+  await sim({ que: 'mensaje', texto: '/new' });
+  await until(() => chatsT().length === 2, 4000);
+  if (chatsT().length !== 2 || !(await until(async () => (await enviados('sendMessage')).some((x) => x.params.text === 'New chat with ' + agenteT.nombre + '.'), 3000))) fail('telegram: /new no abrió otro chat, o no lo dijo');
+  const chatT2 = chatsT().find((c) => c.id !== chatT?.id);
+  // /stop sin nada corriendo
+  await sim({ que: 'mensaje', texto: '/stop' });
+  if (!await until(async () => (await enviados('sendMessage')).some((x) => x.params.text === 'Nothing is running.'), 3000)) fail('telegram: /stop sin nada corriendo no lo dijo');
+
+  // Una foto: llega como imagen adjunta.
+  await sim({ que: 'limpiar' });
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  await sim({ que: 'foto', datos: png, ruta: 'photos/file_9.png', texto: 'what is this?' });
+  await until(async () => (await datosT.hilo(chatT2?.id)).get().mensajes.some((m) => m.rol === 'user'), 5000);
+  await quietoT(chatT2?.id);
+  {
+    const mio = (await datosT.hilo(chatT2?.id)).get().mensajes.find((m) => m.rol === 'user');
+    if (mio?.texto !== 'what is this?' || mio.imagenes?.length !== 1 || !mio.imagenes[0].startsWith('data:image/png;base64,')) fail('telegram: la foto no llegó como imagen adjunta: ' + JSON.stringify(mio).slice(0, 200));
+  }
+
+  // Un audio: pasa por Whisper (de mentira: «oye» lo que se le deja dicho) y se contesta con una nota de voz.
+  await sim({ que: 'limpiar' });
+  await window.rad.invoke('voz:simular', { que: 'dejar', texto: 'what is on my calendar today' });
+  await sim({ que: 'audio' });
+  await until(async () => (await datosT.hilo(chatT2?.id)).get().mensajes.filter((m) => m.rol === 'user').length === 2, 8000);
+  await quietoT(chatT2?.id);
+  await until(async () => (await cuantos('sendVoice')) === 1, 8000);
+  {
+    const mio = (await datosT.hilo(chatT2?.id)).get().mensajes.filter((m) => m.rol === 'user').at(-1);
+    if (mio?.texto !== 'what is on my calendar today' || mio.audio !== true || mio.canal !== 'telegram') fail('telegram: el audio no llegó transcripto y marcado como audio: ' + JSON.stringify(mio).slice(0, 200));
+    const v = (await enviados('sendVoice')).at(-1);
+    if (!v || v.archivo?.cabeza !== 'OggS' || v.archivo.tipo !== 'audio/ogg' || !(v.archivo.largo > 200)) fail('telegram: la respuesta a un audio no fue una nota de voz en OGG: ' + JSON.stringify(v));
+    if (!(await enviados('sendChatAction')).some((x) => x.params.action === 'record_voice')) fail('telegram: mientras armaba el audio no mostró «grabando audio…»');
+    // (el agente supo que se iba a oír)
+    const suyo = (await datosT.hilo(chatT2?.id)).get().mensajes.filter((m) => m.rol === 'assistant').at(-1);
+    const n = Number(/- instructions: (\d+) characters/.exec(suyo?.texto ?? '')?.[1]);
+    if (!(n > (agenteT.instrucciones?.length ?? 0) + 300)) fail('telegram: el turno de un audio no llevó la nota de Telegram (' + n + ' caracteres)');
+    const r = await window.rad.invoke('telegram:ultima-respuesta');
+    if (!r?.voz || r.error) fail('telegram: la nota de voz no se pudo armar: ' + JSON.stringify(r));
+  }
+  // con «Answer voice messages with voice» apagado, a un audio se le contesta con texto
+  campoT('telegram-voz').click();
+  await until(async () => (await estadoT()).conVoz === false, 2000);
+  await sim({ que: 'limpiar' });
+  await window.rad.invoke('voz:simular', { que: 'dejar', texto: 'and tomorrow' });
+  await sim({ que: 'audio' });
+  await until(async () => (await datosT.hilo(chatT2?.id)).get().mensajes.filter((m) => m.rol === 'user').length === 3, 8000);
+  await quietoT(chatT2?.id);
+  await until(async () => (await cuantos('sendMessage')) >= 1, 4000);
+  if ((await cuantos('sendVoice')) || !(await enviados('sendMessage')).some((x) => x.params.text.includes('and tomorrow'))) fail('telegram: con la voz apagada, un audio no se contestó con texto');
+  campoT('telegram-voz').click();
+  await until(async () => (await estadoT()).conVoz === true, 2000);
+  // lo que no se puede leer, lo dice
+  await sim({ que: 'limpiar' });
+  await sim({ que: 'sticker' });
+  if (!await until(async () => (await enviados('sendMessage')).some((x) => x.params.text.startsWith('I can read text, photos')), 3000)) fail('telegram: a un sticker no se le dijo qué se puede leer');
+  // Apagarlo deja de leer.
+  campoT('telegram-activa').click();
+  await until(() => tarjetaT.dataset.conexion === 'off', 3000);
+  await settle();
+  if (!diceT('telegram').startsWith('Off')) fail('telegram: apagado no dice que está apagado: «' + diceT('telegram') + '»');
+  // …y se vuelve a prender, para la pasada 2
+  campoT('telegram-activa').click();
+  await until(() => tarjetaT.dataset.conexion === 'connected', 4000);
+  enIngles('en la tarjeta Telegram, con todo puesto');
+  await go('chat');
+  // (los chats de Telegram se van: la pasada 2 cuenta los chats que vuelven)
+  for (const c of chatsT()) await datosT.borrarChat(c.id);
+  await settle();
+  if (chatsT().length) fail('telegram: los chats de Telegram no se pudieron borrar');
+  data.telegram = 'token cifrado, vincular, extraño sin respuesta, respuesta en HTML, permisos con botones (y en la PC), /new, /stop, foto, audio con nota de voz (y sin), sticker';
+}
+// </telegram>
 
 // <fugas>
 // Nada de una vista oculta ni de una pestaña de Settings que no se ve puede

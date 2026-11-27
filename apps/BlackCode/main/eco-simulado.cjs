@@ -166,7 +166,9 @@ function paraElHumo() {
   });
   function simular({ que = 'estado', texto = '', palabra = 'okay zac', vozMs = 1200, falla = null } = {}) {
     // (sin nadie que atienda, lo «dicho» se pierde: si quedara en la cola, saldría como la transcripción de la frase siguiente)
-    if ((que === 'frase' || que === 'hablar') && !echo.atendido()) { /* nadie escucha */ }
+    // (lo que «oye» Whisper la próxima vez, sin el Echo: un audio de Telegram)
+    if (que === 'dejar') dichos.push(falla ? new Error(String(falla)) : String(texto));
+    else if ((que === 'frase' || que === 'hablar') && !echo.atendido()) { /* nadie escucha */ }
     else if (que === 'frase') { dichos.push(falla ? new Error(String(falla)) : String(texto)); echo.pedir({ palabra }); echo.hablar({ vozMs }); }
     // (en dos pasos: el pedido solo —queda escuchando— y después lo que dice)
     else if (que === 'pedir') echo.pedir({ palabra });

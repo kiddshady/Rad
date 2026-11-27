@@ -70,7 +70,7 @@ const IMAGENES_MAX = 4;
 const ESPERA_MODELOS_MS = 8000;
 
 function limpiar(pedido) {
-  const { id, chat = '', agente = '', proveedor = 'anthropic', modelo, instrucciones, mensajes, tools = [], modo = 'manual', memoria = false, carpeta = '', voz = false } = pedido ?? {};
+  const { id, chat = '', agente = '', proveedor = 'anthropic', modelo, instrucciones, mensajes, tools = [], modo = 'manual', memoria = false, carpeta = '', voz = false, telegram = '' } = pedido ?? {};
   if (typeof id !== 'string' || !id) throw new Error('[blackcode] el pedido no trae id');
   if (!RESPONDER[proveedor]) throw new Error(`[blackcode] proveedor desconocido: ${JSON.stringify(proveedor)}`);
   if (typeof modelo !== 'string' || !modelo) throw new Error('[blackcode] el pedido no trae modelo');
@@ -125,6 +125,8 @@ function limpiar(pedido) {
     carpeta: typeof carpeta === 'string' ? carpeta : '',
     // ¿lo último se dijo por el micrófono? (si además se contesta en voz alta, el agente lo sabe)
     voz: voz === true,
+    // ¿vino de Telegram? 'texto', o 'voz' si era un audio y se contesta con otro
+    telegram: telegram === 'texto' || telegram === 'voz' ? telegram : '',
   };
 }
 
@@ -310,6 +312,12 @@ function wire(rad, { llave }) {
   const ecoDeMentira = taller ? require('./eco-simulado.cjs').paraElHumo() : null;
   // (la respuesta hablada puede ir con ElevenLabs: su llave es la de Settings › Providers)
   const voz = require('./voz.cjs').wire(rad, { taller, cifrar, descifrar, agentes: losAgentes, simulada: ecoDeMentira, llaveElevenlabs: () => llave.leer(rad.store, 'elevenlabs') });
+  // ---------- Telegram ----------
+  // Hablarle a un agente desde Telegram, con un bot propio: este proceso lee
+  // los mensajes del bot y le pasa a la interfaz los del dueño, como la voz.
+  // Apagado de fábrica. Ver main/telegram.cjs. En el humo, Telegram es de
+  // mentira (main/telegram-simulado.cjs) y el guion lo maneja por `telegram:simular`.
+  require('./telegram.cjs').wire(rad, { cifrar, descifrar, voz, taller, simulado: taller ? require('./telegram-simulado.cjs').crear() : null });
   if (taller) rad.handle('voz:simular', (que) => ({ ...ecoDeMentira.simular(que && typeof que === 'object' ? que : {}), llaveDeMentira: ecoDeMentira.llave }));
   // generate_image: la llave de Venice (la misma de los agentes de Venice), lo
   // que el usuario eligió en Settings (el modelo y el filtro de contenido
@@ -696,7 +704,10 @@ function wire(rad, { llave }) {
     // Un turno que se dijo y que se va a contestar en voz alta: el agente lo
     // sabe, así contesta para ser oído (corto, sin markdown).
     if (pedido.voz && voz.hablaActiva()) pedido.instrucciones = [pedido.instrucciones, require('./voz.cjs').VOICE_NOTE].filter(Boolean).join('\n\n');
-    const avisar = (tipo, extra = {}) => rad.send('chat:evento', { id: pedido.id, tipo, ...extra });
+    // Uno que vino de Telegram: el agente sabe que lo leen en el celu (y, si
+    // era un audio, que lo que conteste se va a oír).
+    else if (pedido.telegram) pedido.instrucciones = [pedido.instrucciones, pedido.telegram === 'voz' ? require('./telegram.cjs').TELEGRAM_VOICE_NOTE : require('./telegram.cjs').TELEGRAM_NOTE].filter(Boolean).join('\n\n');
+    const avisar =(tipo, extra = {}) => rad.send('chat:evento', { id: pedido.id, tipo, ...extra });
     const control = new AbortController();
     activos.set(pedido.id, control);
 

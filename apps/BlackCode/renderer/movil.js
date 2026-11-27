@@ -60,7 +60,7 @@ const PEDIDOS = {
         conQue: datos.modeloDe(a), grupos: datos.modeloConTools(a.proveedor, a.modelo) ? datos.gruposDe(a) : [],
       })),
       chats: agentes.flatMap((a) => datos.chatsDe(a.id)).sort((x, y) => y.tocado - x.tocado).map((c) => ({
-        id: c.id, agente: c.agente, titulo: c.titulo, fijado: c.fijado === true, canal: c.voz === true, tocado: c.tocado, cuenta: c.cuenta ?? 0, respondiendo: datos.respondiendo(c.id),
+        id: c.id, agente: c.agente, titulo: c.titulo, fijado: c.fijado === true, canal: datos.deCanal(c), tocado: c.tocado, cuenta: c.cuenta ?? 0, respondiendo: datos.respondiendo(c.id),
       })),
     };
   },
@@ -72,7 +72,7 @@ const PEDIDOS = {
     const hasta = Number.isInteger(Number(antes)) && antes !== null && antes !== '' ? Math.max(0, Math.min(todos.length, Number(antes))) : todos.length;
     const desde = Math.max(0, hasta - POR_PAGINA);
     return {
-      chat: { id: c.id, agente: c.agente, agenteNombre: nombreDe(c.agente), titulo: c.titulo, canal: c.voz === true },
+      chat: { id: c.id, agente: c.agente, agenteNombre: nombreDe(c.agente), titulo: c.titulo, canal: datos.deCanal(c) },
       total: todos.length,
       desde,
       mensajes: todos.slice(desde, hasta).map((m) => alCelu(id, m)),

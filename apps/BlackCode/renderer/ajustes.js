@@ -1337,6 +1337,152 @@ function tarjetaMcp() {
 // va del todo y recién ahí entra la nueva. No es un fundido con la vieja
 // tapando porque el modal es de vidrio: su fondo no tapa nada, y dos pestañas
 // a medio ver en el mismo lugar se leen una encima de la otra.
+// Telegram: hablarle a un agente desde Telegram, con un bot propio
+// (main/telegram.cjs). El token lo guarda cifrado el proceso principal y no
+// vuelve a la interfaz; la cuenta que puede usarlo se vincula desde acá, con
+// quien le escribió al bot. Apagado de fábrica.
+function describirTelegram(v) {
+  const bot = v.bot?.usuario ? `@${v.bot.usuario}` : 'the bot';
+  if (!v.activo) return { tono: 'idle', texto: 'Off: the bot does not answer.' };
+  if (!v.hayToken) return { tono: 'warning', texto: 'Paste the bot’s token below to connect it.' };
+  if (v.conexion === 'connected') return { tono: 'success', texto: v.dueno ? `Connected as ${bot}.` : `Connected as ${bot}. Link your account below.` };
+  if (v.conexion === 'error') return { tono: 'danger', texto: v.error || 'The connection failed.' };
+  if (v.error) return { tono: 'warning', texto: `${v.error} Trying again…` };
+  return { tono: 'idle', texto: `Connecting to ${bot}…` };
+}
+const quienEs = (x) => `${x.nombre || 'Someone'}${x.usuario ? ` (@${x.usuario})` : ''}`;
+function tarjetaTelegram() {
+  const activa = h('input', '', { type: 'checkbox', role: 'switch', 'data-campo': 'telegram-activa' });
+  const texto = h('span', 'dm-estado-texto rad-swap');
+  const estado = h('p', 'dm-estado', { role: 'status', 'data-estado': 'telegram' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), texto);
+
+  const textoToken = h('span', 'dm-estado-texto rad-swap');
+  const estadoToken = h('p', 'dm-estado', { role: 'status', 'data-estado': 'telegram-token' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), textoToken);
+  const campo = h('input', 'rad-input', { type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: '123456789:AA…', 'data-campo': 'telegram-token' });
+  const cajaToken = h('label', 'rad-field', {}, h('span', 'rad-field-label', {}, 'Paste the bot’s token'), campo,
+    h('span', 'rad-field-hint', {}, 'In Telegram, talk to @BotFather, send /newbot and follow the steps: it gives you the token. It is checked with Telegram, stored encrypted on this PC and never shown again.'));
+  const guardar = h('button', 'rad-button', { type: 'submit', 'data-variant': 'primary', 'data-accion': 'telegram-guardar-token' }, 'Save');
+  const quitar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'telegram-quitar-token' }, 'Remove token');
+  const form = h('form', 'dm-llave', {}, cajaToken, h('div', 'dm-llave-acciones', {}, quitar, guardar));
+
+  const textoDueno = h('span', 'dm-estado-texto rad-swap');
+  const estadoDueno = h('p', 'dm-estado', { role: 'status', 'data-estado': 'telegram-dueno' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), textoDueno);
+  const soyYo = h('button', 'rad-button', { type: 'button', 'data-variant': 'primary', 'data-accion': 'telegram-vincular' }, 'This is me');
+  const desvincular = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'telegram-desvincular' }, 'Unlink');
+
+  const huecoAgente = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-telegram-rotulo-agente' }, 'Agent'));
+  const pistaAgente = h('span', 'rad-field-hint', {}, 'Who answers. Everything goes to one Telegram chat of that agent, in Channels, until you send /new in Telegram.');
+  huecoAgente.append(pistaAgente);
+  const actua = h('input', '', { type: 'checkbox', role: 'switch', 'data-campo': 'telegram-actua' });
+  const nota = h('p', 'dm-tarjeta-instr rad-swap');
+  const conVoz = h('input', '', { type: 'checkbox', role: 'switch', 'data-campo': 'telegram-voz' });
+
+  const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'telegram' },
+    h('h2', 'dm-tarjeta-nombre', {}, 'Telegram'),
+    h('p', 'dm-tarjeta-instr', {}, 'Talk to an agent from Telegram, through a bot of your own. BlackCode reads the bot’s messages from this PC, with no server and no open port, so the bot answers while BlackCode is running (in the tray is enough). Only the account you link can use it: anyone else gets no answer.'),
+    h('label', 'rad-switch', {}, activa, h('span', 'rad-switch-track'), 'Connect the bot'),
+    estado,
+    estadoToken, form,
+    h('h3', 'dm-subtarjeta-nombre', {}, 'Your account'),
+    h('div', 'dm-voz-whisper', {}, estadoDueno, desvincular, soyYo),
+    huecoAgente,
+    h('label', 'rad-switch', {}, actua, h('span', 'rad-switch-track'), 'Let Telegram act'),
+    nota,
+    h('label', 'rad-switch', {}, conVoz, h('span', 'rad-switch-track'), 'Answer voice messages with voice'),
+    h('p', 'dm-tarjeta-instr', {}, 'A voice message is turned into text with Whisper, and the answer comes back as a voice message with the voice chosen in Voice. Both need ffmpeg in the PATH.'));
+  wireControls(tarjeta);
+
+  let v = null;
+  let selAgente = null;
+  const agenteDe = () => datosApp.agente(v?.agente) ?? datosApp.listaAgentes()[0];
+  const guardarT = async (cambio) => {
+    const r = await window.rad.invoke('telegram:guardar', cambio).catch(() => ({ ok: false, error: 'It could not be saved.' }));
+    if (!r?.ok) toast({ text: r?.error ?? 'It could not be saved.', kind: 'danger' });
+  };
+  const armarAgente = () => {
+    selAgente?.close();
+    selAgente?.el.remove();
+    selAgente = createSelect({
+      options: datosApp.listaAgentes().map((a) => ({ value: a.id, label: a.nombre })),
+      value: agenteDe()?.id ?? '',
+      onChange: (id) => guardarT({ agente: id }),
+    });
+    selAgente.el.setAttribute('aria-labelledby', 'dm-telegram-rotulo-agente');
+    selAgente.el.dataset.campo = 'telegram-agente';
+    huecoAgente.insertBefore(selAgente.el, pistaAgente);
+  };
+  const poner = (nuevo) => {
+    if (nuevo && typeof nuevo === 'object') v = nuevo;
+    if (!v) return;
+    activa.checked = v.activo;
+    actua.checked = v.actua;
+    conVoz.checked = v.conVoz;
+    const d = describirTelegram(v);
+    estado.dataset.tono = d.tono;
+    swapText(texto, d.texto);
+    estadoToken.dataset.tono = v.hayToken ? 'success' : 'idle';
+    swapText(textoToken, !v.cifrado ? 'Windows encryption is not available, so a token cannot be saved.' : v.hayToken ? `A token${v.bot?.usuario ? ` for @${v.bot.usuario}` : ''} is saved and encrypted on this PC.` : 'No token saved.');
+    quitar.disabled = !v.hayToken;
+    // la cuenta: vinculada, alguien que escribió y espera, o nadie todavía
+    const bot = v.bot?.usuario ? `@${v.bot.usuario}` : 'the bot';
+    estadoDueno.dataset.tono = v.dueno ? 'success' : v.candidato ? 'warning' : 'idle';
+    swapText(textoDueno, v.dueno ? `Linked to ${quienEs(v.dueno)}. Only this account can use the bot.`
+      : v.candidato ? `${quienEs(v.candidato)} wrote to ${bot}. If that is you, link it.`
+      : v.hayToken ? `Not linked. Send any message to ${bot} from your Telegram, and it shows up here.` : 'Not linked.');
+    // (los dos botones quedan siempre en su lugar: se apagan, no aparecen de golpe)
+    soyYo.disabled = !v.candidato || Boolean(v.dueno);
+    desvincular.disabled = !v.dueno;
+    swapText(nota, v.actua
+      ? 'What you write runs like a chat in automatic mode: tools run without asking. Scheduling a task, and the MCP servers set to ask, still ask, with buttons in Telegram.'
+      : 'What you write runs like a chat in manual mode: a tool that needs permission sends you a message with Allow and Deny buttons, and waits. You can also answer it on the PC.');
+    if (selAgente && selAgente.value !== (agenteDe()?.id ?? '')) selAgente.value = agenteDe()?.id ?? '';
+    tarjeta.dataset.activa = v.activo ? 'si' : 'no';
+    tarjeta.dataset.conexion = v.conexion ?? 'off';
+    tarjeta.dataset.token = v.hayToken ? 'si' : 'no';
+    tarjeta.dataset.dueno = v.dueno ? 'si' : v.candidato ? 'candidato' : 'no';
+    setBusy(tarjeta, v.activo && v.hayToken && v.conexion === 'connecting' && !v.error);
+  };
+  activa.addEventListener('change', () => {
+    // (al prenderlo queda anotado a qué agente le habla: el que se ve elegido)
+    const sinElegir = activa.checked && !datosApp.agente(v?.agente);
+    guardarT({ activo: activa.checked, ...(sinElegir ? { agente: agenteDe()?.id ?? '' } : {}) });
+  });
+  actua.addEventListener('change', () => guardarT({ actua: actua.checked }));
+  conVoz.addEventListener('change', () => guardarT({ conVoz: conVoz.checked }));
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!campo.value.trim()) { setFieldError(cajaToken, 'Paste the token here.'); campo.focus(); return; }
+    guardar.disabled = true;
+    const r = await window.rad.invoke('telegram:token', campo.value).catch(() => ({ ok: false, error: 'It could not be saved.' }));
+    guardar.disabled = false;
+    if (!r?.ok) { setFieldError(cajaToken, r?.error ?? 'It could not be saved.'); campo.focus(); return; }
+    setFieldError(cajaToken, null);
+    campo.value = '';
+    toast({ text: r.bot?.usuario ? `Token saved: @${r.bot.usuario}` : 'Token saved', kind: 'success' });
+  });
+  campo.addEventListener('input', () => { if (cajaToken.hasAttribute('data-invalid')) setFieldError(cajaToken, null); });
+  quitar.addEventListener('click', async () => {
+    const si = await confirm({ title: 'Remove the bot’s token?', text: 'The bot stops answering, and your account is unlinked. To use it again, paste the token and link your account again.', confirmLabel: 'Remove', danger: true });
+    if (!si) return;
+    await window.rad.invoke('telegram:token', null);
+    toast({ text: 'Token removed' });
+  });
+  soyYo.addEventListener('click', async () => {
+    const r = await window.rad.invoke('telegram:vincular', { id: v?.candidato?.id }).catch(() => ({ ok: false }));
+    toast(r?.ok ? { text: 'Linked. Write to the bot from Telegram.', kind: 'success' } : { text: r?.error ?? 'It could not be linked.', kind: 'warning' });
+  });
+  desvincular.addEventListener('click', async () => {
+    const si = await confirm({ title: 'Unlink your account?', text: 'The bot stops answering you. Send it a message again to link it.', confirmLabel: 'Unlink' });
+    if (!si) return;
+    await window.rad.invoke('telegram:desvincular');
+  });
+  armarAgente();
+  window.rad.on('telegram:evento', poner);
+  window.rad.invoke('telegram:estado').then(poner).catch(() => {});
+  datosApp.on('agentes', () => { armarAgente(); poner(); });
+  return tarjeta;
+}
+
 export const PESTANAS = [
   { id: 'general', nombre: 'General', icono: 'ajustes' },
   { id: 'providers', nombre: 'Providers', icono: 'llave' },
@@ -1363,7 +1509,7 @@ function armar() {
     providers: PROVEEDORES.map((p) => tarjetaLlave(p)),
     tools: [tarjetaTools(), tarjetaBusqueda(), tarjetaSubagentes()],
     images: [tarjetaImagenes()],
-    integrations: [tarjetaMcp(), tarjetaMovil()],
+    integrations: [tarjetaMcp(), tarjetaMovil(), tarjetaTelegram()],
     voice: [laVoz],
     about: [tarjetaAcerca()],
   };

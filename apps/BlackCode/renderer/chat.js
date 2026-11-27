@@ -135,7 +135,7 @@ export function montarChat(el, { router }) {
   const recientes = h('section', 'dm-grupo', { 'data-grupo': 'recientes', 'aria-label': 'Chats' }, rec.rotulo, rec.caja);
   const comunes = rec.lista;
   const delCanal = h('div', 'dm-chats-lista', { role: 'list' });
-  const canalesCabeza = h('button', 'dm-canales-cabeza', { type: 'button', 'aria-expanded': 'true', 'data-accion': 'canales', 'data-rad-tip': 'What you said to the Atom Echo, and the answers' },
+  const canalesCabeza = h('button', 'dm-canales-cabeza', { type: 'button', 'aria-expanded': 'true', 'data-accion': 'canales', 'data-rad-tip': 'What came in from the Atom Echo and Telegram, and the answers' },
     icono('chevron', 'dm-canales-chev'), icono('canal'), h('span', 'dm-canales-nombre', {}, 'Channels'));
   const canalesBorrar = h('button', 'rad-iconbutton dm-canales-borrar', { type: 'button', 'aria-label': 'Delete all channel chats', 'data-rad-tip': 'Delete all', 'data-accion': 'canales-borrar' }, icono('tacho'));
   const canalesCaja = h('div', 'dm-canales-caja', { 'data-abierto': '' }, h('div', 'dm-canales-in', {}, delCanal));
@@ -338,7 +338,7 @@ export function montarChat(el, { router }) {
     const c = datos.chat(id);
     return c && [
       // (un chat de canal no se fija: ya tiene su grupo)
-      ...(c.voz === true ? [] : [{ id: 'fijar', label: c.fijado === true ? 'Unpin' : 'Pin', icon: icono('pin').innerHTML, onSelect: () => datos.fijarChat(c.id, c.fijado !== true) }]),
+      ...(datos.deCanal(c) ? [] : [{ id: 'fijar', label: c.fijado === true ? 'Unpin' : 'Pin', icon: icono('pin').innerHTML, onSelect: () => datos.fijarChat(c.id, c.fijado !== true) }]),
       { id: 'renombrar', label: 'Rename', icon: icono('lapiz').innerHTML, onSelect: () => renombrar(c) },
       { separator: true },
       { id: 'eliminar', label: 'Delete', danger: true, icon: icono('tacho').innerHTML, onSelect: () => eliminar(c) },
@@ -387,7 +387,7 @@ export function montarChat(el, { router }) {
       return p;
     }
     // (un chat de canal lleva debajo cuándo fue: se arman solos, y así se los distingue)
-    const abrir = h('button', 'dm-fila-abrir', { type: 'button' }, h('span', 'dm-fila-textos', {}, h('span', 'dm-fila-titulo rad-swap'), ...(c.voz === true ? [h('span', 'dm-fila-fecha rad-swap')] : [])), h('span', 'dm-fila-punto', { 'aria-hidden': 'true' }, h('i')));
+    const abrir = h('button', 'dm-fila-abrir', { type: 'button' }, h('span', 'dm-fila-textos', {}, h('span', 'dm-fila-titulo rad-swap'), ...(datos.deCanal(c) ? [h('span', 'dm-fila-fecha rad-swap')] : [])), h('span', 'dm-fila-punto', { 'aria-hidden': 'true' }, h('i')));
     const mas = h('button', 'rad-iconbutton dm-fila-mas', { type: 'button', 'aria-label': 'Chat actions', 'data-rad-tip': 'Actions' }, icono('puntos'));
     // La casilla de la selección: solo se ve en ese modo, y la marca el clic
     // en la fila (no es un label: así un clic no la cambia dos veces).
@@ -410,25 +410,26 @@ export function montarChat(el, { router }) {
     if (actual) nodo.setAttribute('aria-current', 'true');
     else nodo.removeAttribute('aria-current');
     nodo.toggleAttribute('data-respondiendo', datos.respondiendo(c.id));
-    nodo.toggleAttribute('data-voz', c.voz === true);
+    nodo.toggleAttribute('data-voz', datos.deCanal(c));
     const fecha = nodo.querySelector('.dm-fila-fecha');
-    if (fecha) swapText(fecha, cuando(c.tocado));
+    // (uno de Telegram dice que lo es: los de voz y los de Telegram comparten el grupo)
+    if (fecha) swapText(fecha, c.canal === 'telegram' ? `Telegram · ${cuando(c.tocado)}` : cuando(c.tocado));
     // (seleccionando, el botón de acciones se esconde: tampoco se llega con Tab)
-    nodo.querySelector('.dm-fila-mas').inert = seleccionando && c.voz !== true;
+    nodo.querySelector('.dm-fila-mas').inert = seleccionando && !datos.deCanal(c);
     const marcado = seleccionando && elegidos.has(c.id);
     nodo.querySelector('.dm-fila-marca > input').checked = marcado;
     nodo.toggleAttribute('data-elegido', marcado);
     // (en la selección, la fila es un botón que se prende y se apaga)
     const abrir = nodo.querySelector('.dm-fila-abrir');
-    if (seleccionando && c.voz !== true) abrir.setAttribute('aria-pressed', String(marcado));
+    if (seleccionando && !datos.deCanal(c)) abrir.setAttribute('aria-pressed', String(marcado));
     else abrir.removeAttribute('aria-pressed');
   };
   // (día y hora del último mensaje, como los escribe el sistema: «25/11 · 15:50»)
   const cuando = (ms) => { const d = new Date(ms); return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}`; };
   const dibujarLista = () => {
     const suyos = datos.chatsDe(datos.agenteActual().id).filter(coincide);
-    const deCanal = suyos.filter((c) => c.voz === true);
-    const losDemas = suyos.filter((c) => c.voz !== true);
+    const deCanal = suyos.filter((c) => datos.deCanal(c));
+    const losDemas = suyos.filter((c) => !datos.deCanal(c));
     const losFijados = losDemas.filter((c) => c.fijado === true);
     const losRecientes = losDemas.filter((c) => c.fijado !== true);
     reconcile(fij.lista, losFijados, { key: (c) => c.id, create: fila, update: ponerFila });
@@ -463,7 +464,7 @@ export function montarChat(el, { router }) {
 
   // ---------- La selección ----------
   /** Los chats que se pueden marcar: los del agente que se ven con la búsqueda, menos los de canal. */
-  const marcables = () => datos.chatsDe(datos.agenteActual().id).filter((c) => c.voz !== true && coincide(c));
+  const marcables = () => datos.chatsDe(datos.agenteActual().id).filter((c) => !datos.deCanal(c) && coincide(c));
   const marcados = () => marcables().filter((c) => elegidos.has(c.id));
   function ponerSeleccion() {
     lado.toggleAttribute('data-seleccion', seleccionando);
@@ -479,7 +480,7 @@ export function montarChat(el, { router }) {
     todos.disabled = total === 0;
     swapText(cuentaSel, n ? `${n} selected` : '');
     borrarSel.disabled = n === 0;
-    botonSeleccionar.disabled = !seleccionando && !datos.chatsDe(datos.agenteActual().id).some((c) => c.voz !== true);
+    botonSeleccionar.disabled = !seleccionando && !datos.chatsDe(datos.agenteActual().id).some((c) => !datos.deCanal(c));
   }
   const repintarFilas = () => {
     for (const nodo of lista.querySelectorAll('.dm-fila')) {
@@ -518,7 +519,7 @@ export function montarChat(el, { router }) {
     const a = datos.agenteActual();
     const ids = marcados().map((c) => c.id);
     if (!ids.length) return;
-    const sonTodos = !busqueda && ids.length === datos.chatsDe(a.id).filter((c) => c.voz !== true).length;
+    const sonTodos = !busqueda && ids.length === datos.chatsDe(a.id).filter((c) => !datos.deCanal(c)).length;
     const si = await confirm({
       title: ids.length === 1 ? 'Delete 1 chat?' : `Delete ${ids.length} chats?`,
       text: sonTodos
@@ -556,11 +557,11 @@ export function montarChat(el, { router }) {
   // El tacho del grupo borra todos los chats de canal de este agente (pregunta antes).
   canalesBorrar.addEventListener('click', async () => {
     const a = datos.agenteActual();
-    const suyos = datos.chatsDe(a.id).filter((c) => c.voz === true);
+    const suyos = datos.chatsDe(a.id).filter((c) => datos.deCanal(c));
     if (!suyos.length) return;
     const si = await confirm({
       title: suyos.length === 1 ? 'Delete the channel chat?' : `Delete the ${suyos.length} channel chats?`,
-      text: `What you said to the Atom Echo for ${a.nombre}, and its answers. This can’t be undone.`,
+      text: `What you said to the Atom Echo and wrote on Telegram to ${a.nombre}, and its answers. This can’t be undone.`,
       confirmLabel: 'Delete',
       danger: true,
     });
@@ -602,6 +603,8 @@ export function montarChat(el, { router }) {
     if (m.rol === 'user') {
       const meta = h('div', 'dm-msg-meta');
       if (m.voz) meta.append(h('span', 'dm-msg-voz', {}, icono('canal'), 'Said to the Atom Echo'));
+      // (de Telegram: escrito, o un audio que pasó por Whisper)
+      else if (m.canal === 'telegram') meta.append(h('span', 'dm-msg-voz', {}, icono('avion'), m.audio ? 'Voice message on Telegram' : 'Sent from Telegram'));
       meta.append(h('span', 'dm-msg-hora'));
       nodo.append(meta);
     }
@@ -627,7 +630,7 @@ export function montarChat(el, { router }) {
       if (cuerpo.textContent !== m.texto) cuerpo.textContent = m.texto;
       // (un mensaje de antes de que se guardara la hora, y que tampoco se dijo: sin renglón)
       const hay = ponerHora(nodo.querySelector('.dm-msg-hora'), m.t);
-      nodo.querySelector('.dm-msg-meta').toggleAttribute('data-vacia', !hay && !m.voz);
+      nodo.querySelector('.dm-msg-meta').toggleAttribute('data-vacia', !hay && !m.voz && m.canal !== 'telegram');
       return;
     }
     pintar(cuerpo, m.texto);

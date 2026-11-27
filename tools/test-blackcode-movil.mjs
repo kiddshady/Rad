@@ -305,7 +305,7 @@ ok('main.cjs crea el puente y lo aplica al arrancar', main.includes("require('./
 const app = fs.readFileSync(path.join(ROOT, 'apps', 'BlackCode', 'renderer', 'blackcode.js'), 'utf8');
 ok('la interfaz monta su mitad', app.includes("import { montarMovil } from './movil.js';") && /\nmontarMovil\(\);/.test(app));
 const aj = fs.readFileSync(path.join(ROOT, 'apps', 'BlackCode', 'renderer', 'ajustes.js'), 'utf8');
-ok('la tarjeta Phone está en Integrations', aj.includes('integrations: [tarjetaMcp(), tarjetaMovil()]'));
+ok('la tarjeta Phone está en Integrations', /integrations: \[tarjetaMcp\(\), tarjetaMovil\(\)[,\]]/.test(aj));
 
 fs.rmSync(tmp, { recursive: true, force: true });
 if (failures.length) {

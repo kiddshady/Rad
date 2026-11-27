@@ -1,5 +1,49 @@
 # Changelog
 
+## BlackCode 1.21.0 (2026-11-27)
+
+**Telegram: hablarle a un agente desde Telegram, con un bot propio.** Fran lo
+pidió para hablar con Zac desde el celu, y eligió las cuatro recomendadas:
+solo su cuenta, un chat que sigue hasta /new, los permisos con botones y,
+además del texto, fotos, audios con Whisper y respuesta en audio.
+
+- `main/telegram.cjs`: BlackCode le pregunta a Telegram por los mensajes del
+  bot (getUpdates con espera larga), desde esta PC: sin servidor ni puerto
+  abierto, así que el bot contesta mientras BlackCode está abierta (en la
+  bandeja alcanza). El token se comprueba con Telegram al guardarlo, va
+  cifrado en `_telegram` y no vuelve a la interfaz.
+- **Solo la cuenta vinculada.** Hasta vincular, el bot solo dice cómo
+  hacerlo; quien le escribió aparece en Settings › Integrations › Telegram
+  con «This is me». Ya vinculado, a cualquier otro no le contesta nada, y lo
+  suyo ni llega a la interfaz. Los grupos se ignoran.
+- **Un chat que sigue.** Lo que llega va al chat de Telegram del agente
+  elegido (`canal: 'telegram'`), en el grupo Channels con «Telegram ·» y la
+  fecha; cada mensaje dice «Sent from Telegram» con un avión de papel (ícono
+  nuevo, `avion`). /new arranca otro chat, /stop frena la respuesta, /help.
+  `datos.deCanal(c)` reúne los chats de voz y los de Telegram.
+- **Los permisos, con botones.** Un turno de Telegram va en manual salvo
+  «Let Telegram act» (apagado de fábrica): lo que pide permiso llega como un
+  mensaje con Allow / Always in this chat / Deny, y al tocarlo la tarjeta se
+  cierra diciendo qué se eligió. Si se contesta en la PC, los botones se van.
+- **Fotos, archivos y audios.** Una foto (o una imagen como archivo) entra
+  como adjunto, un archivo de texto como los de la PC (hasta 256 KB). Un
+  audio se pasa a PCM con ffmpeg (`main/ffmpeg.cjs`) y a texto con el mismo
+  Whisper del Atom Echo; la respuesta vuelve como nota de voz (OGG/Opus) con
+  la voz elegida en Settings › Voice, con el texto debajo si entra. Se apaga
+  con «Answer voice messages with voice». `voz.cjs` suma `oir()` y
+  `grabar()`: un turno que se graba no suena por los parlantes.
+- La respuesta va en el HTML de Telegram (`main/telegram-formato.cjs`):
+  negrita, cursiva, código, bloques de código, enlaces; los títulos en
+  negrita y las tablas como texto alineado. Lo largo se parte en varios
+  mensajes, y si Telegram rechaza el HTML va en texto plano. Las imágenes
+  que dejaron `generate_image` y `run_code` se mandan como fotos.
+- El agente sabe que lo leen en Telegram (una nota en las instrucciones), y
+  si era un audio, que lo que conteste se va a oír.
+- Pruebas: `tools/test-blackcode-telegram.mjs` (84, contra el Telegram de
+  mentira de `main/telegram-simulado.cjs`, con ffmpeg de verdad) y una
+  sección del humo con el circuito entero; la pasada 2 comprueba que el bot
+  vuelve prendido, vinculado y conectado.
+
 ## BlackCode 1.20.0 (2026-11-27)
 
 **Whisper queda cargado mientras el Atom Echo está conectado.** Medido en la

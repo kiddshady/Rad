@@ -78,9 +78,28 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
   // La voz con la que contesta: Qwen3-TTS, en otro Python del usuario. El audio
   // llega por tramos y va a la interfaz, que es la que lo hace sonar.
   const scriptHabla = electron.app.isPackaged ? path.join(process.resourcesPath, 'motor', 'habla_motor.py') : path.join(__dirname, '..', 'motor', 'habla_motor.py');
+  // Un turno que se GRABA en vez de sonar (la nota de voz de Telegram): sus
+  // tramos se juntan acá y no van a la interfaz.
+  const grabando = new Map(); // turno → { partes, sr, resolve, reject }
   const paraElHabla = {
-    alAudio: (a) => rad.send('voz:audio', { turno: a.turno, n: a.n, sr: a.sr, pcm: a.pcm.toString('base64') }),
-    alFin: (f) => rad.send('voz:dicho', { turno: f.turno, callado: f.callado === true, error: f.error ?? '' }),
+    alAudio: (a) => {
+      const g = grabando.get(a.turno);
+      if (g) { g.partes.push(Buffer.from(a.pcm)); g.sr = a.sr; return; }
+      rad.send('voz:audio', { turno: a.turno, n: a.n, sr: a.sr, pcm: a.pcm.toString('base64') });
+    },
+    alFin: (f) => {
+      const g = grabando.get(f.turno);
+      if (g) {
+        grabando.delete(f.turno);
+        const pcm = Buffer.concat(g.partes);
+        if (f.error) g.reject(new Error(f.error));
+        else if (f.callado && !pcm.length) g.reject(new Error('the voice was stopped'));
+        else if (!pcm.length) g.reject(new Error('the voice made no sound'));
+        else g.resolve({ pcm, sr: g.sr });
+        return;
+      }
+      rad.send('voz:dicho', { turno: f.turno, callado: f.callado === true, error: f.error ?? '' });
+    },
     alCambiar: () => avisar(),
   };
   const qwen = simulada?.crearHabla ? simulada.crearHabla(paraElHabla) : require('./habla.cjs').crear({
@@ -315,7 +334,18 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
   electron.app.whenReady().then(() => eco.arrancar());
   // Cambió la llave de ElevenLabs: lo que se sabía de la cuenta ya no vale.
   const alCambiarLlave = () => { once.apagar(); cat11 = { estado: 'off', voces: [], modelos: [], error: '' }; traerCatalogo11({ forzar: true }); };
-  return { eco, escucha, habla, vista, alCambiarLlave, hablaActiva: () => config().habla.activa };
+  // Para el puente a Telegram: pasar a texto un audio (PCM de 16 kHz) con el
+  // mismo Whisper del Echo, y grabar una respuesta con la voz elegida.
+  const oir = (pcm) => { const c = config(); return escucha.transcribir(pcm, { idioma: c.idioma === 'auto' ? '' : c.idioma, prompt: pista() }); };
+  const grabar = (texto) => new Promise((resolve, reject) => {
+    let turno = null;
+    try { turno = motor().decir(texto); } catch (err) { reject(err); return; }
+    if (!turno) { reject(new Error(habla.estado().error || (config().habla.motor === 'elevenlabs' ? 'pick a voice in Settings › Voice' : 'set up the voice in Settings › Voice'))); return; }
+    // (un turno que tarda demasiado se da por perdido)
+    const plazo = setTimeout(() => { if (grabando.delete(turno)) reject(new Error('the voice took too long')); }, 180000);
+    grabando.set(turno, { partes: [], sr: 24000, resolve: (x) => { clearTimeout(plazo); resolve(x); }, reject: (err) => { clearTimeout(plazo); reject(err); } });
+  });
+  return { eco, escucha, habla, vista, alCambiarLlave, hablaActiva: () => config().habla.activa, oir, grabar };
 }
 
 module.exports = { wire, esLlave, DOC, VOICE_NOTE };

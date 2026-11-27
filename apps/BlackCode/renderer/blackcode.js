@@ -16,6 +16,7 @@ import { montarTareas, ponerPunto, abrirResultado } from './tareas.js';
 import { ICONOS } from './piezas.js';
 import { montarVoz, estadoDeVoz, estadoDeHabla } from './voz.js';
 import { montarMovil } from './movil.js';
+import { montarTelegram } from './telegram.js';
 
 // La interfaz se arma después de leer los datos: el arranque espera.
 const release = hold();
@@ -99,6 +100,10 @@ montarVoz({ shell, alHablar: ponerEstado });
 // El celular (BlackCode Mobile): contesta lo que pide el puente y le pasa lo que
 // pasa en los chats. Ver movil.js y main/movil.cjs.
 montarMovil();
+
+// Telegram: lo que se le escribe al bot entra al chat de Telegram de su
+// agente, y la respuesta vuelve allá. Ver telegram.js y main/telegram.cjs.
+montarTelegram();
 
 // El aviso de versión nueva (no baja nada solo, y no dice «estás al día»).
 wireUpdates({ name: 'BlackCode' });

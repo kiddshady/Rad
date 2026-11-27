@@ -181,7 +181,8 @@ function checkDisk(data, report) {
     const text = fs.readFileSync(path.join(dir, f), 'utf8');
     if (text.includes(MARCA_DE_LLAVE)) failures.push(`una llave quedó en claro en ${f}`);
   }
-  for (const doc of ['_llave.json', '_llave_venice.json', '_llave_tavily.json', '_llave_elevenlabs.json']) {
+  // (el token del Telegram de mentira lleva la marca: si quedara en claro, lo agarra lo de arriba)
+  for (const doc of ['_llave.json', '_llave_venice.json', '_llave_tavily.json', '_llave_elevenlabs.json', '_telegram.json']) {
     if (!files.includes(doc)) failures.push(`una llave no se guardó (falta ${doc})`);
   }
   // el buscador elegido quedó guardado donde lo lee el proceso principal

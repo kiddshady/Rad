@@ -151,10 +151,25 @@ export function chatDeVoz(agenteId, ahora = Date.now()) {
   avisar('chats');
   return nuevo;
 }
+/** ¿Es un chat de canal? Lo que entra solo, sin tipearlo en la PC: lo dicho al
+ *  Atom Echo (`voz`) y lo que llega de Telegram (`canal: 'telegram'`). Van en
+ *  el grupo Channels. */
+export const deCanal = (c) => c?.voz === true || c?.canal === 'telegram';
+/** El chat de Telegram de ese agente: el último que se abrió para Telegram,
+ *  que sigue hasta que llega un /new (`nuevo`). Lo crea si hace falta, sin
+ *  cambiar lo que hay en pantalla. */
+export function chatDeTelegram(agenteId, { nuevo = false, ahora = Date.now() } = {}) {
+  const vigente = nuevo ? null : chats.get().lista.filter((c) => c.agente === agenteId && c.canal === 'telegram').sort((a, b) => (b.creado ?? 0) - (a.creado ?? 0))[0];
+  if (vigente) return vigente;
+  const chatNuevo = { id: nuevoId(), agente: agenteId, titulo: TITULO_NUEVO, auto: true, canal: 'telegram', cuenta: 0, creado: ahora, tocado: ahora, carpeta: carpetaInicio() };
+  chats.update((v) => { v.lista.push(chatNuevo); return v; });
+  avisar('chats');
+  return chatNuevo;
+}
 /** Fija un chat arriba de la lista (o lo suelta). Un chat de canal no se fija: tiene su grupo. */
 export function fijarChat(id, si) {
   const c = chat(id);
-  if (!c || c.voz === true) return;
+  if (!c || deCanal(c)) return;
   chats.update((v) => { const x = v.lista.find((y) => y.id === id); if (si === true) x.fijado = true; else delete x.fijado; return v; });
   avisar('chats');
 }
@@ -608,7 +623,7 @@ export const modeloVe = (prov, id) => prov === 'anthropic' || modelosDe(prov).fi
 /** Manda un mensaje y abre la respuesta. Devuelve si lo mandó. `adjuntos`
  *  es { imagenes: [dataUrl], archivos: [{ name, size, content }] }: con
  *  adjuntos, el texto puede faltar. */
-export async function enviar(chatId, texto, adjuntos = null, { voz: dicho = false, modo = null } = {}) {
+export async function enviar(chatId, texto, adjuntos = null, { voz: dicho = false, modo = null, telegram = null } = {}) {
   const limpio = texto.trim();
   const imagenes = Array.isArray(adjuntos?.imagenes) ? adjuntos.imagenes : [];
   const archivos = Array.isArray(adjuntos?.archivos) ? adjuntos.archivos : [];
@@ -623,8 +638,10 @@ export async function enviar(chatId, texto, adjuntos = null, { voz: dicho = fals
   const valor = doc.get();
   // (`voz`: se dijo, no se tipeó; el chat lo muestra con un micrófono)
   // (`t`: cuándo se mandó. Se guarda con el mensaje: no cambia al reabrir el chat)
-  const mio = { id: nuevoId(), rol: 'user', texto: limpio, t: Date.now(), ...(imagenes.length ? { imagenes } : {}), ...(archivos.length ? { archivos } : {}), ...(dicho ? { voz: true } : {}) };
-  const suyo = { id: nuevoId(), rol: 'assistant', texto: '', estado: 'escribiendo', modelo: a.modelo };
+  const mio = { id: nuevoId(), rol: 'user', texto: limpio, t: Date.now(), ...(imagenes.length ? { imagenes } : {}), ...(archivos.length ? { archivos } : {}), ...(dicho ? { voz: true } : {}),
+    // (`canal`: llegó de Telegram; `audio`, como un audio que pasó por Whisper)
+    ...(telegram ? { canal: 'telegram', ...(telegram.audio ? { audio: true } : {}) } : {}) };
+  const suyo ={ id: nuevoId(), rol: 'assistant', texto: '', estado: 'escribiendo', modelo: a.modelo };
   const historial = [...valor.mensajes.filter(viaja), mio].map(alViaje);
   // Las tools del agente, si su modelo las acepta.
   const tools = modeloConTools(a.proveedor, a.modelo) ? toolsDe(a) : [];
@@ -644,7 +661,7 @@ export async function enviar(chatId, texto, adjuntos = null, { voz: dicho = fals
   if (primero && titulosConModelo()) nombrar(chatId, { texto: limpio, archivos: archivos.map((f) => f.name), imagenes: imagenes.length });
 
   const pedido = nuevoId();
-  respuestas.set(chatId, { pedido, mensaje: suyo, doc, pensando: false, guardado: Date.now(), voz: dicho === true });
+  respuestas.set(chatId, { pedido, mensaje: suyo, doc, pensando: false, guardado: Date.now(), voz: dicho === true, telegram: Boolean(telegram) });
   porPedido.set(pedido, chatId);
   avisar('chats');
   avisar('mensajes', { chat: chatId });
@@ -662,6 +679,8 @@ export async function enviar(chatId, texto, adjuntos = null, { voz: dicho = fals
       carpeta: carpetaDe(chatId),
       // se dijo por el micrófono (si se contesta en voz alta, el agente lo sabe)
       voz: dicho === true,
+      // vino de Telegram ('voz': era un audio y se contesta con otro)
+      telegram: telegram ? (telegram.hablar ? 'voz' : 'texto') : '',
     });
   } catch {
     terminar(chatId, 'error', 'The request could not be sent.');
@@ -794,5 +813,5 @@ function terminar(chatId, estado, nota, ev = null) {
   avisar('respuesta', { chat: chatId });
   if (habiaTarjeta) avisar('confirmar', { chat: chatId });
   // (terminó un turno: lo usa la voz, para avisar y para mandar la frase que quedó esperando)
-  avisar('turno', { chat: chatId, estado, voz: r.voz === true, texto: r.mensaje.texto, nota: nota ?? '' });
+  avisar('turno', { chat: chatId, estado, voz: r.voz === true, telegram: r.telegram === true, texto: r.mensaje.texto, nota: nota ?? '' });
 }
