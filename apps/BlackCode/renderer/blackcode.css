@@ -6,6 +6,18 @@
    ganan sin pelear la especificidad. */
 @import url('vendor/xterm/xterm.css') layer(app.vendor);
 @layer app {
+  /* ---------- La letra ----------
+     Elegida por Fran en el typo lab (26/11/2026) junto con Inter (va en
+     rad.start, main.cjs). Inter dibuja más grande que Segoe a igual tamaño:
+     los chicos suben medio punto, L baja a 14 y el peso fuerte queda en 550
+     (Inter es variable). M (13) y XL (21) quedan los de la piel. */
+  :root {
+    --rad-text-xs: 11.5px;
+    --rad-text-s: 12.5px;
+    --rad-text-l: 14px;
+    --rad-weight-strong: 550;
+  }
+
   /* ---------- Páginas (Agentes, Ajustes) ---------- */
 
   .dm-pagina {
@@ -161,8 +173,10 @@
 
   /* El formulario de un agente, adentro del modal. Más ancho que un modal
      común: el select de modelos tiene que mostrar enteros nombres como
-     «DeepSeek V4.1 Flash 1017 Uncensored», que se distinguen por el final. */
-  .rad-modal:has(.dm-form) { --rad-modal-width: 540px; }
+     «DeepSeek V4.1 Flash 1017 Uncensored», que se distinguen por el final.
+     560 desde Inter (1.17.0): dibuja más ancho que Segoe y a 540 ese nombre
+     ya no entraba (el humo lo agarró por 2 px). */
+  .rad-modal:has(.dm-form) { --rad-modal-width: 560px; }
   .dm-form { display: grid; gap: var(--rad-space-4); }
   .dm-form .rad-select { width: 100%; }
   .dm-form-par { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--rad-space-3); align-items: start; }
@@ -1282,17 +1296,24 @@
   }
 
   /* ---------- El visor de imágenes (visor.js) ----------
-     Un modal casi del tamaño de la ventana: el lienzo, y abajo la barra con
-     el nombre, la medida y el zoom. El lienzo no pinta fondo (el modal es
-     de vidrio: un fondo propio sumaría otro velo). La imagen se mueve con
-     transform, transicionado salvo arrastrando y al nacer. Pasado el tamaño
-     real se ven los píxeles (pixelated): es para mirar de cerca. */
+     Un modal que ocupa la ventana entera (26/11/2026, Fran: los huecos de los
+     costados le daban incomodidad; «como tu visor», el de Claude): el lienzo,
+     y abajo la barra con el nombre, la medida y el zoom. Sin esquinas: llega
+     a los bordes de la ventana. Tapa la titlebar, que arrastra la ventana:
+     el visor la anula (no-drag), o un clic arriba de la imagen la movería.
+     El lienzo no pinta fondo (el modal es de vidrio: un fondo propio sumaría
+     otro velo). La imagen se mueve con transform, transicionado salvo
+     arrastrando y al nacer. Pasado el tamaño real se ven los píxeles
+     (pixelated): es para mirar de cerca. */
   .rad-modal.dm-zoom-modal {
-    --rad-modal-width: 1600px;
-    height: calc(100vh - var(--rad-space-6) * 2);
+    width: 100vw;
+    height: 100vh;
+    max-height: none;
+    border-radius: 0;
     padding: 0;
     gap: 0;
     overflow: hidden;
+    -webkit-app-region: no-drag;
   }
   .dm-zoom-modal > .rad-modal-body { flex: 1; min-height: 0; display: flex; }
   .dm-zoom { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; }
@@ -1303,7 +1324,6 @@
     cursor: zoom-in;
     touch-action: none;
     user-select: none;
-    border-radius: var(--rad-radius-l) var(--rad-radius-l) 0 0;
   }
   .dm-zoom-lienzo[data-movible] { cursor: grab; }
   .dm-zoom-lienzo[data-arrastrando] { cursor: grabbing; }

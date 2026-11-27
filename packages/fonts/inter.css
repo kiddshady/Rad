@@ -1,0 +1,33 @@
+/*
+  Inter 4.001, variable (pesos 100 a 900 y tamaño óptico 14 a 32, normal e
+  itálica), entera: latín, griego, cirílico, subíndices, flechas y signos
+  matemáticos (los apuntes de farmacia los usan). Licencia SIL Open Font
+  License 1.1: inter/OFL.txt. Convertida a woff2 con fontTools, sin tocar los
+  glifos, desde los .ttf variables de Google Fonts.
+
+  Se carga con:   @import url('/@fonts/inter.css');
+  y se usa con:   --rad-font-ui: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+
+  El tamaño óptico va solo (font-optical-sizing: auto): a 12 o 13 px el
+  navegador usa el corte de texto, más abierto, y en los títulos el de display.
+
+  font-display: block, no swap: si la fuente cambiara después de pintar, el
+  texto saltaría de forma. Es local y carga enseguida, y el arranque de Rad
+  espera a document.fonts.ready antes de entrar.
+*/
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: block;
+  font-weight: 100 900;
+  src: url('inter/inter-opsz-wght-normal.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: italic;
+  font-display: block;
+  font-weight: 100 900;
+  src: url('inter/inter-opsz-wght-italic.woff2') format('woff2-variations');
+}

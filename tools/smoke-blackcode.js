@@ -337,6 +337,25 @@ data.idioma = `${window.rad.lang}: ${ventana} · ${riel}`;
   data.mono = pila;
 }
 
+// 0d. La letra de la interfaz y de los títulos es Inter, la que viaja con Rad
+// (la eligió Fran en el typo lab, 26/11/2026): cargada desde /@fonts y no la
+// que pueda tener instalada la PC. Y los tamaños y el peso de BlackCode.
+{
+  const css = getComputedStyle(document.documentElement);
+  for (const rol of ['ui', 'display']) {
+    const pila = css.getPropertyValue(`--rad-font-${rol}`).trim();
+    if (!/^'?"?Inter['"]?,/.test(pila)) fail(`la fuente ${rol} de BlackCode es ${pila}`);
+  }
+  const caras = [...document.fonts].filter((f) => f.family.replace(/["']/g, '') === 'Inter');
+  if (!caras.some((f) => f.status === 'loaded' && f.style === 'normal')) fail(`Inter no cargó de /@fonts: ${caras.map((f) => `${f.style} ${f.status}`).join(', ') || 'no está declarada'}`);
+  if (getComputedStyle(document.querySelector('.rad-root')).fontFamily.split(',')[0].replace(/["']/g, '').trim() !== 'Inter') fail('la interfaz no se pinta en Inter');
+  const esperado = { 'text-xs': '11.5px', 'text-s': '12.5px', 'text-m': '13px', 'text-l': '14px', 'weight-strong': '550' };
+  for (const [t, v] of Object.entries(esperado)) {
+    if (css.getPropertyValue(`--rad-${t}`).trim() !== v) fail(`--rad-${t} es ${css.getPropertyValue(`--rad-${t}`).trim()}, no ${v}`);
+  }
+  data.ui = css.getPropertyValue('--rad-font-ui').trim();
+}
+
 // 1. Crear un agente: el formulario no deja guardarlo sin nombre; con nombre,
 // modelo e instrucciones, su tarjeta entra fundiéndose.
 await go('agentes');
@@ -1192,6 +1211,15 @@ else {
     await sleep(dur('slow') + 120);
     const vz = modal()?.querySelector('.dm-zoom-img');
     if (!modal()?.classList.contains('dm-zoom-modal') || vz?.naturalWidth !== 1568) fail('visor: un clic en la captura no la abrió en el visor (' + (vz?.naturalWidth ?? 'sin imagen') + ')');
+    // Ocupa la ventana entera, sin esquinas, y anula la titlebar de abajo
+    // (Fran, 26/11/2026: sin los huecos de los costados).
+    {
+      const r = modal().getBoundingClientRect();
+      const st = getComputedStyle(modal());
+      if (Math.abs(r.left) > 0.5 || Math.abs(r.top) > 0.5 || Math.abs(r.width - innerWidth) > 0.5 || Math.abs(r.height - innerHeight) > 0.5) fail(`visor: no ocupa la ventana (${r2(r.left)},${r2(r.top)} ${r2(r.width)}×${r2(r.height)} en ${innerWidth}×${innerHeight})`);
+      if (parseFloat(st.borderTopLeftRadius) !== 0) fail(`visor: tiene esquinas redondeadas (${st.borderTopLeftRadius})`);
+      if (st.getPropertyValue('-webkit-app-region') !== 'no-drag' && st.webkitAppRegion !== 'no-drag') fail('visor: tapa la titlebar sin anular su arrastre');
+    }
     const lz = modal()?.querySelector('.dm-zoom-lienzo');
     const pz = () => modal()?.querySelector('.dm-zoom-pct')?.textContent ?? '';
     const antesZ = pz();
@@ -1233,11 +1261,12 @@ else {
   if (fila('fs_write')?.dataset.estado !== 'error' || fila('fetch')?.dataset.estado !== 'error' || cuenta() !== '2 tools · 2 failed') fail(`argumentos incompletos y una tool apagada: ${fila('fs_write')?.dataset.estado}, ${fila('fetch')?.dataset.estado}, «${cuenta()}»`);
   if (!fila('fetch').querySelector('.dm-tool-pre').textContent.includes('not available in this run')) fail('una tool que el agente no tiene prendida no fue rechazada por eso');
 
-  // Sin el renglón TOOLS el agente conversa, y el contador lo dice igual.
+  // Sin el renglón TOOLS el agente conversa, y el contador no dice nada: un
+  // turno sin tools no lleva «no tools» (Fran, 26/11/2026), la fila queda plegada.
   type(area, 'Just say hi.');
   key(area, 'Enter');
   await terminado(18);
-  if (cuenta() !== 'no tools') fail(`un turno con tools prendidas que no usó ninguna dice «${cuenta()}»`);
+  if (cuenta() !== '' || ultimo()?.querySelector('.dm-msg-cuenta')?.hasAttribute('data-abierto')) fail(`un turno con tools prendidas que no usó ninguna dice «${cuenta()}»`);
   enIngles('en un chat con tools');
 
   // Modo automático: Settings lo dice, y una escritura corre sin tarjeta.

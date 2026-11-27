@@ -66,10 +66,12 @@ export const ICONOS = {
   ojo: svg('<g transform="scale(.6667)" stroke-width="2.25"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM9 12a3 3 0 1 0 6 0 3 3 0 1 0-6 0"/></g>'),
   ojoTachado: svg('<g transform="scale(.6667)" stroke-width="2.25"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"/></g>'),
   copiar: svg('<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>'),
-  bajar: svg('<path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/>'),
-  // (exportar: la misma de bajar, con la flecha hacia arriba: sale de la app.
-  // Bajar queda para traer algo, como «Import» o «Save as…». Pedido de Fran.)
-  exportar: svg('<path d="M8 10.5v-8M4.5 6 8 2.5 11.5 6M3 13.5h10"/>'),
+  // (bajar trae algo, como «Import» o «Save as…»; exportar es la flecha hacia
+  // arriba, sale de la app. Pedido de Fran. Las dos con la misma base: una
+  // bandeja con los dos palitos de los costados, como la dibujó él (26/11/2026).
+  // En bajar la flecha sube medio punto para no tocar la bandeja con la punta.)
+  bajar: svg('<path d="M8 2v7.5M4.5 6 8 9.5 11.5 6M2.5 10.5v3h11v-3"/>'),
+  exportar: svg('<path d="M8 10v-7.5M4.5 6 8 2.5 11.5 6M2.5 10.5v3h11v-3"/>'),
   volver: svg('<path d="M5.5 3.5l-3 3 3 3M2.5 6.5H9a3.5 3.5 0 0 1 0 7H6.5"/>'),
   // las notas
   nota: svg('<rect x="3.5" y="2.5" width="9" height="11" rx="1.5"/><path d="M6 5.75h4M6 8h4M6 10.25h2.5"/>'),

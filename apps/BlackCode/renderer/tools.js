@@ -131,11 +131,13 @@ export function ponerTool(nodo, m) {
   if (!texto) { nodo.removeAttribute('data-abierto'); nodo.querySelector('.dm-tool-cabeza').setAttribute('aria-expanded', 'false'); }
 }
 
-/** «3 tools · 2 done, 1 failed», «no tools», o '' si el turno no tenía tools. */
+/** «3 tools · 2 done, 1 failed», o '' si el turno no usó ninguna. Un turno sin
+ * tools no dice «no tools» (26/11/2026, Fran: casi todos son así, y que no
+ * aparezca nada ya lo dice). */
 export function cuentaTools(m) {
   if (!Array.isArray(m.tools)) return '';
   const agotado = m.agotado ? ' · tool steps ran out for this turn, so something may be unfinished' : '';
-  if (!m.tools.length) return `no tools${agotado}`;
+  if (!m.tools.length) return agotado.slice(3);
   const de = (s) => m.tools.filter((t) => t.status === s).length;
   const partes = [
     de('ok') && `${de('ok')} done`,

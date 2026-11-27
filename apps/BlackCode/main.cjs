@@ -113,8 +113,11 @@ function arrancar() {
     },
     // La interfaz está en inglés: los textos que pone el núcleo, también.
     lang: 'en',
-    // El código y los datos, en Roboto Mono (viaja con Rad).
-    fonts: { mono: 'roboto-mono' },
+    // La interfaz y los títulos en Inter, el código y los datos en Roboto
+    // Mono; las dos viajan con Rad (no dependen de lo que tenga la PC). Inter
+    // la eligió Fran en el typo lab (26/11/2026), con los tamaños y el peso
+    // que van en renderer/blackcode.css.
+    fonts: { ui: 'inter', display: 'inter', mono: 'roboto-mono' },
     // Se actualiza desde kiddshady/blackcode-releases (build.publish del
     // package.json). Solo la app instalada: abierta desde el repo no busca nada.
     updates: true,

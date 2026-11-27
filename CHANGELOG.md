@@ -1,5 +1,34 @@
 # Changelog
 
+## BlackCode 1.17.0 (2026-11-26) · @rad/fonts 0.3.0
+
+Lote que pidió Fran, probado por él en la app de dev:
+
+- **La letra es Inter.** La eligió en el typo lab (`npm run typolab`,
+  commit 9966476), comparando sobre la app real: Inter en la interfaz y en
+  los títulos, XS 11,5 px, S 12,5 px, L 14 px y el peso fuerte en 550 (M y
+  XL quedan los de la piel). Inter viaja con Rad, como Roboto Mono: está en
+  `@rad/fonts` (variable, con peso y tamaño óptico, normal e itálica,
+  convertida a woff2 sin tocar los glifos; trae griego, subíndices y
+  flechas), así que no depende de que la PC la tenga instalada. La app la
+  pide con `fonts: { ui: 'inter', display: 'inter', mono: 'roboto-mono' }`
+  y los tamaños van en `blackcode.css`. El humo mira que la interfaz se pinte
+  en Inter cargada desde `/@fonts` y con esos tamaños. Inter dibuja más
+  ancho que Segoe: el formulario del agente pasa de 540 a 560 px para que
+  «DeepSeek V4.1 Flash 1017 Uncensored» se siga leyendo entero (el humo lo
+  agarró por 2 px).
+- **Exportar y bajar con bandeja.** Los dos íconos tienen abajo una bandeja
+  con un palito a cada costado, como la dibujó Fran, en vez de una sola
+  línea. En bajar la flecha sube medio punto para no tocarla con la punta.
+- **Sin «no tools».** Una respuesta que no usó tools ya no lo dice debajo
+  («casi todo el tiempo no usa tools»): que no aparezca nada lo dice. Cuando
+  usa, la cuenta sigue igual. El «no tools» de la barra de estado (el agente
+  con las tools apagadas) queda.
+- **El visor de imágenes ocupa la ventana entera**, sin esquinas, con la
+  misma barra y los mismos botones («me da incomodidad visual que queden
+  esos huecos en los laterales»). Tapa la titlebar y le anula el arrastre:
+  si no, un clic arriba de la imagen movía la ventana. El humo lo mide.
+
 ## BlackCode 1.16.0 (2026-11-26)
 
 **ElevenLabs como segunda voz de las respuestas habladas** (pedido de Fran:
