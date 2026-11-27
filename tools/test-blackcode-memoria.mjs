@@ -202,6 +202,10 @@ function porAgente(doc = undefined, migrar = null) {
   const defs = require(path.join(APP, 'main', 'tools', 'defs.cjs'));
   const de = (n) => defs.TOOL_DEFS.find((t) => t.name === n);
   ok('remember y recall están definidas', defs.existe('remember') && defs.existe('recall'));
+  // (la memoria es de cada agente desde la 1.18.0: la tool no le puede decir al
+  // modelo que la ven los demás, como decía hasta la 1.19.0)
+  const dice = de('remember')?.description ?? '';
+  ok('remember dice que la memoria es solo del agente', /no other agent/i.test(dice) && !/every agent/i.test(dice), dice.slice(0, 200));
   ok('remember pide solo el hecho', JSON.stringify(de('remember').parameters.required) === '["fact"]' && Object.keys(de('remember').parameters.properties).join() === 'fact,detail,core');
   ok('recall no exige nada (id o query)', !de('recall').parameters.required && Object.keys(de('recall').parameters.properties).join() === 'id,query');
   ok('la descripción de remember ya no promete el recuerdo por similitud de NeonCode', !/surfaced only when relevant|RECALL memory/.test(de('remember').description) && de('remember').description.includes('Memory list'));

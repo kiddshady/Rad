@@ -468,7 +468,7 @@ const TOOL_DEFS = [{
   // por similitud). Acá no hay tal cosa: lo anotado entra a la lista que el
   // agente ve en cada chat, y el `detail` se lee con `recall`.
   name: 'remember',
-  description: 'Save one concise lasting fact about the user to persistent memory. It joins the Memory list that every agent in this app sees at the start of each chat, so write it as ONE short self-contained line. '
+  description: 'Save one concise lasting fact about the user to YOUR persistent memory. It joins your Memory list, which you see at the start of each of your chats; it is yours alone, no other agent of this app sees it. Write it as ONE short self-contained line. '
     + 'Add `detail` only when there is more worth keeping than fits in that line (the steps of a procedure, the decisions behind a project): the detail is NOT in context, it is read on demand with `recall`. '
     + 'Pass core:true ONLY for defining facts that must never be missed (who the user is, hard preferences, key projects) — core memory is small and costs context every single turn.',
   parameters: {

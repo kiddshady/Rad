@@ -1,5 +1,13 @@
 # Changelog
 
+## BlackCode 1.19.1 (2026-11-27)
+
+**La tool `remember` ya no le dice al agente que su memoria la ven todos.**
+Desde la 1.18.0 cada agente tiene la suya, pero la descripción de la tool
+seguía diciendo que el recuerdo se sumaba a «the Memory list that every agent
+in this app sees». Ahora dice que es SU lista y que ningún otro agente la ve.
+El test de la memoria lo comprueba (y falla con el texto de antes).
+
 ## BlackCode 1.19.0 (2026-11-27)
 
 **El celu edita los agentes, su memoria y las skills.** Fran: «necesito que
