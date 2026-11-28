@@ -55,6 +55,8 @@ export function createRouter({ stage, views, initial }) {
     entry.el.dataset.state = 'hidden';
     entry.el.inert = true;
     entry.el.style.zIndex = '';
+    // (terminó de irse la última que se iba: el cambio de forma también)
+    if (![...entries.values()].some((e) => e.el.dataset.state === 'leaving')) stage.removeAttribute('data-rad-sheets-swap');
   };
 
   const activate = (entry) => {
@@ -113,6 +115,14 @@ export function createRouter({ stage, views, initial }) {
     // apaga su canto y su sombra (las hojas traen los suyos), fundiéndolos a
     // la par del cambio de vista.
     stage.toggleAttribute('data-rad-sheets', next.def.sheets === true);
+    // Y mientras dura un cambio de FORMA (de una vista de hojas a una común o
+    // al revés), lo marca hasta que la que se va termina de irse (core
+    // 0.21.4): lo que la piel pinta encima de todo en el escenario (el canto
+    // de glass) no puede seguir ahí, dibujado sobre las hojas de la otra; lo
+    // lleva la vista común, y se funde con ella. Fran lo vio en BlackCode al
+    // pasar de Memory a Notes: la línea del canto cruzaba por encima de las
+    // hojas, por el aire del medio y por la esquina.
+    if (!instant && prev && (prev.def.sheets === true) !== (next.def.sheets === true)) stage.setAttribute('data-rad-sheets-swap', '');
 
     if (next.el.dataset.state === 'leaving' && !instant) {
       comeBack(next, prev ? [prev] : []);

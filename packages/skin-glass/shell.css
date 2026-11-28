@@ -139,7 +139,6 @@
   border-radius: inherit;
   box-shadow: var(--skin-rim);
   pointer-events: none;
-  transition: opacity var(--rad-dur-base) var(--rad-ease-in-out);
 }
 
 /* Hojas (core 0.21.0). Una vista de hojas pinta el TELÓN (el mismo del body,
@@ -147,10 +146,20 @@
    fondo de la ventana, y la vista sigue tapando para el fundido del router.
    Cada hoja es un escenario: velo y brillo encima del telón de la vista, su
    canto y su sombra. Mientras se ve una vista así, el escenario apaga los
-   suyos a la par del fundido (la sombra va a transparente con la misma
-   forma, para que interpole). */
+   suyos: la sombra a la par del fundido (va a transparente con la misma
+   forma, para que interpole) y el canto como se cuenta abajo. */
 .rad-stage[data-rad-sheets] { box-shadow: 0 18px 50px #00000000, 0 2px 8px #00000000; }
 .rad-stage[data-rad-sheets]::after { opacity: 0; }
+/* El canto, en un cambio de FORMA (core 0.21.4: de una vista de hojas a una
+   común o al revés). El del escenario va encima de todo, y fundiéndose «a la
+   par» quedaba dibujado sobre las hojas de la otra vista: Fran vio la línea
+   cruzar el aire entre las hojas y la esquina, de Memory a Notes. Mientras
+   dura, el escenario no lo dibuja y lo lleva la vista común que esté a la
+   vista (la que se va o la que llega), como sombra inset de su fondo: así se
+   funde con ella, y debajo de la que se va queda debajo. Al terminar vuelve al
+   escenario en el acto: el mismo dibujo en el mismo lugar, no se nota. */
+.rad-stage[data-rad-sheets-swap]::after { opacity: 0; }
+.rad-stage[data-rad-sheets-swap] > .rad-view:not([data-rad-sheets]) { box-shadow: var(--skin-rim); }
 .rad-stage > .rad-view[data-rad-sheets] {
   background-color: var(--rad-surface-0);
   background-image: var(--skin-field-a), var(--skin-field-b), var(--skin-field-c);

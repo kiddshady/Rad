@@ -5888,24 +5888,44 @@ await go('ajustes', 'about');
   // La lista de chats se esfuma también abajo, y la pista de la scrollbar se separa de las puntas.
   const listaH = vistaChat.querySelector('.dm-chats');
   if (listaH?.hasAttribute('data-rad-line') || !(parseFloat(getComputedStyle(listaH).getPropertyValue('--rad-a-scroll-inset')) > 0)) fail('hojas: la lista de chats no se esfuma abajo o su scrollbar no tiene respiro en las puntas');
-  // Al pasar a una vista entera, el canto del escenario vuelve fundiéndose; y se va igual al volver.
+  // El cambio de FORMA (núcleo 0.21.4, 27/11/2026: Fran vio la línea del
+  // canto del escenario cruzar por encima de las hojas, de Memory a Notes).
+  // Mientras dura, el escenario no dibuja su canto (va encima de todo): lo
+  // lleva la vista entera que esté a la vista, y se funde con ella; al
+  // terminar vuelve al escenario en el mismo cuadro. Y la fila de «New chat»
+  // sigue a su vista EN EL MISMO cuadro: con la visibility demorada quedaba un
+  // instante sobre la vista nueva al irse, y entraba tarde al volver.
+  const filaNueva = vistaChat.querySelector('.dm-lado-cabeza > :not(.dm-sel)');
   const muestrear = async (accion) => {
     const m = [];
     let sigue = true;
-    const tic = () => { m.push(canto()); if (sigue) requestAnimationFrame(tic); };
-    requestAnimationFrame(tic);
+    const tic = () => {
+      // (el cuadro que quedó pendiente al cortar ya es del cambio siguiente)
+      if (!sigue) return;
+      const enEntera = [...document.querySelectorAll('.rad-stage > .rad-view:not([data-rad-sheets])')].filter((x) => x.dataset.state !== 'hidden');
+      m.push({ canto: canto(), swap: stage.hasAttribute('data-rad-sheets-swap'), lleva: enEntera.length > 0 && enEntera.every((x) => getComputedStyle(x).boxShadow.includes('inset')), chat: vistaChat.dataset.state, fila: getComputedStyle(filaNueva).visibility });
+      if (sigue) requestAnimationFrame(tic);
+    };
     accion();
-    await sleep(dur('base') + 200);
+    tic();
+    await sleep(dur('base') + 300);
     sigue = false;
     return m;
   };
+  const ver = (m) => m.map((x) => `${r2(x.canto)}${x.swap ? 's' : ''}${x.lleva ? 'L' : ''}/${x.chat[0]}${x.fila[0]}`).join(' ');
   const ida = await muestrear(() => document.querySelector('.rad-tab[data-view="memoria"]').click());
   const vuelta = await muestrear(() => document.querySelector('.rad-tab[data-view="chat"]').click());
-  const medios = (m) => m.filter((x) => x > 0.05 && x < 0.95).length;
-  if (ida.at(-1) !== 1 || medios(ida) < 3) fail('hojas: al ir a Memory el canto del escenario no volvió fundiéndose: ' + ida.map((x) => r2(x)).join(' '));
-  if (vuelta.at(-1) !== 0 || medios(vuelta) < 3) fail('hojas: al volver al chat el canto del escenario no se fue fundiéndose: ' + vuelta.map((x) => r2(x)).join(' '));
+  for (const [nombre, m, fin] of [['al ir a Memory', ida, 1], ['al volver al chat', vuelta, 0]]) {
+    const durante = m.filter((x) => x.swap);
+    if (durante.length < 3) fail(`hojas: ${nombre} el cambio de forma no quedó marcado en el escenario: ${ver(m)}`);
+    if (durante.some((x) => x.canto > 0.01)) fail(`hojas: ${nombre} el canto del escenario se dibuja encima de las hojas durante el cambio: ${ver(m)}`);
+    if (durante.some((x) => !x.lleva)) fail(`hojas: ${nombre} la vista entera no lleva el canto durante el cambio: ${ver(m)}`);
+    if (m.at(-1).swap || m.at(-1).canto !== fin) fail(`hojas: ${nombre} el canto no volvió a su lugar al terminar (${m.at(-1).canto}, se esperaba ${fin}): ${ver(m)}`);
+    // la fila de «New chat»: oculta exactamente cuando su vista lo está
+    if (m.some((x) => (x.chat === 'hidden') !== (x.fila === 'hidden'))) fail(`hojas: ${nombre} la fila de «New chat» no sigue a su vista en el mismo cuadro: ${ver(m)}`);
+  }
   if (!view('notas').hasAttribute('data-rad-sheets')) fail('hojas: Notes no es una vista de hojas');
-  data.hojas = `aire de ${getComputedStyle(document.documentElement).getPropertyValue('--rad-space-2').trim()}; el canto: ${medios(ida)} cuadros de ida y ${medios(vuelta)} de vuelta`;
+  data.hojas = `aire de ${getComputedStyle(document.documentElement).getPropertyValue('--rad-space-2').trim()}; el canto lo lleva la vista entera en ${ida.filter((x) => x.swap).length} cuadros de ida y ${vuelta.filter((x) => x.swap).length} de vuelta, sin dibujarse sobre las hojas; la fila de «New chat» sigue a su vista`;
 }
 // </hojas>
 

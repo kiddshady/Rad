@@ -364,7 +364,11 @@
 
   /* Arriba de la lista: «New chat» o, seleccionando, la barra de la
      selección. Las dos en la misma celda y en orden: la que se va se esfuma
-     del todo y recién entra la otra. */
+     del todo y recién entra la otra (la demora va en la OPACIDAD de la que
+     entra). La que se ve se prende sin demora en la visibility: con demora,
+     cuando la vista entera se oculta o se muestra la fila la sigue tarde, y
+     al irse de Notes quedaba «New note» un instante sobre la vista nueva, y
+     al volver entraba de golpe (Fran, 27/11/2026). */
   .dm-lado-cabeza { flex: none; display: grid; }
   .dm-lado-cabeza > * { grid-area: 1 / 1; }
   .dm-lado-cabeza > :not(.dm-sel),
@@ -373,7 +377,7 @@
     visibility: inherit;
     transition:
       opacity var(--rad-dur-base) var(--rad-ease-out) var(--rad-dur-fast),
-      visibility 0s linear var(--rad-dur-fast),
+      visibility 0s,
       background-color var(--rad-dur-fast) var(--rad-ease-out),
       box-shadow var(--rad-dur-fast) var(--rad-ease-out),
       color var(--rad-dur-fast) var(--rad-ease-out);

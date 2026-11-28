@@ -1,5 +1,30 @@
 # Changelog
 
+## BlackCode 1.22.1 (2026-11-27) · núcleo 0.21.4
+
+Dos fantasmas al pasar entre Notes y Memory, que Fran grabó en video y
+probó arreglados en dev («los dos solucionados»).
+
+- **«New note» reaparecía un instante después de irse Notes, y al volver
+  entraba tarde y de golpe.** La fila de arriba de la lista (la de «New
+  note», y la de «New chat», que es la misma regla) se prendía con la
+  `visibility` demorada, pensada para el relevo con la barra de la
+  selección; pero la demora valía también cuando la vista entera se ocultaba
+  o se mostraba. Ahora la que se ve se prende sin demora (la demora queda en
+  la opacidad) y la fila sigue a su vista en el mismo cuadro. Ojo: las
+  capturas por CDP no mostraban el fantasma, aunque la `visibility` medida lo
+  confirmaba.
+- **La línea del canto cruzaba por encima de las hojas de Memory a Notes**
+  (núcleo y glass). El canto del escenario va encima de todo (`::after`,
+  z 2000) y se esfumaba «a la par» del cambio, dibujado sobre las hojas de la
+  otra vista: por la esquina y por el aire entre los paneles. Ahora el router
+  marca el cambio de forma (`data-rad-sheets-swap`, de una vista de hojas a
+  una común o al revés) hasta que la que se va termina de irse, y glass le
+  pasa el canto a la vista común mientras dura: se funde con ella, y al
+  terminar vuelve al escenario en el mismo cuadro.
+- El humo de las hojas mide las dos cosas cuadro por cuadro en los dos
+  sentidos (y falla con cada arreglo deshecho).
+
 ## BlackCode 1.22.0 (2026-11-27)
 
 Un lote de cinco cosas que Fran fue encontrando y probó en dev («impecable
