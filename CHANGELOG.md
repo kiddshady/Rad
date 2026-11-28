@@ -1,5 +1,41 @@
 # Changelog
 
+## BlackCode 1.24.0 (2026-11-28)
+
+Hablarle a un agente con un micrófono de la PC, en modo conversación
+(pedido de Fran: «una conversación más larga y fluida con Zac»; con su
+webcam Redragon). Lo probó en dev: «está tremendo… anda re bien y la cámara
+escucha desde más lejos».
+
+- **Settings › Voice: «Listen with»** el Atom Echo o un micrófono de la PC,
+  **nunca los dos**: elegir uno desconecta el otro. Con el Echo todo sigue
+  igual (palabra clave y una frase).
+- **Con el micrófono de la PC es una conversación.** «okay zac» o
+  **Ctrl+Alt+Z** (global, también con la app en la bandeja) la abren; después
+  de cada respuesta, cuando terminó de sonar, el micrófono vuelve a escuchar
+  solo, sin palabra clave. Se cierra diciendo **«gracias, Zac»** (la eligió
+  él: «chau y listo quedan medio mal»; eso no le llega al agente), con **30 s sin hablar** o con el atajo.
+  Mientras el agente habla no se toman frases, solo la palabra clave, que lo
+  calla.
+- **La palabra clave en la PC** es el mismo modelo de microWakeWord del Echo
+  (el .json que se elige en Settings, con su .tflite al lado), corriendo en
+  el Python de Whisper con `pymicro-wakeword` (`motor/palabra_motor.py`,
+  `main/palabra.cjs`): unos 20 ms de CPU por cada 3 s de audio.
+- **La captura** (`renderer/micro.js`, `micro-worklet.js`): el micrófono
+  queda abierto con el cancelador de eco de Chromium, a 16 kHz, y va al
+  proceso principal de a 100 ms. La conversación es `main/micro.cjs`.
+- **Dos cosas que salieron de probarlo con la webcam de verdad** (frases con
+  la voz de Windows por los parlantes): el detector avisa unos 400 ms tarde,
+  ya por la mitad de lo que se pide, así que la frase arranca con el último
+  segundo y medio de audio (lo que entra de la palabra lo saca el mismo filtro
+  del Echo); y el ruido del cuarto se mide todo el tiempo, porque la frase se
+  abre mientras se sigue hablando y el corte tomaba la voz por ruido. A
+  Whisper se le pasa la frase de cierre como pista (la primera que se
+  probó, «Chau Zac», salía «Chilsec»).
+- `tools/test-blackcode-micro.mjs` (60 comprobaciones, cada arreglo probado
+  al revés) y su parte en el humo, que **no abre el micrófono de verdad**.
+  Control nivel 2 verde (tests, dos pasadas del humo y modo real).
+
 ## BlackCode 1.23.0 (2026-11-27)
 
 «New chat» ya no llena la lista de chats vacíos (pedido de Fran, con un

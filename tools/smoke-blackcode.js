@@ -4628,7 +4628,7 @@ else {
     campoV('voz-actua').click();
     await until(() => tarjetaV.dataset.actua === 'si', 2000);
     await settle();
-    if (!shown(campoV('voz-actua').closest('.dm-tarjeta').querySelector('p.dm-tarjeta-instr.rad-swap')).includes('automatic mode')) fail('voz: prender «Let voice act» no cambia lo que explica la tarjeta');
+    if (!shown(campoV('voz-actua').closest('.dm-tarjeta').querySelector('[data-estado="voz-actua-nota"]')).includes('automatic mode')) fail('voz: prender «Let voice act» no cambia lo que explica la tarjeta');
     datosM.ponerModoTools('manual');
     await go('chat');
     const antesAct = (await datosM.hilo(chatV.id)).get().mensajes.length;
@@ -4955,6 +4955,116 @@ else {
       if (!(n >= 1) || datosM.chatsDe(agenteV.id).some((c) => c.voz === true) || datosM.chatsDe(agenteV.id).length !== comunes0 || grupo.offsetHeight !== 0 || !grupo.inert) fail('canales: el tacho no borró los ' + n + ' chats de canal y solo esos, o el grupo sigue a la vista (' + grupo.offsetHeight + ' px)');
     }
     data.habla = 'apagada de fábrica, la prueba de Settings suena y se calla, la respuesta de un turno de voz se dice y la de uno tipeado no, la palabra clave lo interrumpe, y avisa en voz alta cuando espera permiso';
+  }
+
+  // 11u-bis. Un micrófono de la PC, en modo conversación (Fran, 27/11/2026): se
+  // elige en Voice en lugar del Echo (nunca los dos: elegirlo desconecta el
+  // Echo). La palabra clave (o el atajo) abre una conversación: después de cada
+  // respuesta —ya dicha en voz alta— vuelve a escuchar sin palabra, hasta
+  // «gracias, zac». En el humo el micrófono de verdad NO se abre (`capturar:
+  // false`): el audio y la palabra los pone el guion por voz:micro-simular.
+  {
+    const datosM = await import('/datos.js');
+    const microM = await import('/micro.js');
+    const sim = (que = {}) => window.rad.invoke('voz:simular', que);
+    const msim = (que = {}) => window.rad.invoke('voz:micro-simular', que);
+    const estadoV = () => window.rad.invoke('voz:estado');
+    const agenteV = datosM.agenteActual();
+    const delChat = async () => { const c = datosM.chatsDe(agenteV.id).find((x) => x.voz === true); return c ? (await datosM.hilo(c.id)).get().mensajes.filter((m) => m.rol === 'user').map((m) => m.texto) : []; };
+    const fase = async () => (await estadoV()).conversacion;
+    await go('ajustes', 'voice');
+    const tarjetaV = view('ajustes').querySelector('[data-tarjeta="voz"]');
+    const campoV = (c) => tarjetaV.querySelector('[data-campo="' + c + '"]');
+    const dice = (cual) => shown(tarjetaV.querySelector('[data-estado="' + cual + '"] .rad-swap') ?? tarjetaV.querySelector('[data-estado="' + cual + '"]'));
+    const caja = (m) => tarjetaV.querySelector('.dm-voz-motor[data-motor="' + m + '"]');
+    campoV('voz-fuente').scrollIntoView({ block: 'center' });
+    await settle();
+    // De fábrica escucha con el Echo: la caja del micrófono, plegada y sin tocarse.
+    if (tarjetaV.dataset.fuente !== 'eco' || !caja('eco').hasAttribute('data-abierto') || caja('micro').hasAttribute('data-abierto') || !caja('micro').inert || caja('micro').getBoundingClientRect().height > 1) fail('micro: de fábrica no se escucha con el Echo, o la caja del micrófono está a la vista');
+    if (tarjetaV.dataset.conexion !== 'connected') fail('micro: el Echo no estaba conectado antes de elegir el micrófono');
+    // Se elige el micrófono de la PC: el Echo se desconecta y se prende el detector de la palabra.
+    campoV('voz-fuente').click();
+    await until(() => menus().length === 1, 2000);
+    await sleep(dur('base') + 80);
+    await pick('A microphone on this PC');
+    await until(() => tarjetaV.dataset.fuente === 'micro', 3000);
+    await until(() => tarjetaV.dataset.conexion === 'off', 3000);
+    await sleep(dur('fast') + dur('base') * 3 + 200);
+    {
+      const s = await sim({});
+      const e = await estadoV();
+      if (e.fuente !== 'micro' || tarjetaV.dataset.conexion !== 'off' || s.suscripto !== null) fail('micro: elegir el micrófono no desconectó el Echo (cada hardware excluye al otro): ' + JSON.stringify({ fuente: e.fuente, conexion: tarjetaV.dataset.conexion, suscripto: s.suscripto }));
+      if (!s.palabra.prendido || e.conversacion?.activo !== true || e.atajo?.registrado !== true) fail('micro: elegirlo no prendió el detector de la palabra, la conversación o el atajo: ' + JSON.stringify({ palabra: s.palabra, conv: e.conversacion, atajo: e.atajo }));
+      if (!caja('micro').hasAttribute('data-abierto') || caja('micro').inert || caja('eco').hasAttribute('data-abierto') || !caja('eco').inert || caja('eco').getBoundingClientRect().height > 1) fail('micro: la caja del micrófono no quedó a la vista y la del Echo plegada');
+      // (el micrófono de verdad no se toca en el humo)
+      if (microM.estadoMicro().estado !== 'off' || e.capturar !== false) fail('micro: en el humo se abrió el micrófono de verdad: ' + JSON.stringify(microM.estadoMicro()));
+      if (!dice('voz-micro').includes('Waiting for “okay zac”')) fail('micro: la tarjeta no dice que espera la palabra: «' + dice('voz-micro') + '»');
+      if (!campoV('voz-micro') || !shown(tarjetaV.querySelector('[data-estado="voz-micro-nota"]')).includes('Ctrl+Alt+Z')) fail('micro: falta el select del micrófono, o la nota no dice el atajo');
+    }
+    enIngles('en la tarjeta Voice con el micrófono');
+    // El modelo de la palabra: un .json.
+    tarjetaV.querySelector('[data-accion="voz-palabra"]').click();
+    await until(async () => (await estadoV()).palabra.endsWith('okay_zac.json'), 3000);
+    await settle();
+    if (!dice('voz-palabra').endsWith('okay_zac.json') || (await sim({})).palabra.reinicios < 1) fail('micro: elegir el modelo no quedó guardado o no reinició el detector: «' + dice('voz-palabra') + '»');
+    if ((await window.rad.invoke('voz:guardar', { palabra: 'C:\\modelo.tflite' })).ok !== false) fail('micro: aceptó un modelo que no es el .json');
+    // El audio que manda la interfaz entra mientras el micrófono está elegido.
+    if ((await window.rad.invoke('voz:micro-audio', new Uint8Array(3200))) !== true) fail('micro: el audio de la interfaz no entra');
+    // Sin la palabra no toma nada.
+    await msim({ que: 'voz', silencioMs: 1700 });
+    await sleep(200);
+    if ((await delChat()).length || (await fase()).conversacion) fail('micro: sin la palabra clave tomó una frase');
+    if (!((await sim({})).palabra.bytes > 0)) fail('micro: el audio no le llega al detector de la palabra');
+    // La palabra abre la conversación: se ve en la tarjeta y en la barra.
+    await msim({ que: 'oir' });
+    await until(() => tarjetaV.dataset.conversacion === 'listening', 2000);
+    await settle();
+    if (!dice('voz-micro').includes('In a conversation: listening') || statusRight() !== 'Listening…') fail('micro: abierta la conversación no se dice: tarjeta «' + dice('voz-micro') + '», barra «' + statusRight() + '»');
+    // Una frase: va al chat de voz sin la palabra clave, y la respuesta se dice.
+    const dichosAntes = (await sim({})).voz.dichos.length;
+    await msim({ que: 'hablar', texto: 'Okay Zac, what time is it?' });
+    await until(async () => (await delChat()).includes('what time is it?'), 4000);
+    if (!(await delChat()).includes('what time is it?')) fail('micro: la frase no llegó al chat de voz sin la palabra clave: ' + JSON.stringify(await delChat()));
+    // …mientras contesta (y mientras suena), no toma frases; después vuelve a escuchar SOLO.
+    await until(async () => (await fase()).fase === 'listening', 15000);
+    {
+      const s = await sim({});
+      if ((await fase()).fase !== 'listening' || !(await fase()).conversacion) fail('micro: después de la respuesta no volvió a escuchar solo: ' + JSON.stringify(await fase()));
+      if (s.voz.dichos.length !== dichosAntes + 1) fail('micro: la respuesta de la conversación no se dijo en voz alta (' + (s.voz.dichos.length - dichosAntes) + ')');
+      if (s.voz.hablando) fail('micro: volvió a escuchar mientras la respuesta todavía sonaba');
+    }
+    // La segunda, sin palabra.
+    await msim({ que: 'hablar', texto: 'and tomorrow?' });
+    await until(async () => (await delChat()).includes('and tomorrow?'), 4000);
+    if (!(await delChat()).includes('and tomorrow?')) fail('micro: la segunda frase, sin palabra clave, no llegó: ' + JSON.stringify(await delChat()));
+    await until(async () => (await fase()).fase === 'listening', 15000);
+    // «gracias, zac» la cierra, sin llegarle al agente.
+    const nAntes = (await delChat()).length;
+    await msim({ que: 'hablar', texto: 'Gracias, Zac.' });
+    await until(async () => !(await fase()).conversacion, 4000);
+    await settle();
+    if ((await fase()).conversacion || (await fase()).cierre !== 'phrase' || (await delChat()).length !== nAntes) fail('micro: «gracias, zac» no cerró la conversación, o le llegó al agente: ' + JSON.stringify(await fase()));
+    if (!shown(tarjetaV.querySelector('[data-estado="voz-micro-ultima"]')).includes('you said “gracias, Zac”') || statusRight() === 'Listening…') fail('micro: cerrada, la tarjeta no dice cómo terminó o la barra sigue escuchando: «' + shown(tarjetaV.querySelector('[data-estado="voz-micro-ultima"]')) + '»');
+    // El atajo la abre y la vuelve a cerrar.
+    await window.rad.invoke('voz:micro-alternar');
+    if ((await fase()).fase !== 'listening') fail('micro: el atajo no abrió la conversación');
+    await window.rad.invoke('voz:micro-alternar');
+    if ((await fase()).conversacion || (await fase()).cierre !== 'shortcut') fail('micro: el atajo otra vez no la cerró: ' + JSON.stringify(await fase()));
+    // Volver al Echo: se reconecta, y lo del micrófono se apaga (para la pasada 2, que espera el Echo).
+    campoV('voz-fuente').click();
+    await until(() => menus().length === 1, 2000);
+    await sleep(dur('base') + 80);
+    await pick('Atom Echo');
+    await until(() => tarjetaV.dataset.conexion === 'connected', 4000);
+    {
+      const s = await sim({});
+      const e = await estadoV();
+      if (tarjetaV.dataset.conexion !== 'connected' || s.palabra.prendido || e.conversacion?.activo !== false || e.atajo?.registrado) fail('micro: al volver al Echo no se reconectó, o quedó prendido lo del micrófono: ' + JSON.stringify({ palabra: s.palabra, conv: e.conversacion, atajo: e.atajo }));
+      if ((await window.rad.invoke('voz:micro-audio', new Uint8Array(3200))) !== false) fail('micro: con el Echo elegido, el audio de la interfaz igual entra');
+    }
+    await window.rad.invoke('voz:guardar', { palabra: '' });
+    await go('chat');
+    data.micro = 'se elige en lugar del Echo (lo desconecta), sin abrir el micrófono de verdad; sin palabra no toma nada; la palabra abre la conversación, la frase va sin ella, vuelve a escuchar sola cuando la respuesta terminó de sonar, la segunda sin palabra, «gracias, zac» la cierra sin llegarle al agente, el atajo la abre y la cierra, y volver al Echo lo reconecta';
   }
 
   // 11v. Fijar chats. Un chat fijado sube al grupo «Pinned», arriba de todo; los

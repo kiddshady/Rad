@@ -164,6 +164,21 @@ function paraElHumo() {
     apagar: () => { voz.apagadas++; },
     estado: () => ({ estado: voz.cargas || voz.dichos.length ? 'ready' : 'off', error: '', gpu: null, hablando: voz.activos.size > 0 }),
   });
+  // El detector de la palabra clave del micrófono de la PC, de mentira: no
+  // lanza Python; «oye» cuando el guion se lo pide (voz:micro-simular), y
+  // cuenta el audio que le llega.
+  const palabraM = { prendido: false, bytes: 0, reinicios: 0, alOir: null };
+  const crearPalabra = ({ alOir, alCambiar }) => {
+    palabraM.alOir = alOir;
+    return {
+      prender() { if (!palabraM.prendido) { palabraM.prendido = true; alCambiar(); } },
+      apagar() { if (palabraM.prendido) { palabraM.prendido = false; alCambiar(); } },
+      reiniciar() { palabraM.reinicios++; },
+      dar(pcm) { if (palabraM.prendido) palabraM.bytes += pcm?.length ?? 0; },
+      estado: () => ({ estado: palabraM.prendido ? 'ready' : 'off', error: '', palabra: palabraM.prendido ? 'okay zac' : '' }),
+    };
+  };
+  const oirPalabra = () => { if (palabraM.prendido) palabraM.alOir?.(); return palabraM.prendido; };
   function simular({ que = 'estado', texto = '', palabra = 'okay zac', vozMs = 1200, falla = null } = {}) {
     // (sin nadie que atienda, lo «dicho» se pierde: si quedara en la cola, saldría como la transcripción de la frase siguiente)
     // (lo que «oye» Whisper la próxima vez, sin el Echo: un audio de Telegram)
@@ -177,9 +192,10 @@ function paraElHumo() {
     else if (que === 'cortar') echo.cortar();
     else if (que === 'volver') echo.volver();
     else if (que === 'limpiar') echo.limpiar();
-    return { eventos: echo.nombres(), datos: echo.eventos.map((e) => e.datos), conexiones: echo.conexiones, suscripto: echo.suscripto, llave: echo.clientes.at(-1)?.opciones.psk === echo.llave, host: echo.clientes.at(-1)?.opciones.host ?? null, ...cuenta, voz: { dichos: [...voz.dichos], callados: voz.callados, cargas: voz.cargas, apagadas: voz.apagadas, hablando: voz.activos.size > 0 } };
+    return { eventos: echo.nombres(), datos: echo.eventos.map((e) => e.datos), conexiones: echo.conexiones, suscripto: echo.suscripto, llave: echo.clientes.at(-1)?.opciones.psk === echo.llave, host: echo.clientes.at(-1)?.opciones.host ?? null, ...cuenta, voz: { dichos: [...voz.dichos], callados: voz.callados, cargas: voz.cargas, apagadas: voz.apagadas, hablando: voz.activos.size > 0 },
+      palabra: { prendido: palabraM.prendido, bytes: palabraM.bytes, reinicios: palabraM.reinicios } };
   }
-  return { echo, lib, escucha, crearHabla, simular, llave: echo.llave, probar: async () => ({ ok: true, cuda: false, gpu: null, modelo: true }) };
+  return { echo, lib, escucha, crearHabla, crearPalabra, oirPalabra, simular, llave: echo.llave, probar: async () => ({ ok: true, cuda: false, gpu: null, modelo: true }) };
 }
 
 module.exports = { crear, paraElHumo, tono, silencio, VoiceAssistantEvent };

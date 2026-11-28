@@ -24,6 +24,9 @@ const VOICE_NOTE = '[Voice] The user said this out loud to a microphone, and you
 const PIDE_PERMISO = { es: 'Necesito tu permiso en la pantalla.', en: 'I need your permission on screen.', auto: 'I need your permission on screen.' };
 const PRUEBA = { es: 'Así sueno yo. Si me escuchás, está todo andando.', en: 'This is how I sound. If you can hear me, everything is working.', auto: 'This is how I sound. If you can hear me, everything is working.' };
 const IDIOMAS = ['es', 'en', 'auto'];
+const FUENTES = ['eco', 'micro'];
+// El atajo del micrófono de la PC: abre la conversación o la cierra (Ctrl+Alt+B ya es mostrar/esconder la app).
+const ATAJO_MICRO = 'Control+Alt+Z';
 // La llave de la API de ESPHome: 32 bytes en base64.
 const esLlave = (t) => typeof t === 'string' && /^[A-Za-z0-9+/]{43}=$/.test(t.trim()) && Buffer.from(t.trim(), 'base64').length === 32;
 
@@ -48,6 +51,13 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
       actua: d.actua === true,
       python: typeof d.python === 'string' ? d.python : '',
       hayLlave: typeof d.llave === 'string' && d.llave.length > 0,
+      // con qué se escucha: el Atom Echo o un micrófono de la PC, nunca los dos
+      // (Fran, 27/11/2026: «cada hardware excluye al otro»)
+      fuente: FUENTES.includes(d.fuente) ? d.fuente : 'eco',
+      // el micrófono elegido (su id de Chromium y su nombre, para mostrarlo si no está enchufado)
+      micro: { id: typeof d.micro?.id === 'string' ? d.micro.id : '', nombre: typeof d.micro?.nombre === 'string' ? d.micro.nombre : '' },
+      // el modelo de la palabra clave para el micrófono de la PC: el .json de microWakeWord
+      palabra: typeof d.palabra === 'string' ? d.palabra : '',
       // la respuesta hablada (también apagada de fábrica)
       habla: {
         activa: d.habla?.activa === true,
@@ -68,7 +78,9 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
   // Con el Echo conectado, Whisper queda cargado: en frío tarda unos 14 s, y
   // con la descarga a los cinco minutos la primera orden después de un rato
   // esperaba unos 10 s de más (medido el 27/11/2026).
-  const conectado = () => config().activa && eco.estado().conexion === 'connected';
+  // (con el micrófono de la PC, mientras esté prendido: es lo mismo, una orden puede llegar en cualquier momento)
+  const conMicro = () => config().activa && config().fuente === 'micro';
+  const conectado = () => conMicro() || (config().activa && config().fuente === 'eco' && eco.estado().conexion === 'connected');
   const escucha = simulada?.escucha ?? require('./escucha.cjs').crear({
     python: () => config().python || 'python',
     script,
@@ -155,7 +167,8 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
     // (antes de conectar, el cifrado que Electron no trae: ver chacha.cjs)
     cargar: simulada ? async () => simulada.lib : async () => { await require('./chacha.cjs').instalar(); return import('esphome-client'); },
     // (`ilegible`: hay una llave guardada pero Windows ya no la descifra —pasa si se borran los datos de la app a medias—)
-    config: () => { const c = config(); const llave = laLlave(); return { activa: c.activa, host: c.host, puerto: c.puerto, llave, ilegible: c.hayLlave && !llave }; },
+    // (con el micrófono de la PC elegido, el Echo queda desconectado)
+    config: () => { const c = config(); const llave = laLlave(); return { activa: c.activa && c.fuente === 'eco', host: c.host, puerto: c.puerto, llave, ilegible: c.hayLlave && !llave }; },
     // el Echo oyó la palabra clave: si el agente estaba hablando, se calla (es la forma de interrumpirlo)
     // …y si va a contestar en voz alta, el modelo de voz empieza a cargar ya:
     // en frío tarda unos quince segundos, y este es el aviso más temprano que hay
@@ -176,9 +189,62 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
     ...(simulada ? { resolver: async (h) => h } : {}),
   });
 
+  // ---------- Un micrófono de la PC, en modo conversación ----------
+  // El audio lo captura la interfaz (con el cancelador de eco de Chromium) y
+  // llega por `voz:micro-audio`; acá va a dos lados: al detector de la palabra
+  // clave (palabra.cjs, siempre) y a la conversación (micro.cjs, que solo lo
+  // usa con una frase abierta). Ver micro.cjs.
+  const scriptPalabra = electron.app.isPackaged ? path.join(process.resourcesPath, 'motor', 'palabra_motor.py') : path.join(__dirname, '..', 'motor', 'palabra_motor.py');
+  let micro = null;
+  const palabra = simulada?.crearPalabra ? simulada.crearPalabra({ alOir: () => micro?.oida(), alCambiar: () => avisar() }) : require('./palabra.cjs').crear({
+    python: () => config().python || 'python',
+    script: scriptPalabra,
+    modelo: () => config().palabra,
+    alOir: () => micro?.oida(),
+    alCambiar: () => avisar(),
+  });
+  micro = require('./micro.cjs').crear({
+    // (a la pista de los nombres se le suman las frases de cierre: con la webcam,
+    // «Chau Zac» salía «Chilsec», 28/11/2026; la frase de cierre es «gracias, Zac»)
+    transcribir: (pcm) => { const c = config(); return escucha.transcribir(pcm, { idioma: c.idioma === 'auto' ? '' : c.idioma, prompt: `${pista()}, Zac, gracias Zac` }); },
+    calentar: () => { if (config().habla.activa) { try { habla.calentar(); } catch { /* si no arranca, se sabrá al decir */ } } return escucha.calentar(); },
+    callar,
+    alFrase: (f) => {
+      const c = config();
+      // (`conversacion`: la interfaz avisa con `voz:micro-listo` cuando la respuesta termina de sonar)
+      rad.send('voz:frase', { n: ++cuenta, texto: f.texto, agente: c.agente, actua: c.actua, tardo: f.ms, conversacion: true });
+    },
+    alCambiar: () => avisar(),
+  });
+  // El atajo es global, como Ctrl+Alt+B: anda con la app en la bandeja. En el
+  // humo no se registra (no se le roba el atajo a Fran mientras usa la PC).
+  let atajoTomado = false;
+  let atajoFallo = false;
+  const ponerAtajo = (si) => {
+    if (taller || si === atajoTomado) return;
+    if (si) {
+      try { atajoTomado = electron.globalShortcut.register(ATAJO_MICRO, () => micro.atajo()) === true; } catch { atajoTomado = false; }
+      atajoFallo = !atajoTomado;
+    } else {
+      try { electron.globalShortcut.unregister(ATAJO_MICRO); } catch { /* ya no estaba */ }
+      atajoTomado = false;
+      atajoFallo = false;
+    }
+  };
+  /** Prende o apaga todo lo del micrófono de la PC según la config. */
+  const aplicarMicro = () => {
+    const si = conMicro();
+    micro.activar(si);
+    if (si) { palabra.prender(); try { escucha.calentar(); } catch { /* Settings lo dice */ } } else palabra.apagar();
+    ponerAtajo(si);
+  };
+
   const vista = () => {
     const { hayLlave, ...c } = config();
-    return { ...c, hayLlave, cifrado: cifrar('x') !== null, eco: eco.estado(), whisper: escucha.estado(), habla: { ...c.habla, ...habla.estado() }, modelosHabla: MODELOS_HABLA, elevenlabs: cat11 };
+    return { ...c, hayLlave, cifrado: cifrar('x') !== null, eco: eco.estado(), whisper: escucha.estado(), habla: { ...c.habla, ...habla.estado() }, modelosHabla: MODELOS_HABLA, elevenlabs: cat11,
+      conversacion: micro.estado(), palabraClave: palabra.estado(), atajo: { acelerador: ATAJO_MICRO, registrado: atajoTomado || Boolean(taller && conMicro()), fallo: atajoFallo },
+      // (en el humo la interfaz no abre el micrófono de verdad: el audio lo pone el guion)
+      capturar: !taller };
   };
   avisar = () => rad.send('voz:evento', vista());
 
@@ -186,8 +252,16 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
   rad.handle('voz:guardar', (cambio) => {
     const c = cambio && typeof cambio === 'object' ? cambio : {};
     const d = leer();
-    const antes = JSON.stringify([d.activa === true, d.host ?? '', d.puerto ?? 0]);
+    const antes = JSON.stringify([d.activa === true, d.host ?? '', d.puerto ?? 0, d.fuente ?? 'eco']);
+    const palabraAntes = JSON.stringify([d.python ?? '', d.palabra ?? '']);
     if (typeof c.activa === 'boolean') d.activa = c.activa;
+    if (FUENTES.includes(c.fuente)) d.fuente = c.fuente;
+    if (c.micro && typeof c.micro === 'object') d.micro = { id: String(c.micro.id ?? '').slice(0, 200), nombre: String(c.micro.nombre ?? '').slice(0, 200) };
+    if (typeof c.palabra === 'string') {
+      const p = c.palabra.trim().slice(0, 400);
+      if (p && !/\.json$/i.test(p)) return { ok: false, error: 'The wake word model is the .json file of a microWakeWord model, with its .tflite next to it.' };
+      d.palabra = p;
+    }
     if (typeof c.host === 'string') {
       const h = c.host.trim();
       // (un nombre de la red o una IP: sin esquema, sin barras, sin espacios)
@@ -223,10 +297,13 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
     }
     rad.store.write(DOC, d);
     // solo lo que cambia la conexión la reinicia (elegir otro agente no corta nada)
-    if (antes !== JSON.stringify([d.activa === true, d.host ?? '', d.puerto ?? 0])) {
+    if (antes !== JSON.stringify([d.activa === true, d.host ?? '', d.puerto ?? 0, d.fuente ?? 'eco'])) {
       if (!d.activa) escucha.apagar();
       eco.arrancar();
     }
+    // (otro Python u otro modelo: el detector de la palabra arranca de nuevo con lo nuevo)
+    if (palabraAntes !== JSON.stringify([d.python ?? '', d.palabra ?? ''])) palabra.reiniciar();
+    aplicarMicro();
     avisar();
     return { ok: true };
   });
@@ -256,6 +333,25 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
     return turno ? { ok: true, turno } : { ok: false, error: habla.estado().error || 'There was nothing to say.' };
   });
   rad.handle('voz:callar', () => ({ ok: true, habia: callar() }));
+  // El micrófono de la PC: tramos de audio (16 kHz, mono, 16 bits) que manda la
+  // interfaz mientras está prendido. Lo que llega con el modo apagado se tira.
+  rad.handle('voz:micro-audio', (tramo) => {
+    if (!conMicro() || !tramo || !tramo.byteLength) return false;
+    const b = Buffer.from(tramo.buffer ? new Uint8Array(tramo.buffer, tramo.byteOffset, tramo.byteLength) : tramo);
+    palabra.dar(b);
+    micro.dar(b);
+    return true;
+  });
+  // La respuesta de la conversación terminó de sonar: el micrófono se vuelve a abrir.
+  rad.handle('voz:micro-listo', () => { micro.listo(); return micro.estado(); });
+  // Abrir o cerrar la conversación sin decir nada (lo mismo que el atajo; el botón de la barra).
+  rad.handle('voz:micro-alternar', () => { micro.atajo(); return micro.estado(); });
+  // El modelo de la palabra clave: el .json de microWakeWord (con su .tflite al lado).
+  rad.handle('voz:elegir-palabra', async (_q, ctx) => {
+    if (taller) return path.join(taller, 'okay_zac.json'); // (en el humo no se abre un diálogo)
+    const r = await electron.dialog.showOpenDialog(ctx?.window ?? undefined, { title: 'Wake word model', properties: ['openFile'], filters: [{ name: 'microWakeWord model', extensions: ['json'] }] });
+    return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
+  });
   rad.handle('voz:probar-habla', () => (simulada ? simulada.probar() : require('./habla.cjs').probar({ python: config().habla.python })));
   // Las voces y los modelos de ElevenLabs (con `forzar`, se vuelven a pedir).
   rad.handle('voz:elevenlabs', (que) => traerCatalogo11({ forzar: que?.forzar === true }));
@@ -286,6 +382,24 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
     return { mostrado: true };
   });
   if (taller) rad.handle('voz:ultimo-aviso', () => ultimoAviso);
+  // En el humo, el micrófono de la PC es de mentira: esto «oye» la palabra
+  // clave, o «dice» una frase (deja lo que Whisper va a transcribir y le da al
+  // micrófono voz y después silencio, de a tramos de 100 ms, como la interfaz).
+  if (taller && simulada) {
+    const { tono, silencio } = require('./eco-simulado.cjs');
+    rad.handle('voz:micro-simular', async (que) => {
+      const q = que && typeof que === 'object' ? que : {};
+      if (q.que === 'oir') return { oyo: simulada.oirPalabra(), conversacion: micro.estado() };
+      // ('voz': voz sin dejarle nada dicho a Whisper, para lo que no se tiene que transcribir)
+      if (q.que === 'hablar' || q.que === 'voz' || q.que === 'callado') {
+        if (q.que === 'hablar') simulada.simular({ que: 'dejar', texto: String(q.texto ?? '') });
+        // (el ruido del cuarto primero: el corte aprende el piso antes de la voz)
+        const audio = Buffer.concat([silencio(300), ...(q.que !== 'callado' ? [tono(Number(q.vozMs) || 900)] : []), silencio(Number(q.silencioMs) || 1200)]);
+        for (let i = 0; i < audio.length; i += 3200) { micro.dar(audio.subarray(i, i + 3200)); palabra.dar(audio.subarray(i, i + 3200)); }
+      }
+      return { conversacion: micro.estado(), ...simulada.simular({ que: 'estado' }) };
+    });
+  }
   // En el humo el Echo y Whisper son de mentira, así que lo de verdad no se
   // usa: esto comprueba que igual esté (en la app empaquetada es lo primero
   // que se rompe si la librería o el motor no viajaron).
@@ -327,11 +441,12 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
     });
   }
 
-  electron.app.on('before-quit', () => { eco.parar(); escucha.apagar(); habla.apagar(); });
+  electron.app.on('before-quit', () => { eco.parar(); escucha.apagar(); habla.apagar(); palabra.apagar(); micro.activar(false); ponerAtajo(false); });
   // Al abrir la app, si la escucha quedó prendida, se conecta sola. Recién
   // cuando la app está lista: antes de eso safeStorage no descifra, la llave
-  // saldría vacía y el Echo contestaría que le falta.
-  electron.app.whenReady().then(() => eco.arrancar());
+  // saldría vacía y el Echo contestaría que le falta. (Con el micrófono de la
+  // PC elegido, el Echo no conecta: arranca el detector de la palabra.)
+  electron.app.whenReady().then(() => { eco.arrancar(); aplicarMicro(); });
   // Cambió la llave de ElevenLabs: lo que se sabía de la cuenta ya no vale.
   const alCambiarLlave = () => { once.apagar(); cat11 = { estado: 'off', voces: [], modelos: [], error: '' }; traerCatalogo11({ forzar: true }); };
   // Para el puente a Telegram: pasar a texto un audio (PCM de 16 kHz) con el

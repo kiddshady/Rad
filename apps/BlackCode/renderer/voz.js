@@ -12,10 +12,15 @@
 import * as datos from './datos.js';
 import { toast } from '/@core/toast.js';
 import * as habla from './habla.js';
+import { montarMicro } from './micro.js';
 
 const cola = [];        // frases que esperan su turno (el chat de voz estaba contestando)
 let mandando = false;
 let shell = null;
+// La conversación por el micrófono de la PC: el chat cuya respuesta se espera
+// para volver a abrir el micrófono (main/micro.cjs). null si no hay ninguna.
+let enConversacion = null;
+const listoParaEscuchar = () => window.rad.invoke('voz:micro-listo').catch(() => {});
 
 function abrirChat(chatId) {
   const c = datos.chat(chatId);
@@ -38,9 +43,12 @@ async function atender() {
   cola.shift();
   mandando = true;
   let mando = false;
+  if (f.conversacion) enConversacion = c.id;
   try {
     mando = await datos.enviar(c.id, f.texto, null, { voz: true, modo: f.actua ? 'auto' : 'manual' });
   } finally { mandando = false; }
+  // (no salió: no hay respuesta que esperar, el micrófono vuelve a escuchar)
+  if (!mando && f.conversacion) { enConversacion = null; listoParaEscuchar(); }
   if (mando && datos.chatActual()?.id !== c.id) {
     toast({ text: `${a.nombre} heard: “${f.texto.length > 90 ? `${f.texto.slice(0, 90)}…` : f.texto}”`, duration: 9000, action: { label: 'Open', onClick: () => abrirChat(c.id) } });
   }
@@ -50,6 +58,13 @@ async function atender() {
 /** Lo que dice la barra de abajo mientras el Echo trabaja; null si no hay nada que decir. */
 export function estadoDeVoz() {
   const v = datos.voz();
+  if (v.activa && v.fuente === 'micro') {
+    const c = v.conversacion ?? {};
+    if (c.fase === 'listening') return 'Listening…';
+    if (c.fase === 'transcribing') return 'Transcribing…';
+    // (esperando la respuesta, la barra dice lo de siempre: «Answering…», «Speaking…»)
+    return null;
+  }
   if (!v.activa || v.eco?.conexion !== 'connected') return null;
   if (v.eco.fase === 'listening') return 'Listening…';
   if (v.eco.fase === 'transcribing') return 'Transcribing…';
@@ -62,9 +77,11 @@ export function montarVoz({ shell: s, alHablar = () => {} }) {
   shell = s;
   habla.montarHabla();
   habla.alCambiar(alHablar);
+  // (con «A microphone on this PC» elegido, el micrófono queda abierto)
+  montarMicro();
   window.rad.on('voz:frase', (f) => {
     if (!f || typeof f.texto !== 'string' || !f.texto.trim()) return;
-    cola.push({ texto: f.texto.trim(), agente: String(f.agente ?? ''), actua: f.actua === true });
+    cola.push({ texto: f.texto.trim(), agente: String(f.agente ?? ''), actua: f.actua === true, conversacion: f.conversacion === true });
     atender();
   });
   window.rad.on('voz:abrir', (ev) => abrirChat(String(ev?.chat ?? '')));
@@ -75,7 +92,14 @@ export function montarVoz({ shell: s, alHablar = () => {} }) {
       const cuerpo = t.estado === 'error' ? `It failed: ${t.nota || 'there was no answer.'}` : t.estado === 'frenado' ? 'Stopped.' : (t.texto || 'Done.');
       aviso(a?.nombre ?? 'BlackCode', cuerpo, t.chat);
       // …y, si está prendido, la respuesta se dice en voz alta (un turno frenado o roto, no)
-      if (datos.voz().habla?.activa && t.estado === 'ok' && t.texto.trim()) window.rad.invoke('voz:decir', { texto: t.texto }).catch(() => {});
+      const decirla = datos.voz().habla?.activa && t.estado === 'ok' && t.texto.trim();
+      const dicha = decirla ? window.rad.invoke('voz:decir', { texto: t.texto }).catch(() => null) : Promise.resolve(null);
+      // En una conversación por el micrófono de la PC, el micrófono vuelve a
+      // abrirse cuando la respuesta terminó de SONAR (si se dijo) o de llegar.
+      if (enConversacion === t.chat) {
+        enConversacion = null;
+        dicha.then((r) => (r?.ok && r.turno ? habla.cuandoTermine(r.turno) : null)).then(listoParaEscuchar);
+      }
     }
     atender();
   });

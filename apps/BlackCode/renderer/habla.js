@@ -56,11 +56,40 @@ export function callar() {
   }
   cursor = 0;
   avisar();
+  // (lo callado ya terminó: el que esperaba ese turno sigue)
+  for (const [turno, w] of esperas) if (callados.has(turno)) { esperas.delete(turno); w.resolve(); }
+}
+
+// Los que esperan que un turno termine de SONAR (no solo de generarse): la
+// conversación por el micrófono de la PC vuelve a escuchar recién entonces,
+// para no oír la voz de Zac.
+const esperas = new Map(); // turno → { generado, resolve }
+const TOPE_ESPERA_MS = 180000;
+function mirarEsperas() {
+  for (const [turno, w] of esperas) {
+    if (!w.generado) continue;
+    if ([...sonando].some((f) => f.turno === turno)) continue;
+    esperas.delete(turno);
+    w.resolve();
+  }
+}
+/** Se resuelve cuando ese turno terminó de generarse y de sonar (o se lo calló). */
+export function cuandoTermine(turno) {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => { esperas.delete(turno); resolve(); }, TOPE_ESPERA_MS);
+    esperas.set(turno, { generado: false, resolve: () => { clearTimeout(t); resolve(); } });
+  });
 }
 
 export function montarHabla() {
   window.rad.on('voz:audio', (a) => { if (a && typeof a === 'object') tramo(a); });
   window.rad.on('voz:callar', () => callar());
   // (el turno terminó de generarse: si lo habían callado, ya no hace falta recordarlo)
-  window.rad.on('voz:dicho', (f) => { if (f?.turno) setTimeout(() => callados.delete(f.turno), 5000); });
+  window.rad.on('voz:dicho', (f) => {
+    if (!f?.turno) return;
+    setTimeout(() => callados.delete(f.turno), 5000);
+    const w = esperas.get(f.turno);
+    if (w) { w.generado = true; mirarEsperas(); }
+  });
+  alCambiar(mirarEsperas);
 }

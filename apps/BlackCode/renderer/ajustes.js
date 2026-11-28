@@ -13,6 +13,7 @@ import * as actualizacion from './actualizacion.js';
 import * as datosApp from './datos.js';
 import { h, icono } from './piezas.js';
 import * as parlante from './habla.js';
+import { listarMicros, estadoMicro, alCambiarMicro } from './micro.js';
 
 const PROVEEDORES = [
   {
@@ -741,6 +742,31 @@ function describirEco(v) {
   if (e.error) return { tono: 'warning', texto: `${e.error} Trying again…` };
   return { tono: 'idle', texto: `Connecting to ${v.host || 'the device'}…` };
 }
+// El micrófono de la PC: el micrófono abierto, el detector de la palabra y la conversación.
+function describirMicro(v, mic) {
+  if (!v.activa) return { tono: 'idle', texto: 'Off: the microphone is closed.' };
+  if (v.capturar !== false && mic.estado === 'error') return { tono: 'danger', texto: mic.error || 'The microphone could not be opened.' };
+  const p = v.palabraClave ?? {};
+  if (p.estado === 'error') return { tono: 'danger', texto: p.error || 'The wake word listener stopped.' };
+  if (v.capturar !== false && mic.estado !== 'on') return { tono: 'idle', texto: 'Opening the microphone…' };
+  if (p.estado !== 'ready') return { tono: 'idle', texto: 'Loading the wake word model…' };
+  const c = v.conversacion ?? {};
+  const quien = mic.nombre ? `Listening on ${mic.nombre}.` : 'The microphone is open.';
+  if (c.fase === 'listening') return { tono: 'success', texto: `${quien} In a conversation: listening…` };
+  if (c.fase === 'transcribing') return { tono: 'success', texto: `${quien} In a conversation: transcribing…` };
+  if (c.conversacion) return { tono: 'success', texto: `${quien} In a conversation: waiting for the answer.` };
+  return { tono: 'success', texto: `${quien} Waiting for “${p.palabra || 'the wake word'}”.` };
+}
+const CIERRES = { phrase: 'you said “gracias, Zac”', silence: '30 seconds went by without talking', shortcut: 'the shortcut ended it', error: 'Whisper could not transcribe', off: 'listening was turned off' };
+function describirUltimaMicro(v) {
+  const c = v.conversacion ?? {};
+  const u = c.ultima;
+  if (!c.conversacion && c.cierre && CIERRES[c.cierre]) return `The last conversation ended: ${CIERRES[c.cierre]}.`;
+  if (!u) return '';
+  if (u.texto && !u.cierre) return `Last heard: “${u.texto}”`;
+  if (u.error) return `Last time it could not be transcribed: ${u.error}`;
+  return '';
+}
 function describirUltima(v) {
   const u = v.eco?.ultima;
   if (!u) return '';
@@ -767,6 +793,23 @@ function tarjetaVoz() {
   const quitar = h('button', 'rad-button', { type: 'button', 'data-variant': 'quiet', 'data-accion': 'voz-quitar-llave' }, 'Remove key');
   const form = h('form', 'dm-llave', {}, cajaLlave, h('div', 'dm-llave-acciones', {}, quitar, guardar));
 
+  // --- Con qué se escucha: el Atom Echo o un micrófono de la PC, nunca los dos.
+  // Lo de cada uno va en su caja, y la del que no se usa se pliega (como los motores de la voz).
+  const huecoFuente = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-voz-rotulo-fuente' }, 'Listen with'));
+  const cajaEco = h('div', 'dm-voz-motor', { 'data-motor': 'eco' }, h('div', 'dm-voz-motor-in', {}, estado, ultima, cajaHost, estadoLlave, form));
+  const textoMic = h('span', 'dm-estado-texto rad-swap');
+  const estadoMic = h('p', 'dm-estado', { role: 'status', 'data-estado': 'voz-micro' }, h('i', 'dm-estado-punto', { 'aria-hidden': 'true' }), textoMic);
+  const ultimaMic = h('p', 'dm-voz-ultima rad-swap', { 'data-estado': 'voz-micro-ultima' });
+  const huecoMic = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-voz-rotulo-micro' }, 'Microphone'));
+  const pistaMic = h('span', 'rad-field-hint', {}, 'It stays open while listening is on, with echo cancellation. While the agent speaks it takes no phrases, only the wake word, which makes it stop.');
+  huecoMic.append(pistaMic);
+  const modeloPalabra = h('span', 'dm-carpeta-inicio rad-mono rad-swap', { 'data-estado': 'voz-palabra' });
+  const elegirPalabra = h('button', 'rad-button', { type: 'button', 'data-accion': 'voz-palabra' }, 'Choose…');
+  const cajaPalabra = h('div', 'rad-field', {}, h('span', 'rad-field-label', {}, 'Wake word model'), h('div', 'dm-carpeta-inicio-fila', {}, modeloPalabra, elegirPalabra),
+    h('span', 'rad-field-hint', {}, 'The .json of a microWakeWord model, with its .tflite next to it: the same one the Atom Echo runs. It runs in Whisper’s Python, which needs the pymicro-wakeword package.'));
+  const notaMic = h('p', 'dm-tarjeta-instr rad-swap', { 'data-estado': 'voz-micro-nota' });
+  const cajaMicro = h('div', 'dm-voz-motor', { 'data-motor': 'micro' }, h('div', 'dm-voz-motor-in', {}, estadoMic, ultimaMic, huecoMic, cajaPalabra, notaMic));
+
   const huecoAgente = h('div', 'rad-field', {}, h('span', 'rad-field-label', { id: 'dm-voz-rotulo-agente' }, 'Agent'));
   const pistaAgente = h('span', 'rad-field-hint', {}, 'Who receives what you say. It goes to a voice chat of that agent; after half an hour without talking, the next thing you say starts a new one.');
   huecoAgente.append(pistaAgente);
@@ -780,7 +823,7 @@ function tarjetaVoz() {
     h('span', 'rad-field-hint', {}, 'Whisper runs in your own Python, with the openai-whisper package. Leave it empty to use the one in your PATH, or put the full path to another python.exe.'));
 
   const actua = h('input', '', { type: 'checkbox', role: 'switch', 'data-campo': 'voz-actua' });
-  const nota = h('p', 'dm-tarjeta-instr rad-swap');
+  const nota = h('p', 'dm-tarjeta-instr rad-swap', { 'data-estado': 'voz-actua-nota' });
 
   // --- La respuesta hablada: el agente contesta por los parlantes, con una voz clonada.
   const hablaActiva = h('input', '', { type: 'checkbox', role: 'switch', 'data-campo': 'voz-habla' });
@@ -817,10 +860,9 @@ function tarjetaVoz() {
 
   const tarjeta = h('section', 'dm-tarjeta', { 'data-tarjeta': 'voz' },
     h('h2', 'dm-tarjeta-nombre', {}, 'Voice'),
-    h('p', 'dm-tarjeta-instr', {}, 'Say the wake word to an M5Stack Atom Echo running ESPHome, and what you say next goes to an agent as a chat message. BlackCode connects to the device itself, without Home Assistant, and turns the audio into text on this PC with Whisper. The audio is never saved.'),
-    h('label', 'rad-switch', {}, activa, h('span', 'rad-switch-track'), 'Listen to the Atom Echo'),
-    estado, ultima,
-    cajaHost, estadoLlave, form,
+    h('p', 'dm-tarjeta-instr', {}, 'Say the wake word, and what you say next goes to an agent as a chat message. With an M5Stack Atom Echo running ESPHome, each order is one phrase: BlackCode connects to the device itself, without Home Assistant. With a microphone on this PC, it is a conversation. The audio is turned into text on this PC with Whisper, and never saved.'),
+    h('label', 'rad-switch', {}, activa, h('span', 'rad-switch-track'), 'Listen for the wake word'),
+    huecoFuente, cajaEco, cajaMicro,
     h('div', 'dm-voz-par', {}, huecoAgente, huecoIdioma),
     h('h3', 'dm-subtarjeta-nombre', {}, 'Whisper'),
     h('div', 'dm-voz-whisper', {}, estadoW, probar),
@@ -864,10 +906,10 @@ function tarjetaVoz() {
     if (probando) return { tono: 'idle', texto: 'Asking Python whether it has Whisper…' };
     if (w.estado === 'error') return { tono: 'danger', texto: w.error || 'Whisper stopped.' };
     if (w.estado === 'loading' || w.estado === 'starting') return { tono: 'idle', texto: 'Loading the model…' };
-    if (w.estado === 'ready') return { tono: 'success', texto: `The model is loaded${w.gpu ? ` on ${w.gpu}` : w.dispositivo === 'cpu' ? ' on the CPU' : ''}. It stays loaded while the Echo is connected.` };
+    if (w.estado === 'ready') return { tono: 'success', texto: `The model is loaded${w.gpu ? ` on ${w.gpu}` : w.dispositivo === 'cpu' ? ' on the CPU' : ''}. It stays loaded while ${v.fuente === 'micro' ? 'listening is on' : 'the Echo is connected'}.` };
     if (!prueba) return { tono: 'idle', texto: 'Not checked yet.' };
     if (!prueba.ok) return { tono: 'danger', texto: prueba.error || 'Whisper could not be loaded.' };
-    return { tono: 'success', texto: `Whisper is installed${prueba.gpu ? ` and will use ${prueba.gpu}` : ', and will run on the CPU'}. ${prueba.modelo ? 'The model loads when the Echo connects.' : 'The model is not downloaded yet: the first phrase will download it (1.5 GB).'}` };
+    return { tono: 'success', texto: `Whisper is installed${prueba.gpu ? ` and will use ${prueba.gpu}` : ', and will run on the CPU'}. ${prueba.modelo ? `The model loads when ${v.fuente === 'micro' ? 'listening turns on' : 'the Echo connects'}.` : 'The model is not downloaded yet: the first phrase will download it (1.5 GB).'}` };
   };
   const poner = () => {
     const v = datosApp.voz();
@@ -892,14 +934,77 @@ function tarjetaVoz() {
       : 'What you say runs like a chat in manual mode: a tool that needs permission shows its card in the window and waits for you.');
     if (selAgente && selAgente.value !== (datosApp.agenteDeVoz()?.id ?? '')) selAgente.value = datosApp.agenteDeVoz()?.id ?? '';
     if (selIdioma && selIdioma.value !== v.idioma) selIdioma.value = v.idioma;
+    // con qué se escucha: la caja del otro se pliega y no se toca
+    const conMic = v.fuente === 'micro';
+    if (selFuente && selFuente.value !== (v.fuente ?? 'eco')) selFuente.value = v.fuente ?? 'eco';
+    cajaEco.toggleAttribute('data-abierto', !conMic);
+    cajaMicro.toggleAttribute('data-abierto', conMic);
+    cajaEco.inert = conMic;
+    cajaMicro.inert = !conMic;
+    const mic = estadoMicro();
+    const dm = describirMicro(v, mic);
+    estadoMic.dataset.tono = dm.tono;
+    swapText(textoMic, dm.texto);
+    const um = describirUltimaMicro(v);
+    swapText(ultimaMic, um);
+    ultimaMic.toggleAttribute('data-vacia', !um);
+    swapText(modeloPalabra, v.palabra || 'None chosen');
+    const at = v.atajo ?? {};
+    swapText(notaMic, `Say the wake word${at.fallo ? '' : ` or press ${(at.acelerador ?? 'Control+Alt+Z').replace('Control', 'Ctrl')}`} to start a conversation: after each answer it listens again, without the wake word. Say “gracias, Zac”, stay quiet for 30 seconds${at.fallo ? '' : ', or press the shortcut again'} to end it.${at.fallo ? ` The shortcut ${(at.acelerador ?? '').replace('Control', 'Ctrl')} is taken by another program, so only the wake word starts it.` : ''}`);
+    if (selMic && selMic.value !== (v.micro?.id ?? '')) armarMicros();
+    tarjeta.dataset.fuente = conMic ? 'micro' : 'eco';
+    tarjeta.dataset.micro = mic.estado;
+    tarjeta.dataset.conversacion = v.conversacion?.conversacion ? (v.conversacion.fase ?? 'idle') : 'no';
     tarjeta.dataset.activa = v.activa ? 'si' : 'no';
     tarjeta.dataset.conexion = v.eco?.conexion ?? 'off';
     tarjeta.dataset.fase = v.eco?.fase ?? 'idle';
     tarjeta.dataset.llave = v.hayLlave ? 'si' : 'no';
     tarjeta.dataset.actua = v.actua ? 'si' : 'no';
     // la tarjeta trabaja mientras conecta
-    setBusy(tarjeta, v.activa && v.eco?.conexion === 'connecting');
+    setBusy(tarjeta, v.activa && !conMic && v.eco?.conexion === 'connecting');
   };
+  // --- los selects de con qué se escucha y de qué micrófono
+  let selFuente = null;
+  let selMic = null;
+  let firmaMics = '';
+  const FUENTES_VOZ = [{ value: 'eco', label: 'Atom Echo' }, { value: 'micro', label: 'A microphone on this PC' }];
+  const armarFuente = () => {
+    selFuente = createSelect({ options: FUENTES_VOZ, value: datosApp.voz().fuente ?? 'eco', onChange: async (id) => { await datosApp.guardarVoz({ fuente: id }); if (id === 'micro') traerMicros(); } });
+    selFuente.el.setAttribute('aria-labelledby', 'dm-voz-rotulo-fuente');
+    selFuente.el.dataset.campo = 'voz-fuente';
+    huecoFuente.append(selFuente.el);
+  };
+  // (la lista sale de Windows: se rearma solo cuando cambia, o cuando cambia el elegido)
+  let mics = [];
+  const armarMicros = () => {
+    const v = datosApp.voz();
+    const elegido = v.micro ?? { id: '', nombre: '' };
+    const opciones = [{ value: '', label: 'Windows default' }, ...mics.map((m) => ({ value: m.id, label: m.nombre }))];
+    // el elegido que no está enchufado se sigue viendo, con su nombre
+    if (elegido.id && !mics.some((m) => m.id === elegido.id)) opciones.push({ value: elegido.id, label: `${elegido.nombre || 'Microphone'} (not connected)` });
+    const firma = JSON.stringify([opciones, elegido.id]);
+    if (firma === firmaMics && selMic) return;
+    firmaMics = firma;
+    selMic?.close();
+    selMic?.el.remove();
+    selMic = createSelect({ options: opciones, value: elegido.id, onChange: (id) => datosApp.guardarVoz({ micro: { id, nombre: mics.find((m) => m.id === id)?.nombre ?? '' } }) });
+    selMic.el.setAttribute('aria-labelledby', 'dm-voz-rotulo-micro');
+    selMic.el.dataset.campo = 'voz-micro';
+    huecoMic.insertBefore(selMic.el, pistaMic);
+  };
+  const traerMicros = async () => {
+    // (el permiso se pide abriendo uno un instante, solo de verdad: en el humo no se toca el micrófono)
+    mics = await listarMicros({ pedirPermiso: datosApp.voz().capturar !== false }).catch(() => []);
+    armarMicros();
+  };
+  elegirPalabra.addEventListener('click', async () => {
+    const elegida = await window.rad.invoke('voz:elegir-palabra').catch(() => null);
+    if (!elegida) return;
+    const r = await datosApp.guardarVoz({ palabra: elegida });
+    if (!r?.ok) toast({ text: r?.error ?? 'It could not be saved.', kind: 'danger' });
+  });
+  navigator.mediaDevices?.addEventListener?.('devicechange', () => { if (datosApp.voz().fuente === 'micro') traerMicros(); });
+  alCambiarMicro(poner);
   const preguntar = async () => {
     probando = true;
     poner();
@@ -1105,11 +1210,15 @@ function tarjetaVoz() {
 
   armarAgente();
   armarIdioma();
+  armarFuente();
+  armarMicros();
   poner();
   datosApp.on('voz', poner);
   datosApp.on('agentes', () => { armarAgente(); poner(); });
   // (a Python se le pregunta la primera vez que se abre Settings, no al abrir la app)
   tarjeta.preguntar = () => {
+    // (los micrófonos se piden cada vez que se abre: se enchufan y se desenchufan)
+    traerMicros();
     if (!prueba && !probando) preguntar();
     if (!pruebaH && !probandoH) preguntarH();
     // (las voces de ElevenLabs también se piden acá, no al abrir la app)

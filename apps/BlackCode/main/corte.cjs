@@ -30,12 +30,19 @@ function volumen(buf, desde = 0, hasta = buf.length) {
  * @param {number} o.umbral      volumen mínimo para contar como voz, sea cual sea el piso
  * @param {number} o.sobrePiso   cuántas veces el piso de ruido tiene que superar la voz
  * @param {number} o.arranqueMs  voz seguida que hace falta para dar la frase por empezada
+ * @param {number} o.piso        el ruido de fondo, si ya se conoce (el micrófono de la PC lo
+ *                               mide todo el tiempo: la frase se abre mientras se sigue
+ *                               hablando, y sin esto la voz pasaba por el piso)
  */
-function crear({ silencioMs = 900, esperaMs = 4000, topeMs = 15000, umbral = 350, sobrePiso = 3, arranqueMs = 60 } = {}) {
+// (minVozMs: una frase con menos voz que esto no se cierra al callar: se
+// sigue esperando. Es para la que se abre con la palabra clave en el micrófono
+// de la PC: la cola de «zac» y la pausa que se hace antes de pedir algo la
+// cerraban antes de que se dijera nada. 0 = sin mínimo, como el Echo.)
+function crear({ silencioMs = 900, esperaMs = 4000, topeMs = 15000, umbral = 350, sobrePiso = 3, arranqueMs = 60, piso: pisoInicial = Infinity, minVozMs = 0 } = {}) {
   const partes = [];
   let resto = Buffer.alloc(0);
   let ms = 0;          // audio recibido
-  let piso = Infinity; // el ruido de fondo: el cuadro más callado, que sube despacio
+  let piso = Number.isFinite(pisoInicial) && pisoInicial > 0 ? pisoInicial : Infinity; // el ruido de fondo: el cuadro más callado, que sube despacio
   let seguida = 0;     // voz seguida, hasta que la frase empieza
   let empezo = false;
   let callado = 0;     // silencio desde la última voz
@@ -59,7 +66,8 @@ function crear({ silencioMs = 900, esperaMs = 4000, topeMs = 15000, umbral = 350
       const voz = v > Math.max(umbral, piso * sobrePiso);
       piso = voz ? Math.min(v, piso) : Math.min(v, piso * 1.003 + 0.5);
       if (voz) { conVoz += CUADRO_MS; callado = 0; seguida += CUADRO_MS; if (seguida >= arranqueMs) empezo = true; } else { seguida = 0; if (empezo) callado += CUADRO_MS; }
-      if (empezo && callado >= silencioMs) cierre = 'fin';
+      if (empezo && callado >= silencioMs && conVoz < minVozMs) { empezo = false; callado = 0; conVoz = 0; } // (un pedacito suelto: no era la frase)
+      else if (empezo && callado >= silencioMs) cierre = 'fin';
       else if (!empezo && ms >= esperaMs) cierre = 'vacio';
       else if (ms >= topeMs) cierre = empezo ? 'tope' : 'vacio';
     }
