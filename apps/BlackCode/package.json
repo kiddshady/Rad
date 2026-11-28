@@ -1,7 +1,7 @@
 {
   "name": "blackcode",
   "productName": "BlackCode",
-  "version": "1.24.1",
+  "version": "1.25.0",
   "private": true,
   "description": "BlackCode: an AI chat with several agents, each with its own provider, model, instructions and chats.",
   "author": "Kidd Shady · Umbrovex Systems",
@@ -47,6 +47,8 @@
       "build/icon.png",
       "build/tray.ico",
       "build/tray-dark.ico",
+      "build/tray-rec.ico",
+      "build/tray-dark-rec.ico",
       "package.json"
     ],
     "asarUnpack": [

@@ -66,7 +66,10 @@ function arrancar() {
 
   let pedidos = null;
   llave.wire(rad, { alCambiar: (proveedor) => pedidos?.alCambiarLlave(proveedor) });
-  pedidos = chat.wire(rad, { llave });
+  // (una conversación por el micrófono de la PC abierta pone el punto rojo en la bandeja)
+  pedidos = chat.wire(rad, { llave, alConversacion: (si) => bandeja.grabando(si) });
+  // (solo en el humo, donde la bandeja no se crea: qué ícono tendría)
+  if (process.env.RAD_SMOKE) rad.handle('bandeja:icono', () => path.basename(bandeja.icono()));
   // El puente al celular (BlackCode Mobile): apagado de fábrica, se prende en
   // Settings › Integrations. Ver main/movil.cjs.
   const movil = require('./main/movil.cjs').crear(rad);

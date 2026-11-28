@@ -1,5 +1,38 @@
 # Changelog
 
+## BlackCode 1.25.0 (2026-11-28)
+
+Saber cuándo te escucha la conversación por el micrófono de la PC y cuándo
+se cerró (pedido de Fran: con la webcam lo oye desde la otra punta del
+cuarto, pero no se daba cuenta de cuándo escuchaba ni de cuándo «gracias,
+Zac» cerraba el micrófono). Las tres señales las eligió en su maqueta
+(`Documents\BlackCode-mockups\voz-senales.html`).
+
+- **Un sonido al abrir y otro al cerrar** («Gotas»: dos notas que suben y
+  dos que bajan), para oírlo desde lejos o con la app en la bandeja. Suena
+  al abrirse con «okay zac» o Ctrl+Alt+Z y al cerrarse con «gracias, Zac»,
+  a los 30 s sin hablar o con el atajo (el mismo para los tres). Cuando el
+  micrófono se reabre después de cada respuesta no suena nada, ni al apagar
+  la voz desde Settings. Lo genera Web Audio en la misma página que dice la
+  voz de Zac: el cancelador de eco lo saca de lo que oye el micrófono.
+- **La isla**: una pastilla en el medio de la titlebar mientras dura la
+  conversación, con el micrófono, cinco barritas que siguen el volumen de
+  lo que oye (un analizador sobre la misma captura) y en qué anda:
+  Listening, Transcribing, Thinking, Speaking. Entra y sale fundiéndose; el
+  texto se releva en orden y la pastilla no cambia de ancho. En la maqueta
+  iba arriba de la conversación; ahí tapaba la cabecera y un título largo,
+  así que va en la titlebar, que en el medio siempre está vacía, del alto
+  de la pestaña activa. La barra de abajo ya no repite «Listening…» con el
+  micrófono de la PC (con el Echo sigue igual).
+- **Punto rojo en el ícono de la bandeja** mientras la conversación está
+  abierta (`tray-rec.ico` y `tray-dark-rec.ico`, horneados por
+  `scripts/icon.mjs`; un aro transparente lo separa del dibujo, que va
+  entero). `icon-kit.mjs` suma capas que borran (`erase`).
+- En el humo los sonidos se cuentan y no suenan; se miden la entrada y la
+  salida de la isla cuadro por cuadro, su lugar entre las pestañas y los
+  botones, y el ícono de la bandeja (`bandeja:icono`, solo en el humo).
+  Probado al revés: sin sonido, sin fundido o sin punto, el humo falla.
+
 ## BlackCode 1.24.1 (2026-11-28)
 
 - **Una negrita de un solo carácter se comía hasta la siguiente.** Fran lo

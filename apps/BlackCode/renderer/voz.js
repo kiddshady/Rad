@@ -13,6 +13,7 @@ import * as datos from './datos.js';
 import { toast } from '/@core/toast.js';
 import * as habla from './habla.js';
 import { montarMicro } from './micro.js';
+import { montarSenales } from './senales.js';
 
 const cola = [];        // frases que esperan su turno (el chat de voz estaba contestando)
 let mandando = false;
@@ -58,13 +59,9 @@ async function atender() {
 /** Lo que dice la barra de abajo mientras el Echo trabaja; null si no hay nada que decir. */
 export function estadoDeVoz() {
   const v = datos.voz();
-  if (v.activa && v.fuente === 'micro') {
-    const c = v.conversacion ?? {};
-    if (c.fase === 'listening') return 'Listening…';
-    if (c.fase === 'transcribing') return 'Transcribing…';
-    // (esperando la respuesta, la barra dice lo de siempre: «Answering…», «Speaking…»)
-    return null;
-  }
+  // (con el micrófono de la PC lo dice la isla, arriba: senales.js. La barra
+  // sigue con lo de siempre, como en la maqueta que eligió Fran)
+  if (v.activa && v.fuente === 'micro') return null;
   if (!v.activa || v.eco?.conexion !== 'connected') return null;
   if (v.eco.fase === 'listening') return 'Listening…';
   if (v.eco.fase === 'transcribing') return 'Transcribing…';
@@ -79,6 +76,8 @@ export function montarVoz({ shell: s, alHablar = () => {} }) {
   habla.alCambiar(alHablar);
   // (con «A microphone on this PC» elegido, el micrófono queda abierto)
   montarMicro();
+  // …y lo que avisa cuándo escucha y cuándo se cerró: el sonido y la isla
+  montarSenales();
   window.rad.on('voz:frase', (f) => {
     if (!f || typeof f.texto !== 'string' || !f.texto.trim()) return;
     cola.push({ texto: f.texto.trim(), agente: String(f.agente ?? ''), actua: f.actua === true, conversacion: f.conversacion === true });

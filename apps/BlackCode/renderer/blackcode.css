@@ -2229,4 +2229,72 @@
   .dm-tools-lista { transition: opacity var(--rad-dur-base) var(--rad-ease-in-out); }
   .dm-tarjeta-datos { display: flex; flex-wrap: wrap; gap: var(--rad-space-1) var(--rad-space-3); min-width: 0; }
   .dm-tarjeta-tools { font-size: var(--rad-text-s); color: var(--rad-text-3); }
+
+  /* ---------- La isla de la voz (renderer/senales.js) ----------
+     Mientras dura una conversación por el micrófono de la PC: una pastilla
+     con el micrófono, cinco barritas que siguen lo que oye y en qué anda. La
+     eligió Fran en su maqueta (28/11/2026). Va en el MEDIO DE LA TITLEBAR,
+     que siempre está vacío (las pestañas a la izquierda, los botones a la
+     derecha), del alto de la pestaña activa: más abajo caía sobre la
+     cabecera de la conversación y tapaba un título largo, y sobre el
+     navegador lo eclipsaba. Vive en la capa de overlays pero DEBAJO de todo
+     lo demás de ahí (z -1: un modal o un toast la tapan aunque se abran
+     antes) y no se toca (el arrastre de la titlebar pasa a través). OPACA,
+     como «Jump to latest»: entra bajando un poco, y lo que esmerila no se
+     mueve. */
+  .dm-isla {
+    position: absolute;
+    top: calc(var(--rad-space-3) / 2);
+    left: 50%;
+    z-index: -1;
+    display: flex;
+    align-items: center;
+    gap: var(--rad-space-2);
+    height: calc(var(--rad-titlebar-height) - var(--rad-space-3));
+    padding-inline: var(--rad-space-3) var(--rad-space-4);
+    border-radius: var(--rad-radius-pill);
+    background-color: var(--rad-surface-0);
+    background-image: linear-gradient(var(--rad-surface-3), var(--rad-surface-3));
+    box-shadow: var(--rad-shadow-1), inset 0 0 0 var(--rad-line-width) var(--rad-line-strong);
+    color: var(--rad-text-1);
+    font-size: var(--rad-text-s);
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, calc(var(--rad-space-1) * -1)) scale(0.96);
+    transition: opacity var(--rad-dur-base) var(--rad-ease-in), transform var(--rad-dur-base) var(--rad-ease-in);
+  }
+  .dm-isla[data-visible] {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+    transition: opacity var(--rad-dur-base) var(--rad-ease-out), transform var(--rad-dur-base) var(--rad-ease-out);
+  }
+  .dm-isla-micro { width: 14px; height: 14px; color: var(--rad-text-1); }
+  .dm-isla-barras { display: flex; align-items: center; gap: 2px; height: 14px; }
+  /* cada barra mide entera y se achica con scaleY (nunca se anima el alto):
+     --dm-k la pone senales.js cuadro por cuadro, de 0 (un puntito) a 1 */
+  .dm-isla-barra {
+    width: 3px;
+    height: 14px;
+    border-radius: var(--rad-radius-pill);
+    background: currentColor;
+    transform: scaleY(calc(0.19 + var(--dm-k, 0) * 0.81));
+    transition: opacity var(--rad-dur-base) var(--rad-ease-in-out);
+  }
+  /* pensando o hablando, el micrófono no oye: las barras se apagan un poco */
+  .dm-isla[data-fase='thinking'] .dm-isla-barra, .dm-isla[data-fase='speaking'] .dm-isla-barra { opacity: 0.45; }
+  /* Los cuatro textos en la misma celda: el relevo va EN ORDEN (el que se va
+     se apaga del todo y recién después entra el nuevo), y la pastilla no
+     cambia de ancho porque la celda mide siempre al más largo. */
+  .dm-isla-textos { display: grid; }
+  .dm-isla-texto {
+    grid-area: 1 / 1;
+    justify-self: start;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity var(--rad-dur-fast) var(--rad-ease-in);
+  }
+  .dm-isla-texto[data-activo] {
+    opacity: 1;
+    transition: opacity var(--rad-dur-base) var(--rad-ease-out) var(--rad-dur-fast);
+  }
 }

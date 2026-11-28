@@ -22,6 +22,22 @@ const poner = (cambio) => { Object.assign(e, cambio); avisar(); };
 
 /** El estado del micrófono: 'off', 'opening', 'on' o 'error' (con su error y el nombre del que se abrió). */
 export const estadoMicro = () => ({ ...e });
+
+// Cuánto suena lo que oye el micrófono ahora mismo, de 0 a 1: lo dibujan las
+// barritas de la isla (senales.js) cuadro por cuadro. Sale de un analizador
+// pegado a la misma fuente (los tramos de 100 ms que van al main son pocos
+// para que las barras sigan la voz). Con el micrófono cerrado, 0.
+let muestras = null;
+export function nivelMicro() {
+  const an = actual?.analizador;
+  if (!an) return 0;
+  if (!muestras || muestras.length !== an.fftSize) muestras = new Float32Array(an.fftSize);
+  an.getFloatTimeDomainData(muestras);
+  let s = 0;
+  for (let i = 0; i < muestras.length; i++) s += muestras[i] * muestras[i];
+  // (la voz a un metro da un RMS de 0,02 a 0,1 con el control de ganancia: se lleva a 0..1 en escala de raíz, que reparte mejor lo bajo)
+  return Math.min(1, Math.sqrt(Math.sqrt(s / muestras.length) * 9));
+}
 export function alCambiarMicro(fn) { oyentes.add(fn); return () => oyentes.delete(fn); }
 
 /** Los micrófonos de la PC: [{ id, nombre }]. Sin permiso todavía, los nombres
@@ -77,8 +93,11 @@ async function abrir(id) {
     const nodo = new AudioWorkletNode(ctx, 'blackcode-micro', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1 });
     nodo.port.onmessage = (ev) => { window.rad.invoke('voz:micro-audio', new Uint8Array(ev.data)).catch(() => {}); };
     fuente.connect(nodo);
+    const analizador = ctx.createAnalyser();
+    analizador.fftSize = 512;
+    fuente.connect(analizador);
     if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
-    actual = { stream, ctx, nodo, id };
+    actual = { stream, ctx, nodo, id, analizador };
     const pista = stream.getAudioTracks()[0];
     // (si se desenchufa, se dice; al volver a enchufarlo, se reabre cuando cambie la lista)
     pista?.addEventListener('ended', () => { if (actual?.stream === stream) { cerrar(); poner({ estado: 'error', error: 'The microphone was disconnected.' }); } });

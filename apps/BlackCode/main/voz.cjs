@@ -35,7 +35,7 @@ const MOTORES = ['qwen', 'elevenlabs'];
 const esIdVoz11 = (t) => typeof t === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(t);
 const esModelo11 = (t) => typeof t === 'string' && /^[a-z0-9_.-]{1,64}$/.test(t);
 
-function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveElevenlabs = () => null }) {
+function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveElevenlabs = () => null, alConversacion = () => {} }) {
   const electron = require('electron');
   const MODELOS_HABLA = require('./habla.cjs').MODELOS;
   const elevenlabs = require('./elevenlabs.cjs');
@@ -214,7 +214,8 @@ function wire(rad, { taller, cifrar, descifrar, agentes, simulada = null, llaveE
       // (`conversacion`: la interfaz avisa con `voz:micro-listo` cuando la respuesta termina de sonar)
       rad.send('voz:frase', { n: ++cuenta, texto: f.texto, agente: c.agente, actua: c.actua, tardo: f.ms, conversacion: true });
     },
-    alCambiar: () => avisar(),
+    // (abierta o cerrada la conversación, también lo sabe la bandeja: el punto rojo, main.cjs)
+    alCambiar: (e) => { avisar(); try { alConversacion(e?.conversacion === true); } catch { /* la bandeja no frena esto */ } },
   });
   // El atajo es global, como Ctrl+Alt+B: anda con la app en la bandeja. En el
   // humo no se registra (no se le roba el atajo a Fran mientras usa la PC).

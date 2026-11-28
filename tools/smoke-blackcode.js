@@ -4975,6 +4975,17 @@ else {
   {
     const datosM = await import('/datos.js');
     const microM = await import('/micro.js');
+    const senales = await import('/senales.js');
+    const islaEl = () => document.querySelector('.rad-overlays .dm-isla');
+    // la opacidad de la isla cuadro por cuadro mientras pasa `accion` (entrar o irse)
+    const muestrearIsla = async (accion, ms) => {
+      const vistos = [];
+      const t0 = performance.now();
+      const corre = accion();
+      while (performance.now() - t0 < ms) { const el = islaEl(); vistos.push(el ? op(el) : -1); await frame(); }
+      await corre;
+      return vistos;
+    };
     const sim = (que = {}) => window.rad.invoke('voz:simular', que);
     const msim = (que = {}) => window.rad.invoke('voz:micro-simular', que);
     const estadoV = () => window.rad.invoke('voz:estado');
@@ -5024,15 +5035,42 @@ else {
     await sleep(200);
     if ((await delChat()).length || (await fase()).conversacion) fail('micro: sin la palabra clave tomó una frase');
     if (!((await sim({})).palabra.bytes > 0)) fail('micro: el audio no le llega al detector de la palabra');
-    // La palabra abre la conversación: se ve en la tarjeta y en la barra.
-    await msim({ que: 'oir' });
+    // La palabra abre la conversación: se ve en la tarjeta y en la isla (la
+    // barra sigue con lo de siempre), suena «se abre» y la bandeja lleva el
+    // punto rojo. La isla entra fundiéndose, sin aparecer de golpe.
+    const sen0 = senales.medidasSenales();
+    if (sen0.isla || islaEl()) fail('micro: hay una isla con la conversación cerrada: ' + JSON.stringify(sen0.isla));
+    if (!/^tray(-dark)?\.ico$/.test(await window.rad.invoke('bandeja:icono'))) fail('micro: con la conversación cerrada la bandeja ya tiene el punto: ' + (await window.rad.invoke('bandeja:icono')));
+    const entrada = await muestrearIsla(() => msim({ que: 'oir' }), dur('base') + 260);
     await until(() => tarjetaV.dataset.conversacion === 'listening', 2000);
     await settle();
-    if (!dice('voz-micro').includes('In a conversation: listening') || statusRight() !== 'Listening…') fail('micro: abierta la conversación no se dice: tarjeta «' + dice('voz-micro') + '», barra «' + statusRight() + '»');
+    {
+      const m = senales.medidasSenales();
+      if (!dice('voz-micro').includes('In a conversation: listening') || statusRight() === 'Listening…') fail('micro: abierta la conversación no se dice en la tarjeta, o la barra repite lo de la isla: tarjeta «' + dice('voz-micro') + '», barra «' + statusRight() + '»');
+      if (m.abre !== sen0.abre + 1 || m.cierra !== sen0.cierra) fail('micro: abrir la conversación no sonó «se abre» una vez: ' + JSON.stringify({ antes: sen0, ahora: m }));
+      if (m.sonados !== sen0.sonados) fail('micro: en el humo sonó de verdad una señal (tiene que contarse, no sonar)');
+      if (!m.isla?.visible || m.isla.fase !== 'listening' || m.isla.texto !== 'Listening') fail('micro: abierta la conversación no se ve la isla escuchando: ' + JSON.stringify(m.isla));
+      const medios = entrada.filter((o) => o > 0.05 && o < 0.95);
+      if (medios.length < 2 || r2(entrada.at(-1)) !== 1 || entrada.some((o, i) => i && entrada[i - 1] >= 0 && o < entrada[i - 1] - 0.01)) fail('micro: la isla no entra fundiéndose de a poco: ' + JSON.stringify(entrada.map(r2)));
+      const el = islaEl();
+      const r = el.getBoundingClientRect();
+      const tb = document.querySelector('.rad-titlebar').getBoundingClientRect();
+      // en el medio de la titlebar, entre las pestañas y los botones de la ventana, sin tocar a ninguno
+      const tabs = document.querySelector('.rad-tabs')?.getBoundingClientRect();
+      const botones = [...document.querySelectorAll('.rad-winbtn')].map((x) => x.getBoundingClientRect().left);
+      if (Math.abs((r.left + r.right) / 2 - innerWidth / 2) > 1.5 || r.top < tb.top || r.bottom > tb.bottom || (tabs && r.left < tabs.right) || r.right > Math.min(...botones) || getComputedStyle(el).zIndex !== '-1' || getComputedStyle(el).pointerEvents !== 'none') fail('micro: la isla no está en el medio de la titlebar, debajo de lo demás de la capa y sin tocarse: ' + JSON.stringify({ r: [r.left, r.top, r.right, r.bottom], ancho: innerWidth, tb: [tb.top, tb.bottom], tabs: tabs?.right, botones: Math.min(...botones), z: getComputedStyle(el).zIndex }));
+      // los cuatro textos ocupan la misma celda: la pastilla no cambia de ancho en el relevo
+      const textos = [...el.querySelectorAll('.dm-isla-texto')];
+      if (textos.length !== 4 || textos.filter((t) => op(t) > 0.5).length !== 1 || new Set(textos.map((t) => Math.round(t.getBoundingClientRect().left))).size !== 1) fail('micro: los textos de la isla no están en la misma celda o se ve más de uno');
+      if (!/-rec\.ico$/.test(await window.rad.invoke('bandeja:icono'))) fail('micro: abierta la conversación, la bandeja no tiene el punto rojo: ' + (await window.rad.invoke('bandeja:icono')));
+    }
     // Una frase: va al chat de voz sin la palabra clave, y la respuesta se dice.
     const dichosAntes = (await sim({})).voz.dichos.length;
     await msim({ que: 'hablar', texto: 'Okay Zac, what time is it?' });
     await until(async () => (await delChat()).includes('what time is it?'), 4000);
+    // mientras se espera la respuesta la isla sigue, sin volver a sonar, y dice que piensa o que habla
+    await until(() => ['thinking', 'speaking'].includes(senales.medidasSenales().isla?.fase), 4000);
+    if (!['Thinking', 'Speaking'].includes(senales.medidasSenales().isla?.texto) || senales.medidasSenales().abre !== sen0.abre + 1) fail('micro: esperando la respuesta, la isla no dice que piensa o habla, o volvió a sonar: ' + JSON.stringify(senales.medidasSenales()));
     if (!(await delChat()).includes('what time is it?')) fail('micro: la frase no llegó al chat de voz sin la palabra clave: ' + JSON.stringify(await delChat()));
     // …mientras contesta (y mientras suena), no toma frases; después vuelve a escuchar SOLO.
     await until(async () => (await fase()).fase === 'listening', 15000);
@@ -5041,6 +5079,11 @@ else {
       if ((await fase()).fase !== 'listening' || !(await fase()).conversacion) fail('micro: después de la respuesta no volvió a escuchar solo: ' + JSON.stringify(await fase()));
       if (s.voz.dichos.length !== dichosAntes + 1) fail('micro: la respuesta de la conversación no se dijo en voz alta (' + (s.voz.dichos.length - dichosAntes) + ')');
       if (s.voz.hablando) fail('micro: volvió a escuchar mientras la respuesta todavía sonaba');
+      // volver a escuchar después de la respuesta no suena (molestaría en una charla larga)
+      const m = senales.medidasSenales();
+      if (m.abre !== sen0.abre + 1 || m.cierra !== sen0.cierra) fail('micro: volver a escuchar después de la respuesta hizo sonar una señal: ' + JSON.stringify(m));
+      await until(() => senales.medidasSenales().isla?.texto === 'Listening', 2000);
+      if (senales.medidasSenales().isla?.texto !== 'Listening') fail('micro: después de la respuesta la isla no volvió a decir Listening: ' + JSON.stringify(senales.medidasSenales().isla));
     }
     // La segunda, sin palabra.
     await msim({ que: 'hablar', texto: 'and tomorrow?' });
@@ -5049,9 +5092,16 @@ else {
     await until(async () => (await fase()).fase === 'listening', 15000);
     // «gracias, zac» la cierra, sin llegarle al agente.
     const nAntes = (await delChat()).length;
-    await msim({ que: 'hablar', texto: 'Gracias, Zac.' });
-    await until(async () => !(await fase()).conversacion, 4000);
+    const salida = await muestrearIsla(async () => { await msim({ que: 'hablar', texto: 'Gracias, Zac.' }); await until(async () => !(await fase()).conversacion, 4000); }, dur('base') + 600);
     await settle();
+    {
+      // suena «se cierra», la isla se va fundiéndose y sale del documento, y la bandeja pierde el punto
+      const m = senales.medidasSenales();
+      if (m.cierra !== sen0.cierra + 1 || m.abre !== sen0.abre + 1) fail('micro: «gracias, zac» no sonó «se cierra» una vez: ' + JSON.stringify(m));
+      const medios = salida.filter((o) => o > 0.05 && o < 0.95);
+      if (medios.length < 2 || islaEl() || m.isla) fail('micro: la isla no se fue fundiéndose, o quedó en el documento: ' + JSON.stringify({ vistos: salida.map(r2), isla: m.isla }));
+      if ((await window.rad.invoke('bandeja:icono')).includes('-rec')) fail('micro: cerrada la conversación, la bandeja sigue con el punto rojo');
+    }
     if ((await fase()).conversacion || (await fase()).cierre !== 'phrase' || (await delChat()).length !== nAntes) fail('micro: «gracias, zac» no cerró la conversación, o le llegó al agente: ' + JSON.stringify(await fase()));
     if (!shown(tarjetaV.querySelector('[data-estado="voz-micro-ultima"]')).includes('you said “gracias, Zac”') || statusRight() === 'Listening…') fail('micro: cerrada, la tarjeta no dice cómo terminó o la barra sigue escuchando: «' + shown(tarjetaV.querySelector('[data-estado="voz-micro-ultima"]')) + '»');
     // El atajo la abre y la vuelve a cerrar.
@@ -5059,6 +5109,9 @@ else {
     if ((await fase()).fase !== 'listening') fail('micro: el atajo no abrió la conversación');
     await window.rad.invoke('voz:micro-alternar');
     if ((await fase()).conversacion || (await fase()).cierre !== 'shortcut') fail('micro: el atajo otra vez no la cerró: ' + JSON.stringify(await fase()));
+    // el atajo también suena al abrir y al cerrar
+    await until(() => senales.medidasSenales().cierra === sen0.cierra + 2, 2000);
+    if (senales.medidasSenales().abre !== sen0.abre + 2 || senales.medidasSenales().cierra !== sen0.cierra + 2) fail('micro: abrir y cerrar con el atajo no sonó: ' + JSON.stringify(senales.medidasSenales()));
     // Volver al Echo: se reconecta, y lo del micrófono se apaga (para la pasada 2, que espera el Echo).
     campoV('voz-fuente').click();
     await until(() => menus().length === 1, 2000);
@@ -5073,7 +5126,7 @@ else {
     }
     await window.rad.invoke('voz:guardar', { palabra: '' });
     await go('chat');
-    data.micro = 'se elige en lugar del Echo (lo desconecta), sin abrir el micrófono de verdad; sin palabra no toma nada; la palabra abre la conversación, la frase va sin ella, vuelve a escuchar sola cuando la respuesta terminó de sonar, la segunda sin palabra, «gracias, zac» la cierra sin llegarle al agente, el atajo la abre y la cierra, y volver al Echo lo reconecta';
+    data.micro = 'se elige en lugar del Echo (lo desconecta), sin abrir el micrófono de verdad; sin palabra no toma nada; la palabra abre la conversación (suena «se abre», entra la isla fundiéndose y la bandeja lleva el punto rojo), la frase va sin ella, vuelve a escuchar sola cuando la respuesta terminó de sonar, la segunda sin palabra, «gracias, zac» la cierra sin llegarle al agente, el atajo la abre y la cierra, y volver al Echo lo reconecta';
   }
 
   // 11v. Fijar chats. Un chat fijado sube al grupo «Pinned», arriba de todo; los

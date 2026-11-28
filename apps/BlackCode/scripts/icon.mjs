@@ -140,6 +140,16 @@ const TRAY_SIZES = [16, 20, 24, 32, 40, 48, 64];
 // (el metal de arriba hacia abajo, a lo alto del lienzo entero)
 const TRAY_CLARO = { tinta: gradientStops(METAL, [0, -0.5], [0, 0.5]), nucleo: liso('#ffffff') };
 const TRAY_OSCURO = { tinta: liso('#141414'), nucleo: liso('#141414') };
+// Mientras dura una conversación por el micrófono de la PC, el ícono lleva un
+// punto rojo de grabación abajo a la derecha (lo eligió Fran en su maqueta,
+// Documents\BlackCode-mockups\voz-senales.html, 28/11/2026). El dibujo va
+// entero; alrededor del punto, un aro transparente lo separa de la punta que
+// pisa, sobre la barra que sea. El rojo es el de peligro de la piel mono, uno
+// más hondo para la barra clara.
+const REC = { radio: 0.121, aro: 0.166, centro: 0.354 };
+const conRec = (v, rojo) => ({ ...v, rec: liso(rojo) });
+const TRAY_CLARO_REC = conRec(TRAY_CLARO, '#ef4f58');
+const TRAY_OSCURO_REC = conRec(TRAY_OSCURO, '#e03a44');
 const trayGlyph = (size, v) => () => {
   const px = 1 / size;
   // Las proporciones del ícono común, llevadas a que el dibujo llene el lienzo;
@@ -160,6 +170,11 @@ const trayGlyph = (size, v) => () => {
     ...p.map((a) => ({ color: v.tinta, sd: (x, y) => sdCircle(x - a[0], y - a[1], nodo) })),
     // el núcleo
     { color: v.nucleo, sd: (x, y) => sdCircle(x, y, nucleo) },
+    // el punto de grabación, con su aro que borra (sin piso: a 16 px ya mide casi 2 de radio)
+    ...(v.rec ? [
+      { erase: true, sd: (x, y) => sdCircle(x - REC.centro, y - REC.centro, REC.aro) },
+      { color: v.rec, sd: (x, y) => sdCircle(x - REC.centro, y - REC.centro, REC.radio) },
+    ] : []),
   ];
 };
 const drawTray = (size, v) => rasterizeBare(size, trayGlyph(size, v));
@@ -180,6 +195,8 @@ if (hoja > 0) {
   fs.writeFileSync(path.join(out, 'icon.ico'), encodeICO(ICO_SIZES.map((size) => ({ size, rgba: draw(size) }))));
   fs.writeFileSync(path.join(out, 'tray.ico'), encodeICO(TRAY_SIZES.map((size) => ({ size, rgba: drawTray(size, TRAY_CLARO) }))));
   fs.writeFileSync(path.join(out, 'tray-dark.ico'), encodeICO(TRAY_SIZES.map((size) => ({ size, rgba: drawTray(size, TRAY_OSCURO) }))));
+  fs.writeFileSync(path.join(out, 'tray-rec.ico'), encodeICO(TRAY_SIZES.map((size) => ({ size, rgba: drawTray(size, TRAY_CLARO_REC) }))));
+  fs.writeFileSync(path.join(out, 'tray-dark-rec.ico'), encodeICO(TRAY_SIZES.map((size) => ({ size, rgba: drawTray(size, TRAY_OSCURO_REC) }))));
   // La marca de la pantalla de inicio: el mismo dibujo sin baldosa de la
   // bandeja (el claro), grande. Se ve a 92 px; va a 368 para que quede nítida
   // con la pantalla al 200 % y más.
@@ -188,6 +205,8 @@ if (hoja > 0) {
   if (process.argv.includes('--sueltos')) {
     for (const size of [16, 24, 32, 48, 64, 256]) fs.writeFileSync(path.join(out, `icon-${size}.png`), encodePNG(size, draw(size)));
     for (const size of [16, 24, 32]) fs.writeFileSync(path.join(out, `tray-${size}.png`), encodePNG(size, drawTray(size, TRAY_CLARO)));
+    for (const size of [16, 24, 32]) fs.writeFileSync(path.join(out, `tray-rec-${size}.png`), encodePNG(size, drawTray(size, TRAY_CLARO_REC)));
+    for (const size of [16, 24, 32]) fs.writeFileSync(path.join(out, `tray-dark-rec-${size}.png`), encodePNG(size, drawTray(size, TRAY_OSCURO_REC)));
   }
-  console.log(`ícono: build/icon.png (1024) y build/icon.ico (${ICO_SIZES.join(', ')}), variante ${VARIANTE}; bandeja: build/tray.ico y build/tray-dark.ico (${TRAY_SIZES.join(', ')})`);
+  console.log(`ícono: build/icon.png (1024) y build/icon.ico (${ICO_SIZES.join(', ')}), variante ${VARIANTE}; bandeja: build/tray.ico, tray-dark.ico y sus -rec (${TRAY_SIZES.join(', ')})`);
 }

@@ -43,6 +43,8 @@ export const ICONOS = {
   // La voz: la onda de Verba (las cinco barras de su marca, con las mismas
   // proporciones), en el trazo de acá. No es `canal`, que es el de los chats
   // que entran solos.
+  // el micrófono de la isla de la conversación por voz (renderer/senales.js)
+  micro: svg('<rect x="6" y="2" width="4" height="7.5" rx="2"/><path d="M3.8 7.5a4.2 4.2 0 0 0 8.4 0M8 11.7V14"/>'),
   onda: svg('<path d="M3 6.5v3M5.5 4.6v6.8M8 3v10M10.5 5.2v5.6M13 6.5v3"/>'),
   info: svg('<circle cx="8" cy="8" r="5.5"/><path d="M8 7.5V11"/><circle cx="8" cy="5.2" r=".6" fill="currentColor" stroke="none"/>'),
   mas: svg('<path d="M8 3v10M3 8h10"/>'),

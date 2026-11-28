@@ -129,6 +129,8 @@ const tileLayer = (tile) => ({ color: tile, sd: (x, y) => sdRoundRect(x, y, 0.5,
  * es [r,g,b] o una función (x, y) => [r,g,b] (un degradé). Una capa puede
  * llevar `alpha` (0 a 1): cuánto tapa donde está entera. Sin baldosa detrás no
  * hay contra qué aclarar una línea tenue, así que se la deja ver a través.
+ * Una capa con `erase: true` no pinta: borra lo que haya abajo (el aro
+ * transparente alrededor del punto rojo de la bandeja de BlackCode).
  */
 function sample(size, stack) {
   const out = new Float32Array(size * size * 4);
@@ -146,6 +148,8 @@ function sample(size, stack) {
           for (const layer of stack) {
             const cov = Math.min(1, Math.max(0, 0.5 - layer.sd(x, y) / (px / SS))) * (layer.alpha ?? 1);
             if (!cov) continue;
+            // una capa que borra (`erase`): saca lo de abajo, deja transparente
+            if (layer.erase) { cr *= 1 - cov; cg *= 1 - cov; cb *= 1 - cov; ca *= 1 - cov; continue; }
             const col = typeof layer.color === 'function' ? layer.color(x, y) : layer.color;
             cr = col[0] * cov + cr * (1 - cov);
             cg = col[1] * cov + cg * (1 - cov);

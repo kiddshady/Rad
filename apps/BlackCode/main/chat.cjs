@@ -130,7 +130,7 @@ function limpiar(pedido) {
   };
 }
 
-function wire(rad, { llave }) {
+function wire(rad, { llave, alConversacion }) {
   const activos = new Map(); // id del pedido -> AbortController
 
   // ---------- Las tools ----------
@@ -311,7 +311,7 @@ function wire(rad, { llave }) {
   // guion los maneja por `voz:simular`.
   const ecoDeMentira = taller ? require('./eco-simulado.cjs').paraElHumo() : null;
   // (la respuesta hablada puede ir con ElevenLabs: su llave es la de Settings › Providers)
-  const voz = require('./voz.cjs').wire(rad, { taller, cifrar, descifrar, agentes: losAgentes, simulada: ecoDeMentira, llaveElevenlabs: () => llave.leer(rad.store, 'elevenlabs') });
+  const voz = require('./voz.cjs').wire(rad, { taller, cifrar, descifrar, agentes: losAgentes, simulada: ecoDeMentira, llaveElevenlabs: () => llave.leer(rad.store, 'elevenlabs'), alConversacion });
   // ---------- Telegram ----------
   // Hablarle a un agente desde Telegram, con un bot propio: este proceso lee
   // los mensajes del bot y le pasa a la interfaz los del dueño, como la voz.

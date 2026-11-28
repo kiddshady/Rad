@@ -348,18 +348,25 @@ ok('cada cuánto, en palabras', T.describir({ kind: 'daily', a: '09:00' }) === '
   salida = '    SystemUsesLightTheme    REG_DWORD    0x1';
   ok('con la barra clara va el dibujo oscuro, y se avisa', await b.mirar() === true && path.basename(b.icono()) === 'tray-dark.ico' && cambios === 1);
   ok('…y vuelve cuando vuelve', (salida = 'x', await b.mirar() === true && path.basename(b.icono()) === 'tray.ico' && cambios === 2));
+  // la conversación por el micrófono de la PC pone el punto rojo, sobre la barra que sea
+  ok('abierta la conversación, el punto rojo, y se avisa', b.grabando(true) === true && path.basename(b.icono()) === 'tray-rec.ico' && cambios === 3);
+  ok('…otra vez abierta no cambia nada', b.grabando(true) === false && cambios === 3);
+  salida = '    SystemUsesLightTheme    REG_DWORD    0x1';
+  ok('…con la barra clara, el oscuro con el punto', await b.mirar() === true && path.basename(b.icono()) === 'tray-dark-rec.ico');
+  ok('…y al cerrarse vuelve al de siempre', b.grabando(false) === true && path.basename(b.icono()) === 'tray-dark.ico' && b.grabando(undefined) === false);
   // los archivos del ícono: existen, son .ico, y viajan en el paquete
   const build = path.join(APP, 'build');
   const ico = (f) => { const buf = fs.readFileSync(path.join(build, f)); return { tipo: buf.readUInt16LE(2), n: buf.readUInt16LE(4), primero: buf[6] }; };
-  ok('los dos íconos de bandeja están horneados, con sus tamaños', ico('tray.ico').tipo === 1 && ico('tray.ico').n === 7 && ico('tray.ico').primero === 16 && ico('tray-dark.ico').n === 7);
-  ok('…y no son el mismo archivo', !fs.readFileSync(path.join(build, 'tray.ico')).equals(fs.readFileSync(path.join(build, 'tray-dark.ico'))));
+  ok('los cuatro íconos de bandeja están horneados, con sus tamaños', ['tray.ico', 'tray-dark.ico', 'tray-rec.ico', 'tray-dark-rec.ico'].every((f) => ico(f).tipo === 1 && ico(f).n === 7 && ico(f).primero === 16));
+  ok('…y no son el mismo archivo', new Set(['tray.ico', 'tray-dark.ico', 'tray-rec.ico', 'tray-dark-rec.ico'].map((f) => fs.readFileSync(path.join(build, f)).toString('base64'))).size === 4);
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
-  ok('…y viajan en la app empaquetada', pkg.build.files.includes('build/tray.ico') && pkg.build.files.includes('build/tray-dark.ico'));
+  ok('…y viajan en la app empaquetada', ['tray.ico', 'tray-dark.ico', 'tray-rec.ico', 'tray-dark-rec.ico'].every((f) => pkg.build.files.includes(`build/${f}`)));
   // (desde la 1.3.0 el de la bandeja es el dibujo ENTERO del ícono común —contorno, rayos, agentes y núcleo—, sin la baldosa)
   {
     const horno = fs.readFileSync(path.join(APP, 'scripts', 'icon.mjs'), 'utf8');
     const deBandeja = horno.slice(horno.indexOf('const trayGlyph'), horno.indexOf('const drawTray'));
-    ok('el ícono de la bandeja lleva el dibujo entero: contorno, rayos, agentes y núcleo', deBandeja.includes('alpha: CONTORNO') && deBandeja.includes('alpha: RAYOS') && (deBandeja.match(/sdSegment/g) ?? []).length === 2 && (deBandeja.match(/sdCircle/g) ?? []).length === 2);
+    ok('el ícono de la bandeja lleva el dibujo entero: contorno, rayos, agentes y núcleo', deBandeja.includes('alpha: CONTORNO') && deBandeja.includes('alpha: RAYOS') && (deBandeja.match(/sdSegment/g) ?? []).length === 2 && (deBandeja.match(/sdCircle/g) ?? []).length === 4);
+    ok('…y el punto de grabación borra un aro a su alrededor, sin tapar el dibujo', deBandeja.includes('erase: true') && deBandeja.includes('v.rec ?'));
     ok('…y sigue sin baldosa', horno.includes('const drawTray = (size, v) => rasterizeBare(size, trayGlyph(size, v));'));
     // el archivo horneado: de un agente al núcleo hay tinta todo el camino (el rayo), y la esquina sigue vacía
     const crudo = fs.readFileSync(path.join(build, 'tray.ico'));

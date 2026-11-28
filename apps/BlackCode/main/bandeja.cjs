@@ -36,11 +36,17 @@ function barraClara({ correr = execFile, plataforma = process.platform } = {}) {
  * El ícono de la bandeja de la app.
  *   dir          la carpeta `build` de la app
  *   alCambiar()  el ícono cambió (hay que pedirle al núcleo que lo relea)
- * Devuelve { icono(), mirar(), clara() }.
+ * Devuelve { icono(), mirar(), clara(), grabando(si) }.
+ *
+ * Mientras dura una conversación por el micrófono de la PC, el ícono lleva un
+ * punto rojo de grabación (tray-rec.ico / tray-dark-rec.ico, de
+ * scripts/icon.mjs): con BlackCode escondida en la bandeja, así se sabe que
+ * está escuchando. Lo eligió Fran el 28/11/2026.
  */
 function crear({ dir, alCambiar = () => {}, correr, plataforma } = {}) {
   let clara = false;
-  const icono = () => path.join(dir, clara ? 'tray-dark.ico' : 'tray.ico');
+  let rec = false;
+  const icono = () => path.join(dir, `${clara ? 'tray-dark' : 'tray'}${rec ? '-rec' : ''}.ico`);
   async function mirar() {
     const ahora = await barraClara({ correr, plataforma });
     if (ahora === clara) return false;
@@ -48,7 +54,15 @@ function crear({ dir, alCambiar = () => {}, correr, plataforma } = {}) {
     try { alCambiar(); } catch { /* quien escucha no tumba esto */ }
     return true;
   }
-  return { icono, mirar, clara: () => clara };
+  /** La conversación se abrió o se cerró. Devuelve si cambió el ícono. */
+  function grabando(si) {
+    const ahora = si === true;
+    if (ahora === rec) return false;
+    rec = ahora;
+    try { alCambiar(); } catch { /* quien escucha no tumba esto */ }
+    return true;
+  }
+  return { icono, mirar, clara: () => clara, grabando };
 }
 
 module.exports = { crear, temaDe, barraClara };
