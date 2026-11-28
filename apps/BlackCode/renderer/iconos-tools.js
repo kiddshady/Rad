@@ -19,7 +19,11 @@
 import { h, icono } from './piezas.js';
 
 const PATHS = {
-  import: "M3 12h14M13 8l4 4-4 4M21 4v16",
+  // fetch: el eslabón de la cadena en diagonal (el `link` de Feather). Fran lo
+  // eligió en su maqueta el 28/11/2026 (Documents\BlackCode-mockups\
+  // fetch-iconos.html): la flecha contra la barra de NeonCode se leía como Tab,
+  // no como «traer una URL».
+  cadena: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71",
   globe: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z",
   clock: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20M12 6v6l4 2",
   terminal: "M4 17l6-5-6-5M12 19h8",
@@ -62,7 +66,7 @@ const DE_TOOL = {
   shell_exec: 'terminal', cmd_exec: 'terminal',
   job_start: 'terminal', job_output: 'terminal', job_kill: 'terminal',
   run_code: 'code', db_query: 'db', sqlite_query: 'drive',
-  fetch: 'import', http_request: 'exchange',
+  fetch: 'cadena', http_request: 'exchange',
   os_open: 'external', screen_capture: 'eye',
   browser_navigate: 'globe', browser_read: 'globe', browser_click: 'globe',
   browser_type: 'globe', browser_press: 'globe', browser_upload: 'globe',

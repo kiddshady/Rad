@@ -1,5 +1,19 @@
 # Changelog
 
+## BlackCode 1.24.1 (2026-11-28)
+
+- **Una negrita de un solo carácter se comía hasta la siguiente.** Fran lo
+  vio varias veces en Zac: «la **2** o la **3**» salía «la <b>2** o la
+  **3</b>», y parecía una manía del modelo. Era el markdown: en la regex de
+  `**`, `__` y `~~` el resto opcional iba con `?` (codicioso), y ante un
+  solo carácter prefería estirarse hasta el próximo cierre. Ahora va con
+  `??`. El celu usa el mismo `markdown.js`: le llega en su próxima
+  compilación. Telegram no tenía el problema (su regex no deja pasar
+  asteriscos adentro). El humo lo prueba con negrita, tachado y `__`.
+- **El ícono de `fetch` es el eslabón de la cadena** en diagonal (el `link`
+  de Feather), elegido por Fran en su maqueta: la flecha contra la barra de
+  NeonCode se leía como Tab, no como «traer una URL».
+
 ## BlackCode 1.24.0 (2026-11-28)
 
 Hablarle a un agente con un micrófono de la PC, en modo conversación

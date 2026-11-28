@@ -689,6 +689,15 @@ else {
       if (bloques('a | b\nc | d').map((x) => x.tipo).join() !== 'parrafo' || bloques('one line\nanother line').length !== 1) fail('markdown: un párrafo con barras se partió sin ser una tabla');
       // (mientras llega: el renglón de los títulos solo, todavía sin sus guiones, es texto)
       if (bloques('**Theory**\n| Unit | Size |').map((x) => x.tipo).join() !== 'parrafo') fail('markdown: un renglón con barras, sin los guiones todavía, se tomó como tabla');
+      // Una negrita de UN carácter con otra más adelante (Zac: «la **2** o la
+      // **3**» salía «la <b>2** o la **3</b>», 28/11/2026): cada una la suya.
+      {
+        const c = document.createElement('div');
+        pintar(c, 'I would pick **2** or **3**, and ~~a~~ or ~~b~~, __x__ or __y__.');
+        const negritas = [...c.querySelectorAll('strong')].map((x) => x.textContent).join();
+        const tachados = [...c.querySelectorAll('del')].map((x) => x.textContent).join();
+        if (negritas !== '2,3,x,y' || tachados !== 'a,b' || c.textContent.includes('*') || c.textContent.includes('~') || c.textContent.includes('_')) fail('markdown: una negrita de un carácter se come hasta la siguiente: «' + c.innerHTML.slice(0, 200) + '»');
+      }
     }
     data.markdown = `título, negrita, ${md.querySelectorAll('ul > li').length} items, código ${has('.dm-codigo-lang').textContent}, tabla de ${md.querySelectorAll('.dm-tabla tbody tr').length} filas`;
   }
