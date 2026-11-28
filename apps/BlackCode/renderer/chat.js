@@ -894,9 +894,11 @@ export function montarChat(el, { router }) {
   area.addEventListener('input', () => { ajustarAlto(); ponerRedactor(); });
 
   nuevo.addEventListener('click', () => {
-    // Si el chat abierto todavía está vacío, ese ya es el chat nuevo.
+    // Abre un borrador: no entra a la lista hasta que se manda el primer
+    // mensaje, y si se sale sin mandar nada se descarta (datos.js). Si lo
+    // abierto ya es un borrador, ese ya es el chat nuevo.
     const c = datos.chatActual();
-    if (!c || c.cuenta > 0) datos.crearChat(datos.agenteActual().id);
+    if (!datos.esBorrador(c)) datos.crearChat(datos.agenteActual().id);
     area.focus();
   });
 

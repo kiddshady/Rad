@@ -1,5 +1,26 @@
 # Changelog
 
+## BlackCode 1.23.0 (2026-11-27)
+
+«New chat» ya no llena la lista de chats vacíos (pedido de Fran, con un
+video: cada vez que tocaba «New chat» desde otro chat quedaba un «New chat»
+más en la columna, aunque no mandara nada).
+
+- **«New chat» abre un borrador**: la conversación en blanco con el campo
+  para escribir, pero sin fila en la lista. El chat entra a la lista, elegido,
+  recién con el primer mensaje. Tocar «New chat» estando en un borrador no
+  abre otro.
+- **Salir de un borrador sin mandar nada lo descarta**, de la lista y del
+  disco. El de otro agente queda guardado sin verse: al volver a ese agente,
+  sigue ahí. Al abrir la app se van los que quedaron de la sesión anterior y
+  los «New chat» vacíos de antes. Antes de borrar uno, se mira su documento:
+  si tiene mensajes, no se borra (se le corrige la cuenta).
+- Un chat de canal (voz, Telegram) nunca es borrador. El celu tampoco ve los
+  borradores en su lista.
+- El humo comprueba el borrador fuera de la lista, que entra con el primer
+  mensaje, que al salir se descarta (también su documento) y que «New chat»
+  no apila otro. Control nivel 2 verde (tests, dos pasadas del humo y modo real).
+
 ## BlackCode 1.22.1 (2026-11-27) · núcleo 0.21.4
 
 Dos fantasmas al pasar entre Notes y Memory, que Fran grabó en video y

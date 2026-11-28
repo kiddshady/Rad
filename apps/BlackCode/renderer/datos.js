@@ -75,6 +75,9 @@ export async function abrir() {
   // sin ningún chat elegido, de ningún agente. El agente sí se recuerda. De
   // ahí en más, en la sesión, cada agente recuerda el chat que se le abrió.
   if (Object.keys(ui.get().chats ?? {}).length) ui.update((v) => { v.chats = {}; return v; });
+  // Los borradores que quedaron de la sesión anterior (y los «New chat» vacíos
+  // de antes de que existieran) se van: ya no hay ninguno abierto.
+  await Promise.all(chats.get().lista.filter(esBorrador).map((c) => descartarBorrador(c.id)));
   fondoDoc = await openDoc('fondo', { bandeja: true });
   {
     const v = await window.rad.invoke('voz:estado').catch(() => null);
@@ -432,9 +435,34 @@ export function elegirAgente(id) {
 }
 
 // ---------- Chats ----------
+// «New chat» abre un BORRADOR (Fran, 27/11/2026): un chat sin mensajes que
+// no figura en ninguna lista hasta que se manda el primero. Si se sale de él
+// sin mandar nada, se descarta: no quedan «New chat» vacíos colgando. Los de
+// canal (voz, Telegram) no son borradores: nacen para recibir lo que llega.
 export const chat = (id) => chats.get().lista.find((c) => c.id === id) ?? null;
-/** Los chats de un agente, el último que se tocó primero. */
-export const chatsDe = (agenteId) => chats.get().lista.filter((c) => c.agente === agenteId).sort((a, b) => b.tocado - a.tocado);
+const enviando = new Set(); // chats cuyo primer mensaje está saliendo (todavía con cuenta 0)
+/** ¿Es un borrador? Un chat de los de siempre que todavía no tiene mensajes. */
+export const esBorrador = (c) => Boolean(c) && !deCanal(c) && !(c.cuenta > 0) && !respuestas.has(c.id) && !enviando.has(c.id);
+/** Los chats de un agente que se ven, el último que se tocó primero (sin borradores). */
+export const chatsDe = (agenteId) => chats.get().lista.filter((c) => c.agente === agenteId && !esBorrador(c)).sort((a, b) => b.tocado - a.tocado);
+// Saca un borrador de la lista y del disco. Antes mira su documento: si por
+// lo que fuera tiene mensajes (su cuenta quedó vieja), no lo borra: le
+// corrige la cuenta y vuelve a la lista.
+async function descartarBorrador(id) {
+  const c = chat(id);
+  if (!esBorrador(c)) return;
+  const n = (await hilo(id)).get().mensajes.length;
+  if (!esBorrador(chat(id)) || ui.get().chats[c.agente] === id) return; // mientras miraba, se mandó algo o se volvió a él
+  if (n) {
+    chats.update((v) => { const x = v.lista.find((y) => y.id === id); if (x) x.cuenta = n; return v; });
+    avisar('chats');
+    return;
+  }
+  soltarChat(id);
+  chats.update((v) => { v.lista = v.lista.filter((x) => x.id !== id); return v; });
+  avisar('chats');
+  await removeDoc(`chat-${id}`);
+}
 export function chatActual() {
   const a = agenteActual();
   const c = chat(ui.get().chats[a.id]);
@@ -476,8 +504,12 @@ export function elegirChat(id) {
   if (!c) return;
   const v = ui.get();
   if (v.agente === c.agente && v.chats[c.agente] === id) return;
+  const antes = v.chats[c.agente];
   ui.update((u) => { u.agente = c.agente; u.chats[c.agente] = id; return u; });
   avisar('seleccion');
+  // (se dejó un borrador de ese agente sin mandar nada: se va. El de otro
+  // agente queda, sin verse en la lista: al volver a ese agente, sigue ahí)
+  if (antes && antes !== id) descartarBorrador(antes);
 }
 
 export function renombrarChat(id, titulo) {
@@ -630,8 +662,12 @@ export async function enviar(chatId, texto, adjuntos = null, { voz: dicho = fals
   const c = chat(chatId);
   if (!c || (!limpio && !imagenes.length && !archivos.length) || respuestas.has(chatId)) return false;
   const a = agente(c.agente);
-  const doc = await hilo(chatId);
-  if (respuestas.has(chatId) || !chat(chatId)) return false;
+  // (mientras se abre su documento, un borrador que está mandando su primer mensaje ya no se descarta)
+  // (hasta que el turno queda anotado en `respuestas`, más abajo)
+  enviando.add(chatId);
+  let doc;
+  try { doc = await hilo(chatId); } catch (err) { enviando.delete(chatId); throw err; }
+  if (respuestas.has(chatId) || !chat(chatId)) { enviando.delete(chatId); return false; }
 
   // Se cambia el valor vivo del documento (no una copia): la respuesta se va
   // escribiendo sobre este mismo objeto mientras llega.
@@ -662,6 +698,7 @@ export async function enviar(chatId, texto, adjuntos = null, { voz: dicho = fals
 
   const pedido = nuevoId();
   respuestas.set(chatId, { pedido, mensaje: suyo, doc, pensando: false, guardado: Date.now(), voz: dicho === true, telegram: Boolean(telegram) });
+  enviando.delete(chatId);
   porPedido.set(pedido, chatId);
   avisar('chats');
   avisar('mensajes', { chat: chatId });

@@ -506,11 +506,15 @@ chatView.querySelector('[data-accion="nuevo-chat"]').click();
   data.inicioRelevo = dice;
 }
 await settle();
-if (rows().length !== 1 || rows()[0].getAttribute('aria-current') !== 'true') fail(`después de «Nuevo chat» hay ${rows().length} filas (o la nueva no quedó elegida)`);
+// «New chat» abre un borrador (Fran, 27/11/2026): un chat elegido pero que
+// no figura en la lista hasta que se manda el primer mensaje.
+const datosB = await import('/datos.js');
+const chatId = datosB.chatActual()?.id;
+if (!chatId || !datosB.esBorrador(datosB.chatActual())) fail('«New chat» no dejó un borrador elegido');
+if (rows().length !== 0) fail(`«New chat» puso ${rows().length} filas en la lista antes de mandar nada (tiene que ser un borrador)`);
 chatView.querySelector('[data-accion="nuevo-chat"]').click();
 await settle();
-if (rows().length !== 1) fail('«Nuevo chat» apiló otro con el anterior todavía vacío');
-const chatId = rows()[0]?.dataset.radKey;
+if (datosB.chatActual()?.id !== chatId || rows().length !== 0) fail('«New chat» sobre un borrador abrió otro en vez de quedarse en el mismo');
 
 // 4. Mandar un mensaje. Shift+Enter no manda; Enter sí. La respuesta llega
 // de a poco: se mide el largo del texto cuadro por cuadro.
@@ -521,6 +525,9 @@ await frame();
 if (msgs().length) fail('Shift+Enter mandó el mensaje');
 key(area, 'Enter');
 await until(() => msgs().length === 2, 2000);
+// …y con el primer mensaje el borrador pasa a ser un chat: entra a la lista, elegido
+await until(() => rows().length === 1, 1000);
+if (rows().length !== 1 || rows()[0].dataset.radKey !== chatId || rows()[0].getAttribute('aria-current') !== 'true') fail(`al mandar el primer mensaje el chat no entró a la lista, elegido (hay ${rows().length} filas)`);
 const [mine, theirs] = msgs();
 if (!mine || !theirs) fail(`después de mandar hay ${msgs().length} mensajes`);
 else {
@@ -786,17 +793,34 @@ for (const t0 = performance.now(); performance.now() - t0 < dur('fast') + dur('b
 const both = Math.max(...relay.map((f) => Math.min(f.out, f.live)));
 if (both > 0.08) fail(`al cambiar de chat se vieron las dos conversaciones a la vez (las dos por encima de ${r2(both)})`);
 if (threads().length !== 1) fail(`después de cambiar de chat quedaron ${threads().length} conversaciones en el DOM`);
-if (rows().length !== 2 || rows()[0].getAttribute('aria-current') !== 'true') fail('el chat nuevo no quedó primero y elegido');
+// (es un borrador: en la lista sigue solo el de antes, y sin marcar)
+if (rows().length !== 1 || rows().some((r) => r.getAttribute('aria-current') === 'true')) fail('el borrador del chat nuevo apareció en la lista, o el de antes quedó marcado');
 if (msgs().length || !thread()?.querySelector('.dm-vacio')) fail('el chat nuevo no abrió vacío');
 data.relevo = relay.filter((_, i) => i % 2 === 0).map((f) => `${r2(f.out)}/${r2(f.live)}`).join(' ');
+// Salir del borrador sin mandar nada lo descarta: ni en la lista ni en el
+// disco. «New chat» otra vez abre uno nuevo, y tampoco se apila.
+{
+  const borrador = datosB.chatActual()?.id;
+  rows()[0].querySelector('.dm-fila-abrir').click();
+  await settle();
+  if (datosB.chatActual()?.id !== chatId) fail('borrador: tocar el chat de antes no lo abrió');
+  if (!(await until(() => !datosB.chat(borrador), 1500))) fail('borrador: al salir sin mandar nada, el chat vacío quedó guardado');
+  if (rows().length !== 1) fail(`borrador: al salir de él quedaron ${rows().length} filas`);
+  if (await window.rad.store.read(`chat-${borrador}`) !== undefined) fail('borrador: quedó su documento en el disco');
+  chatView.querySelector('[data-accion="nuevo-chat"]').click();
+  await settle();
+  if (!datosB.esBorrador(datosB.chatActual()) || datosB.chatActual().id === borrador || rows().length !== 1) fail('borrador: «New chat» después de descartar uno no abrió otro borrador limpio');
+  data.borrador = 'fuera de la lista hasta el primer mensaje; al salir sin mandar nada se descarta';
+}
 
 // 8. Borrarlo mientras contesta, desde su menú contextual: pide confirmar,
 // la fila se va, el documento se borra y vuelve a abrirse el otro chat.
-const doomed = rows()[0];
-const doomedId = doomed.dataset.radKey;
+const doomedId = datosB.chatActual().id;
 type(area, 'This chat is going to be deleted.');
 key(area, 'Enter');
 await until(() => msgs().length === 2 && msgs()[1].querySelector('.dm-msg-cuerpo').textContent.length > 40, 4000);
+const doomed = rows()[0];
+if (doomed?.dataset.radKey !== doomedId || doomed.getAttribute('aria-current') !== 'true') fail('el chat nuevo, ya con un mensaje, no quedó primero y elegido en la lista');
 const box = doomed.getBoundingClientRect();
 doomed.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: Math.round(box.left + 30), clientY: Math.round(box.top + 12) }));
 await frame();
@@ -2544,8 +2568,9 @@ else {
     const datosM = await import('/datos.js');
     datosM.ponerModoTools('auto');
     const agenteL = datosM.agenteActual();
-    const otro = datosM.crearChat(agenteL.id);
-    const largo = datosM.crearChat(agenteL.id);
+    // (sin elegirlos al crearlos: elegir uno nuevo descartaría al otro, vacío, como un borrador abandonado)
+    const otro = datosM.crearChat(agenteL.id, { elegir: false });
+    const largo = datosM.crearChat(agenteL.id, { elegir: false });
     const docL = await datosM.hilo(largo.id);
     const mensajesL = [];
     for (let i = 0; i < 120; i++) {
@@ -5788,7 +5813,16 @@ await go('ajustes', 'about');
     const a = datosM.agenteActual();
     const antes = datosM.chatsDe(a.id).map((c) => c.id);
     const abierto = datosM.chatActual()?.id ?? null;
-    const nuevos = ['Smoke búsqueda Química', 'Smoke búsqueda farmacia', 'Smoke otra cosa'].map((t) => { const c = datosM.crearChat(a.id, { elegir: false }); datosM.renombrarChat(c.id, t); return c.id; });
+    // (cada uno con un mensaje: sin ninguno, un chat es un borrador y no figura en la lista)
+    const nuevos = [];
+    for (const t of ['Smoke búsqueda Química', 'Smoke búsqueda farmacia', 'Smoke otra cosa']) {
+      const c = datosM.crearChat(a.id, { elegir: false });
+      datosM.renombrarChat(c.id, t);
+      if (alive(lado.querySelectorAll('.dm-fila')).some((f) => f.dataset.radKey === c.id)) fail('lista: un chat recién creado, sin mensajes, ya figura en la lista');
+      await datosM.enviar(c.id, 'Hello from the list test.');
+      nuevos.push(c.id);
+    }
+    await until(() => nuevos.every((id) => !datosM.respondiendo(id)), 8000);
     await settle();
     if ((datosM.chatActual()?.id ?? null) !== abierto) fail('lista: crear un chat sin elegirlo cambió el chat abierto');
 
